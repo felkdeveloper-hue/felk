@@ -1,0 +1,2 @@
+# Static assets (images, fonts, icons) live here.
+# Import via `import logo from '@/assets/logo.svg'` once assets are added.

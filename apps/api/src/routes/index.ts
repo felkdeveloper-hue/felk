@@ -1,0 +1,11 @@
+export { systemRouter } from './system.routes';
+export { authRouter } from './auth.routes';
+export { cmsRouter } from './cms/cms.routes';
+export { catalogRouter } from './catalog/catalog.routes';
+export { inventoryRouter } from './inventory/inventory.routes';
+export { customersRouter } from './customers/customers.routes';
+export { cartRouter } from './cart/cart.routes';
+export { checkoutRouter } from './checkout/checkout.routes';
+export { paymentsRouter } from './payments/payments.routes';
+export { ordersRouter } from './orders/orders.routes';
+export { v1Router } from './v1';

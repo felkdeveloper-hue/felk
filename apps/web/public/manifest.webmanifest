@@ -1,0 +1,18 @@
+{
+  "name": "FE Platform",
+  "short_name": "FE Platform",
+  "description": "Fashion eCommerce storefront",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fafafa",
+  "theme_color": "#171717",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+# FE Platform Web (production build served by nginx)
+FROM node:20-alpine AS base
+RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
+WORKDIR /app
+
+FROM base AS deps
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
+COPY packages ./packages
+COPY apps/web/package.json ./apps/web/
+RUN pnpm install --frozen-lockfile || pnpm install
+
+FROM base AS builder
+ARG VITE_API_URL
+ARG VITE_APP_NAME=FE Platform
+ARG VITE_SITE_URL
+ARG VITE_CDN_URL
+ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_APP_NAME=$VITE_APP_NAME
+ENV VITE_SITE_URL=$VITE_SITE_URL
+ENV VITE_CDN_URL=$VITE_CDN_URL
+ENV NODE_ENV=production
+COPY --from=deps /app ./
+COPY . .
+RUN pnpm --filter @fe-platform/types build \
+ && pnpm --filter @fe-platform/utils build \
+ && pnpm --filter @fe-platform/config build \
+ && pnpm --filter @fe-platform/web build
+
+FROM nginx:1.27-alpine AS runner
+COPY docker/nginx/security-headers.conf /etc/nginx/conf.d/security-headers.conf
+COPY docker/nginx/web.conf /etc/nginx/conf.d/default.conf
+COPY --from=builder /app/apps/web/dist /usr/share/nginx/html
+EXPOSE 80
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget -qO- http://127.0.0.1/ || exit 1
+
+CMD ["nginx", "-g", "daemon off;"]

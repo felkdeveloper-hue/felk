@@ -1,0 +1,9 @@
+export { AccountPage } from './account.page';
+export { AccountProfilePage } from './profile.page';
+export { AccountSecurityPage } from './security.page';
+export { AccountAddressesPage } from './addresses.page';
+export { AccountPreferencesPage } from './preferences.page';
+export { AccountOrdersPage } from './orders/list.page';
+export { AccountOrderDetailPage } from './orders/detail.page';
+export { AccountOrderInvoicePage } from './orders/invoice.page';
+export { AccountReturnsPage } from './returns.page';

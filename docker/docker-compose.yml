@@ -1,0 +1,107 @@
+services:
+  mongodb:
+    image: mongo:7
+    container_name: fe-platform-mongo
+    restart: unless-stopped
+    ports:
+      - '27017:27017'
+    volumes:
+      - mongo_data:/data/db
+    environment:
+      MONGO_INITDB_DATABASE: fe-platform
+    healthcheck:
+      test: ['CMD', 'mongosh', '--eval', "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  redis:
+    image: redis:7-alpine
+    container_name: fe-platform-redis
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+    container_name: fe-platform-api
+    restart: unless-stopped
+    ports:
+      - '4000:4000'
+    env_file:
+      - ../.env
+    environment:
+      MONGODB_URI: mongodb://mongodb:27017/fe-platform
+      REDIS_URL: redis://redis:6379
+      HOST: 0.0.0.0
+      SWAGGER_ENABLED: 'false'
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:4000/api/v1/health/ready']
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  web:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.web
+      args:
+        VITE_API_URL: http://localhost:4000/api/v1
+        VITE_APP_NAME: FE Platform
+        VITE_SITE_URL: http://localhost:5173
+    container_name: fe-platform-web
+    restart: unless-stopped
+    ports:
+      - '5173:80'
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1/']
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  admin:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.admin
+      args:
+        VITE_API_URL: http://localhost:4000/api/v1
+        VITE_APP_NAME: FE Platform Admin
+    container_name: fe-platform-admin
+    restart: unless-stopped
+    ports:
+      - '5174:80'
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1/']
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  mongo_data:
+  redis_data:

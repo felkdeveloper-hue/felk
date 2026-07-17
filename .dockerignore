@@ -1,0 +1,42 @@
+# Dependencies
+node_modules
+**/node_modules
+.pnpm-store
+
+# Build outputs
+dist
+.turbo
+**/.turbo
+**/dist
+coverage
+
+# Dev / local
+.env
+.env.local
+.env.*.local
+*.log
+logs
+
+# Git / IDE
+.git
+.github
+.vscode
+.cursor
+*.md
+!docs/**/*.md
+
+# Tests & tooling
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+**/test
+**/tests
+**/__tests__
+
+# Docker (avoid recursive context)
+docker/data
+
+# OS
+.DS_Store
+Thumbs.db

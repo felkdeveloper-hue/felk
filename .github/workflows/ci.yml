@@ -1,0 +1,97 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Lint · Typecheck · Test · Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+        env:
+          NODE_ENV: production
+          VITE_API_URL: http://localhost:4000/api/v1
+          VITE_SITE_URL: http://localhost:5173
+
+  security-audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Audit production dependencies
+        run: pnpm audit --prod --audit-level=high
+        continue-on-error: true
+
+      - name: API security test suite
+        run: pnpm --filter @fe-platform/api test:security
+
+  docker-build:
+    name: Docker build smoke
+    runs-on: ubuntu-latest
+    needs: quality
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build API image
+        run: docker build -f docker/Dockerfile.api -t fe-platform-api:ci .
+
+      - name: Build Web image
+        run: docker build -f docker/Dockerfile.web -t fe-platform-web:ci --build-arg VITE_API_URL=http://localhost:4000/api/v1 --build-arg VITE_SITE_URL=http://localhost:5173 .
+
+      - name: Build Admin image
+        run: docker build -f docker/Dockerfile.admin -t fe-platform-admin:ci --build-arg VITE_API_URL=http://localhost:4000/api/v1 .

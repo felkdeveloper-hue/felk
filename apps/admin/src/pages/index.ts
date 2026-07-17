@@ -1,0 +1,28 @@
+export { LoginPage } from './auth/login-page';
+export { ForbiddenPage } from './auth/forbidden-page';
+export { DashboardPage } from './dashboard/dashboard-page';
+export { ProductsListPage } from './products/products-list-page';
+export { ProductFormPage } from './products/product-form-page';
+export { OrdersListPage } from './orders/orders-list-page';
+export { OrderDetailPage } from './orders/order-detail-page';
+export { CustomersListPage } from './customers/customers-list-page';
+export { CustomerDetailPage } from './customers/customer-detail-page';
+export { InventoryPage } from './inventory/inventory-page';
+export { CmsHubPage } from './cms/cms-hub-page';
+export {
+  BrandsPage,
+  CategoriesPage,
+  CollectionsPage,
+  CmsBannersPage,
+  CmsHomePage,
+  CmsPagesPage,
+} from './catalog/catalog-pages';
+export { FinancePage } from './finance/finance-page';
+export {
+  AuditPage,
+  MarketingPage,
+  ReportsPage,
+  RolesPage,
+  SettingsPage,
+  UsersPage,
+} from './system/system-pages';

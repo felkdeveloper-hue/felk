@@ -1,0 +1,8 @@
+@import 'tailwindcss';
+@import '@fe-platform/ui/globals.css';
+
+html,
+body,
+#root {
+  min-height: 100%;
+}

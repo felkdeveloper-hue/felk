@@ -1,0 +1,80 @@
+import { CmsResourceListPage } from '@/components/admin';
+import { cmsApi } from '@/services';
+
+export function CategoriesPage() {
+  return (
+    <CmsResourceListPage
+      title="Categories"
+      description="Organize catalog hierarchy with SEO-friendly category trees."
+      resourceKey="categories"
+      api={cmsApi.categories}
+      canCreate
+      canDelete
+    />
+  );
+}
+
+export function CollectionsPage() {
+  return (
+    <CmsResourceListPage
+      title="Collections"
+      description="Curated product groups for campaigns and navigation."
+      resourceKey="collections"
+      api={cmsApi.collections}
+      canCreate
+      canDelete
+    />
+  );
+}
+
+export function BrandsPage() {
+  return (
+    <CmsResourceListPage
+      title="Brands"
+      description="Manage brand profiles and linked products."
+      resourceKey="brands"
+      api={cmsApi.brands}
+      canCreate
+      canDelete
+    />
+  );
+}
+
+export function CmsPagesPage() {
+  return (
+    <CmsResourceListPage
+      title="CMS Pages"
+      description="Create and publish static storefront pages."
+      resourceKey="pages"
+      api={cmsApi.pages}
+      canCreate
+      canDelete
+    />
+  );
+}
+
+export function CmsBannersPage() {
+  return (
+    <CmsResourceListPage
+      title="Banners"
+      description="Hero and marketing banners for the storefront."
+      resourceKey="hero-banners"
+      api={cmsApi.heroBanners}
+      canCreate
+      canDelete
+    />
+  );
+}
+
+export function CmsHomePage() {
+  return (
+    <CmsResourceListPage
+      title="Home sections"
+      description="Configure home page sections and featured modules."
+      resourceKey="home-sections"
+      api={cmsApi.homeSections}
+      canCreate
+      canDelete
+    />
+  );
+}

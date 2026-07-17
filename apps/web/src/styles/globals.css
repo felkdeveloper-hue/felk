@@ -1,0 +1,347 @@
+@import url('https://fonts.googleapis.com/css2?family=Figtree:ital,wght@0,300..900;1,300..900&family=Syne:wght@500;600;700;800&display=swap');
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/**
+ * Premium fashion storefront tokens.
+ * Near-black ink, porcelain canvas, hot sale accent — Zara/H&M/Nike energy.
+ */
+:root {
+  --background: 40 25% 98%;
+  --foreground: 0 0% 6%;
+
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 6%;
+
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 6%;
+
+  --muted: 40 16% 94%;
+  --muted-foreground: 0 0% 38%;
+
+  --primary: 0 0% 7%;
+  --primary-foreground: 0 0% 100%;
+
+  --secondary: 40 18% 94%;
+  --secondary-foreground: 0 0% 12%;
+
+  --accent: 351 92% 54%;
+  --accent-foreground: 0 0% 100%;
+
+  --destructive: 4 78% 48%;
+  --destructive-foreground: 0 0% 100%;
+
+  --success: 152 55% 32%;
+  --success-foreground: 0 0% 100%;
+
+  --warning: 36 95% 48%;
+  --warning-foreground: 0 0% 10%;
+
+  --border: 40 12% 88%;
+  --input: 40 12% 88%;
+  --ring: 0 0% 7%;
+
+  --radius: 1rem;
+
+  --font-display: 'Syne', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Figtree', ui-sans-serif, system-ui, sans-serif;
+
+  --shadow-color: 0 0% 0%;
+  --shadow-soft:
+    0 1px 2px hsl(var(--shadow-color) / 0.04), 0 8px 24px -12px hsl(var(--shadow-color) / 0.1);
+  --shadow-elevated: 0 12px 40px -16px hsl(var(--shadow-color) / 0.22);
+  --shadow-focus: 0 0 0 3px hsl(var(--ring) / 0.18);
+
+  --glass: 0 0% 100% / 0.72;
+  --surface-ink: 0 0% 7%;
+}
+
+.dark {
+  --background: 0 0% 5%;
+  --foreground: 40 20% 96%;
+
+  --card: 0 0% 8%;
+  --card-foreground: 40 20% 96%;
+
+  --popover: 0 0% 8%;
+  --popover-foreground: 40 20% 96%;
+
+  --muted: 0 0% 12%;
+  --muted-foreground: 40 8% 68%;
+
+  --primary: 0 0% 98%;
+  --primary-foreground: 0 0% 6%;
+
+  --secondary: 0 0% 14%;
+  --secondary-foreground: 40 20% 96%;
+
+  --accent: 351 92% 58%;
+  --accent-foreground: 0 0% 100%;
+
+  --destructive: 4 70% 52%;
+  --destructive-foreground: 0 0% 100%;
+
+  --success: 152 45% 42%;
+  --success-foreground: 0 0% 100%;
+
+  --warning: 38 90% 52%;
+  --warning-foreground: 0 0% 8%;
+
+  --border: 0 0% 18%;
+  --input: 0 0% 18%;
+  --ring: 0 0% 98%;
+
+  --shadow-soft: 0 1px 2px hsl(0 0% 0% / 0.4), 0 8px 24px -12px hsl(0 0% 0% / 0.55);
+  --shadow-elevated: 0 18px 48px -18px hsl(0 0% 0% / 0.7);
+  --shadow-focus: 0 0 0 3px hsl(var(--ring) / 0.28);
+
+  --glass: 0 0% 8% / 0.72;
+  --surface-ink: 0 0% 98%;
+}
+
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-success: hsl(var(--success));
+  --color-success-foreground: hsl(var(--success-foreground));
+  --color-warning: hsl(var(--warning));
+  --color-warning-foreground: hsl(var(--warning-foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --font-display: var(--font-display);
+  --font-sans: var(--font-sans);
+  --radius-sm: calc(var(--radius) - 6px);
+  --radius-md: calc(var(--radius) - 3px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 12px);
+  --shadow-soft: var(--shadow-soft);
+  --shadow-elevated: var(--shadow-elevated);
+  --shadow-focus: var(--shadow-focus);
+}
+
+@keyframes enter {
+  from {
+    opacity: var(--tw-enter-opacity, 1);
+    transform: translate3d(var(--tw-enter-translate-x, 0), var(--tw-enter-translate-y, 0), 0)
+      scale3d(var(--tw-enter-scale, 1), var(--tw-enter-scale, 1), var(--tw-enter-scale, 1));
+  }
+}
+
+@keyframes exit {
+  to {
+    opacity: var(--tw-exit-opacity, 1);
+    transform: translate3d(var(--tw-exit-translate-x, 0), var(--tw-exit-translate-y, 0), 0)
+      scale3d(var(--tw-exit-scale, 1), var(--tw-exit-scale, 1), var(--tw-exit-scale, 1));
+  }
+}
+
+@keyframes accordion-down {
+  from {
+    height: 0;
+  }
+  to {
+    height: var(--radix-accordion-content-height);
+  }
+}
+
+@keyframes accordion-up {
+  from {
+    height: var(--radix-accordion-content-height);
+  }
+  to {
+    height: 0;
+  }
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@utility animate-in {
+  animation-name: enter;
+  animation-duration: 180ms;
+  animation-fill-mode: both;
+  --tw-enter-opacity: initial;
+  --tw-enter-scale: initial;
+  --tw-enter-translate-x: initial;
+  --tw-enter-translate-y: initial;
+}
+
+@utility animate-out {
+  animation-name: exit;
+  animation-duration: 160ms;
+  animation-fill-mode: both;
+  --tw-exit-opacity: initial;
+  --tw-exit-scale: initial;
+  --tw-exit-translate-x: initial;
+  --tw-exit-translate-y: initial;
+}
+
+@utility animate-accordion-down {
+  animation: accordion-down 0.2s ease-out;
+}
+
+@utility animate-accordion-up {
+  animation: accordion-up 0.2s ease-out;
+}
+
+@utility fade-in-0 {
+  --tw-enter-opacity: 0;
+}
+@utility fade-out-0 {
+  --tw-exit-opacity: 0;
+}
+@utility zoom-in-95 {
+  --tw-enter-scale: 0.95;
+}
+@utility zoom-out-95 {
+  --tw-exit-scale: 0.95;
+}
+@utility slide-in-from-top-1 {
+  --tw-enter-translate-y: -0.25rem;
+}
+@utility slide-in-from-top-2 {
+  --tw-enter-translate-y: -0.5rem;
+}
+@utility slide-in-from-top-full {
+  --tw-enter-translate-y: -100%;
+}
+@utility slide-in-from-bottom-1 {
+  --tw-enter-translate-y: 0.25rem;
+}
+@utility slide-in-from-bottom-2 {
+  --tw-enter-translate-y: 0.5rem;
+}
+@utility slide-in-from-bottom-full {
+  --tw-enter-translate-y: 100%;
+}
+@utility slide-in-from-left-1 {
+  --tw-enter-translate-x: -0.25rem;
+}
+@utility slide-in-from-left-2 {
+  --tw-enter-translate-x: -0.5rem;
+}
+@utility slide-in-from-left-full {
+  --tw-enter-translate-x: -100%;
+}
+@utility slide-in-from-right-1 {
+  --tw-enter-translate-x: 0.25rem;
+}
+@utility slide-in-from-right-2 {
+  --tw-enter-translate-x: 0.5rem;
+}
+@utility slide-in-from-right-full {
+  --tw-enter-translate-x: 100%;
+}
+@utility slide-out-to-top-full {
+  --tw-exit-translate-y: -100%;
+}
+@utility slide-out-to-bottom-full {
+  --tw-exit-translate-y: 100%;
+}
+@utility slide-out-to-left-full {
+  --tw-exit-translate-x: -100%;
+}
+@utility slide-out-to-right-full {
+  --tw-exit-translate-x: 100%;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    @apply scroll-smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-feature-settings:
+      'ss01' 1,
+      'cv11' 1;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-display tracking-tight;
+  }
+
+  ::selection {
+    @apply bg-accent/20 text-foreground;
+  }
+}
+
+@layer utilities {
+  .glass-panel {
+    background: hsl(var(--glass));
+    backdrop-filter: blur(18px) saturate(1.2);
+    -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  }
+
+  .skeleton-shimmer {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .skeleton-shimmer::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, hsl(var(--foreground) / 0.06), transparent);
+    animation: shimmer 1.4s infinite;
+  }
+
+  .hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .safe-pb {
+    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+  width: 100%;
+}
