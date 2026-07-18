@@ -7,7 +7,6 @@ import { getSetting } from '@/utils/cms';
 import { Container } from '@/components/layout/container';
 import { Separator } from '@/components/ui/separator';
 import { SocialIconLink } from '@/components/storefront/social-icon-link';
-import { NewsletterSignupSection } from '@/components/storefront/newsletter-signup';
 
 export function StorefrontFooter() {
   const { data: settings } = usePublicSettings();
@@ -24,15 +23,13 @@ export function StorefrontFooter() {
 
   const cmsPages = pagesResult?.data ?? [];
   const companyLinks = cmsPages.filter((page) =>
-    (['about', 'contact', 'privacy', 'terms'] as const).includes(
-      page.slug as 'about' | 'contact' | 'privacy' | 'terms',
+    (['contact', 'privacy', 'terms'] as const).includes(
+      page.slug as 'contact' | 'privacy' | 'terms',
     ),
   );
 
   const slugToRoute = (slug: string): RoutePath => {
     switch (slug) {
-      case 'about':
-        return ROUTES.about;
       case 'contact':
         return ROUTES.contact;
       case 'privacy':
@@ -52,10 +49,6 @@ export function StorefrontFooter() {
       data-slot="storefront-footer"
       className="border-border border-t bg-[linear-gradient(180deg,hsl(var(--muted))_0%,hsl(var(--background))_40%)]"
     >
-      <div className="border-border/70 border-b">
-        <NewsletterSignupSection />
-      </div>
-
       <Container className="grid gap-12 py-16 sm:grid-cols-2 lg:grid-cols-5">
         <div className="col-span-2 space-y-4 lg:col-span-2">
           <Link

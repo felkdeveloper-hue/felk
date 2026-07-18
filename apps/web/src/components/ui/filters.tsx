@@ -33,6 +33,8 @@ export interface FiltersProps {
   className?: string;
   /** Desktop inline panel vs mobile sheet trigger. */
   variant?: 'inline' | 'sheet';
+  /** Hide the built-in Filters heading when the parent provides its own. */
+  hideHeading?: boolean;
 }
 
 function FilterChip({
@@ -120,6 +122,7 @@ export function Filters({
   onClear,
   className,
   variant = 'inline',
+  hideHeading = false,
 }: FiltersProps) {
   const activeCount = Object.values(values).reduce((sum, v) => {
     if (Array.isArray(v)) return sum + v.length;
@@ -161,16 +164,26 @@ export function Filters({
 
   return (
     <aside className={cn('space-y-4', className)} aria-label="Filters">
-      <div className="flex items-center justify-between">
-        <h2 className="text-muted-foreground text-sm font-semibold uppercase tracking-wide">
-          Filters
-        </h2>
-        {onClear && activeCount > 0 ? (
-          <Button variant="ghost" size="sm" onClick={onClear}>
-            Clear
-          </Button>
-        ) : null}
-      </div>
+      {hideHeading ? (
+        onClear && activeCount > 0 ? (
+          <div className="flex justify-end">
+            <Button variant="ghost" size="sm" onClick={onClear}>
+              Clear
+            </Button>
+          </div>
+        ) : null
+      ) : (
+        <div className="flex items-center justify-between">
+          <h2 className="text-muted-foreground text-sm font-semibold uppercase tracking-wide">
+            Filters
+          </h2>
+          {onClear && activeCount > 0 ? (
+            <Button variant="ghost" size="sm" onClick={onClear}>
+              Clear
+            </Button>
+          ) : null}
+        </div>
+      )}
       <FilterGroups groups={groups} values={values} onChange={onChange} />
     </aside>
   );

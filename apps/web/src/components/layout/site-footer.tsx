@@ -33,7 +33,7 @@ const DEFAULT_COLUMNS: FooterColumn[] = [
   {
     title: 'Company',
     links: [
-      { label: 'About', href: '/about' },
+      { label: 'Contact', href: '/contact' },
       { label: 'Careers', href: '/careers' },
       { label: 'Journal', href: '/journal' },
     ],

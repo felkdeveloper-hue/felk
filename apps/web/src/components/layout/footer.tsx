@@ -2,7 +2,6 @@ import { Link } from '@tanstack/react-router';
 import { ROUTES } from '@/constants';
 
 const FOOTER_LINKS = [
-  { label: 'About', to: ROUTES.about },
   { label: 'Contact', to: ROUTES.contact },
   { label: 'Privacy Policy', to: ROUTES.privacy },
   { label: 'Terms of Service', to: ROUTES.terms },

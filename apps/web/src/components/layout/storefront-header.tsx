@@ -25,9 +25,10 @@ import { MobileNav } from '@/components/navigation/mobile-nav';
 import { MegaMenuPlaceholder } from '@/components/navigation/mega-menu-placeholder';
 
 const DEFAULT_NAV: NavItem[] = [
-  { label: 'Shop', href: ROUTES.products, megaMenu: true },
-  { label: 'Categories', href: ROUTES.categories },
-  { label: 'About', href: ROUTES.about },
+  { label: 'Shop', href: ROUTES.products },
+  { label: 'Women', href: '/categories/women' },
+  { label: 'Men', href: '/categories/men' },
+  { label: 'Browse', href: ROUTES.categories },
   { label: 'Contact', href: ROUTES.contact },
 ];
 
@@ -80,10 +81,14 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
           </Link>
         </div>
 
-        <div className="hidden lg:flex lg:items-center lg:gap-1">
-          <MainNav items={navItems} activeHref={pathname} transparent={transparent} />
-          <MegaMenuPlaceholder transparent={transparent} />
-        </div>
+        <MainNav
+          items={navItems}
+          activeHref={pathname}
+          transparent={transparent}
+          renderItem={(item) =>
+            item.label === 'Browse' ? <MegaMenuPlaceholder transparent={transparent} /> : undefined
+          }
+        />
 
         <div className="flex items-center gap-0.5">
           <Button
@@ -188,7 +193,9 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
             ) : null}
           </Button>
           <div className="hidden sm:block">
-            <ThemeToggle />
+            <ThemeToggle
+              className={transparent ? 'text-white hover:bg-white/10 hover:text-white' : undefined}
+            />
           </div>
         </div>
       </Container>

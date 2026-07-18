@@ -1,9 +1,12 @@
 import type { ReactNode } from 'react';
 import { useMemo } from 'react';
+import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { Container } from '@/components/layout/container';
+import { Button } from '@/components/ui/button';
 import { PaginationControl } from '@/components/ui/pagination';
+import { useDisclosure } from '@/hooks';
+import { cn } from '@/lib/utils';
 import { CatalogFilterSheet, CatalogFilterSidebar } from './catalog-filter-sidebar';
-import { CatalogToolbar } from './catalog-toolbar';
 import { AppliedFilterChips, type AppliedFilterChip } from './applied-filter-chips';
 import { ProductGrid, ProductGridError, ProductGridSkeletonWrapper } from './product-grid';
 import { useCatalogFilterFacets } from '@/hooks/catalog';
@@ -33,7 +36,6 @@ export function CatalogListShell({
   banner,
   state,
   products,
-  total,
   totalPages = 1,
   isLoading,
   isError,
@@ -42,6 +44,7 @@ export function CatalogListShell({
   onClearFilters,
 }: CatalogListShellProps) {
   const facets = useCatalogFilterFacets();
+  const { isOpen: filtersOpen, open: openFilters, close: closeFilters } = useDisclosure(true);
 
   const chips = useMemo(() => {
     const list: AppliedFilterChip[] = [];
@@ -69,36 +72,64 @@ export function CatalogListShell({
   }, [facets.brands.data?.data, facets.categories.data?.data, state]);
 
   return (
-    <Container className="py-10 sm:py-14">
-      {banner}
-      <header className="mb-10 space-y-3">
-        {eyebrow ? (
-          <p className="text-muted-foreground text-[11px] font-semibold uppercase tracking-[0.22em]">
-            {eyebrow}
-          </p>
+    <div className="pb-10 sm:pb-14">
+      <Container className="pt-10 sm:pt-14">
+        {banner}
+        <header className="mb-10 space-y-3 text-center">
+          {eyebrow ? (
+            <p className="text-muted-foreground text-[11px] font-semibold uppercase tracking-[0.22em]">
+              {eyebrow}
+            </p>
+          ) : null}
+          <h1 className="font-display text-foreground text-4xl font-bold uppercase tracking-tight sm:text-6xl">
+            {title}
+          </h1>
+          {description ? (
+            <p className="text-muted-foreground mx-auto max-w-2xl">{description}</p>
+          ) : null}
+        </header>
+      </Container>
+
+      <div
+        className={cn(
+          'border-border/60 border-t',
+          filtersOpen
+            ? 'lg:grid lg:grid-cols-[17.5rem_minmax(0,1fr)] xl:grid-cols-[19rem_minmax(0,1fr)]'
+            : undefined,
+        )}
+      >
+        {filtersOpen ? (
+          <aside className="border-border/60 bg-background hidden self-stretch border-r lg:flex lg:flex-col">
+            <div className="sticky top-16 flex max-h-[calc(100vh-4rem)] flex-col lg:top-[4.75rem] lg:max-h-[calc(100vh-4.75rem)]">
+              <div className="border-border/60 flex shrink-0 items-center justify-between gap-2 border-b px-5 py-4 xl:px-6">
+                <p className="text-muted-foreground text-sm font-semibold uppercase tracking-wide">
+                  Filters
+                </p>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Hide filters"
+                  onClick={closeFilters}
+                >
+                  <PanelLeftClose className="size-4" />
+                </Button>
+              </div>
+              <div className="flex-1 overflow-y-auto px-5 py-5 xl:px-6">
+                <CatalogFilterSidebar
+                  state={state}
+                  onChange={onSearchChange}
+                  onClear={onClearFilters}
+                  hideHeading
+                />
+              </div>
+            </div>
+          </aside>
         ) : null}
-        <h1 className="font-display text-foreground text-4xl font-bold uppercase tracking-tight sm:text-6xl">
-          {title}
-        </h1>
-        {description ? <p className="text-muted-foreground max-w-2xl">{description}</p> : null}
-      </header>
 
-      <div className="grid gap-8 lg:grid-cols-[18rem_minmax(0,1fr)] xl:grid-cols-[20rem_minmax(0,1fr)] 2xl:gap-10">
-        <div className="hidden lg:block">
-          <div className="border-border/70 bg-card/80 sticky top-28 rounded-[1.5rem] border p-4 shadow-[var(--shadow-soft)] backdrop-blur">
-            <CatalogFilterSidebar
-              state={state}
-              onChange={onSearchChange}
-              onClear={onClearFilters}
-            />
-          </div>
-        </div>
-
-        <div className="space-y-6">
-          <CatalogToolbar
-            state={state}
-            total={total}
-            filterTrigger={
+        <div className="min-w-0">
+          <Container className="space-y-6 py-6 sm:py-8">
+            <div className="flex flex-wrap items-center gap-3">
               <div className="lg:hidden">
                 <CatalogFilterSheet
                   state={state}
@@ -106,32 +137,41 @@ export function CatalogListShell({
                   onClear={onClearFilters}
                 />
               </div>
-            }
-            onSortChange={(sortBy, sortOrder) => onSearchChange({ sortBy, sortOrder })}
-            onViewChange={(view) => onSearchChange({ view })}
-          />
+              {!filtersOpen ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="hidden lg:inline-flex"
+                  aria-label="Show filters"
+                  onClick={openFilters}
+                >
+                  <PanelLeftOpen className="size-4" />
+                </Button>
+              ) : null}
+              <AppliedFilterChips
+                chips={chips}
+                onRemove={(key) => onSearchChange({ [key]: undefined, page: 1 })}
+                onClearAll={onClearFilters}
+              />
+            </div>
 
-          <AppliedFilterChips
-            chips={chips}
-            onRemove={(key) => onSearchChange({ [key]: undefined, page: 1 })}
-            onClearAll={onClearFilters}
-          />
+            {isLoading ? (
+              <ProductGridSkeletonWrapper view={state.view} />
+            ) : isError ? (
+              <ProductGridError onRetry={onRetry} />
+            ) : (
+              <ProductGrid products={products} view={state.view} filtersOpen={filtersOpen} />
+            )}
 
-          {isLoading ? (
-            <ProductGridSkeletonWrapper view={state.view} />
-          ) : isError ? (
-            <ProductGridError onRetry={onRetry} />
-          ) : (
-            <ProductGrid products={products} view={state.view} />
-          )}
-
-          <PaginationControl
-            page={state.page ?? 1}
-            totalPages={totalPages}
-            onPageChange={(page) => onSearchChange({ page })}
-          />
+            <PaginationControl
+              page={state.page ?? 1}
+              totalPages={totalPages}
+              onPageChange={(page) => onSearchChange({ page })}
+            />
+          </Container>
         </div>
       </div>
-    </Container>
+    </div>
   );
 }

@@ -36,10 +36,6 @@ export const appConfig = {
     uri: env.MONGODB_URI,
     maxPoolSize: env.MONGODB_MAX_POOL_SIZE,
   },
-  redis: {
-    url: env.REDIS_URL,
-    keyPrefix: env.REDIS_KEY_PREFIX,
-  },
   auth: {
     accessSecret: env.JWT_ACCESS_SECRET,
     refreshSecret: env.JWT_REFRESH_SECRET,

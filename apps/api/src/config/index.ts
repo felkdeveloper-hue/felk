@@ -7,13 +7,6 @@ export {
   disconnectDatabase,
   type DatabaseStatus,
 } from './database';
-export {
-  redisManager,
-  getRedisClient,
-  connectRedis,
-  disconnectRedis,
-  type RedisStatus,
-} from './redis';
 export { corsOptions } from './cors';
 export { helmetOptions } from './helmet';
 export { openApiSpec } from './swagger';

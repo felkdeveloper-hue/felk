@@ -22,10 +22,12 @@ type FormValues = z.infer<typeof schema>;
 
 export function ContactPage() {
   const pageQuery = useCmsPage('contact');
+  const aboutQuery = useCmsPage('about');
   const settingsQuery = usePublicSettings();
   const contactQuery = useContactInfos();
 
   const page = pageQuery.data;
+  const about = aboutQuery.data;
   const settings = settingsQuery.data;
   const contactInfos = contactQuery.data?.data ?? [];
   const seo = extractSeo(page, settings);
@@ -44,6 +46,13 @@ export function ContactPage() {
     });
     form.reset();
   });
+
+  const aboutTitle = about?.title ?? 'About';
+  const aboutBody = about?.body;
+  const aboutExcerpt =
+    about?.excerpt ??
+    getSetting<string>(settings, 'store.tagline') ??
+    'Modern fashion essentials, designed for everyday presence.';
 
   return (
     <>
@@ -73,6 +82,32 @@ export function ContactPage() {
             dangerouslySetInnerHTML={{ __html: page.body }}
           />
         ) : null}
+
+        <section
+          id="about"
+          aria-labelledby="about-heading"
+          className="border-border mx-auto mt-4 max-w-3xl border-t pt-12"
+        >
+          <p className="text-primary text-xs font-medium uppercase tracking-[0.2em]">About</p>
+          <h2 id="about-heading" className="font-display text-foreground mt-3 text-3xl sm:text-4xl">
+            {aboutTitle}
+          </h2>
+          {aboutExcerpt ? (
+            <p className="text-muted-foreground mt-3 text-lg">{aboutExcerpt}</p>
+          ) : null}
+          {aboutBody ? (
+            <div
+              className="prose prose-neutral dark:prose-invert mt-8 max-w-none"
+              dangerouslySetInnerHTML={{ __html: aboutBody }}
+            />
+          ) : (
+            <p className="text-muted-foreground mt-6 leading-relaxed">
+              We craft considered clothing and accessories with a quiet-luxury point of view —
+              minimal silhouettes, refined materials, and pieces made to last beyond a single
+              season. Reach out below for sizing help, order questions, or collaborations.
+            </p>
+          )}
+        </section>
       </Container>
 
       <section

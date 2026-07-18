@@ -74,13 +74,23 @@ export function MegaMenuPlaceholder({ transparent }: MegaMenuPlaceholderProps) {
             className="bg-foreground relative hidden min-h-56 overflow-hidden text-white sm:block"
           >
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.18),transparent_45%),linear-gradient(160deg,#111_0%,#2a2a2a_100%)]" />
-            <div className="relative flex h-full flex-col justify-end p-6">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/70">
-                New season
-              </p>
-              <p className="font-display mt-2 text-3xl font-bold uppercase tracking-tight">
-                Shop the edit
-              </p>
+            <div className="relative flex h-full flex-col justify-between gap-6 p-6">
+              <div
+                aria-hidden
+                className="flex aspect-[4/3] w-full max-w-[11rem] items-center justify-center border border-[#c4a574]/70"
+              >
+                <span className="font-display text-5xl font-bold uppercase tracking-[-0.06em] text-white">
+                  FE
+                </span>
+              </div>
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/70">
+                  New season
+                </p>
+                <p className="font-display mt-2 text-3xl font-bold uppercase tracking-tight">
+                  Shop the edit
+                </p>
+              </div>
             </div>
           </Link>
         </div>

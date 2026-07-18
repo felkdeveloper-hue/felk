@@ -6,7 +6,7 @@ import type { ThemeMode } from '@/types';
 
 /**
  * Thin store kept alongside `next-themes` (which owns the actual DOM
- * class/attribute + localStorage sync for `light`/`dark`/`system`).
+ * class/attribute + localStorage sync for `light`/`dark`).
  * This store only tracks extra, app-specific display preferences that
  * `next-themes` doesn't manage.
  */
@@ -25,7 +25,7 @@ export type ThemeStore = ThemeState & ThemeActions;
 export const useThemeStore = create<ThemeStore>()(
   persist(
     (set) => ({
-      lastKnownMode: 'system',
+      lastKnownMode: 'dark',
       reducedMotion: false,
 
       setLastKnownMode: (mode) => set({ lastKnownMode: mode }),

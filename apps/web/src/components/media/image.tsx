@@ -8,6 +8,17 @@ export interface ImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {
   aspectRatio?: string;
 }
 
+function markIfComplete(
+  node: HTMLImageElement | null,
+  setStatus: (status: 'loading' | 'loaded' | 'error') => void,
+) {
+  if (!node) return;
+  // Cached images often skip `onLoad` — detect that so we never stay invisible.
+  if (node.complete) {
+    setStatus(node.naturalWidth > 0 ? 'loaded' : 'error');
+  }
+}
+
 export const Image = React.forwardRef<HTMLImageElement, ImageProps>(
   (
     {
@@ -19,11 +30,28 @@ export const Image = React.forwardRef<HTMLImageElement, ImageProps>(
       onLoad,
       onError,
       alt,
+      src,
       ...props
     },
     ref,
   ) => {
     const [status, setStatus] = React.useState<'loading' | 'loaded' | 'error'>('loading');
+    const imgRef = React.useRef<HTMLImageElement | null>(null);
+
+    React.useLayoutEffect(() => {
+      setStatus('loading');
+      markIfComplete(imgRef.current, setStatus);
+    }, [src]);
+
+    const setRefs = React.useCallback(
+      (node: HTMLImageElement | null) => {
+        imgRef.current = node;
+        if (typeof ref === 'function') ref(node);
+        else if (ref) ref.current = node;
+        markIfComplete(node, setStatus);
+      },
+      [ref],
+    );
 
     return (
       <div
@@ -39,7 +67,8 @@ export const Image = React.forwardRef<HTMLImageElement, ImageProps>(
           </div>
         ) : (
           <img
-            ref={ref}
+            ref={setRefs}
+            src={src}
             alt={alt}
             loading={loading}
             decoding={decoding}

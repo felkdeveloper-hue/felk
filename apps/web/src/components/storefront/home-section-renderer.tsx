@@ -7,8 +7,14 @@ import { SectionSkeleton } from './section-skeleton';
 const FeaturedCollectionsSection = lazy(() =>
   import('./featured-collections').then((m) => ({ default: m.FeaturedCollectionsSection })),
 );
+const ShopYourMoodSection = lazy(() =>
+  import('./shop-your-mood').then((m) => ({ default: m.ShopYourMoodSection })),
+);
 const FeaturedCategoriesSection = lazy(() =>
   import('./featured-categories').then((m) => ({ default: m.FeaturedCategoriesSection })),
+);
+const CategoryShowcaseSection = lazy(() =>
+  import('./category-showcase').then((m) => ({ default: m.CategoryShowcaseSection })),
 );
 const FeaturedBrandsSection = lazy(() =>
   import('./featured-brands').then((m) => ({ default: m.FeaturedBrandsSection })),
@@ -54,7 +60,7 @@ export function HomeSectionRenderer({ section }: HomeSectionRendererProps) {
     case HOME_SECTION_KEYS.featuredCategories:
       return (
         <LazySection>
-          <FeaturedCategoriesSection section={section} />
+          <ShopYourMoodSection section={section} />
         </LazySection>
       );
     case HOME_SECTION_KEYS.trendingProducts:
@@ -70,21 +76,13 @@ export function HomeSectionRenderer({ section }: HomeSectionRendererProps) {
     case HOME_SECTION_KEYS.bestSellers:
       return (
         <LazySection>
-          <ProductRailSection
-            kind="best-sellers"
-            title={section.title}
-            description={section.subtitle}
-          />
+          <CategoryShowcaseSection section={section} />
         </LazySection>
       );
     case HOME_SECTION_KEYS.newArrivals:
       return (
         <LazySection>
-          <ProductRailSection
-            kind="new-arrivals"
-            title={section.title}
-            description={section.subtitle}
-          />
+          <FeaturedCategoriesSection section={section} />
         </LazySection>
       );
     case HOME_SECTION_KEYS.featuredBrands:

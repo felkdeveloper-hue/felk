@@ -7,7 +7,7 @@ import { ProductGridSkeleton } from '@/components/feedback/skeletons';
 import { ROUTES } from '@/constants';
 import { AsyncSection } from './async-section';
 import { HorizontalCarousel } from './horizontal-carousel';
-import { MotionItem, MotionReveal } from './motion-reveal';
+import { MotionReveal } from './motion-reveal';
 import { ProductCard } from './product-card';
 
 const railCopy: Record<ProductRailKind, { eyebrow: string; title: string; description: string }> = {
@@ -83,9 +83,7 @@ export function ProductRailSection({ kind, title, description, eyebrow }: Produc
               itemClassName="w-[72%] sm:w-[40%] lg:w-[26%] 2xl:w-[20%]"
             >
               {result.data.map((product) => (
-                <MotionItem key={product.id}>
-                  <ProductCard product={product} />
-                </MotionItem>
+                <ProductCard key={product.id} product={product} />
               ))}
             </HorizontalCarousel>
           </MotionReveal>

@@ -129,17 +129,19 @@ export function PreferencesPanel() {
             <h2 className="text-sm font-medium">Appearance</h2>
             <div className="space-y-2">
               <FormLabel>Theme</FormLabel>
-              <Select value={theme ?? 'system'} onValueChange={(value) => setTheme(value)}>
+              <Select
+                value={theme === 'light' ? 'light' : 'dark'}
+                onValueChange={(value) => setTheme(value)}
+              >
                 <SelectTrigger className="w-full sm:w-64">
                   <SelectValue placeholder="Select theme" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="light">Light</SelectItem>
                   <SelectItem value="dark">Dark</SelectItem>
-                  <SelectItem value="system">System</SelectItem>
                 </SelectContent>
               </Select>
-              <FormDescription>Choose how the storefront looks on your device.</FormDescription>
+              <FormDescription>Choose light or dark for the storefront.</FormDescription>
             </div>
           </section>
 

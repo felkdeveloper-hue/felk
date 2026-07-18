@@ -1,6 +1,6 @@
 import http from 'node:http';
 import { createApp } from '@/app';
-import { appConfig, connectDatabase, connectRedis, logger } from '@/config';
+import { appConfig, connectDatabase, logger } from '@/config';
 import { registerGracefulShutdown } from '@/utils/shutdown';
 import {
   initOrderPaymentConsumer,
@@ -32,12 +32,6 @@ async function bootstrap(): Promise<void> {
       });
   } catch (error) {
     logger.warn({ err: error }, 'MongoDB unavailable — starting in degraded mode');
-  }
-
-  try {
-    await connectRedis();
-  } catch (error) {
-    logger.warn({ err: error }, 'Redis unavailable — starting in degraded mode');
   }
 
   server.listen(appConfig.server.port, appConfig.server.host, () => {

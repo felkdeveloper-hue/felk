@@ -1,7 +1,14 @@
 import { config as loadDotenv } from 'dotenv';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 
-loadDotenv();
+const configDir = dirname(fileURLToPath(import.meta.url));
+const repoRoot = join(configDir, '../../../..');
+
+// Root .env first, then app-specific overrides.
+loadDotenv({ path: join(repoRoot, '.env') });
+loadDotenv({ path: join(repoRoot, 'apps/api/.env'), override: true });
 
 const DEV_SECRETS = [
   'dev-access-secret-change-me!!',
@@ -27,8 +34,6 @@ const envSchema = z
     CORS_ORIGINS: z.string().default('http://localhost:5173,http://localhost:5174'),
     MONGODB_URI: z.string().min(1).default('mongodb://localhost:27017/fe-platform'),
     MONGODB_MAX_POOL_SIZE: z.coerce.number().int().positive().default(10),
-    REDIS_URL: z.string().min(1).default('redis://localhost:6379'),
-    REDIS_KEY_PREFIX: z.string().default('fe:'),
     JWT_ACCESS_SECRET: z.string().min(16).default('dev-access-secret-change-me!!'),
     JWT_REFRESH_SECRET: z.string().min(16).default('dev-refresh-secret-change-me!'),
     JWT_ACCESS_EXPIRES_IN: z.string().default('15m'),

@@ -1,6 +1,5 @@
 import { appConfig } from '@/config/app.config';
 import { databaseManager } from '@/config/database';
-import { redisManager } from '@/config/redis';
 import { HTTP_STATUS } from '@/constants/http';
 import { ApiResponse } from '@/utils/response/api-response';
 import { asyncHandler } from '@/utils/async-handler';
@@ -18,12 +17,9 @@ export const healthController = {
   }),
 
   ready: asyncHandler(async (_req, res) => {
-    const [mongo, redis] = await Promise.all([
-      databaseManager.healthCheck(),
-      redisManager.healthCheck(),
-    ]);
+    const mongo = await databaseManager.healthCheck();
 
-    const ready = mongo.ok && redis.ok;
+    const ready = mongo.ok;
     const payload = {
       status: ready ? 'ready' : 'not_ready',
       uptime: process.uptime(),
@@ -31,7 +27,6 @@ export const healthController = {
       version: appConfig.app.version,
       checks: {
         mongodb: mongo,
-        redis,
       },
     };
 

@@ -6,8 +6,7 @@ import { HTTP_STATUS } from '@/constants/http';
 const skipLocalNoise = () => appConfig.app.isTest || appConfig.app.isDev;
 
 /**
- * Global API rate limiter. Redis store can be plugged in later.
- * Skipped in development/test so local React Query traffic does not 429.
+ * Global API rate limiter (in-memory). Skipped in development/test.
  */
 export const globalRateLimiter = rateLimit({
   windowMs: appConfig.rateLimit.windowMs,

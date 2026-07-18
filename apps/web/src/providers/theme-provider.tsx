@@ -7,15 +7,15 @@ interface ThemeProviderProps {
 }
 
 /**
- * Wraps `next-themes`, which owns `light` / `dark` / `system` resolution
- * and syncs the `class` attribute on `<html>` to avoid flash-of-wrong-theme.
+ * Wraps `next-themes` for light/dark only (no system).
+ * Dark is the default storefront theme.
  */
 export function ThemeProvider({ children }: ThemeProviderProps) {
   return (
     <NextThemesProvider
       attribute="class"
-      defaultTheme="system"
-      enableSystem
+      defaultTheme="dark"
+      enableSystem={false}
       disableTransitionOnChange
       storageKey={STORAGE_KEYS.theme}
     >

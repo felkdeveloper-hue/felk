@@ -1,7 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { randomUUID } from 'node:crypto';
 import { appConfig } from '@/config/app.config';
-import { redisManager } from '@/config/redis';
 import type { RoleKey } from '@/constants/roles';
 import { ApiError } from '@/utils/errors/api-error';
 import { generateSecureToken, hashToken } from '@/utils/token.helper';
@@ -83,23 +82,10 @@ export function createOpaqueRefreshToken(): { token: string; tokenHash: string }
   return { token, tokenHash: hashToken(token) };
 }
 
-export async function blacklistAccessToken(jti: string, expiresAt: Date): Promise<void> {
-  const ttlSeconds = Math.max(1, Math.ceil((expiresAt.getTime() - Date.now()) / 1000));
-
-  if (!redisManager.isConnected()) {
-    return;
-  }
-
-  const client = redisManager.getClient();
-  await client.set(`bl:jti:${jti}`, '1', 'EX', ttlSeconds);
+export async function blacklistAccessToken(_jti: string, _expiresAt: Date): Promise<void> {
+  // No external session store — logout relies on refresh-token revocation.
 }
 
-export async function isAccessTokenBlacklisted(jti: string): Promise<boolean> {
-  if (!redisManager.isConnected()) {
-    return false;
-  }
-
-  const client = redisManager.getClient();
-  const value = await client.get(`bl:jti:${jti}`);
-  return value === '1';
+export async function isAccessTokenBlacklisted(_jti: string): Promise<boolean> {
+  return false;
 }

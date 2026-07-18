@@ -24,10 +24,21 @@ const image = (id: string, width = 1200, height = 1600) =>
   `https://images.unsplash.com/${id}?auto=format&fit=crop&w=${width}&h=${height}&q=86`;
 
 const categories = [
+  ['Shirts', 'shirts', 'photo-1596755094514-f87e34085b2c'],
+  ['Shoes', 'shoes', 'photo-1542291026-7eec264c27ff'],
+  ['Jeans', 'jeans', 'photo-1542272454315-4c01d7abdf4a'],
+  ['Perfumes', 'perfumes', 'photo-1541643600914-78b084683601'],
+  ['T-Shirts', 't-shirts', 'photo-1521572163474-6864f9cf17ab'],
+  ['Skirts', 'skirts', 'photo-1583496661160-fb5886a0aaaa'],
+  ['Heels & Boots', 'heels-boots', 'photo-1543163521-1bf539c55dd2'],
+  ['Sunglasses', 'sunglasses', 'photo-1511499767150-a48a237f0083'],
+  ['Hoodies', 'hoodies', 'photo-1556821840-3a63f95609a7'],
+  ['Oversized Tees', 'oversized-tees', 'photo-1576566588028-4147f3842f27'],
+  ['Halloween Special', 'halloween-special', 'photo-1509551388413-e18d0ac5d495'],
   ['Women', 'women', 'photo-1483985988355-763728e1935b'],
   ['Men', 'men', 'photo-1617137968427-85924c800a22'],
   ['Accessories', 'accessories', 'photo-1523779917675-b6ed3a42a561'],
-  ['Essentials', 'essentials', 'photo-1521572163474-6864f9cf17ab'],
+  ['Essentials', 'essentials', 'photo-1553062407-98eeb64c6a62'],
 ] as const;
 
 const brands = [
@@ -411,30 +422,64 @@ async function seedProducts(
 }
 
 async function seedHomepage() {
-  const heroImage = image('photo-1496747611176-843222e1e57c', 2200, 1400);
-  await HeroBannerModel.findOneAndUpdate(
-    { title: 'Color, cut, confidence.' },
+  const heroSlides = [
     {
-      $set: {
-        title: 'Color, cut, confidence.',
-        subtitle: 'THE NEW MODERN EDIT · Expressive pieces designed for every version of you.',
-        images: {
-          desktop: { url: heroImage, alt: 'Modern fashion collection' },
-          tablet: { url: heroImage, alt: 'Modern fashion collection' },
-          mobile: {
-            url: image('photo-1496747611176-843222e1e57c', 900, 1400),
-            alt: 'Modern fashion collection',
-          },
-        },
-        ctaLabel: 'Explore the edit',
-        ctaUrl: '/products',
-        priority: 1,
-        status: 'active',
-        isDeleted: false,
-        deletedAt: null,
-      },
+      title: 'Color, cut, confidence.',
+      subtitle: 'THE NEW MODERN EDIT · Expressive pieces designed for every version of you.',
+      photo: 'photo-1496747611176-843222e1e57c',
+      alt: 'Modern fashion collection',
+      ctaLabel: 'Explore the edit',
+      priority: 30,
     },
-    { upsert: true },
+    {
+      title: 'Quiet luxury, loud presence.',
+      subtitle: 'ESSENTIAL LAYERING · Minimal silhouettes that still make an entrance.',
+      photo: 'photo-1469334031218-e382a71b716b',
+      alt: 'Quiet luxury fashion look',
+      ctaLabel: 'Shop essentials',
+      priority: 20,
+    },
+    {
+      title: 'Weekend energy, elevated.',
+      subtitle: 'OFF-DUTY EDIT · Easy pieces made for sunlit days and late nights.',
+      photo: 'photo-1515886657613-9f3515b0c78f',
+      alt: 'Weekend fashion edit',
+      ctaLabel: 'Shop weekend',
+      priority: 10,
+    },
+  ] as const;
+
+  for (const slide of heroSlides) {
+    const desktop = image(slide.photo, 2200, 1400);
+    await HeroBannerModel.findOneAndUpdate(
+      { title: slide.title },
+      {
+        $set: {
+          title: slide.title,
+          subtitle: slide.subtitle,
+          images: {
+            desktop: { url: desktop, alt: slide.alt },
+            tablet: { url: desktop, alt: slide.alt },
+            mobile: {
+              url: image(slide.photo, 900, 1400),
+              alt: slide.alt,
+            },
+          },
+          ctaLabel: slide.ctaLabel,
+          ctaUrl: '/products',
+          priority: slide.priority,
+          status: 'active',
+          isDeleted: false,
+          deletedAt: null,
+        },
+      },
+      { upsert: true },
+    );
+  }
+
+  await HeroBannerModel.updateMany(
+    { title: { $nin: heroSlides.map((slide) => slide.title) } },
+    { $set: { status: 'inactive' } },
   );
 
   await PromoBannerModel.findOneAndUpdate(
@@ -474,25 +519,20 @@ async function seedHomepage() {
       'The pieces making the biggest impression right now.',
       'products',
     ],
-    [
-      'new_arrivals',
-      'The latest drop',
-      'Fresh silhouettes, vibrant accents, and new-season energy.',
-      'products',
-    ],
+    ['new_arrivals', 'Featured Categories', 'Shop the edits that define the season.', 'collection'],
     [
       'promotional_banner',
       'The modern edit',
       'Confident color meets refined everyday design.',
       'banners',
     ],
-    ['best_sellers', 'Most wanted', 'Enduring favorites chosen by our community.', 'products'],
     [
       'trust_features',
       'Designed around you',
       'A seamless experience from discovery to delivery.',
       'custom',
     ],
+    ['best_sellers', 'Shop categories', 'Hover a category to preview the edit.', 'custom'],
     [
       'newsletter',
       'Your front-row invitation',

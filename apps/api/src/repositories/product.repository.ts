@@ -23,6 +23,8 @@ export interface ProductListFilters extends ListOptions {
   isBestSeller?: boolean;
   isClearance?: boolean;
   visibility?: string;
+  excludeStatuses?: string[];
+  excludeVisibility?: string[];
   createdFrom?: string;
   createdTo?: string;
   publishFrom?: string;
@@ -72,8 +74,16 @@ export class ProductRepository extends BaseRepository {
     if (!options.includeDeleted) {
       filter.isDeleted = false;
     }
-    if (options.status) filter.status = options.status;
-    if (options.visibility) filter.visibility = options.visibility;
+    if (options.status) {
+      filter.status = options.status;
+    } else if (options.excludeStatuses?.length) {
+      filter.status = { $nin: options.excludeStatuses };
+    }
+    if (options.visibility) {
+      filter.visibility = options.visibility;
+    } else if (options.excludeVisibility?.length) {
+      filter.visibility = { $nin: options.excludeVisibility };
+    }
     if (options.brandId) filter.brandId = new Types.ObjectId(options.brandId);
     if (options.categoryId) filter.categoryId = new Types.ObjectId(options.categoryId);
     if (options.subcategoryId) {

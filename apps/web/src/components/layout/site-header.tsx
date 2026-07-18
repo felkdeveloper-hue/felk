@@ -7,10 +7,11 @@ import { MobileNav } from '@/components/navigation/mobile-nav';
 import { Container } from '@/components/layout/container';
 
 const DEFAULT_NAV_ITEMS: NavItem[] = [
-  { label: 'New Arrivals', href: '/shop?filter=new' },
-  { label: 'Shop', href: '/shop' },
-  { label: 'Wishlist', href: '/wishlist' },
-  { label: 'About', href: '/about' },
+  { label: 'Shop', href: '/products' },
+  { label: 'Women', href: '/categories/women' },
+  { label: 'Men', href: '/categories/men' },
+  { label: 'Browse', href: '/categories' },
+  { label: 'Contact', href: '/contact' },
 ];
 
 export interface SiteHeaderProps {

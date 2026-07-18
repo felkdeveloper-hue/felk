@@ -1,4 +1,4 @@
-# Local infrastructure only (MongoDB + Redis)
+# Local infrastructure only (MongoDB)
 services:
   mongodb:
     image: mongo:7
@@ -11,16 +11,5 @@ services:
     environment:
       MONGO_INITDB_DATABASE: fe-platform
 
-  redis:
-    image: redis:7-alpine
-    container_name: fe-platform-redis
-    restart: unless-stopped
-    ports:
-      - '6379:6379'
-    volumes:
-      - redis_data:/data
-    command: redis-server --appendonly yes
-
 volumes:
   mongo_data:
-  redis_data:

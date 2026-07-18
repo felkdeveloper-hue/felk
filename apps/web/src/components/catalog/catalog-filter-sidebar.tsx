@@ -10,6 +10,8 @@ export interface CatalogFilterSidebarProps {
   onChange: (patch: Partial<CatalogSearchState>) => void;
   onClear: () => void;
   variant?: 'inline' | 'sheet';
+  /** Hide the built-in Filters heading when the parent provides its own. */
+  hideHeading?: boolean;
 }
 
 export function CatalogFilterSidebar({
@@ -17,6 +19,7 @@ export function CatalogFilterSidebar({
   onChange,
   onClear,
   variant = 'inline',
+  hideHeading = false,
 }: CatalogFilterSidebarProps) {
   const facets = useCatalogFilterFacets();
 
@@ -99,6 +102,7 @@ export function CatalogFilterSidebar({
         groups={groups}
         values={values}
         onClear={onClear}
+        hideHeading={hideHeading}
         onChange={(groupId, value) => {
           const key = groupId as keyof CatalogSearchState;
           if (key === 'inStock') {

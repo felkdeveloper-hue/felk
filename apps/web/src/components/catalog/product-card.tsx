@@ -59,8 +59,8 @@ export function ProductCard({ product, className, layout = 'grid' }: ProductCard
                 src={hoverImage}
                 alt=""
                 aspectRatio="3/4"
-                containerClassName="absolute inset-0"
-                className="opacity-0 transition-all duration-700 ease-out group-hover:scale-[1.06] group-hover:opacity-100"
+                containerClassName="absolute inset-0 opacity-0 transition-opacity duration-700 ease-out group-hover:opacity-100"
+                className="transition-transform duration-700 ease-out group-hover:scale-[1.06]"
                 aria-hidden
               />
             ) : null}

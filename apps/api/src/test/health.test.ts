@@ -29,7 +29,6 @@ describe('System health endpoints', () => {
     expect([200, 503]).toContain(response.status);
     expect(response.body.data.checks).toBeDefined();
     expect(response.body.data.checks.mongodb).toBeDefined();
-    expect(response.body.data.checks.redis).toBeDefined();
   });
 
   it('GET /metrics returns runtime stats', async () => {

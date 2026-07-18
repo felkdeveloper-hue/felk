@@ -8,10 +8,17 @@ import { ProductCard } from './product-card';
 export interface ProductGridProps {
   products: Product[];
   view?: 'grid' | 'list';
+  /** When true, cap the grid at 4 columns so cards stay larger beside the sidebar. */
+  filtersOpen?: boolean;
   className?: string;
 }
 
-export function ProductGrid({ products, view = 'grid', className }: ProductGridProps) {
+export function ProductGrid({
+  products,
+  view = 'grid',
+  filtersOpen = false,
+  className,
+}: ProductGridProps) {
   if (!products.length) {
     return (
       <EmptyState
@@ -26,7 +33,9 @@ export function ProductGrid({ products, view = 'grid', className }: ProductGridP
       data-virtual-ready
       className={cn(
         view === 'grid'
-          ? 'grid grid-cols-2 gap-4 sm:gap-6 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 min-[1800px]:grid-cols-6'
+          ? filtersOpen
+            ? 'grid grid-cols-2 gap-4 sm:gap-6 md:grid-cols-3 xl:grid-cols-4'
+            : 'grid grid-cols-2 gap-5 sm:gap-7 md:grid-cols-3 xl:grid-cols-4'
           : 'flex flex-col gap-4',
         className,
       )}
@@ -38,7 +47,12 @@ export function ProductGrid({ products, view = 'grid', className }: ProductGridP
   );
 }
 
-export function ProductGridSkeletonWrapper({ view = 'grid' }: { view?: 'grid' | 'list' }) {
+export function ProductGridSkeletonWrapper({
+  view = 'grid',
+}: {
+  view?: 'grid' | 'list';
+  filtersOpen?: boolean;
+}) {
   if (view === 'list') {
     return (
       <div className="flex flex-col gap-4">

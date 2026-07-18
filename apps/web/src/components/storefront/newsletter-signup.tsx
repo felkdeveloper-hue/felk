@@ -59,17 +59,17 @@ export function NewsletterSignupSection({ section }: NewsletterSignupSectionProp
   });
 
   return (
-    <Section spacing="default" className="bg-foreground text-white">
+    <Section spacing="default" className="bg-zinc-800 text-zinc-50">
       <Container>
         <MotionReveal>
           <div className="mx-auto max-w-2xl text-center">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/65">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-50/65">
               Stay in touch
             </p>
-            <h2 className="font-display mt-2 text-3xl font-bold uppercase tracking-tight text-white sm:text-5xl">
+            <h2 className="font-display mt-2 text-3xl font-bold uppercase tracking-tight text-zinc-50 sm:text-5xl">
               {title}
             </h2>
-            <p className="mt-3 text-white/70">{description}</p>
+            <p className="mt-3 text-zinc-50/70">{description}</p>
 
             <form
               onSubmit={onSubmit}
@@ -85,7 +85,7 @@ export function NewsletterSignupSection({ section }: NewsletterSignupSectionProp
                   autoComplete="email"
                   placeholder="you@example.com"
                   aria-invalid={Boolean(form.formState.errors.email)}
-                  className="text-foreground h-12 rounded-full border-white/15 bg-white"
+                  className="h-12 rounded-full border-white/10 bg-zinc-100 text-zinc-900 placeholder:text-zinc-500"
                   {...form.register('email')}
                 />
                 {form.formState.errors.email ? (
@@ -95,7 +95,7 @@ export function NewsletterSignupSection({ section }: NewsletterSignupSectionProp
               <Button
                 type="submit"
                 disabled={submitting}
-                className="text-foreground h-12 rounded-full bg-white px-8 hover:bg-white/90"
+                className="h-12 rounded-full bg-zinc-100 px-8 text-zinc-900 hover:bg-white"
               >
                 {submitting ? 'Subscribing…' : 'Subscribe'}
               </Button>

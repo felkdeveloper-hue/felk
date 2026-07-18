@@ -18,6 +18,7 @@ export const corsOptions: CorsOptions = {
     'X-Request-Id',
     'X-CSRF-Token',
     'Idempotency-Key',
+    'x-guest-cart-token',
   ],
   exposedHeaders: ['X-Request-Id', 'X-RateLimit-Limit', 'X-RateLimit-Remaining', 'Retry-After'],
   maxAge: 86_400,

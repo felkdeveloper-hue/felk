@@ -21,6 +21,7 @@ import {
 } from '@/models';
 import { productService } from '@/services/product.service';
 import { CmsCrudService } from '@/services/cms-crud.service';
+import { PRODUCT_STATUS, PRODUCT_VISIBILITY } from '@/constants/product';
 import { asyncHandler } from '@/utils/async-handler';
 import { ApiResponse } from '@/utils/response/api-response';
 import { ApiError } from '@/utils/errors/api-error';
@@ -45,11 +46,18 @@ function publicList(path: string, resource: string, model: Model<any>, status = 
 storefrontRouter.get(
   '/products',
   asyncHandler(async (req, res) => {
+    const { status: _status, visibility: _visibility, ...query } = req.query;
     const result = await productService.list({
-      ...req.query,
-      status: 'active',
-      visibility: 'public',
+      ...query,
       includeDeleted: false,
+      excludeStatuses: [
+        PRODUCT_STATUS.DRAFT,
+        PRODUCT_STATUS.ARCHIVED,
+        PRODUCT_STATUS.DISCONTINUED,
+        PRODUCT_STATUS.HIDDEN,
+        PRODUCT_STATUS.SCHEDULED,
+      ],
+      excludeVisibility: [PRODUCT_VISIBILITY.HIDDEN],
     } as never);
     ApiResponse.success(res, result.data, 'OK', 200, result.meta);
   }),
@@ -100,7 +108,16 @@ storefrontRouter.get(
   asyncHandler(async (req, res) => {
     const product = await productService.getById(String(req.params.id));
     const record = product as unknown as Record<string, unknown>;
-    if (record.status !== 'active' || record.visibility !== 'public') {
+    const status = String(record.status ?? '');
+    const visibility = String(record.visibility ?? '');
+    const hiddenStatuses = new Set<string>([
+      PRODUCT_STATUS.DRAFT,
+      PRODUCT_STATUS.ARCHIVED,
+      PRODUCT_STATUS.DISCONTINUED,
+      PRODUCT_STATUS.HIDDEN,
+      PRODUCT_STATUS.SCHEDULED,
+    ]);
+    if (hiddenStatuses.has(status) || visibility === PRODUCT_VISIBILITY.HIDDEN) {
       throw ApiError.notFound('Product not found');
     }
     ApiResponse.success(res, product);

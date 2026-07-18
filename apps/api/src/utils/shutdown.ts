@@ -2,12 +2,11 @@ import type { Server } from 'node:http';
 import { appConfig } from '@/config/app.config';
 import { disconnectDatabase } from '@/config/database';
 import { logger } from '@/config/logger';
-import { disconnectRedis } from '@/config/redis';
 
 let isShuttingDown = false;
 
 /**
- * Graceful shutdown — stop accepting traffic, close DB/Redis, exit.
+ * Graceful shutdown — stop accepting traffic, close DB, exit.
  */
 export function registerGracefulShutdown(server: Server): void {
   const shutdown = async (signal: string) => {
@@ -31,7 +30,7 @@ export function registerGracefulShutdown(server: Server): void {
       }
 
       try {
-        await Promise.allSettled([disconnectDatabase(), disconnectRedis()]);
+        await disconnectDatabase();
         logger.info('Connections closed — exiting');
         process.exit(0);
       } catch (error) {

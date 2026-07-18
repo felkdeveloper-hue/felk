@@ -41,7 +41,7 @@ export function MobileNav({ items, activeHref, transparent, open, onOpenChange }
 
             return (
               <Link
-                key={item.href}
+                key={item.label}
                 to={item.href}
                 preload="intent"
                 aria-current={isActive ? 'page' : undefined}

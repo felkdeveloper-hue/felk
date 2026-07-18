@@ -34,7 +34,7 @@ export function PromoBannerSection({ section, placement = 'home' }: PromoBannerS
         >
           {(item) => (
             <MotionReveal>
-              <div className="bg-foreground relative min-h-[22rem] overflow-hidden rounded-[2rem] text-white shadow-[var(--shadow-elevated)] sm:min-h-[26rem]">
+              <div className="bg-foreground text-background relative min-h-[22rem] overflow-hidden rounded-[2rem] shadow-[var(--shadow-elevated)] sm:min-h-[26rem]">
                 {item.imageUrl ? (
                   <Image
                     src={item.imageUrl}
@@ -43,8 +43,8 @@ export function PromoBannerSection({ section, placement = 'home' }: PromoBannerS
                     containerClassName="absolute inset-0"
                   />
                 ) : null}
-                <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/45 to-transparent" />
-                <div className="relative flex h-full min-h-[22rem] flex-col justify-end gap-6 px-8 py-10 sm:min-h-[26rem] sm:flex-row sm:items-end sm:justify-between sm:px-12 sm:py-14">
+                <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/45 to-transparent dark:from-black/70 dark:via-black/40" />
+                <div className="relative flex h-full min-h-[22rem] flex-col justify-end gap-6 px-8 py-10 text-white sm:min-h-[26rem] sm:flex-row sm:items-end sm:justify-between sm:px-12 sm:py-14">
                   <div className="max-w-xl space-y-3">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/70">
                       {(section?.config?.eyebrow as string) ?? 'Limited offer'}
@@ -60,7 +60,7 @@ export function PromoBannerSection({ section, placement = 'home' }: PromoBannerS
                     <Button
                       asChild
                       size="lg"
-                      className="text-foreground bg-white hover:bg-white/90"
+                      className="bg-background text-foreground hover:bg-background/90"
                     >
                       <CmsLink href={item.linkUrl!}>
                         {item.ctaLabel ?? 'Shop now'}
