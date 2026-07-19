@@ -1,8 +1,28 @@
 @import 'tailwindcss';
 @import '@fe-platform/ui/globals.css';
 
+:root {
+  --admin-ink: #0c0d10;
+  --admin-ink-soft: #17191f;
+  --admin-surface: #f3f1ec;
+  --admin-panel: #fffcf8;
+  --admin-line: rgba(12, 13, 16, 0.08);
+  --admin-accent: #b08d57;
+  --admin-accent-soft: rgba(176, 141, 87, 0.14);
+}
+
 html,
 body,
 #root {
   min-height: 100%;
+}
+
+body {
+  font-family: 'Figtree', ui-sans-serif, system-ui, sans-serif;
+  background: var(--admin-surface);
+  color: var(--admin-ink);
+}
+
+.font-serif {
+  font-family: 'Instrument Serif', ui-serif, Georgia, serif;
 }

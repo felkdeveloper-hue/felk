@@ -27,6 +27,7 @@ const LABELS: Record<string, string> = {
   settings: 'Settings',
   audit: 'Audit',
   new: 'New',
+  forbidden: 'Access denied',
 };
 
 export function AdminBreadcrumbs() {
@@ -44,18 +45,18 @@ export function AdminBreadcrumbs() {
   return (
     <nav
       aria-label="Breadcrumb"
-      className="mb-4 flex flex-wrap items-center gap-1 text-sm text-neutral-500"
+      className="mb-5 flex flex-wrap items-center gap-1 text-xs text-neutral-500"
     >
-      <Link to={ADMIN_ROUTES.dashboard} className="hover:text-neutral-900">
+      <Link to={ADMIN_ROUTES.dashboard} className="transition hover:text-[var(--admin-ink)]">
         Dashboard
       </Link>
       {crumbs.slice(1).map((crumb) => (
         <span key={crumb.href} className="inline-flex items-center gap-1">
-          <ChevronRight className="size-4" aria-hidden />
+          <ChevronRight className="size-3.5 opacity-50" aria-hidden />
           {crumb.isLast ? (
-            <span className="font-medium text-neutral-900">{crumb.label}</span>
+            <span className="font-medium text-[var(--admin-ink)]">{crumb.label}</span>
           ) : (
-            <Link to={crumb.href} className="hover:text-neutral-900">
+            <Link to={crumb.href} className="transition hover:text-[var(--admin-ink)]">
               {crumb.label}
             </Link>
           )}

@@ -1,58 +1,73 @@
-import { Bell, Menu, Moon, Search, Sun } from 'lucide-react';
-import { Button } from '@fe-platform/ui';
+import { Bell, Menu, Search } from 'lucide-react';
 import { useLogoutMutation } from '@/hooks';
 import { useAuthStore, useUiStore } from '@/store';
 
 export function AdminTopbar() {
   const user = useAuthStore((state) => state.user);
   const toggleSidebar = useUiStore((state) => state.toggleSidebar);
-  const theme = useUiStore((state) => state.theme);
-  const setTheme = useUiStore((state) => state.setTheme);
   const logout = useLogoutMutation();
+  const displayName =
+    [user?.firstName, user?.lastName].filter(Boolean).join(' ') || user?.email || 'Staff';
+  const initials = displayName
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? '')
+    .join('');
 
   return (
-    <header className="flex h-16 items-center justify-between gap-4 border-b border-neutral-200 bg-white px-4 lg:px-6">
+    <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-4 border-b border-[var(--admin-line)] bg-[color-mix(in_srgb,var(--admin-panel)_88%,transparent)] px-4 backdrop-blur-md lg:px-6">
       <div className="flex min-w-0 flex-1 items-center gap-3">
-        <Button variant="outline" size="sm" onClick={toggleSidebar} aria-label="Toggle sidebar">
+        <button
+          type="button"
+          onClick={toggleSidebar}
+          aria-label="Toggle sidebar"
+          className="inline-flex size-9 items-center justify-center rounded-lg border border-[var(--admin-line)] bg-[var(--admin-panel)] text-[var(--admin-ink)] transition hover:bg-white"
+        >
           <Menu className="size-4" />
-        </Button>
+        </button>
         <label className="relative hidden max-w-md flex-1 sm:block">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
           <input
             type="search"
-            placeholder="Search admin (coming soon)"
-            className="w-full rounded-lg border border-neutral-200 bg-neutral-50 py-2 pl-10 pr-3 text-sm"
+            placeholder="Search catalog, orders, customers…"
+            className="focus:border-[var(--admin-accent)]/40 focus:ring-[var(--admin-accent)]/25 w-full rounded-lg border border-[var(--admin-line)] bg-[var(--admin-panel)] py-2 pl-10 pr-3 text-sm outline-none transition placeholder:text-neutral-400 focus:ring-1"
             disabled
           />
         </label>
       </div>
 
-      <div className="flex items-center gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          aria-label="Toggle theme"
-          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+      <div className="flex items-center gap-2 sm:gap-3">
+        <button
+          type="button"
+          aria-label="Notifications"
+          disabled
+          className="inline-flex size-9 items-center justify-center rounded-lg border border-[var(--admin-line)] bg-[var(--admin-panel)] text-neutral-500 opacity-60"
         >
-          {theme === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}
-        </Button>
-        <Button variant="outline" size="sm" aria-label="Notifications" disabled>
           <Bell className="size-4" />
-        </Button>
-        <div className="hidden text-right sm:block">
-          <p className="text-sm font-medium text-neutral-900">
-            {[user?.firstName, user?.lastName].filter(Boolean).join(' ') || user?.email}
-          </p>
-          <p className="text-xs text-neutral-500">{user?.roles[0]}</p>
+        </button>
+
+        <div className="flex items-center gap-3 rounded-xl border border-[var(--admin-line)] bg-[var(--admin-panel)] py-1.5 pl-1.5 pr-2.5">
+          <span className="flex size-8 items-center justify-center rounded-lg bg-[var(--admin-ink)] text-xs font-semibold text-white">
+            {initials || 'FE'}
+          </span>
+          <div className="hidden text-left sm:block">
+            <p className="text-sm font-medium leading-tight text-[var(--admin-ink)]">
+              {displayName}
+            </p>
+            <p className="text-[11px] uppercase tracking-wide text-neutral-500">
+              {user?.roles[0] ?? 'staff'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => logout.mutate()}
+            disabled={logout.isPending}
+            className="ml-1 hidden rounded-md px-2 py-1 text-xs font-medium text-neutral-600 transition hover:bg-neutral-100 hover:text-[var(--admin-ink)] disabled:opacity-60 sm:inline"
+          >
+            {logout.isPending ? 'Signing out…' : 'Sign out'}
+          </button>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => logout.mutate()}
-          disabled={logout.isPending}
-        >
-          Sign out
-        </Button>
       </div>
     </header>
   );

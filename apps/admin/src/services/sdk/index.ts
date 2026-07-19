@@ -8,10 +8,21 @@ export { paymentsApi } from './payments';
 export { cmsApi, createCmsResourceApi } from './cms';
 export { reviewsApi } from './reviews';
 
-export type { AdminProduct, ProductInput, ProductListParams } from './products';
+export type {
+  AdminProduct,
+  AdminVariant,
+  ProductInput,
+  ProductListParams,
+  VariantInput,
+} from './products';
 export type { AdminOrder, OrderListParams } from './orders';
 export type { AdminCustomer } from './customers';
-export type { InventoryItemRow, WarehouseRow } from './inventory';
+export type {
+  InventoryItemCreateInput,
+  InventoryItemRow,
+  StockAdjustInput,
+  WarehouseRow,
+} from './inventory';
 export type { PaymentRow } from './payments';
 export type { CmsResource } from './cms';
 export type { AdminReview, ReviewListParams } from './reviews';

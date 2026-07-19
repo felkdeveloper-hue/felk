@@ -56,6 +56,7 @@ describe('PermissionRoute', () => {
       accessToken: 'token',
       refreshToken: 'refresh',
       hasHydrated: true,
+      permissionsHydrated: true,
     });
   });
 

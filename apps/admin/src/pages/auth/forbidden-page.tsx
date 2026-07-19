@@ -1,20 +1,37 @@
 import { Link } from '@tanstack/react-router';
-import { Button } from '@fe-platform/ui';
-import { AdminPageHeader, PageMotion } from '@/components/admin';
-import { ADMIN_ROUTES } from '@/constants';
+import { ShieldAlert } from 'lucide-react';
+import { ADMIN_NAV_ITEMS, ADMIN_ROUTES, filterNavByPermissions } from '@/constants';
+import { PageMotion } from '@/components/admin';
+import { useAuthStore } from '@/store';
 
 export function ForbiddenPage() {
+  const hasAnyPermission = useAuthStore((state) => state.hasAnyPermission);
+  const fallback =
+    filterNavByPermissions(ADMIN_NAV_ITEMS, hasAnyPermission)[0]?.to ?? ADMIN_ROUTES.products;
+
   return (
     <PageMotion>
-      <AdminPageHeader
-        title="Access denied"
-        description="You do not have permission to view this area, or your account is not authorized for admin access."
-      />
-      <Link to={ADMIN_ROUTES.dashboard} className="inline-flex">
-        <Button variant="outline" size="sm">
-          Return to dashboard
-        </Button>
-      </Link>
+      <div className="mx-auto flex min-h-[55vh] max-w-lg flex-col items-center justify-center text-center">
+        <span className="flex size-14 items-center justify-center rounded-2xl bg-[var(--admin-accent-soft)] text-[var(--admin-accent)]">
+          <ShieldAlert className="size-7" aria-hidden />
+        </span>
+        <p className="mt-6 text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--admin-accent)]">
+          Restricted
+        </p>
+        <h1 className="mt-2 font-serif text-4xl tracking-tight text-[var(--admin-ink)]">
+          Access denied
+        </h1>
+        <p className="mt-3 text-sm leading-relaxed text-neutral-500">
+          You do not have permission for this area. If you believe this is a mistake, ask a super
+          admin to review your role.
+        </p>
+        <Link
+          to={fallback}
+          className="mt-8 inline-flex h-11 items-center justify-center rounded-lg bg-[var(--admin-ink)] px-5 text-sm font-semibold text-white transition hover:bg-black"
+        >
+          Go to available page
+        </Link>
+      </div>
     </PageMotion>
   );
 }

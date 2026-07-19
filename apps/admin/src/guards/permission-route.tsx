@@ -14,8 +14,17 @@ export function PermissionRoute({
   requireAll = false,
   children,
 }: PermissionRouteProps) {
+  const permissionsHydrated = useAuthStore((state) => state.permissionsHydrated);
   const hasAnyPermission = useAuthStore((state) => state.hasAnyPermission);
   const hasPermission = useAuthStore((state) => state.hasPermission);
+
+  if (!permissionsHydrated) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center text-sm text-neutral-500">
+        Loading permissions…
+      </div>
+    );
+  }
 
   const allowed = requireAll
     ? permissions.every((permission) => hasPermission(permission))

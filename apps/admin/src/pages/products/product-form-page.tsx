@@ -1,10 +1,9 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Link, useNavigate } from '@tanstack/react-router';
+import { Link, useNavigate, useRouterState } from '@tanstack/react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
-import { Button } from '@fe-platform/ui';
 import {
   AdminErrorState,
   AdminPageHeader,
@@ -13,9 +12,12 @@ import {
   AdminTextInput,
   AdminTextarea,
   PageMotion,
+  ProductCommercePanels,
+  type ProductSection,
 } from '@/components/admin';
 import { ADMIN_ROUTES, QUERY_KEYS } from '@/constants';
 import { usePermissions } from '@/hooks';
+import { cn } from '@/lib/utils';
 import { cmsApi, productsApi } from '@/services';
 
 const productSchema = z.object({
@@ -32,11 +34,23 @@ const productSchema = z.object({
 
 type ProductFormValues = z.infer<typeof productSchema>;
 
+function parseSection(search: string): ProductSection {
+  const value = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search).get(
+    'section',
+  );
+  if (value === 'variants' || value === 'prices' || value === 'stock' || value === 'details') {
+    return value;
+  }
+  return 'details';
+}
+
 export function ProductFormPage({ productId }: { productId?: string }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { products: productPerms } = usePermissions();
+  const { products: productPerms, inventory } = usePermissions();
   const isEdit = Boolean(productId);
+  const searchStr = useRouterState({ select: (state) => state.location.searchStr });
+  const section = useMemo(() => parseSection(searchStr), [searchStr]);
 
   const detailQuery = useQuery({
     queryKey: QUERY_KEYS.products.detail(productId ?? ''),
@@ -121,6 +135,14 @@ export function ProductFormPage({ productId }: { productId?: string }) {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['products'] }),
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: () => productsApi.remove(productId!),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['products'] });
+      await navigate({ to: ADMIN_ROUTES.products });
+    },
+  });
+
   const onSubmit = handleSubmit((values) => saveMutation.mutate(values));
 
   if (isEdit && detailQuery.isError) {
@@ -152,129 +174,187 @@ export function ProductFormPage({ productId }: { productId?: string }) {
     })) ?? []),
   ];
 
+  const sectionHref = (value: ProductSection) => {
+    if (!productId) return ADMIN_ROUTES.products;
+    const base = ADMIN_ROUTES.productDetail.replace('$productId', productId);
+    return value === 'details' ? base : `${base}?section=${value}`;
+  };
+
   return (
     <PageMotion>
       <AdminPageHeader
         title={isEdit ? 'Edit product' : 'Create product'}
-        description="Manage product details, category, variants, media, and SEO metadata."
+        description="Manage product details, category, variants, prices, and stock."
         actions={
           <>
-            <Link to={ADMIN_ROUTES.products}>
-              <Button variant="outline" size="sm">
-                Back to list
-              </Button>
+            <Link
+              to={ADMIN_ROUTES.products}
+              className="inline-flex h-9 items-center rounded-lg border border-[var(--admin-line)] bg-white px-3.5 text-sm font-medium transition hover:bg-neutral-50"
+            >
+              Back to list
             </Link>
             {isEdit && productPerms.publish ? (
-              <Button
-                size="sm"
-                variant="secondary"
+              <button
+                type="button"
+                className="inline-flex h-9 items-center rounded-lg border border-[var(--admin-line)] bg-white px-3.5 text-sm font-medium transition hover:bg-neutral-50 disabled:opacity-60"
                 onClick={() => publishMutation.mutate()}
                 disabled={publishMutation.isPending}
               >
                 Publish
-              </Button>
+              </button>
+            ) : null}
+            {isEdit && productPerms.delete ? (
+              <button
+                type="button"
+                className="inline-flex h-9 items-center rounded-lg bg-red-600 px-3.5 text-sm font-medium text-white transition hover:bg-red-700 disabled:opacity-60"
+                onClick={() => {
+                  if (window.confirm('Delete this product?')) deleteMutation.mutate();
+                }}
+                disabled={deleteMutation.isPending}
+              >
+                Delete
+              </button>
             ) : null}
           </>
         }
       />
 
-      <form onSubmit={onSubmit} className="grid gap-6 xl:grid-cols-[2fr_1fr]">
-        <AdminPanel title="Details">
-          <div className="space-y-4">
-            <AdminTextInput
-              label="Name"
-              registration={register('name')}
-              error={errors.name}
-              disabled={readOnly}
-            />
-            <AdminTextInput
-              label="Slug"
-              registration={register('slug')}
-              error={errors.slug}
-              disabled={readOnly}
-            />
-            <AdminSelect
-              label="Status"
-              registration={register('status')}
-              error={errors.status}
-              disabled={readOnly}
-              options={[
-                { label: 'Draft', value: 'draft' },
-                { label: 'Published', value: 'published' },
-                { label: 'Archived', value: 'archived' },
-              ]}
-            />
-            <AdminSelect
-              label="Category"
-              registration={register('categoryId')}
-              error={errors.categoryId}
-              disabled={readOnly}
-              options={categoryOptions}
-            />
-            <AdminSelect
-              label="Brand"
-              registration={register('brandId')}
-              error={errors.brandId}
-              disabled={readOnly}
-              options={brandOptions}
-            />
-            <AdminSelect
-              label="Gender"
-              registration={register('gender')}
-              error={errors.gender}
-              disabled={readOnly}
-              options={[
-                { label: 'Unisex / All', value: '' },
-                { label: 'Women', value: 'women' },
-                { label: 'Men', value: 'men' },
-              ]}
-            />
-            <AdminSelect
-              label="Occasion"
-              registration={register('occasionId')}
-              error={errors.occasionId}
-              disabled={readOnly}
-              options={occasionOptions}
-            />
-            <AdminTextarea
-              label="Short description"
-              registration={register('shortDescription')}
-              error={errors.shortDescription}
-              disabled={readOnly}
-            />
-            <AdminTextarea
-              label="Description"
-              registration={register('description')}
-              error={errors.description}
-              disabled={readOnly}
-            />
-            {!readOnly ? (
-              <Button type="submit" disabled={saveMutation.isPending}>
-                {saveMutation.isPending ? 'Saving…' : 'Save product'}
-              </Button>
-            ) : null}
-          </div>
-        </AdminPanel>
-
-        <div className="space-y-6">
-          <AdminPanel title="Variants">
-            <p className="text-sm text-neutral-600">
-              Variant management UI connects to catalog variant endpoints.
-            </p>
-          </AdminPanel>
-          <AdminPanel title="Media">
-            <p className="text-sm text-neutral-600">
-              Media manager placeholder for product images and assets. Upload multiple images so the
-              storefront gallery can show thumbnails.
-            </p>
-          </AdminPanel>
-          <AdminPanel title="SEO">
-            <p className="text-sm text-neutral-600">
-              Meta title, description, and canonical URL editor.
-            </p>
-          </AdminPanel>
+      {isEdit ? (
+        <div className="mb-5 flex flex-wrap gap-2">
+          {(
+            [
+              ['details', 'Details'],
+              ['variants', 'Variants'],
+              ['prices', 'Prices'],
+              ['stock', 'Stock'],
+            ] as const
+          ).map(([value, label]) => (
+            <a
+              key={value}
+              href={sectionHref(value)}
+              className={cn(
+                'rounded-full px-3 py-1.5 text-xs font-medium transition',
+                section === value
+                  ? 'bg-[var(--admin-ink)] text-white'
+                  : 'border border-[var(--admin-line)] bg-white text-neutral-600 hover:bg-neutral-50',
+              )}
+            >
+              {label}
+            </a>
+          ))}
         </div>
-      </form>
+      ) : null}
+
+      <div className="grid gap-6 xl:grid-cols-[1.25fr_1fr]">
+        <form
+          id="product-section-details"
+          onSubmit={onSubmit}
+          className={cn(
+            'space-y-6',
+            section === 'details' && isEdit && 'ring-[var(--admin-accent)]/30 rounded-2xl ring-2',
+          )}
+        >
+          <AdminPanel title="Details">
+            <div className="space-y-4">
+              <AdminTextInput
+                label="Name"
+                registration={register('name')}
+                error={errors.name}
+                disabled={readOnly}
+              />
+              <AdminTextInput
+                label="Slug"
+                registration={register('slug')}
+                error={errors.slug}
+                disabled={readOnly}
+              />
+              <AdminSelect
+                label="Status"
+                registration={register('status')}
+                error={errors.status}
+                disabled={readOnly}
+                options={[
+                  { label: 'Draft', value: 'draft' },
+                  { label: 'Active', value: 'active' },
+                  { label: 'Published', value: 'published' },
+                  { label: 'Archived', value: 'archived' },
+                ]}
+              />
+              <AdminSelect
+                label="Category"
+                registration={register('categoryId')}
+                error={errors.categoryId}
+                disabled={readOnly}
+                options={categoryOptions}
+              />
+              <AdminSelect
+                label="Brand"
+                registration={register('brandId')}
+                error={errors.brandId}
+                disabled={readOnly}
+                options={brandOptions}
+              />
+              <AdminSelect
+                label="Gender"
+                registration={register('gender')}
+                error={errors.gender}
+                disabled={readOnly}
+                options={[
+                  { label: 'Unisex / All', value: '' },
+                  { label: 'Women', value: 'women' },
+                  { label: 'Men', value: 'men' },
+                ]}
+              />
+              <AdminSelect
+                label="Occasion"
+                registration={register('occasionId')}
+                error={errors.occasionId}
+                disabled={readOnly}
+                options={occasionOptions}
+              />
+              <AdminTextarea
+                label="Short description"
+                registration={register('shortDescription')}
+                error={errors.shortDescription}
+                disabled={readOnly}
+              />
+              <AdminTextarea
+                label="Description"
+                registration={register('description')}
+                error={errors.description}
+                disabled={readOnly}
+              />
+              {!readOnly ? (
+                <button
+                  type="submit"
+                  disabled={saveMutation.isPending}
+                  className="inline-flex h-10 items-center rounded-lg bg-[var(--admin-ink)] px-4 text-sm font-semibold text-white transition hover:bg-black disabled:opacity-60"
+                >
+                  {saveMutation.isPending ? 'Saving…' : 'Save product'}
+                </button>
+              ) : null}
+            </div>
+          </AdminPanel>
+        </form>
+
+        {isEdit && productId ? (
+          <ProductCommercePanels
+            productId={productId}
+            section={section}
+            canUpdate={productPerms.update}
+            canCreate={productPerms.create}
+            canDelete={productPerms.delete}
+            canAdjustStock={inventory.adjust}
+          />
+        ) : (
+          <AdminPanel title="Next steps">
+            <p className="text-sm text-neutral-600">
+              Save the product first, then add variants, set prices, and adjust stock from this
+              page.
+            </p>
+          </AdminPanel>
+        )}
+      </div>
     </PageMotion>
   );
 }

@@ -65,7 +65,7 @@ export interface AuthTokensResult {
   user: ReturnType<typeof sanitizeUser>;
 }
 
-function sanitizeUser(user: UserDocument) {
+function sanitizeUser(user: UserDocument, permissions: string[] = []) {
   return {
     id: user._id.toString(),
     email: user.email,
@@ -74,6 +74,7 @@ function sanitizeUser(user: UserDocument) {
     roleKey: user.roleKey,
     status: user.status,
     emailVerified: Boolean(user.emailVerifiedAt),
+    permissions,
   };
 }
 
@@ -170,11 +171,13 @@ async function createSessionAndTokens(
     sessionId: session._id.toString(),
   });
 
+  const permissions = await getPermissionsForRole(user.roleId.toString());
+
   return {
     accessToken: access.token,
     refreshToken,
     expiresIn: Math.floor(getAccessTokenTtlMs() / 1000),
-    user: sanitizeUser(user),
+    user: sanitizeUser(user, permissions),
   };
 }
 

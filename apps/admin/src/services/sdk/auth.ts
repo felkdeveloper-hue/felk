@@ -13,7 +13,7 @@ export const authApi = {
       accessToken: string;
       refreshToken: string;
       user: unknown;
-    }>('/auth/login', payload);
+    }>('/auth/login', { ...payload, portal: 'admin' });
     return {
       accessToken: raw.accessToken,
       refreshToken: raw.refreshToken,

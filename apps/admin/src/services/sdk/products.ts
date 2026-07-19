@@ -25,6 +25,30 @@ export interface AdminProduct {
   updatedAt?: string;
 }
 
+export interface AdminVariant {
+  id: string;
+  productId: string;
+  sku: string;
+  title?: string;
+  price: number;
+  salePrice?: number | null;
+  costPrice?: number | null;
+  currency?: string;
+  status?: string;
+  isDefault?: boolean;
+}
+
+export interface VariantInput {
+  sku: string;
+  title?: string;
+  price: number;
+  salePrice?: number | null;
+  costPrice?: number | null;
+  currency?: string;
+  status?: string;
+  isDefault?: boolean;
+}
+
 function normalizeProduct(raw: unknown): AdminProduct {
   const record = raw as Record<string, unknown>;
   const price = record.price as Record<string, unknown> | number | undefined;
@@ -64,6 +88,22 @@ function normalizeProduct(raw: unknown): AdminProduct {
     thumbnailUrl: typeof record.thumbnailUrl === 'string' ? record.thumbnailUrl : undefined,
     createdAt: typeof record.createdAt === 'string' ? record.createdAt : undefined,
     updatedAt: typeof record.updatedAt === 'string' ? record.updatedAt : undefined,
+  };
+}
+
+function normalizeVariant(raw: unknown): AdminVariant {
+  const record = raw as Record<string, unknown>;
+  return {
+    id: normalizeId(record),
+    productId: String(record.productId ?? ''),
+    sku: String(record.sku ?? ''),
+    title: typeof record.title === 'string' ? record.title : undefined,
+    price: Number(record.price ?? 0),
+    salePrice: record.salePrice == null ? null : Number(record.salePrice),
+    costPrice: record.costPrice == null ? null : Number(record.costPrice),
+    currency: typeof record.currency === 'string' ? record.currency : 'LKR',
+    status: typeof record.status === 'string' ? record.status : undefined,
+    isDefault: Boolean(record.isDefault),
   };
 }
 
@@ -122,5 +162,24 @@ export const productsApi = {
 
   async bulkStatus(ids: string[], status: string): Promise<void> {
     await http.post('/catalog/products/bulk-status', { ids, status });
+  },
+
+  async listVariants(productId: string): Promise<AdminVariant[]> {
+    const rows = await http.get<unknown[]>(`/catalog/products/${productId}/variants`);
+    return normalizeList(rows, normalizeVariant);
+  },
+
+  async createVariant(productId: string, payload: VariantInput): Promise<AdminVariant> {
+    return normalizeVariant(
+      await http.post<unknown>(`/catalog/products/${productId}/variants`, payload),
+    );
+  },
+
+  async updateVariant(variantId: string, payload: Partial<VariantInput>): Promise<AdminVariant> {
+    return normalizeVariant(await http.patch<unknown>(`/catalog/variants/${variantId}`, payload));
+  },
+
+  async removeVariant(variantId: string): Promise<void> {
+    await http.delete(`/catalog/variants/${variantId}`);
   },
 };
