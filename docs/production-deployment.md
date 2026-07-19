@@ -99,6 +99,41 @@ pnpm docker:up
 - **Frontends**: redeploy previous static asset bundle (keep prior Docker image)
 - **Database**: restore from backup only if schema/data migration failed (see backup guide)
 
+## Vercel + Render deployment
+
+### Frontends (Vercel)
+
+1. Create one Vercel project per app with **Root Directory** `apps/web` or `apps/admin`.
+2. Framework preset: Vite. Output directory: `dist`.
+3. Each app includes `vercel.json` with an SPA rewrite so client routes (e.g. `/login`, `/products`) do not 404.
+4. Set build-time env vars (then **Redeploy** — Vite embeds them at build):
+
+| Variable              | Example                                 |
+| --------------------- | --------------------------------------- |
+| `VITE_API_URL`        | `https://felk-mq41.onrender.com/api/v1` |
+| `VITE_SOCKET_URL`     | `https://felk-mq41.onrender.com`        |
+| `VITE_SITE_URL` (web) | `https://felk-web.vercel.app`           |
+| `VITE_APP_NAME`       | Your brand / admin title                |
+
+If `VITE_API_URL` is set to the API origin without `/api/v1`, the apps append `/api/v1` automatically.
+
+### API (Render)
+
+Allow both Vercel origins (comma-separated, no spaces preferred):
+
+```text
+CORS_ORIGINS=https://felk-web.vercel.app,https://felk-admin.vercel.app
+```
+
+For cross-site cookie auth (Vercel ↔ Render), also use:
+
+```text
+COOKIE_SECURE=true
+COOKIE_SAME_SITE=none
+```
+
+Restart/redeploy the API after changing env vars.
+
 ## Related documents
 
 - [Production Checklist](./production-checklist.md)
