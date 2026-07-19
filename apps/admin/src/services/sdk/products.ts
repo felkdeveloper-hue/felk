@@ -34,7 +34,7 @@ export interface AdminVariant {
 }
 
 export interface VariantInput {
-  sku: string;
+  sku?: string;
   title?: string;
   price: number;
   salePrice?: number | null;

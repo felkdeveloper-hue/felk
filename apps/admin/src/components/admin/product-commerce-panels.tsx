@@ -6,6 +6,7 @@ import { ImageUploader } from '@/components/admin/image-uploader';
 import { QUERY_KEYS } from '@/constants';
 import { formatCurrency } from '@/lib/utils';
 import { AppError } from '@/lib/errors';
+import { nextLinkedSku } from '@/lib/sku';
 import { inventoryApi, mediaApi, productsApi, type AdminVariant } from '@/services';
 
 const fieldClass =
@@ -20,6 +21,7 @@ export type ProductSection = 'details' | 'images' | 'variants' | 'prices' | 'sto
 
 export function ProductCommercePanels({
   productId,
+  productSku,
   productName,
   section = 'details',
   canUpdate,
@@ -32,6 +34,7 @@ export function ProductCommercePanels({
   onPublish,
 }: {
   productId: string;
+  productSku?: string;
   productName: string;
   section?: ProductSection;
   canUpdate: boolean;
@@ -61,7 +64,6 @@ export function ProductCommercePanels({
     queryFn: () => mediaApi.list(productId),
   });
 
-  const [sku, setSku] = useState('');
   const [title, setTitle] = useState('');
   const [price, setPrice] = useState('0');
   const [salePrice, setSalePrice] = useState('');
@@ -150,14 +152,12 @@ export function ProductCommercePanels({
   const createMutation = useMutation({
     mutationFn: () =>
       productsApi.createVariant(productId, {
-        sku: sku.trim(),
         title: title.trim() || undefined,
         price: Number(price) || 0,
         salePrice: salePrice === '' ? null : Number(salePrice),
         currency: 'LKR',
       }),
     onSuccess: async () => {
-      setSku('');
       setTitle('');
       setPrice('0');
       setSalePrice('');
@@ -253,6 +253,22 @@ export function ProductCommercePanels({
     return map;
   }, [stockRows]);
 
+  const nextVariantSku = useMemo(() => {
+    if (!productSku) return null;
+    try {
+      return nextLinkedSku(
+        productSku,
+        variants.map((variant) => variant.sku),
+      );
+    } catch {
+      return null;
+    }
+  }, [productSku, variants]);
+
+  // If parent isn't an FE* sku yet (legacy data), hide a fake preview.
+  const canPreviewSku = Boolean(productSku && /^FE\d+$/i.test(productSku));
+  const previewSku = canPreviewSku ? nextVariantSku : null;
+
   const highlight = (name: ProductSection) =>
     section === name ? 'ring-2 ring-[var(--admin-accent)]/35' : '';
 
@@ -293,38 +309,52 @@ export function ProductCommercePanels({
         <div id="product-section-variants" className={highlight('variants')}>
           {canCreate ? (
             <form
-              className="mb-5 grid gap-3 rounded-xl border border-[var(--admin-line)] bg-[var(--admin-surface)] p-4 md:grid-cols-4"
+              className="mb-5 space-y-3 rounded-xl border border-[var(--admin-line)] bg-[var(--admin-surface)] p-4"
               onSubmit={(event) => {
                 event.preventDefault();
                 createMutation.mutate();
               }}
             >
-              <input
-                className={fieldClass}
-                placeholder="SKU"
-                value={sku}
-                onChange={(event) => setSku(event.target.value)}
-                required
-              />
-              <input
-                className={fieldClass}
-                placeholder="Title (optional)"
-                value={title}
-                onChange={(event) => setTitle(event.target.value)}
-              />
-              <input
-                className={fieldClass}
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder="Price"
-                value={price}
-                onChange={(event) => setPrice(event.target.value)}
-                required
-              />
-              <button type="submit" className={btnPrimary} disabled={createMutation.isPending}>
-                {createMutation.isPending ? 'Adding…' : 'Add variant'}
-              </button>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+                    Next variant SKU
+                  </p>
+                  <p className="mt-0.5 font-mono text-sm font-semibold tracking-wide text-[var(--admin-ink)]">
+                    {previewSku ?? 'Assigned on save'}
+                  </p>
+                </div>
+                {canPreviewSku && productSku ? (
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                    Linked to parent <span className="font-mono">{productSku}</span>
+                  </p>
+                ) : (
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                    Linked FE2026 sequence assigned automatically
+                  </p>
+                )}
+              </div>
+              <div className="grid gap-3 md:grid-cols-[1.2fr_1fr_auto]">
+                <input
+                  className={fieldClass}
+                  placeholder="Title (optional)"
+                  value={title}
+                  onChange={(event) => setTitle(event.target.value)}
+                />
+                <input
+                  className={fieldClass}
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="Price"
+                  value={price}
+                  onChange={(event) => setPrice(event.target.value)}
+                  required
+                />
+                <button type="submit" className={btnPrimary} disabled={createMutation.isPending}>
+                  {createMutation.isPending ? 'Adding…' : 'Add variant'}
+                </button>
+              </div>
             </form>
           ) : null}
 

@@ -24,7 +24,6 @@ import { productsApi } from '@/services';
 const productSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   slug: z.string().optional(),
-  sku: z.string().min(1, 'SKU is required'),
   status: z.string().default('draft'),
   shortDescription: z.string().optional(),
   description: z.string().optional(),
@@ -83,7 +82,6 @@ export function ProductFormPage({ productId }: { productId?: string }) {
     defaultValues: {
       name: '',
       slug: '',
-      sku: '',
       status: 'draft',
       shortDescription: '',
       description: '',
@@ -95,7 +93,6 @@ export function ProductFormPage({ productId }: { productId?: string }) {
       reset({
         name: detailQuery.data.name,
         slug: detailQuery.data.slug,
-        sku: detailQuery.data.sku ?? '',
         status: detailQuery.data.status,
         shortDescription: '',
         description: '',
@@ -114,10 +111,6 @@ export function ProductFormPage({ productId }: { productId?: string }) {
       });
     },
     onError: (err) => {
-      if (err instanceof AppError && err.code === 'SKU_EXISTS') {
-        setError('sku', { message: 'This SKU is already used by another product.' });
-        return;
-      }
       if (err instanceof AppError) {
         setError('name', { message: err.message });
       }
@@ -239,13 +232,30 @@ export function ProductFormPage({ productId }: { productId?: string }) {
                 disabled={readOnly}
                 placeholder="e.g. Cloud Studio Sneaker"
               />
-              <AdminTextInput
-                label="SKU"
-                registration={register('sku')}
-                error={errors.sku}
-                disabled={readOnly}
-                placeholder="e.g. ATL-042"
-              />
+              <div className="block space-y-1.5 text-sm">
+                <span className="font-medium text-neutral-700 dark:text-neutral-300">SKU</span>
+                <div className="rounded-lg border border-dashed border-[var(--admin-line)] bg-[var(--admin-panel-soft)] px-3 py-2.5">
+                  {isEdit && detailQuery.data?.sku ? (
+                    <>
+                      <p className="font-mono text-sm font-semibold tracking-wide text-[var(--admin-ink)]">
+                        {detailQuery.data.sku}
+                      </p>
+                      <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+                        Auto-generated. Variant SKUs continue from this number.
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="font-mono text-sm text-neutral-500 dark:text-neutral-400">
+                        FE2026XXXX
+                      </p>
+                      <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+                        Assigned automatically when you save (e.g. FE20261234).
+                      </p>
+                    </>
+                  )}
+                </div>
+              </div>
               <AdminTextInput
                 label="Slug"
                 registration={register('slug')}
@@ -297,6 +307,7 @@ export function ProductFormPage({ productId }: { productId?: string }) {
         {isEdit && productId ? (
           <ProductCommercePanels
             productId={productId}
+            productSku={detailQuery.data?.sku}
             productName={detailQuery.data?.name ?? 'this product'}
             section={section}
             canUpdate={productPerms.update}

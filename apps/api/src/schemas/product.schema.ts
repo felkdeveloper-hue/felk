@@ -161,7 +161,7 @@ export const dimensionsSchema = z
   .optional();
 
 export const variantCreateSchema = z.object({
-  sku: z.string().trim().min(1).max(64),
+  sku: z.string().trim().min(1).max(64).optional(),
   barcode: z.string().trim().max(64).nullable().optional(),
   title: z.string().trim().min(1).max(200).optional(),
   colorId: objectIdSchema.nullable().optional(),

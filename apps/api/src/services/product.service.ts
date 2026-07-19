@@ -15,6 +15,7 @@ import { slugify } from '@/utils/slug.helper';
 import { sanitizeRichText } from '@/utils/sanitize-html';
 import { assertSalePriceValid, buildProductJsonLd, computePricing } from '@/utils/pricing.helper';
 import { PRODUCT_AUDIT, PRODUCT_STATUS } from '@/constants/product';
+import { allocateUniqueParentSku, isSkuTaken } from '@/services/sku-allocation.service';
 
 function toPlain(doc: { toObject?: () => Record<string, unknown> } | Record<string, unknown>) {
   if (doc && typeof (doc as { toObject?: () => Record<string, unknown> }).toObject === 'function') {
@@ -187,12 +188,11 @@ export class ProductService {
       slug = `${slug}-${Date.now().toString(36)}`;
     }
 
-    const sku = payload.sku ? String(payload.sku).trim().toUpperCase() : null;
-    if (sku) {
-      const skuExisting = await ProductModel.findOne({ sku, isDeleted: false });
-      if (skuExisting) {
-        throw ApiError.conflict('SKU already exists', undefined, 'SKU_EXISTS');
-      }
+    const sku = payload.sku
+      ? String(payload.sku).trim().toUpperCase()
+      : await allocateUniqueParentSku();
+    if (payload.sku && (await isSkuTaken(sku))) {
+      throw ApiError.conflict('SKU already exists', undefined, 'SKU_EXISTS');
     }
 
     const pricing = (payload.pricing as Record<string, unknown>) ?? {
@@ -295,12 +295,11 @@ export class ProductService {
     if (payload.sku) {
       const sku = String(payload.sku).trim().toUpperCase();
       payload.sku = sku;
-      if (sku !== before.sku) {
-        const skuExisting = await ProductModel.findOne({ sku, isDeleted: false });
-        if (skuExisting && skuExisting._id.toString() !== id) {
-          throw ApiError.conflict('SKU already exists', undefined, 'SKU_EXISTS');
-        }
+      if (sku !== before.sku && (await isSkuTaken(sku, { excludeProductId: id }))) {
+        throw ApiError.conflict('SKU already exists', undefined, 'SKU_EXISTS');
       }
+    } else if (!before.sku) {
+      payload.sku = await allocateUniqueParentSku();
     }
 
     if (payload.pricing) {

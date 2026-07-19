@@ -3,8 +3,14 @@ import { productRepository } from '@/repositories/product.repository';
 import { writeAuditLog, writeActivityLog } from '@/services/audit.service';
 import type { ActorMeta } from '@/services/cms-crud.service';
 import { productService } from '@/services/product.service';
+import {
+  allocateUniqueLinkedSku,
+  allocateUniqueParentSku,
+  isSkuTaken,
+} from '@/services/sku-allocation.service';
 import { ApiError } from '@/utils/errors/api-error';
 import { assertSalePriceValid, computePricing } from '@/utils/pricing.helper';
+import { parseSkuNumeric } from '@/utils/sku.helper';
 import { PRODUCT_AUDIT } from '@/constants/product';
 
 function toPlain(doc: { toObject: () => Record<string, unknown> }) {
@@ -76,12 +82,7 @@ export class ProductVariantService {
   }
 
   private async assertUniqueSkuBarcode(sku: string, barcode?: string | null, excludeId?: string) {
-    const skuExisting = await ProductVariantModel.findOne({
-      sku: sku.toUpperCase(),
-      isDeleted: false,
-      ...(excludeId ? { _id: { $ne: excludeId } } : {}),
-    });
-    if (skuExisting) {
+    if (await isSkuTaken(sku, { excludeVariantId: excludeId })) {
       throw ApiError.conflict('SKU already exists', undefined, 'SKU_EXISTS');
     }
 
@@ -101,7 +102,18 @@ export class ProductVariantService {
     const product = await productRepository.findById(productId);
     if (!product) throw ApiError.notFound('Product not found');
 
-    const sku = String(payload.sku).toUpperCase();
+    let parentSku = product.sku ? String(product.sku).toUpperCase() : null;
+    if (!parentSku || parseSkuNumeric(parentSku) == null) {
+      parentSku = await allocateUniqueParentSku();
+      await ProductModel.updateOne({ _id: productId }, { $set: { sku: parentSku } });
+    }
+
+    const siblings = await ProductVariantModel.find({ productId, isDeleted: false }).select('sku');
+    const siblingSkus = siblings.map((row) => String(row.sku));
+
+    const sku = payload.sku
+      ? String(payload.sku).toUpperCase()
+      : await allocateUniqueLinkedSku(parentSku, siblingSkus);
     const barcode = (payload.barcode as string | null | undefined) ?? null;
     await this.assertUniqueSkuBarcode(sku, barcode);
 
