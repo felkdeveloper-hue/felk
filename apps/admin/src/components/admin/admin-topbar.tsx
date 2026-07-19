@@ -1,10 +1,12 @@
-import { Bell, Menu, Search } from 'lucide-react';
+import { Bell, Menu, Moon, Search, Sun } from 'lucide-react';
 import { useLogoutMutation } from '@/hooks';
 import { useAuthStore, useUiStore } from '@/store';
 
 export function AdminTopbar() {
   const user = useAuthStore((state) => state.user);
   const toggleSidebar = useUiStore((state) => state.toggleSidebar);
+  const theme = useUiStore((state) => state.theme);
+  const toggleTheme = useUiStore((state) => state.toggleTheme);
   const logout = useLogoutMutation();
   const displayName =
     [user?.firstName, user?.lastName].filter(Boolean).join(' ') || user?.email || 'Staff';
@@ -22,7 +24,7 @@ export function AdminTopbar() {
           type="button"
           onClick={toggleSidebar}
           aria-label="Toggle sidebar"
-          className="inline-flex size-9 items-center justify-center rounded-lg border border-[var(--admin-line)] bg-[var(--admin-panel)] text-[var(--admin-ink)] transition hover:bg-white"
+          className="inline-flex size-9 items-center justify-center rounded-lg border border-[var(--admin-line)] bg-[var(--admin-panel)] text-[var(--admin-ink)] transition hover:bg-white dark:hover:bg-white/10"
         >
           <Menu className="size-4" />
         </button>
@@ -40,6 +42,16 @@ export function AdminTopbar() {
       <div className="flex items-center gap-2 sm:gap-3">
         <button
           type="button"
+          onClick={toggleTheme}
+          aria-label="Toggle theme"
+          title={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+          className="inline-flex size-9 items-center justify-center rounded-lg border border-[var(--admin-line)] bg-[var(--admin-panel)] text-[var(--admin-ink)] transition hover:bg-white dark:hover:bg-white/10"
+        >
+          {theme === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}
+        </button>
+
+        <button
+          type="button"
           aria-label="Notifications"
           disabled
           className="inline-flex size-9 items-center justify-center rounded-lg border border-[var(--admin-line)] bg-[var(--admin-panel)] text-neutral-500 opacity-60"
@@ -48,7 +60,7 @@ export function AdminTopbar() {
         </button>
 
         <div className="flex items-center gap-3 rounded-xl border border-[var(--admin-line)] bg-[var(--admin-panel)] py-1.5 pl-1.5 pr-2.5">
-          <span className="flex size-8 items-center justify-center rounded-lg bg-[var(--admin-ink)] text-xs font-semibold text-white">
+          <span className="flex size-8 items-center justify-center rounded-lg bg-[var(--admin-ink)] text-xs font-semibold text-[var(--admin-surface)]">
             {initials || 'FE'}
           </span>
           <div className="hidden text-left sm:block">
@@ -63,7 +75,7 @@ export function AdminTopbar() {
             type="button"
             onClick={() => logout.mutate()}
             disabled={logout.isPending}
-            className="ml-1 hidden rounded-md px-2 py-1 text-xs font-medium text-neutral-600 transition hover:bg-neutral-100 hover:text-[var(--admin-ink)] disabled:opacity-60 sm:inline"
+            className="ml-1 hidden rounded-md px-2 py-1 text-xs font-medium text-neutral-600 transition hover:bg-neutral-100 hover:text-[var(--admin-ink)] disabled:opacity-60 sm:inline dark:text-neutral-400 dark:hover:bg-white/10"
           >
             {logout.isPending ? 'Signing out…' : 'Sign out'}
           </button>

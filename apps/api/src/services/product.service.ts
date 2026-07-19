@@ -150,7 +150,7 @@ export class ProductService {
         return {
           ...withComputedPricing(product as unknown as Record<string, unknown>),
           brandName: product.brandId ? brandById.get(product.brandId.toString()) : undefined,
-          sku: defaultVariant?.sku,
+          sku: product.sku ?? defaultVariant?.sku,
           thumbnailUrl: primary?.thumbnailUrl ?? primary?.url ?? defaultVariant?.thumbnailUrl,
           hoverImageUrl: hover?.url,
           media: productMedia,
@@ -185,6 +185,14 @@ export class ProductService {
     const existing = await productRepository.findBySlug(slug);
     if (existing) {
       slug = `${slug}-${Date.now().toString(36)}`;
+    }
+
+    const sku = payload.sku ? String(payload.sku).trim().toUpperCase() : null;
+    if (sku) {
+      const skuExisting = await ProductModel.findOne({ sku, isDeleted: false });
+      if (skuExisting) {
+        throw ApiError.conflict('SKU already exists', undefined, 'SKU_EXISTS');
+      }
     }
 
     const pricing = (payload.pricing as Record<string, unknown>) ?? {
@@ -222,6 +230,7 @@ export class ProductService {
     const doc = await ProductModel.create({
       name,
       slug,
+      sku,
       shortDescription: payload.shortDescription ?? null,
       description: sanitizeRichText(payload.description as string | undefined) ?? null,
       brandId: payload.brandId ?? null,
@@ -280,6 +289,17 @@ export class ProductService {
       const existing = await productRepository.findBySlug(String(payload.slug));
       if (existing && existing._id.toString() !== id) {
         throw ApiError.conflict('Slug already exists', undefined, 'SLUG_EXISTS');
+      }
+    }
+
+    if (payload.sku) {
+      const sku = String(payload.sku).trim().toUpperCase();
+      payload.sku = sku;
+      if (sku !== before.sku) {
+        const skuExisting = await ProductModel.findOne({ sku, isDeleted: false });
+        if (skuExisting && skuExisting._id.toString() !== id) {
+          throw ApiError.conflict('SKU already exists', undefined, 'SKU_EXISTS');
+        }
       }
     }
 

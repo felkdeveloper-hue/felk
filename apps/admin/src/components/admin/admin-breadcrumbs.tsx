@@ -42,7 +42,7 @@ export function AdminBreadcrumbs() {
   return (
     <nav
       aria-label="Breadcrumb"
-      className="mb-5 flex flex-wrap items-center gap-1 text-xs text-neutral-500"
+      className="mb-5 flex flex-wrap items-center gap-1 text-xs text-neutral-500 dark:text-neutral-400"
     >
       <Link to={ADMIN_ROUTES.dashboard} className="transition hover:text-[var(--admin-ink)]">
         Dashboard

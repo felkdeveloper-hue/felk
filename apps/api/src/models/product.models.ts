@@ -81,6 +81,7 @@ AttributeValueModel.schema.index({ attributeId: 1, value: 1 }, { unique: true })
 export interface ProductDocument extends Document {
   name: string;
   slug: string;
+  sku?: string | null;
   shortDescription?: string | null;
   description?: string | null;
   brandId?: Types.ObjectId | null;
@@ -133,6 +134,7 @@ const productSchema = new Schema<ProductDocument>(
   {
     name: { type: String, required: true, trim: true },
     slug: { type: String, required: true, trim: true },
+    sku: { type: String, default: null, trim: true, uppercase: true },
     shortDescription: { type: String, default: null },
     description: { type: String, default: null },
     brandId: { type: Schema.Types.ObjectId, ref: 'Brand', default: null, index: true },
@@ -199,6 +201,10 @@ const productSchema = new Schema<ProductDocument>(
 );
 
 productSchema.index({ slug: 1 }, { unique: true });
+productSchema.index(
+  { sku: 1 },
+  { unique: true, partialFilterExpression: { sku: { $type: 'string' } } },
+);
 productSchema.index({ status: 1, isDeleted: 1, publishAt: -1 });
 productSchema.index({
   name: 'text',

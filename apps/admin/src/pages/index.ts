@@ -24,5 +24,5 @@ export {
   ReportsPage,
   RolesPage,
   SettingsPage,
-  UsersPage,
 } from './system/system-pages';
+export { UsersListPage as UsersPage } from './users/users-list-page';

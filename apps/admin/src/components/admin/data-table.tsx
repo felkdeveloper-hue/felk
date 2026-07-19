@@ -33,9 +33,9 @@ export function DataTable<T>({
   const allSelected = data.length > 0 && data.every((row) => selectedIds.includes(getRowId(row)));
 
   return (
-    <div className="overflow-x-auto rounded-2xl border border-[var(--admin-line)] bg-[var(--admin-panel)]">
+    <div className="overflow-x-auto rounded-2xl border border-[var(--admin-line)] bg-[var(--admin-panel)] transition-colors">
       <table className="min-w-full text-sm">
-        <thead className="bg-[var(--admin-surface)] text-left text-neutral-500">
+        <thead className="bg-[var(--admin-surface)] text-left text-neutral-500 dark:text-neutral-400">
           <tr>
             {onToggleRow ? (
               <th scope="col" className="px-4 py-3">
@@ -66,7 +66,7 @@ export function DataTable<T>({
             <tr>
               <td
                 colSpan={columns.length + (onToggleRow ? 1 : 0)}
-                className="px-4 py-10 text-center text-neutral-500"
+                className="px-4 py-10 text-center text-neutral-500 dark:text-neutral-400"
               >
                 Loading…
               </td>
@@ -76,7 +76,7 @@ export function DataTable<T>({
             <tr>
               <td
                 colSpan={columns.length + (onToggleRow ? 1 : 0)}
-                className="px-4 py-10 text-center text-neutral-500"
+                className="px-4 py-10 text-center text-neutral-500 dark:text-neutral-400"
               >
                 {emptyMessage}
               </td>
@@ -86,7 +86,10 @@ export function DataTable<T>({
             ? data.map((row) => {
                 const rowId = getRowId(row);
                 return (
-                  <tr key={rowId} className="border-t border-neutral-100 hover:bg-neutral-50">
+                  <tr
+                    key={rowId}
+                    className="border-t border-[var(--admin-line)] hover:bg-neutral-50 dark:hover:bg-white/[0.04]"
+                  >
                     {onToggleRow ? (
                       <td className="px-4 py-3">
                         <input

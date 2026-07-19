@@ -1,37 +1,47 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { CheckCircle2, XCircle } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { AdminEmptyState, AdminPanel } from '@/components/admin';
+import { ImageUploader } from '@/components/admin/image-uploader';
 import { QUERY_KEYS } from '@/constants';
 import { formatCurrency } from '@/lib/utils';
 import { AppError } from '@/lib/errors';
-import { inventoryApi, productsApi, type AdminVariant } from '@/services';
+import { inventoryApi, mediaApi, productsApi, type AdminVariant } from '@/services';
 
 const fieldClass =
-  'w-full rounded-lg border border-[var(--admin-line)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--admin-accent)]/50';
+  'w-full rounded-lg border border-[var(--admin-line)] bg-[var(--admin-panel-soft)] px-3 py-2 text-sm text-[var(--admin-ink)] outline-none focus:border-[var(--admin-accent)]/50';
 
 const btnPrimary =
-  'inline-flex h-9 items-center justify-center rounded-lg bg-[var(--admin-ink)] px-3 text-sm font-medium text-white transition hover:bg-black disabled:opacity-60';
-const btnGhost =
-  'inline-flex h-8 items-center justify-center rounded-md px-2.5 text-xs font-medium text-neutral-600 transition hover:bg-neutral-100 hover:text-[var(--admin-ink)] disabled:opacity-60';
+  'inline-flex h-9 items-center justify-center rounded-lg bg-[var(--admin-ink)] px-3 text-sm font-medium text-[var(--admin-surface)] transition hover:opacity-90 disabled:opacity-60';
 const btnDanger =
-  'inline-flex h-8 items-center justify-center rounded-md px-2.5 text-xs font-medium text-red-700 transition hover:bg-red-50 disabled:opacity-60';
+  'inline-flex h-8 items-center justify-center rounded-md px-2.5 text-xs font-medium text-red-700 transition hover:bg-red-50 disabled:opacity-60 dark:text-red-400 dark:hover:bg-red-500/10';
 
-export type ProductSection = 'details' | 'variants' | 'prices' | 'stock';
+export type ProductSection = 'details' | 'images' | 'variants' | 'prices' | 'stock' | 'review';
 
 export function ProductCommercePanels({
   productId,
+  productName,
   section = 'details',
   canUpdate,
   canCreate,
   canDelete,
   canAdjustStock,
+  canPublish,
+  isPublished,
+  isPublishing,
+  onPublish,
 }: {
   productId: string;
+  productName: string;
   section?: ProductSection;
   canUpdate: boolean;
   canCreate: boolean;
   canDelete: boolean;
   canAdjustStock: boolean;
+  canPublish: boolean;
+  isPublished: boolean;
+  isPublishing: boolean;
+  onPublish: () => void;
 }) {
   const queryClient = useQueryClient();
   const variantsQuery = useQuery({
@@ -45,6 +55,10 @@ export function ProductCommercePanels({
   const stockQuery = useQuery({
     queryKey: QUERY_KEYS.inventory.items({ productId, limit: 100 }),
     queryFn: () => inventoryApi.listItems({ productId, limit: 100 }),
+  });
+  const mediaQuery = useQuery({
+    queryKey: [...QUERY_KEYS.products.detail(productId), 'media'],
+    queryFn: () => mediaApi.list(productId),
   });
 
   const [sku, setSku] = useState('');
@@ -62,6 +76,16 @@ export function ProductCommercePanels({
   const variants = variantsQuery.data ?? [];
   const warehouses = warehousesQuery.data ?? [];
   const stockRows = stockQuery.data?.data ?? [];
+  const media = mediaQuery.data ?? [];
+  const mainImages = useMemo(() => media.filter((item) => !item.variantId), [media]);
+  const variantMediaMap = useMemo(() => {
+    const map = new Map<string, typeof media>();
+    for (const item of media) {
+      if (!item.variantId) continue;
+      map.set(item.variantId, [...(map.get(item.variantId) ?? []), item]);
+    }
+    return map;
+  }, [media]);
 
   useEffect(() => {
     const next: Record<string, { price: string; salePrice: string }> = {};
@@ -81,7 +105,7 @@ export function ProductCommercePanels({
       document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 80);
     return () => window.clearTimeout(timer);
-  }, [section, variantsQuery.isFetched, stockQuery.isFetched]);
+  }, [section, variantsQuery.isFetched, stockQuery.isFetched, mediaQuery.isFetched]);
 
   const invalidate = async () => {
     await Promise.all([
@@ -91,6 +115,37 @@ export function ProductCommercePanels({
       }),
     ]);
   };
+
+  const uploadMainMutation = useMutation({
+    mutationFn: (file: File) =>
+      mediaApi.upload(productId, file, { isPrimary: mainImages.length === 0 }),
+    onSuccess: async () => {
+      setError(null);
+      await invalidate();
+    },
+    onError: (err) => setError(err instanceof AppError ? err.message : 'Unable to upload image.'),
+  });
+
+  const setPrimaryMutation = useMutation({
+    mutationFn: (mediaId: string) => mediaApi.setPrimary(mediaId),
+    onSuccess: () => invalidate(),
+  });
+
+  const removeMediaMutation = useMutation({
+    mutationFn: (mediaId: string) => mediaApi.remove(mediaId),
+    onSuccess: () => invalidate(),
+  });
+
+  const uploadVariantImageMutation = useMutation({
+    mutationFn: ({ variantId, file }: { variantId: string; file: File }) =>
+      mediaApi.upload(productId, file, { variantId }),
+    onSuccess: async () => {
+      setError(null);
+      await invalidate();
+    },
+    onError: (err) =>
+      setError(err instanceof AppError ? err.message : 'Unable to upload variant image.'),
+  });
 
   const createMutation = useMutation({
     mutationFn: () =>
@@ -201,13 +256,38 @@ export function ProductCommercePanels({
   const highlight = (name: ProductSection) =>
     section === name ? 'ring-2 ring-[var(--admin-accent)]/35' : '';
 
+  const hasMainImage = mainImages.length > 0;
+  const hasVariants = variants.length > 0;
+  const variantsMissingImages = variants.filter(
+    (variant) => (variantMediaMap.get(variant.id)?.length ?? 0) === 0,
+  );
+  const allVariantsHaveImages = hasVariants && variantsMissingImages.length === 0;
+  const readyToPublish = hasMainImage && hasVariants && allVariantsHaveImages;
+
   return (
     <div className="space-y-6">
       {error ? (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
           {error}
         </div>
       ) : null}
+
+      <AdminPanel title="Product images">
+        <div id="product-section-images" className={highlight('images')}>
+          <p className="mb-3 text-xs text-neutral-500 dark:text-neutral-400">
+            The first image becomes the main listing photo. At least one image is required.
+          </p>
+          <ImageUploader
+            images={mainImages}
+            required
+            disabled={!canUpdate}
+            uploading={uploadMainMutation.isPending}
+            onUpload={(file) => uploadMainMutation.mutate(file)}
+            onSetPrimary={(id) => setPrimaryMutation.mutate(id)}
+            onRemove={(id) => removeMediaMutation.mutate(id)}
+          />
+        </div>
+      </AdminPanel>
 
       <AdminPanel title="Variants">
         <div id="product-section-variants" className={highlight('variants')}>
@@ -249,7 +329,7 @@ export function ProductCommercePanels({
           ) : null}
 
           {variantsQuery.isLoading ? (
-            <p className="text-sm text-neutral-500">Loading variants…</p>
+            <p className="text-sm text-neutral-500 dark:text-neutral-400">Loading variants…</p>
           ) : variants.length === 0 ? (
             <AdminEmptyState
               title="No variants yet"
@@ -257,42 +337,61 @@ export function ProductCommercePanels({
             />
           ) : (
             <ul className="divide-y divide-[var(--admin-line)]">
-              {variants.map((variant) => (
-                <li
-                  key={variant.id}
-                  className="flex flex-wrap items-center justify-between gap-3 py-3"
-                >
-                  <div>
-                    <p className="font-medium text-[var(--admin-ink)]">
-                      {variant.title || variant.sku}
-                    </p>
-                    <p className="text-xs text-neutral-500">
-                      {variant.sku}
-                      {variant.isDefault ? ' · default' : ''} · stock{' '}
-                      {stockByVariant.get(variant.id) ?? 0}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium">
-                      {formatCurrency(variant.price, variant.currency)}
-                    </span>
-                    {canDelete ? (
-                      <button
-                        type="button"
-                        className={btnDanger}
-                        disabled={deleteMutation.isPending}
-                        onClick={() => {
-                          if (window.confirm(`Delete variant ${variant.sku}?`)) {
-                            deleteMutation.mutate(variant.id);
-                          }
-                        }}
-                      >
-                        Remove
-                      </button>
-                    ) : null}
-                  </div>
-                </li>
-              ))}
+              {variants.map((variant) => {
+                const variantImages = variantMediaMap.get(variant.id) ?? [];
+                return (
+                  <li
+                    key={variant.id}
+                    className="flex flex-wrap items-start justify-between gap-4 py-4"
+                  >
+                    <div className="flex items-start gap-3">
+                      <ImageUploader
+                        images={variantImages}
+                        required
+                        compact
+                        disabled={!canUpdate}
+                        uploading={
+                          uploadVariantImageMutation.isPending &&
+                          uploadVariantImageMutation.variables?.variantId === variant.id
+                        }
+                        onUpload={(file) =>
+                          uploadVariantImageMutation.mutate({ variantId: variant.id, file })
+                        }
+                        onRemove={(id) => removeMediaMutation.mutate(id)}
+                      />
+                      <div>
+                        <p className="font-medium text-[var(--admin-ink)]">
+                          {variant.title || variant.sku}
+                        </p>
+                        <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                          {variant.sku}
+                          {variant.isDefault ? ' · default' : ''} · stock{' '}
+                          {stockByVariant.get(variant.id) ?? 0}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">
+                        {formatCurrency(variant.price, variant.currency)}
+                      </span>
+                      {canDelete ? (
+                        <button
+                          type="button"
+                          className={btnDanger}
+                          disabled={deleteMutation.isPending}
+                          onClick={() => {
+                            if (window.confirm(`Delete variant ${variant.sku}?`)) {
+                              deleteMutation.mutate(variant.id);
+                            }
+                          }}
+                        >
+                          Remove
+                        </button>
+                      ) : null}
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>
@@ -314,9 +413,9 @@ export function ProductCommercePanels({
                 >
                   <div>
                     <p className="text-sm font-medium">{variant.title || variant.sku}</p>
-                    <p className="text-xs text-neutral-500">{variant.sku}</p>
+                    <p className="text-xs text-neutral-500 dark:text-neutral-400">{variant.sku}</p>
                   </div>
-                  <label className="block text-xs text-neutral-500">
+                  <label className="block text-xs text-neutral-500 dark:text-neutral-400">
                     Price
                     <input
                       className={`${fieldClass} mt-1`}
@@ -336,7 +435,7 @@ export function ProductCommercePanels({
                       }
                     />
                   </label>
-                  <label className="block text-xs text-neutral-500">
+                  <label className="block text-xs text-neutral-500 dark:text-neutral-400">
                     Sale price
                     <input
                       className={`${fieldClass} mt-1`}
@@ -400,11 +499,11 @@ export function ProductCommercePanels({
                   >
                     <div>
                       <p className="text-sm font-medium">{variant.title || variant.sku}</p>
-                      <p className="text-xs text-neutral-500">
+                      <p className="text-xs text-neutral-500 dark:text-neutral-400">
                         Available: {stockByVariant.get(variant.id) ?? 0}
                       </p>
                     </div>
-                    <label className="block text-xs text-neutral-500">
+                    <label className="block text-xs text-neutral-500 dark:text-neutral-400">
                       Warehouse
                       <select
                         className={`${fieldClass} mt-1`}
@@ -424,7 +523,7 @@ export function ProductCommercePanels({
                         ))}
                       </select>
                     </label>
-                    <label className="block text-xs text-neutral-500">
+                    <label className="block text-xs text-neutral-500 dark:text-neutral-400">
                       Qty
                       <input
                         className={`${fieldClass} mt-1`}
@@ -440,7 +539,7 @@ export function ProductCommercePanels({
                         }
                       />
                     </label>
-                    <label className="block text-xs text-neutral-500">
+                    <label className="block text-xs text-neutral-500 dark:text-neutral-400">
                       Direction
                       <select
                         className={`${fieldClass} mt-1`}
@@ -470,7 +569,9 @@ export function ProductCommercePanels({
                         Apply
                       </button>
                     ) : (
-                      <span className={`${btnGhost} self-end`}>View only</span>
+                      <span className="self-end text-xs text-neutral-500 dark:text-neutral-400">
+                        View only
+                      </span>
                     )}
                   </div>
                 );
@@ -479,6 +580,59 @@ export function ProductCommercePanels({
           )}
         </div>
       </AdminPanel>
+
+      <AdminPanel title="Review & publish">
+        <div id="product-section-review" className={highlight('review')}>
+          <p className="mb-4 text-sm text-neutral-600 dark:text-neutral-300">
+            Everything below must be complete before <strong>{productName}</strong> can go live.
+          </p>
+          <ul className="space-y-2 text-sm">
+            <ChecklistItem ok={hasMainImage} label="At least one product image" />
+            <ChecklistItem ok={hasVariants} label="At least one variant" />
+            <ChecklistItem
+              ok={allVariantsHaveImages}
+              label={
+                variantsMissingImages.length > 0
+                  ? `All variants have an image (${variantsMissingImages.length} missing)`
+                  : 'All variants have an image'
+              }
+            />
+          </ul>
+
+          {canPublish ? (
+            <button
+              type="button"
+              className={`${btnPrimary} mt-5`}
+              disabled={isPublishing || (!isPublished && !readyToPublish)}
+              onClick={onPublish}
+              title={
+                !readyToPublish && !isPublished
+                  ? 'Complete the checklist above to publish'
+                  : undefined
+              }
+            >
+              {isPublished ? 'Published' : isPublishing ? 'Publishing…' : 'Publish product'}
+            </button>
+          ) : null}
+        </div>
+      </AdminPanel>
     </div>
+  );
+}
+
+function ChecklistItem({ ok, label }: { ok: boolean; label: string }) {
+  return (
+    <li className="flex items-center gap-2">
+      {ok ? (
+        <CheckCircle2 className="size-4 shrink-0 text-emerald-600" />
+      ) : (
+        <XCircle className="size-4 shrink-0 text-red-500" />
+      )}
+      <span
+        className={ok ? 'text-neutral-700 dark:text-neutral-300' : 'text-red-700 dark:text-red-400'}
+      >
+        {label}
+      </span>
+    </li>
   );
 }

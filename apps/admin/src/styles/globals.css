@@ -1,14 +1,32 @@
 @import 'tailwindcss';
 @import '@fe-platform/ui/globals.css';
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
+  color-scheme: light;
   --admin-ink: #0c0d10;
   --admin-ink-soft: #17191f;
   --admin-surface: #f3f1ec;
   --admin-panel: #fffcf8;
+  --admin-panel-soft: #f7f4ee;
   --admin-line: rgba(12, 13, 16, 0.08);
   --admin-accent: #b08d57;
   --admin-accent-soft: rgba(176, 141, 87, 0.14);
+  --admin-shadow: 0 1px 0 rgba(12, 13, 16, 0.03);
+}
+
+.dark {
+  color-scheme: dark;
+  --admin-ink: #f3f1ec;
+  --admin-ink-soft: #dedad2;
+  --admin-surface: #0b0c0f;
+  --admin-panel: #15171c;
+  --admin-panel-soft: #1b1d23;
+  --admin-line: rgba(255, 255, 255, 0.09);
+  --admin-accent: #d3ab77;
+  --admin-accent-soft: rgba(211, 171, 119, 0.16);
+  --admin-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
 }
 
 html,
@@ -21,8 +39,17 @@ body {
   font-family: 'Figtree', ui-sans-serif, system-ui, sans-serif;
   background: var(--admin-surface);
   color: var(--admin-ink);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
 }
 
 .font-serif {
   font-family: 'Instrument Serif', ui-serif, Georgia, serif;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
 }

@@ -17,12 +17,14 @@ import {
 } from '@/components/admin';
 import { ADMIN_ROUTES, QUERY_KEYS } from '@/constants';
 import { usePermissions } from '@/hooks';
+import { AppError } from '@/lib/errors';
 import { cn } from '@/lib/utils';
 import { productsApi } from '@/services';
 
 const productSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   slug: z.string().optional(),
+  sku: z.string().min(1, 'SKU is required'),
   status: z.string().default('draft'),
   shortDescription: z.string().optional(),
   description: z.string().optional(),
@@ -34,11 +36,27 @@ function parseSection(search: string): ProductSection {
   const value = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search).get(
     'section',
   );
-  if (value === 'variants' || value === 'prices' || value === 'stock' || value === 'details') {
+  if (
+    value === 'images' ||
+    value === 'variants' ||
+    value === 'prices' ||
+    value === 'stock' ||
+    value === 'review' ||
+    value === 'details'
+  ) {
     return value;
   }
   return 'details';
 }
+
+const STEPS: Array<[ProductSection, string]> = [
+  ['details', 'Details'],
+  ['images', 'Images'],
+  ['variants', 'Variants'],
+  ['prices', 'Prices'],
+  ['stock', 'Stock'],
+  ['review', 'Review & publish'],
+];
 
 export function ProductFormPage({ productId }: { productId?: string }) {
   const navigate = useNavigate();
@@ -58,10 +76,18 @@ export function ProductFormPage({ productId }: { productId?: string }) {
     register,
     handleSubmit,
     reset,
+    setError,
     formState: { errors },
   } = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
-    defaultValues: { name: '', slug: '', status: 'draft', shortDescription: '', description: '' },
+    defaultValues: {
+      name: '',
+      slug: '',
+      sku: '',
+      status: 'draft',
+      shortDescription: '',
+      description: '',
+    },
   });
 
   useEffect(() => {
@@ -69,6 +95,7 @@ export function ProductFormPage({ productId }: { productId?: string }) {
       reset({
         name: detailQuery.data.name,
         slug: detailQuery.data.slug,
+        sku: detailQuery.data.sku ?? '',
         status: detailQuery.data.status,
         shortDescription: '',
         description: '',
@@ -81,7 +108,19 @@ export function ProductFormPage({ productId }: { productId?: string }) {
       isEdit ? productsApi.update(productId!, values) : productsApi.create(values),
     onSuccess: async (product) => {
       await queryClient.invalidateQueries({ queryKey: ['products'] });
-      await navigate({ to: ADMIN_ROUTES.productDetail.replace('$productId', product.id) });
+      if (isEdit) return;
+      await navigate({
+        to: `${ADMIN_ROUTES.productDetail.replace('$productId', product.id)}?section=images`,
+      });
+    },
+    onError: (err) => {
+      if (err instanceof AppError && err.code === 'SKU_EXISTS') {
+        setError('sku', { message: 'This SKU is already used by another product.' });
+        return;
+      }
+      if (err instanceof AppError) {
+        setError('name', { message: err.message });
+      }
     },
   });
 
@@ -107,6 +146,7 @@ export function ProductFormPage({ productId }: { productId?: string }) {
   }
 
   const readOnly = isEdit && !productPerms.update;
+  const isPublished = detailQuery.data?.status === 'published';
 
   const sectionHref = (value: ProductSection) => {
     if (!productId) return ADMIN_ROUTES.products;
@@ -117,26 +157,20 @@ export function ProductFormPage({ productId }: { productId?: string }) {
   return (
     <PageMotion>
       <AdminPageHeader
-        title={isEdit ? 'Edit product' : 'Create product'}
-        description="Manage product details, variants, prices, and stock."
+        title={isEdit ? 'Edit product' : 'Add product'}
+        description={
+          isEdit
+            ? 'Manage product details, images, variants, prices, and stock.'
+            : 'Start with the basics — you\u2019ll add images, variants, and stock next.'
+        }
         actions={
           <>
             <Link
               to={ADMIN_ROUTES.products}
-              className="inline-flex h-9 items-center rounded-lg border border-[var(--admin-line)] bg-white px-3.5 text-sm font-medium transition hover:bg-neutral-50"
+              className="inline-flex h-9 items-center rounded-lg border border-[var(--admin-line)] bg-[var(--admin-panel)] px-3.5 text-sm font-medium text-[var(--admin-ink)] transition hover:bg-neutral-50 dark:hover:bg-white/10"
             >
               Back to list
             </Link>
-            {isEdit && productPerms.publish ? (
-              <button
-                type="button"
-                className="inline-flex h-9 items-center rounded-lg border border-[var(--admin-line)] bg-white px-3.5 text-sm font-medium transition hover:bg-neutral-50 disabled:opacity-60"
-                onClick={() => publishMutation.mutate()}
-                disabled={publishMutation.isPending}
-              >
-                Publish
-              </button>
-            ) : null}
             {isEdit && productPerms.delete ? (
               <button
                 type="button"
@@ -155,52 +189,69 @@ export function ProductFormPage({ productId }: { productId?: string }) {
 
       {isEdit ? (
         <div className="mb-5 flex flex-wrap gap-2">
-          {(
-            [
-              ['details', 'Details'],
-              ['variants', 'Variants'],
-              ['prices', 'Prices'],
-              ['stock', 'Stock'],
-            ] as const
-          ).map(([value, label]) => (
+          {STEPS.map(([value, label]) => (
             <a
               key={value}
               href={sectionHref(value)}
               className={cn(
                 'rounded-full px-3 py-1.5 text-xs font-medium transition',
                 section === value
-                  ? 'bg-[var(--admin-ink)] text-white'
-                  : 'border border-[var(--admin-line)] bg-white text-neutral-600 hover:bg-neutral-50',
+                  ? 'bg-[var(--admin-ink)] text-[var(--admin-surface)]'
+                  : 'border border-[var(--admin-line)] bg-[var(--admin-panel)] text-neutral-600 hover:bg-neutral-50 dark:text-neutral-300 dark:hover:bg-white/10',
               )}
             >
               {label}
             </a>
           ))}
         </div>
-      ) : null}
+      ) : (
+        <div className="mb-5 flex items-center gap-2 text-xs text-neutral-500 dark:text-neutral-400">
+          <span className="rounded-full bg-[var(--admin-ink)] px-2.5 py-1 font-medium text-[var(--admin-surface)]">
+            1. Details
+          </span>
+          <span>→</span>
+          <span>2. Images</span>
+          <span>→</span>
+          <span>3. Variants</span>
+          <span>→</span>
+          <span>4. Prices &amp; stock</span>
+          <span>→</span>
+          <span>5. Review &amp; publish</span>
+        </div>
+      )}
 
-      <div className="grid gap-6 xl:grid-cols-[1.25fr_1fr]">
+      <div className={cn('grid gap-6', isEdit && 'xl:grid-cols-[1.25fr_1fr]')}>
         <form
           id="product-section-details"
           onSubmit={onSubmit}
           className={cn(
             'space-y-6',
             section === 'details' && isEdit && 'ring-[var(--admin-accent)]/30 rounded-2xl ring-2',
+            !isEdit && 'mx-auto w-full max-w-xl',
           )}
         >
           <AdminPanel title="Details">
             <div className="space-y-4">
               <AdminTextInput
-                label="Name"
+                label="Product name"
                 registration={register('name')}
                 error={errors.name}
                 disabled={readOnly}
+                placeholder="e.g. Cloud Studio Sneaker"
+              />
+              <AdminTextInput
+                label="SKU"
+                registration={register('sku')}
+                error={errors.sku}
+                disabled={readOnly}
+                placeholder="e.g. ATL-042"
               />
               <AdminTextInput
                 label="Slug"
                 registration={register('slug')}
                 error={errors.slug}
                 disabled={readOnly}
+                placeholder="auto-generated if left blank"
               />
               <AdminSelect
                 label="Status"
@@ -230,9 +281,13 @@ export function ProductFormPage({ productId }: { productId?: string }) {
                 <button
                   type="submit"
                   disabled={saveMutation.isPending}
-                  className="inline-flex h-10 items-center rounded-lg bg-[var(--admin-ink)] px-4 text-sm font-semibold text-white transition hover:bg-black disabled:opacity-60"
+                  className="inline-flex h-10 w-full items-center justify-center rounded-lg bg-[var(--admin-ink)] px-4 text-sm font-semibold text-[var(--admin-surface)] transition hover:opacity-90 disabled:opacity-60 sm:w-auto"
                 >
-                  {saveMutation.isPending ? 'Saving…' : 'Save product'}
+                  {saveMutation.isPending
+                    ? 'Saving…'
+                    : isEdit
+                      ? 'Save product'
+                      : 'Continue to images →'}
                 </button>
               ) : null}
             </div>
@@ -242,20 +297,18 @@ export function ProductFormPage({ productId }: { productId?: string }) {
         {isEdit && productId ? (
           <ProductCommercePanels
             productId={productId}
+            productName={detailQuery.data?.name ?? 'this product'}
             section={section}
             canUpdate={productPerms.update}
             canCreate={productPerms.create}
             canDelete={productPerms.delete}
             canAdjustStock={inventory.adjust}
+            canPublish={productPerms.publish}
+            isPublished={isPublished}
+            isPublishing={publishMutation.isPending}
+            onPublish={() => publishMutation.mutate()}
           />
-        ) : (
-          <AdminPanel title="Next steps">
-            <p className="text-sm text-neutral-600">
-              Save the product first, then add variants, set prices, and adjust stock from this
-              page.
-            </p>
-          </AdminPanel>
-        )}
+        ) : null}
       </div>
     </PageMotion>
   );

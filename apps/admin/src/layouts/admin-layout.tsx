@@ -1,7 +1,15 @@
 import { Outlet } from '@tanstack/react-router';
+import { useEffect } from 'react';
 import { AdminBreadcrumbs, AdminSidebar, AdminTopbar } from '@/components/admin';
+import { useUiStore } from '@/store';
 
 export function AdminLayout() {
+  const theme = useUiStore((state) => state.theme);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', theme === 'dark');
+  }, [theme]);
+
   return (
     <div className="flex min-h-screen bg-[var(--admin-surface)] text-[var(--admin-ink)]">
       <a

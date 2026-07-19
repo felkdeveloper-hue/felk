@@ -20,7 +20,9 @@ export function AdminPageHeader({
           {title}
         </h1>
         {description ? (
-          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-neutral-500">{description}</p>
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">
+            {description}
+          </p>
         ) : null}
       </div>
       {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
@@ -42,20 +44,24 @@ export function AdminStatCard({
   return (
     <article
       className={cn(
-        'rounded-2xl border border-[var(--admin-line)] bg-[var(--admin-panel)] p-5 shadow-[0_1px_0_rgba(12,13,16,0.03)]',
+        'rounded-2xl border border-[var(--admin-line)] bg-[var(--admin-panel)] p-5 shadow-[var(--admin-shadow)] transition-colors',
         className,
       )}
     >
-      <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">{title}</p>
-      <p className="mt-3 font-serif text-3xl tracking-tight text-[var(--admin-ink)]">{value}</p>
-      {hint ? <p className="mt-2 text-xs text-neutral-500">{hint}</p> : null}
+      <p className="text-xs font-medium uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+        {title}
+      </p>
+      <p className="mt-3 font-serif text-3xl tabular-nums tracking-tight text-[var(--admin-ink)]">
+        {value}
+      </p>
+      {hint ? <p className="mt-2 text-xs text-neutral-500 dark:text-neutral-400">{hint}</p> : null}
     </article>
   );
 }
 
 export function AdminPanel({ title, children }: { title?: string; children: ReactNode }) {
   return (
-    <section className="rounded-2xl border border-[var(--admin-line)] bg-[var(--admin-panel)] shadow-[0_1px_0_rgba(12,13,16,0.03)]">
+    <section className="rounded-2xl border border-[var(--admin-line)] bg-[var(--admin-panel)] shadow-[var(--admin-shadow)] transition-colors">
       {title ? (
         <header className="flex items-center justify-between border-b border-[var(--admin-line)] px-5 py-4">
           <h2 className="text-sm font-semibold tracking-tight text-[var(--admin-ink)]">{title}</h2>
@@ -71,7 +77,9 @@ export function AdminEmptyState({ title, description }: { title: string; descrip
     <div className="rounded-2xl border border-dashed border-[var(--admin-line)] bg-[var(--admin-panel)] px-8 py-12 text-center">
       <h3 className="font-serif text-2xl text-[var(--admin-ink)]">{title}</h3>
       {description ? (
-        <p className="mx-auto mt-2 max-w-md text-sm text-neutral-500">{description}</p>
+        <p className="mx-auto mt-2 max-w-md text-sm text-neutral-500 dark:text-neutral-400">
+          {description}
+        </p>
       ) : null}
     </div>
   );
@@ -79,7 +87,7 @@ export function AdminEmptyState({ title, description }: { title: string; descrip
 
 export function AdminErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
-    <div className="rounded-2xl border border-red-200/80 bg-red-50/80 p-5 text-sm text-red-800">
+    <div className="rounded-2xl border border-red-200/80 bg-red-50/80 p-5 text-sm text-red-800 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
       <p>{message}</p>
       {onRetry ? (
         <button

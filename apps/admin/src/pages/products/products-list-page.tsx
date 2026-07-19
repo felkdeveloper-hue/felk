@@ -21,6 +21,8 @@ function productHref(productId: string, section?: string) {
 
 const actionBtn =
   'inline-flex h-8 items-center rounded-md px-2.5 text-xs font-medium transition disabled:opacity-50';
+const actionSecondary =
+  'border border-[var(--admin-line)] bg-[var(--admin-panel-soft)] text-neutral-700 hover:bg-white dark:text-neutral-300 dark:hover:bg-white/10';
 
 export function ProductsListPage() {
   const queryClient = useQueryClient();
@@ -106,11 +108,15 @@ export function ProductsListPage() {
   const statusTone = (value: string) => {
     const normalized = value.toLowerCase();
     if (normalized === 'published' || normalized === 'active') {
-      return 'bg-emerald-50 text-emerald-800';
+      return 'bg-emerald-50 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300';
     }
-    if (normalized === 'draft') return 'bg-amber-50 text-amber-800';
-    if (normalized === 'archived') return 'bg-neutral-100 text-neutral-600';
-    return 'bg-neutral-100 text-neutral-700';
+    if (normalized === 'draft') {
+      return 'bg-amber-50 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300';
+    }
+    if (normalized === 'archived') {
+      return 'bg-neutral-100 text-neutral-600 dark:bg-white/10 dark:text-neutral-300';
+    }
+    return 'bg-neutral-100 text-neutral-700 dark:bg-white/10 dark:text-neutral-300';
   };
 
   return (
@@ -124,7 +130,7 @@ export function ProductsListPage() {
               to={ADMIN_ROUTES.productNew}
               className="inline-flex h-9 items-center rounded-lg bg-[var(--admin-ink)] px-3.5 text-sm font-medium text-white transition hover:bg-black"
             >
-              Create product
+              Add product
             </Link>
           ) : null
         }
@@ -181,7 +187,7 @@ export function ProductsListPage() {
                   {products.update ? (
                     <button
                       type="button"
-                      className={cn(actionBtn, 'border border-[var(--admin-line)] bg-white')}
+                      className={cn(actionBtn, actionSecondary)}
                       onClick={() => archiveMutation.mutate(selectedIds)}
                     >
                       Archive
@@ -252,30 +258,27 @@ export function ProductsListPage() {
                       </a>
                     ) : null}
                     <a
+                      href={productHref(row.id, 'images')}
+                      className={cn(actionBtn, actionSecondary)}
+                    >
+                      Images
+                    </a>
+                    <a
                       href={productHref(row.id, 'variants')}
-                      className={cn(
-                        actionBtn,
-                        'border border-[var(--admin-line)] bg-white text-neutral-700 hover:bg-neutral-50',
-                      )}
+                      className={cn(actionBtn, actionSecondary)}
                     >
                       Variants
                     </a>
                     <a
                       href={productHref(row.id, 'prices')}
-                      className={cn(
-                        actionBtn,
-                        'border border-[var(--admin-line)] bg-white text-neutral-700 hover:bg-neutral-50',
-                      )}
+                      className={cn(actionBtn, actionSecondary)}
                     >
                       Prices
                     </a>
                     {(inventory.view || inventory.adjust) && (
                       <a
                         href={productHref(row.id, 'stock')}
-                        className={cn(
-                          actionBtn,
-                          'border border-[var(--admin-line)] bg-white text-neutral-700 hover:bg-neutral-50',
-                        )}
+                        className={cn(actionBtn, actionSecondary)}
                       >
                         Stock
                       </a>
@@ -283,7 +286,10 @@ export function ProductsListPage() {
                     {products.delete ? (
                       <button
                         type="button"
-                        className={cn(actionBtn, 'text-red-700 hover:bg-red-50')}
+                        className={cn(
+                          actionBtn,
+                          'text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10',
+                        )}
                         disabled={removeOneMutation.isPending}
                         onClick={() => {
                           if (window.confirm(`Delete “${row.name}”?`)) {

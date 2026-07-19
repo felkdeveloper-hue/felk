@@ -17,3 +17,4 @@ export { AdminTextInput, AdminTextarea, AdminSelect, AdminField } from './admin-
 export { CmsResourceListPage } from './cms-resource-list-page';
 export { ModuleHubPage, PlaceholderModulePage } from './placeholder-module-page';
 export { ProductCommercePanels, type ProductSection } from './product-commerce-panels';
+export { ImageUploader } from './image-uploader';

@@ -30,21 +30,6 @@ export function ReportsPage() {
   );
 }
 
-export function UsersPage() {
-  return (
-    <PlaceholderModulePage
-      title="Users"
-      description="Staff user management and access control."
-      bullets={[
-        'Invite staff users',
-        'Lock/unlock accounts',
-        'Assign roles',
-        'Requires backend user admin endpoints',
-      ]}
-    />
-  );
-}
-
 export function RolesPage() {
   return (
     <PlaceholderModulePage
