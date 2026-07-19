@@ -9,6 +9,7 @@ interface AuthState {
   accessToken: string | null;
   refreshToken: string | null;
   hasHydrated: boolean;
+  permissionsHydrated: boolean;
 }
 
 interface AuthActions {
@@ -17,6 +18,7 @@ interface AuthActions {
   setUser: (user: AuthUser | null) => void;
   clearSession: () => void;
   setHasHydrated: (hydrated: boolean) => void;
+  setPermissionsHydrated: (hydrated: boolean) => void;
   hasRole: (role: string) => boolean;
   hasAnyRole: (roles: string[]) => boolean;
   hasPermission: (permission: string) => boolean;
@@ -32,12 +34,14 @@ export const useAuthStore = create<AuthStore>()(
       accessToken: null,
       refreshToken: null,
       hasHydrated: false,
+      permissionsHydrated: false,
 
       setSession: (session) =>
         set({
           user: session.user,
           accessToken: session.accessToken,
           refreshToken: session.refreshToken,
+          permissionsHydrated: true,
         }),
 
       setTokens: (tokens) =>
@@ -46,9 +50,16 @@ export const useAuthStore = create<AuthStore>()(
           refreshToken: tokens.refreshToken ?? state.refreshToken,
         })),
 
-      setUser: (user) => set({ user }),
-      clearSession: () => set({ user: null, accessToken: null, refreshToken: null }),
+      setUser: (user) => set({ user, permissionsHydrated: true }),
+      clearSession: () =>
+        set({
+          user: null,
+          accessToken: null,
+          refreshToken: null,
+          permissionsHydrated: false,
+        }),
       setHasHydrated: (hydrated) => set({ hasHydrated: hydrated }),
+      setPermissionsHydrated: (hydrated) => set({ permissionsHydrated: hydrated }),
 
       hasRole: (role) => Boolean(get().user?.roles.includes(role)),
       hasAnyRole: (roles) => roles.some((role) => get().user?.roles.includes(role)),
@@ -64,7 +75,13 @@ export const useAuthStore = create<AuthStore>()(
         accessToken: state.accessToken,
         refreshToken: state.refreshToken,
       }),
-      onRehydrateStorage: () => (state) => state?.setHasHydrated(true),
+      onRehydrateStorage: () => (state) => {
+        if (!state) return;
+        state.setHasHydrated(true);
+        if ((state.user?.permissions.length ?? 0) > 0) {
+          state.setPermissionsHydrated(true);
+        }
+      },
     },
   ),
 );

@@ -1,22 +1,30 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useMemo, useState } from 'react';
-import { Button } from '@fe-platform/ui';
 import {
   AdminErrorState,
   AdminPageHeader,
+  AdminStatCard,
   DataTable,
   ListToolbar,
   PageMotion,
 } from '@/components/admin';
 import { ADMIN_ROUTES, QUERY_KEYS } from '@/constants';
 import { usePermissions } from '@/hooks';
-import { formatCurrency, formatDate } from '@/lib/utils';
-import { productsApi } from '@/services';
+import { cn, formatCurrency, formatDate } from '@/lib/utils';
+import { inventoryApi, productsApi } from '@/services';
+
+function productHref(productId: string, section?: string) {
+  const base = ADMIN_ROUTES.productDetail.replace('$productId', productId);
+  return section ? `${base}?section=${section}` : base;
+}
+
+const actionBtn =
+  'inline-flex h-8 items-center rounded-md px-2.5 text-xs font-medium transition disabled:opacity-50';
 
 export function ProductsListPage() {
   const queryClient = useQueryClient();
-  const { products } = usePermissions();
+  const { products, inventory } = usePermissions();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
@@ -32,18 +40,55 @@ export function ProductsListPage() {
     queryFn: () => productsApi.list(params),
   });
 
+  const summaryQueries = useQueries({
+    queries: [
+      {
+        queryKey: QUERY_KEYS.products.list({ page: 1, limit: 1, summary: 'total' }),
+        queryFn: () => productsApi.list({ page: 1, limit: 1 }),
+      },
+      {
+        queryKey: QUERY_KEYS.products.list({ page: 1, limit: 1, status: 'active' }),
+        queryFn: () => productsApi.list({ page: 1, limit: 1, status: 'active' }),
+      },
+      {
+        queryKey: QUERY_KEYS.products.list({ page: 1, limit: 1, status: 'published' }),
+        queryFn: () => productsApi.list({ page: 1, limit: 1, status: 'published' }),
+      },
+      {
+        queryKey: QUERY_KEYS.products.list({ page: 1, limit: 1, status: 'draft' }),
+        queryFn: () => productsApi.list({ page: 1, limit: 1, status: 'draft' }),
+      },
+      {
+        queryKey: QUERY_KEYS.inventory.items({ page: 1, limit: 1, lowStockOnly: true }),
+        queryFn: () => inventoryApi.listItems({ page: 1, limit: 1, lowStockOnly: true }),
+      },
+    ],
+  });
+
+  const totalProducts = summaryQueries[0]?.data?.meta.total ?? 0;
+  const activeProducts =
+    (summaryQueries[1]?.data?.meta.total ?? 0) + (summaryQueries[2]?.data?.meta.total ?? 0);
+  const draftProducts = summaryQueries[3]?.data?.meta.total ?? 0;
+  const lowStock = summaryQueries[4]?.data?.meta.total ?? 0;
+
   const deleteMutation = useMutation({
     mutationFn: (ids: string[]) => productsApi.bulkDelete(ids),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['products'] }),
+    onSuccess: () => {
+      setSelectedIds([]);
+      void queryClient.invalidateQueries({ queryKey: ['products'] });
+    },
   });
 
   const archiveMutation = useMutation({
     mutationFn: (ids: string[]) => productsApi.bulkStatus(ids, 'archived'),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['products'] }),
+    onSuccess: () => {
+      setSelectedIds([]);
+      void queryClient.invalidateQueries({ queryKey: ['products'] });
+    },
   });
 
-  const duplicateMutation = useMutation({
-    mutationFn: (id: string) => productsApi.duplicate(id),
+  const removeOneMutation = useMutation({
+    mutationFn: (id: string) => productsApi.remove(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['products'] }),
   });
 
@@ -58,6 +103,16 @@ export function ProductsListPage() {
     setSelectedIds((current) => (current.length === rows.length ? [] : rows.map((row) => row.id)));
   };
 
+  const statusTone = (value: string) => {
+    const normalized = value.toLowerCase();
+    if (normalized === 'published' || normalized === 'active') {
+      return 'bg-emerald-50 text-emerald-800';
+    }
+    if (normalized === 'draft') return 'bg-amber-50 text-amber-800';
+    if (normalized === 'archived') return 'bg-neutral-100 text-neutral-600';
+    return 'bg-neutral-100 text-neutral-700';
+  };
+
   return (
     <PageMotion>
       <AdminPageHeader
@@ -65,12 +120,22 @@ export function ProductsListPage() {
         description="Manage catalog products, variants, media, and SEO."
         actions={
           products.create ? (
-            <Link to={ADMIN_ROUTES.productNew}>
-              <Button size="sm">Create product</Button>
+            <Link
+              to={ADMIN_ROUTES.productNew}
+              className="inline-flex h-9 items-center rounded-lg bg-[var(--admin-ink)] px-3.5 text-sm font-medium text-white transition hover:bg-black"
+            >
+              Create product
             </Link>
           ) : null
         }
       />
+
+      <div className="mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <AdminStatCard title="Total products" value={totalProducts} hint="All catalog items" />
+        <AdminStatCard title="Active" value={activeProducts} hint="Active + published" />
+        <AdminStatCard title="Draft" value={draftProducts} hint="Not ready to sell" />
+        <AdminStatCard title="Low stock" value={lowStock} hint="SKUs at or below threshold" />
+      </div>
 
       {query.isError ? (
         <AdminErrorState message="Unable to load products." onRetry={() => query.refetch()} />
@@ -82,12 +147,14 @@ export function ProductsListPage() {
               setSearch(value);
               setPage(1);
             }}
+            searchPlaceholder="Search products, SKU…"
             status={status}
             onStatusChange={(value) => {
               setStatus(value);
               setPage(1);
             }}
             statusOptions={[
+              { label: 'Active', value: 'active' },
               { label: 'Draft', value: 'draft' },
               { label: 'Published', value: 'published' },
               { label: 'Archived', value: 'archived' },
@@ -99,22 +166,26 @@ export function ProductsListPage() {
               selectedIds.length > 0 ? (
                 <>
                   {products.delete ? (
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => deleteMutation.mutate(selectedIds)}
+                    <button
+                      type="button"
+                      className={cn(actionBtn, 'bg-red-600 text-white hover:bg-red-700')}
+                      onClick={() => {
+                        if (window.confirm(`Delete ${selectedIds.length} product(s)?`)) {
+                          deleteMutation.mutate(selectedIds);
+                        }
+                      }}
                     >
-                      Delete
-                    </Button>
+                      Delete selected
+                    </button>
                   ) : null}
                   {products.update ? (
-                    <Button
-                      variant="outline"
-                      size="sm"
+                    <button
+                      type="button"
+                      className={cn(actionBtn, 'border border-[var(--admin-line)] bg-white')}
                       onClick={() => archiveMutation.mutate(selectedIds)}
                     >
                       Archive
-                    </Button>
+                    </button>
                   ) : null}
                 </>
               ) : null
@@ -134,15 +205,28 @@ export function ProductsListPage() {
                 header: 'Product',
                 cell: (row) => (
                   <Link
-                    to={ADMIN_ROUTES.productDetail.replace('$productId', row.id)}
-                    className="font-medium text-neutral-900 hover:underline"
+                    to={productHref(row.id)}
+                    className="font-medium text-[var(--admin-ink)] hover:underline"
                   >
                     {row.name}
                   </Link>
                 ),
               },
               { id: 'sku', header: 'SKU', cell: (row) => row.sku ?? '—' },
-              { id: 'status', header: 'Status', cell: (row) => row.status },
+              {
+                id: 'status',
+                header: 'Status',
+                cell: (row) => (
+                  <span
+                    className={cn(
+                      'inline-flex rounded-full px-2 py-0.5 text-xs font-medium capitalize',
+                      statusTone(row.status),
+                    )}
+                  >
+                    {row.status}
+                  </span>
+                ),
+              },
               {
                 id: 'price',
                 header: 'Price',
@@ -156,17 +240,62 @@ export function ProductsListPage() {
               },
               {
                 id: 'actions',
-                header: '',
-                cell: (row) =>
-                  products.create ? (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => duplicateMutation.mutate(row.id)}
+                header: 'Actions',
+                cell: (row) => (
+                  <div className="flex flex-wrap items-center justify-end gap-1">
+                    {products.update || products.view ? (
+                      <a
+                        href={productHref(row.id)}
+                        className={cn(actionBtn, 'bg-[var(--admin-ink)] text-white hover:bg-black')}
+                      >
+                        Edit
+                      </a>
+                    ) : null}
+                    <a
+                      href={productHref(row.id, 'variants')}
+                      className={cn(
+                        actionBtn,
+                        'border border-[var(--admin-line)] bg-white text-neutral-700 hover:bg-neutral-50',
+                      )}
                     >
-                      Duplicate
-                    </Button>
-                  ) : null,
+                      Variants
+                    </a>
+                    <a
+                      href={productHref(row.id, 'prices')}
+                      className={cn(
+                        actionBtn,
+                        'border border-[var(--admin-line)] bg-white text-neutral-700 hover:bg-neutral-50',
+                      )}
+                    >
+                      Prices
+                    </a>
+                    {(inventory.view || inventory.adjust) && (
+                      <a
+                        href={productHref(row.id, 'stock')}
+                        className={cn(
+                          actionBtn,
+                          'border border-[var(--admin-line)] bg-white text-neutral-700 hover:bg-neutral-50',
+                        )}
+                      >
+                        Stock
+                      </a>
+                    )}
+                    {products.delete ? (
+                      <button
+                        type="button"
+                        className={cn(actionBtn, 'text-red-700 hover:bg-red-50')}
+                        disabled={removeOneMutation.isPending}
+                        onClick={() => {
+                          if (window.confirm(`Delete “${row.name}”?`)) {
+                            removeOneMutation.mutate(row.id);
+                          }
+                        }}
+                      >
+                        Delete
+                      </button>
+                    ) : null}
+                  </div>
+                ),
               },
             ]}
           />

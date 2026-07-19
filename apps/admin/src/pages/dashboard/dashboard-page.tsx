@@ -1,5 +1,4 @@
 import { Link } from '@tanstack/react-router';
-import { Button } from '@fe-platform/ui';
 import {
   AdminErrorState,
   AdminPageHeader,
@@ -33,15 +32,17 @@ export function DashboardPage() {
         description="Overview of store performance, inventory health, and recent activity."
         actions={
           <>
-            <Link to={ADMIN_ROUTES.productNew}>
-              <Button variant="outline" size="sm">
-                Add product
-              </Button>
+            <Link
+              to={ADMIN_ROUTES.productNew}
+              className="inline-flex h-9 items-center rounded-lg border border-[var(--admin-line)] bg-[var(--admin-panel)] px-3.5 text-sm font-medium transition hover:bg-white"
+            >
+              Add product
             </Link>
-            <Link to={ADMIN_ROUTES.orders}>
-              <Button variant="outline" size="sm">
-                View orders
-              </Button>
+            <Link
+              to={ADMIN_ROUTES.orders}
+              className="inline-flex h-9 items-center rounded-lg bg-[var(--admin-ink)] px-3.5 text-sm font-medium text-white transition hover:bg-black"
+            >
+              View orders
             </Link>
           </>
         }
@@ -103,20 +104,30 @@ export function DashboardPage() {
         </AdminPanel>
 
         <div className="space-y-6">
-          <AdminPanel title="Charts">
-            <div className="flex h-40 items-center justify-center rounded-lg border border-dashed border-neutral-200 bg-neutral-50 text-sm text-neutral-500">
-              Sales chart placeholder
+          <AdminPanel title="Performance">
+            <div className="flex h-40 flex-col items-center justify-center rounded-xl border border-dashed border-[var(--admin-line)] bg-[var(--admin-surface)] px-6 text-center">
+              <p className="text-sm font-medium text-[var(--admin-ink)]">Sales trend</p>
+              <p className="mt-1 text-xs text-neutral-500">
+                Charts will appear once report data is connected.
+              </p>
             </div>
           </AdminPanel>
           <AdminPanel title="Recent activity">
             <ul className="space-y-3 text-sm text-neutral-600">
               {(data?.recentPayments ?? []).slice(0, 5).map((payment) => (
-                <li key={payment.id}>
-                  Payment {payment.referenceNumber ?? payment.id} · {payment.status}
+                <li
+                  key={payment.id}
+                  className="flex items-start gap-3 border-b border-[var(--admin-line)] pb-3 last:border-0 last:pb-0"
+                >
+                  <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-[var(--admin-accent)]" />
+                  <span>
+                    Payment {payment.referenceNumber ?? payment.id}
+                    <span className="text-neutral-400"> · {payment.status}</span>
+                  </span>
                 </li>
               ))}
               {!stats.isLoading && (data?.recentPayments?.length ?? 0) === 0 ? (
-                <li>No recent payment activity.</li>
+                <li className="text-neutral-500">No recent payment activity.</li>
               ) : null}
             </ul>
           </AdminPanel>

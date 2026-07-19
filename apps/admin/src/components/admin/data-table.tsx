@@ -33,9 +33,9 @@ export function DataTable<T>({
   const allSelected = data.length > 0 && data.every((row) => selectedIds.includes(getRowId(row)));
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-white">
+    <div className="overflow-x-auto rounded-2xl border border-[var(--admin-line)] bg-[var(--admin-panel)]">
       <table className="min-w-full text-sm">
-        <thead className="bg-neutral-50 text-left text-neutral-500">
+        <thead className="bg-[var(--admin-surface)] text-left text-neutral-500">
           <tr>
             {onToggleRow ? (
               <th scope="col" className="px-4 py-3">
@@ -51,7 +51,10 @@ export function DataTable<T>({
               <th
                 key={column.id}
                 scope="col"
-                className={cn('px-4 py-3 font-medium', column.className)}
+                className={cn(
+                  'px-4 py-3 text-xs font-semibold uppercase tracking-wide',
+                  column.className,
+                )}
               >
                 {column.header}
               </th>
