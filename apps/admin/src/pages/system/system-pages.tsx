@@ -1,19 +1,5 @@
 import { PlaceholderModulePage } from '@/components/admin';
 
-export function MarketingPage() {
-  return (
-    <PlaceholderModulePage
-      title="Marketing"
-      description="Campaigns, coupons, and newsletter tools."
-      bullets={[
-        'Campaign builder placeholder',
-        'Coupon management placeholder',
-        'Newsletter audience placeholder',
-      ]}
-    />
-  );
-}
-
 export function ReportsPage() {
   return (
     <PlaceholderModulePage
@@ -55,21 +41,6 @@ export function SettingsPage() {
         'Checkout settings',
         'Tax and shipping defaults',
         'Notification preferences',
-      ]}
-    />
-  );
-}
-
-export function AuditPage() {
-  return (
-    <PlaceholderModulePage
-      title="Audit logs"
-      description="Immutable activity timeline for compliance and troubleshooting."
-      bullets={[
-        'Filter by actor and resource',
-        'Search events',
-        'Export audit trail',
-        'Requires backend audit read API',
       ]}
     />
   );

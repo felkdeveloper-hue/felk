@@ -11,7 +11,7 @@ import { authLayoutRoute } from './layout-routes';
 
 export const authIndexRoute = createRoute({
   getParentRoute: () => authLayoutRoute,
-  path: '/',
+  id: 'auth-index',
   beforeLoad: () => {
     throw redirect({ to: ROUTES.authLogin });
   },

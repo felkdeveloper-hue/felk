@@ -38,10 +38,7 @@ export function DashboardPage() {
             >
               Add product
             </Link>
-            <Link
-              to={ADMIN_ROUTES.orders}
-              className="inline-flex h-9 items-center rounded-lg bg-[var(--admin-ink)] px-3.5 text-sm font-medium text-white transition hover:bg-black"
-            >
+            <Link to={ADMIN_ROUTES.orders} className="admin-btn admin-btn-primary admin-btn-lg">
               View orders
             </Link>
           </>

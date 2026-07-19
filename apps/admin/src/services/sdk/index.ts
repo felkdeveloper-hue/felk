@@ -8,6 +8,7 @@ export { inventoryApi } from './inventory';
 export { paymentsApi } from './payments';
 export { cmsApi, createCmsResourceApi } from './cms';
 export { mediaApi } from './media';
+export { auditApi } from './audit';
 export { reviewsApi } from './reviews';
 
 export type {
@@ -29,4 +30,5 @@ export type {
 export type { PaymentRow } from './payments';
 export type { CmsResource } from './cms';
 export type { MediaUploadOptions, ProductMediaRow } from './media';
+export type { AuditListParams, AuditLogRow } from './audit';
 export type { AdminReview, ReviewListParams } from './reviews';

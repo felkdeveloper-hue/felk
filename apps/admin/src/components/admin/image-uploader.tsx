@@ -43,7 +43,7 @@ export function ImageUploader({
               className="h-full w-full object-cover"
             />
             {image.isPrimary ? (
-              <span className="absolute left-1 top-1 rounded-full bg-[var(--admin-ink)] p-1 text-white">
+              <span className="absolute left-1 top-1 rounded-full bg-[var(--admin-ink)] p-1 text-[var(--admin-surface)]">
                 <Star className="size-2.5 fill-current" />
               </span>
             ) : null}

@@ -1,21 +1,56 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useMemo, useState } from 'react';
-import { Button } from '@fe-platform/ui';
 import {
   AdminErrorState,
   AdminPageHeader,
-  AdminPanel,
   DataTable,
   ListToolbar,
   PageMotion,
 } from '@/components/admin';
 import { QUERY_KEYS } from '@/constants';
-import { formatDate } from '@/lib/utils';
+import { cn, formatDate } from '@/lib/utils';
 import type { createCmsResourceApi } from '@/services';
 import type { CmsResource } from '@/services';
 
 type CmsApi = ReturnType<typeof createCmsResourceApi>;
+
+function draftPayload(resourceKey: string, title: string): Record<string, unknown> {
+  const stamp = Date.now();
+  switch (resourceKey) {
+    case 'hero-banners':
+    case 'promo-banners':
+      return {
+        title: `New ${title.replace(/s$/, '')}`,
+        status: 'draft',
+        priority: 0,
+      };
+    case 'home-sections':
+      return {
+        key: `section-${stamp}`,
+        title: `New ${title.replace(/s$/, '')}`,
+        status: 'draft',
+      };
+    case 'faqs':
+      return {
+        question: 'New FAQ question?',
+        answer: 'Add the answer here.',
+        status: 'draft',
+      };
+    case 'announcements':
+      return {
+        title: `New ${title.replace(/s$/, '')}`,
+        body: 'Announcement body',
+        status: 'draft',
+      };
+    default:
+      return {
+        name: `New ${title.replace(/s$/, '')}`,
+        slug: `new-${resourceKey}-${stamp}`,
+        status: 'draft',
+      };
+  }
+}
 
 export function CmsResourceListPage({
   title,
@@ -88,19 +123,14 @@ export function CmsResourceListPage({
         description={description}
         actions={
           canCreate ? (
-            <Button
-              size="sm"
+            <button
+              type="button"
+              className="admin-btn admin-btn-primary admin-btn-lg"
               disabled={createMutation.isPending}
-              onClick={() =>
-                createMutation.mutate({
-                  name: `New ${title.replace(/s$/, '')}`,
-                  slug: `new-${resourceKey}-${Date.now()}`,
-                  status: 'draft',
-                })
-              }
+              onClick={() => createMutation.mutate(draftPayload(resourceKey, title))}
             >
-              Create
-            </Button>
+              {createMutation.isPending ? 'Creating…' : 'Create'}
+            </button>
           ) : null
         }
       />
@@ -122,6 +152,7 @@ export function CmsResourceListPage({
             }}
             statusOptions={[
               { label: 'Draft', value: 'draft' },
+              { label: 'Active', value: 'active' },
               { label: 'Published', value: 'published' },
               { label: 'Archived', value: 'archived' },
             ]}
@@ -130,9 +161,13 @@ export function CmsResourceListPage({
             onPageChange={setPage}
             bulkActions={
               canDelete && selectedIds.length > 0 ? (
-                <Button variant="destructive" size="sm" onClick={bulkDelete}>
+                <button
+                  type="button"
+                  className="admin-btn bg-red-600 text-white hover:bg-red-700"
+                  onClick={() => void bulkDelete()}
+                >
                   Delete selected ({selectedIds.length})
-                </Button>
+                </button>
               ) : null
             }
           />
@@ -144,6 +179,7 @@ export function CmsResourceListPage({
             onToggleRow={canDelete ? toggleRow : undefined}
             onToggleAll={canDelete ? toggleAll : undefined}
             getRowId={(row) => row.id}
+            emptyMessage={`No ${title.toLowerCase()} yet.`}
             columns={[
               {
                 id: 'name',
@@ -152,16 +188,29 @@ export function CmsResourceListPage({
                   detailPath ? (
                     <Link
                       to={detailPath.replace('$id', row.id)}
-                      className="font-medium text-neutral-900 hover:underline"
+                      className="font-medium text-[var(--admin-ink)] hover:underline"
                     >
-                      {row.name}
+                      {row.name || '—'}
                     </Link>
                   ) : (
-                    row.name
+                    <span className="font-medium text-[var(--admin-ink)]">{row.name || '—'}</span>
                   ),
               },
-              { id: 'slug', header: 'Slug', cell: (row) => row.slug ?? '—' },
-              { id: 'status', header: 'Status', cell: (row) => row.status ?? '—' },
+              { id: 'slug', header: 'Slug / key', cell: (row) => row.slug ?? '—' },
+              {
+                id: 'status',
+                header: 'Status',
+                cell: (row) => (
+                  <span
+                    className={cn(
+                      'inline-flex rounded-full px-2 py-0.5 text-xs font-medium capitalize',
+                      'bg-[var(--admin-panel-soft)] text-[var(--admin-ink)]',
+                    )}
+                  >
+                    {row.status ?? '—'}
+                  </span>
+                ),
+              },
               {
                 id: 'updated',
                 header: 'Updated',
@@ -169,30 +218,25 @@ export function CmsResourceListPage({
               },
               {
                 id: 'actions',
-                header: '',
+                header: 'Actions',
                 cell: (row) =>
                   canDelete ? (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeMutation.mutate(row.id)}
+                    <button
+                      type="button"
+                      className="admin-btn admin-btn-danger"
+                      onClick={() => {
+                        if (window.confirm(`Delete “${row.name || row.id}”?`)) {
+                          removeMutation.mutate(row.id);
+                        }
+                      }}
                       disabled={removeMutation.isPending}
                     >
                       Delete
-                    </Button>
+                    </button>
                   ) : null,
               },
             ]}
           />
-
-          <div className="mt-6">
-            <AdminPanel title="SEO">
-              <p className="text-sm text-neutral-600">
-                SEO metadata is managed per record in the full editor. Connect detail routes when
-                backend fields are exposed in the admin SDK.
-              </p>
-            </AdminPanel>
-          </div>
         </>
       )}
     </PageMotion>

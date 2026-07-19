@@ -14,7 +14,7 @@ export function AdminLayout() {
     <div className="flex min-h-screen bg-[var(--admin-surface)] text-[var(--admin-ink)]">
       <a
         href="#admin-main"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-[var(--admin-ink)] focus:px-4 focus:py-2 focus:text-white"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-[var(--admin-ink)] focus:px-4 focus:py-2 focus:text-[var(--admin-surface)]"
       >
         Skip to main content
       </a>

@@ -15,17 +15,15 @@ export {
   CategoriesPage,
   CollectionsPage,
   CmsBannersPage,
+  CmsFaqsPage,
   CmsHomePage,
   CmsPagesPage,
+  MarketingPromosPage,
   OccasionsPage,
   SizesPage,
 } from './catalog/catalog-pages';
 export { FinancePage } from './finance/finance-page';
-export {
-  AuditPage,
-  MarketingPage,
-  ReportsPage,
-  RolesPage,
-  SettingsPage,
-} from './system/system-pages';
+export { MarketingPage } from './marketing/marketing-page';
+export { AuditListPage as AuditPage } from './audit/audit-list-page';
+export { ReportsPage, RolesPage, SettingsPage } from './system/system-pages';
 export { UsersListPage as UsersPage } from './users/users-list-page';

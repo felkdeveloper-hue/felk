@@ -6,6 +6,7 @@ import {
   BrandsPage,
   CategoriesPage,
   CmsBannersPage,
+  CmsFaqsPage,
   CmsHomePage,
   CmsHubPage,
   CmsPagesPage,
@@ -18,6 +19,7 @@ import {
   InventoryPage,
   LoginPage,
   MarketingPage,
+  MarketingPromosPage,
   OrderDetailPage,
   OrdersListPage,
   ProductFormPage,
@@ -273,12 +275,32 @@ const cmsHomeRoute = createRoute({
   ),
 });
 
+const cmsFaqsRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: 'cms/faqs',
+  component: () => (
+    <PermissionRoute permissions={[PERMISSIONS.CMS_VIEW, PERMISSIONS.FAQS_VIEW]}>
+      <CmsFaqsPage />
+    </PermissionRoute>
+  ),
+});
+
 const marketingRoute = createRoute({
   getParentRoute: () => adminLayoutRoute,
   path: 'marketing',
   component: () => (
     <PermissionRoute permissions={[PERMISSIONS.MARKETING_VIEW, PERMISSIONS.COUPONS_READ]}>
       <MarketingPage />
+    </PermissionRoute>
+  ),
+});
+
+const marketingPromosRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: 'marketing/promos',
+  component: () => (
+    <PermissionRoute permissions={[PERMISSIONS.MARKETING_VIEW, PERMISSIONS.BANNERS_VIEW]}>
+      <MarketingPromosPage />
     </PermissionRoute>
   ),
 });
@@ -367,7 +389,9 @@ const routeTree = rootRoute.addChildren([
     cmsPagesRoute,
     cmsBannersRoute,
     cmsHomeRoute,
+    cmsFaqsRoute,
     cmsRoute,
+    marketingPromosRoute,
     marketingRoute,
     financeRoute,
     reportsRoute,

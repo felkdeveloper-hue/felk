@@ -25,10 +25,7 @@ export function ForbiddenPage() {
           You do not have permission for this area. If you believe this is a mistake, ask a super
           admin to review your role.
         </p>
-        <Link
-          to={fallback}
-          className="mt-8 inline-flex h-11 items-center justify-center rounded-lg bg-[var(--admin-ink)] px-5 text-sm font-semibold text-white transition hover:bg-black"
-        >
+        <Link to={fallback} className="admin-btn admin-btn-primary admin-btn-lg mt-8">
           Go to available page
         </Link>
       </div>
