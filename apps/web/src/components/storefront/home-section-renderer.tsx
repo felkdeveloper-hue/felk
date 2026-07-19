@@ -25,9 +25,6 @@ const PromoBannerSection = lazy(() =>
 const EditorialSection = lazy(() =>
   import('./editorial-section').then((m) => ({ default: m.EditorialSection })),
 );
-const NewsletterSignupSection = lazy(() =>
-  import('./newsletter-signup').then((m) => ({ default: m.NewsletterSignupSection })),
-);
 const SocialGallerySection = lazy(() =>
   import('./social-gallery').then((m) => ({ default: m.SocialGallerySection })),
 );
@@ -107,11 +104,8 @@ export function HomeSectionRenderer({ section }: HomeSectionRendererProps) {
         </LazySection>
       );
     case HOME_SECTION_KEYS.newsletter:
-      return (
-        <LazySection>
-          <NewsletterSignupSection section={section} />
-        </LazySection>
-      );
+      // Newsletter lives in the footer — skip the duplicate home-page block.
+      return null;
     case HOME_SECTION_KEYS.socialGallery:
       return (
         <LazySection>

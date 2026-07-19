@@ -116,7 +116,7 @@ export function FeaturedCategoriesSection({ section }: FeaturedCategoriesSection
 
   return (
     <Section spacing="default" className="bg-background">
-      <div className="mx-auto mb-8 max-w-[1600px] px-4 text-center sm:mb-10 sm:px-6 lg:px-10">
+      <div className="mx-auto mb-8 max-w-[1120px] px-6 text-center sm:mb-10 sm:px-10 lg:px-16 xl:px-20">
         <h2 className="font-display text-foreground text-2xl font-bold uppercase tracking-[0.08em] sm:text-3xl lg:text-4xl">
           {title}
         </h2>
@@ -129,9 +129,9 @@ export function FeaturedCategoriesSection({ section }: FeaturedCategoriesSection
         isEmpty={(items) => !items?.length}
         onRetry={() => void query.refetch()}
         skeleton={
-          <div className="mx-auto grid max-w-[1600px] grid-cols-2 gap-3 px-4 sm:grid-cols-3 sm:gap-4 sm:px-6 md:grid-cols-4 lg:grid-cols-5 lg:gap-5 lg:px-10">
+          <div className="mx-auto grid max-w-[1120px] grid-cols-2 gap-4 px-6 sm:grid-cols-3 sm:gap-5 sm:px-10 md:grid-cols-4 lg:grid-cols-5 lg:gap-6 lg:px-16 xl:px-20">
             {Array.from({ length: 10 }).map((_, index) => (
-              <div key={index} className="bg-muted aspect-3/4 animate-pulse rounded-[1.35rem]" />
+              <div key={index} className="bg-muted aspect-3/4 animate-pulse rounded-2xl" />
             ))}
           </div>
         }
@@ -140,19 +140,19 @@ export function FeaturedCategoriesSection({ section }: FeaturedCategoriesSection
         {(items) => (
           <MotionReveal
             stagger
-            className="mx-auto grid max-w-[1600px] grid-cols-2 gap-3 px-4 sm:grid-cols-3 sm:gap-4 sm:px-6 md:grid-cols-4 lg:grid-cols-5 lg:gap-5 lg:px-10"
+            className="mx-auto grid max-w-[1120px] grid-cols-2 gap-4 px-6 sm:grid-cols-3 sm:gap-5 sm:px-10 md:grid-cols-4 lg:grid-cols-5 lg:gap-6 lg:px-16 xl:px-20"
           >
             {showAnnouncement ? (
               <MotionItem>
                 <motion.div
-                  className="aspect-3/4 flex flex-col items-center justify-center rounded-[1.35rem] bg-[#c4a574] px-4 text-center"
-                  whileHover={reduceMotion ? undefined : { y: -6 }}
+                  className="aspect-3/4 flex flex-col items-center justify-center rounded-2xl bg-[#c4a574] px-3 text-center"
+                  whileHover={reduceMotion ? undefined : { y: -4 }}
                   transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
                 >
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-black/70 sm:text-[11px]">
+                  <p className="text-[9px] font-semibold uppercase tracking-[0.22em] text-black/70 sm:text-[10px]">
                     {announcementEyebrow}
                   </p>
-                  <p className="font-display mt-2 text-xl font-bold uppercase leading-none tracking-tight text-black sm:text-2xl lg:text-[1.65rem]">
+                  <p className="font-display mt-1.5 text-lg font-bold uppercase leading-none tracking-tight text-black sm:text-xl lg:text-[1.35rem]">
                     {announcementTitle}
                   </p>
                 </motion.div>
@@ -162,14 +162,14 @@ export function FeaturedCategoriesSection({ section }: FeaturedCategoriesSection
             {items.map((category) => (
               <MotionItem key={category.id}>
                 <motion.div
-                  whileHover={reduceMotion ? undefined : { y: -6 }}
+                  whileHover={reduceMotion ? undefined : { y: -4 }}
                   transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
                 >
                   <Link
                     to="/categories/$slug"
                     params={{ slug: category.slug }}
                     preload="intent"
-                    className="group relative block overflow-hidden rounded-[1.35rem]"
+                    className="group relative block overflow-hidden rounded-2xl"
                     aria-label={`Shop ${category.name}`}
                   >
                     <Image
@@ -179,8 +179,8 @@ export function FeaturedCategoriesSection({ section }: FeaturedCategoriesSection
                       className="transition-transform duration-700 ease-out group-hover:scale-[1.06]"
                     />
                     <div className="bg-linear-to-t absolute inset-0 from-black/70 via-black/15 to-transparent transition-opacity duration-300 group-hover:from-black/80" />
-                    <div className="absolute inset-x-0 bottom-0 flex justify-center px-3 pb-4 pt-10 sm:pb-5">
-                      <h3 className="text-center text-[11px] font-bold uppercase tracking-[0.14em] text-white transition-transform duration-300 group-hover:-translate-y-0.5 sm:text-xs lg:text-[13px]">
+                    <div className="absolute inset-x-0 bottom-0 flex justify-center px-2 pb-3 pt-8 sm:pb-4">
+                      <h3 className="text-center text-[10px] font-bold uppercase tracking-[0.14em] text-white transition-transform duration-300 group-hover:-translate-y-0.5 sm:text-[11px] lg:text-xs">
                         {category.name}
                       </h3>
                     </div>

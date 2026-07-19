@@ -8,7 +8,9 @@ import { connectDatabase, disconnectDatabase, logger } from '@/config';
 import {
   BrandModel,
   CategoryModel,
+  CmsPageModel,
   CollectionModel,
+  ContactInfoModel,
   HeroBannerModel,
   HomeSectionModel,
   InventoryItemModel,
@@ -16,6 +18,7 @@ import {
   ProductModel,
   ProductVariantModel,
   PromoBannerModel,
+  SocialLinkModel,
   StoreSettingModel,
   WarehouseModel,
 } from '@/models';
@@ -566,8 +569,12 @@ async function seedStoreSettings() {
   const settings = [
     ['store.name', 'FE', 'store'],
     ['storeName', 'FE', 'store'],
-    ['store.tagline', 'Modern fashion for every day.', 'store'],
-    ['seo.description', 'Shop the FE collection — modern fashion essentials.', 'seo'],
+    ['store.tagline', 'Modern fashion for every day', 'store'],
+    ['seo.description', 'Shop Fashion Edge — modern fashion for every day at fe.lk.', 'seo'],
+    ['contact.email', 'support@fe.lk', 'contact'],
+    ['contactEmail', 'support@fe.lk', 'contact'],
+    ['contact.phone', '081 220 4315', 'contact'],
+    ['contact.address', 'No. 14, Kotugodella Veediya, Kandy', 'contact'],
   ] as const;
 
   for (const [key, value, group] of settings) {
@@ -589,9 +596,130 @@ async function seedStoreSettings() {
   }
 }
 
+async function seedBrandPresence() {
+  const contacts = [
+    {
+      label: 'Email',
+      type: 'email',
+      value: 'support@fe.lk',
+      isPrimary: true,
+      sortOrder: 0,
+    },
+    {
+      label: 'Hotline',
+      type: 'phone',
+      value: '081 220 4315',
+      isPrimary: false,
+      sortOrder: 1,
+    },
+    {
+      label: 'Flagship store',
+      type: 'address',
+      value: 'No. 14, Kotugodella Veediya, Kandy',
+      isPrimary: false,
+      sortOrder: 2,
+    },
+  ] as const;
+
+  for (const contact of contacts) {
+    await ContactInfoModel.findOneAndUpdate(
+      { type: contact.type, value: contact.value },
+      {
+        $set: {
+          ...contact,
+          status: 'active',
+          isDeleted: false,
+          deletedAt: null,
+        },
+      },
+      { upsert: true },
+    );
+  }
+
+  const socials = [
+    {
+      platform: 'facebook',
+      url: 'https://www.facebook.com/fashionedge.lk/',
+      sortOrder: 0,
+    },
+    {
+      platform: 'instagram',
+      url: 'https://www.instagram.com/fashion__edge__/',
+      sortOrder: 1,
+    },
+    {
+      platform: 'tiktok',
+      url: 'https://www.tiktok.com/@fashion_edge_',
+      sortOrder: 2,
+    },
+  ] as const;
+
+  for (const social of socials) {
+    await SocialLinkModel.findOneAndUpdate(
+      { platform: social.platform },
+      {
+        $set: {
+          ...social,
+          status: 'active',
+          isDeleted: false,
+          deletedAt: null,
+        },
+      },
+      { upsert: true },
+    );
+  }
+
+  const pages = [
+    {
+      slug: 'about',
+      title: 'About',
+      excerpt: 'Our story',
+      content:
+        '<p>Fashion Edge is about stepping out of the ordinary and embracing the extraordinary with daring designs, unusual fabrics, and standout pieces. Modern fashion for every day — from our flagship on Kotugodella Veediya, Kandy, to fe.lk.</p>',
+    },
+    {
+      slug: 'contact',
+      title: 'Contact',
+      excerpt: 'We are here to help',
+      content:
+        '<p>Reach Fashion Edge at support@fe.lk or call 081 220 4315. Visit us at No. 14, Kotugodella Veediya, Kandy (8:00 am – 8:00 pm daily), or message us on <a href="https://www.facebook.com/fashionedge.lk/">Facebook</a>.</p>',
+    },
+    {
+      slug: 'privacy',
+      title: 'Privacy Policy',
+      excerpt: null,
+      content:
+        '<p>Your privacy matters to us. Contact support@fe.lk with any privacy questions.</p>',
+    },
+    {
+      slug: 'terms',
+      title: 'Terms of Service',
+      excerpt: null,
+      content:
+        '<p>Terms for using fe.lk and Fashion Edge services. Contact support@fe.lk if you need assistance.</p>',
+    },
+  ] as const;
+
+  for (const page of pages) {
+    await CmsPageModel.findOneAndUpdate(
+      { slug: page.slug },
+      {
+        $set: {
+          ...page,
+          status: 'published',
+          isDeleted: false,
+          deletedAt: null,
+        },
+      },
+      { upsert: true },
+    );
+  }
+}
+
 async function main() {
   await connectDatabase();
   await seedStoreSettings();
+  await seedBrandPresence();
   const { categoryDocs, brandDocs, collection } = await upsertMasterData();
   await seedProducts(categoryDocs, brandDocs, collection);
   await seedHomepage();

@@ -1,12 +1,49 @@
 import { Link } from '@tanstack/react-router';
 import { useCmsPages, useContactInfos, usePublicSettings, useSocialLinks } from '@/hooks/cms';
-import { buildAbsoluteUrl } from '@/config';
 import { ROUTES, type RoutePath } from '@/constants';
 import { cn } from '@/lib/utils';
 import { getSetting } from '@/utils/cms';
 import { Container } from '@/components/layout/container';
 import { Separator } from '@/components/ui/separator';
 import { SocialIconLink } from '@/components/storefront/social-icon-link';
+import { NewsletterSignupSection } from '@/components/storefront/newsletter-signup';
+
+/** Fashion Edge (fe.lk) public details — used when CMS has not been seeded yet. */
+const FE_FALLBACK = {
+  storeName: 'FE',
+  tagline: 'Modern fashion for every day',
+  companyLinks: [
+    { label: 'About', href: ROUTES.about },
+    { label: 'Contact', href: ROUTES.contact },
+    { label: 'Privacy', href: ROUTES.privacy },
+    { label: 'Terms', href: ROUTES.terms },
+  ] as const,
+  socialLinks: [
+    { id: 'fb', platform: 'facebook', url: 'https://www.facebook.com/fashionedge.lk/' },
+    { id: 'ig', platform: 'instagram', url: 'https://www.instagram.com/fashion__edge__/' },
+    { id: 'tt', platform: 'tiktok', url: 'https://www.tiktok.com/@fashion_edge_' },
+  ],
+  contactInfos: [
+    {
+      id: 'email',
+      label: 'Email',
+      type: 'email' as const,
+      value: 'support@fe.lk',
+    },
+    {
+      id: 'phone',
+      label: 'Hotline',
+      type: 'phone' as const,
+      value: '081 220 4315',
+    },
+    {
+      id: 'address',
+      label: 'Flagship store',
+      type: 'address' as const,
+      value: 'No. 14, Kotugodella Veediya, Kandy',
+    },
+  ],
+};
 
 export function StorefrontFooter() {
   const { data: settings } = usePublicSettings();
@@ -15,40 +52,50 @@ export function StorefrontFooter() {
   const { data: contactResult } = useContactInfos();
 
   const storeName =
-    getSetting<string>(settings, 'store.name') ?? getSetting<string>(settings, 'storeName') ?? 'FE';
+    getSetting<string>(settings, 'store.name') ??
+    getSetting<string>(settings, 'storeName') ??
+    FE_FALLBACK.storeName;
   const tagline =
     getSetting<string>(settings, 'store.tagline') ??
     getSetting<string>(settings, 'store.description') ??
-    'Considered clothing, made to last.';
+    FE_FALLBACK.tagline;
 
   const cmsPages = pagesResult?.data ?? [];
-  const companyLinks = cmsPages.filter((page) =>
-    (['contact', 'privacy', 'terms'] as const).includes(
-      page.slug as 'contact' | 'privacy' | 'terms',
-    ),
-  );
+  const companyLinksFromCms = cmsPages
+    .filter((page) =>
+      (['about', 'contact', 'privacy', 'terms'] as const).includes(
+        page.slug as 'about' | 'contact' | 'privacy' | 'terms',
+      ),
+    )
+    .map((page) => ({
+      label: page.title,
+      href: slugToRoute(page.slug),
+    }));
 
-  const slugToRoute = (slug: string): RoutePath => {
-    switch (slug) {
-      case 'contact':
-        return ROUTES.contact;
-      case 'privacy':
-        return ROUTES.privacy;
-      case 'terms':
-        return ROUTES.terms;
-      default:
-        return ROUTES.home;
-    }
-  };
-  const socialLinks = socialResult?.data ?? [];
-  const contactInfos = contactResult?.data ?? [];
-  const primaryContact = contactInfos.find((item) => item.isPrimary) ?? contactInfos[0];
+  const companyLinks =
+    companyLinksFromCms.length > 0 ? companyLinksFromCms : FE_FALLBACK.companyLinks;
+
+  const socialLinks = socialResult?.data?.length ? socialResult.data : FE_FALLBACK.socialLinks;
+
+  const cmsContacts = contactResult?.data ?? [];
+  const settingEmail =
+    getSetting<string>(settings, 'contact.email') ?? getSetting<string>(settings, 'contactEmail');
+  const contactInfos =
+    cmsContacts.length > 0
+      ? cmsContacts.slice(0, 4)
+      : settingEmail
+        ? [{ id: 'setting-email', label: 'Email', type: 'email' as const, value: settingEmail }]
+        : FE_FALLBACK.contactInfos;
 
   return (
     <footer
       data-slot="storefront-footer"
       className="border-border border-t bg-[linear-gradient(180deg,hsl(var(--muted))_0%,hsl(var(--background))_40%)]"
     >
+      <div className="border-border/70 border-b">
+        <NewsletterSignupSection />
+      </div>
+
       <Container className="grid gap-12 py-16 sm:grid-cols-2 lg:grid-cols-5">
         <div className="col-span-2 space-y-4 lg:col-span-2">
           <Link
@@ -60,26 +107,24 @@ export function StorefrontFooter() {
           </Link>
           <p className="text-muted-foreground max-w-xs text-sm leading-relaxed">{tagline}</p>
 
-          {socialLinks.length ? (
-            <div className="flex items-center gap-3 pt-2">
-              {socialLinks.map((link) => (
-                <SocialIconLink key={link.id} platform={link.platform} url={link.url} />
-              ))}
-            </div>
-          ) : null}
+          <div className="flex items-center gap-3 pt-2">
+            {socialLinks.map((link) => (
+              <SocialIconLink key={link.id} platform={link.platform} url={link.url} />
+            ))}
+          </div>
         </div>
 
         <nav aria-label="Company" className="space-y-3">
           <p className="text-foreground text-xs font-medium uppercase tracking-[0.15em]">Company</p>
           <ul className="space-y-2.5">
-            {companyLinks.map((page) => (
-              <li key={page.slug}>
+            {companyLinks.map((link) => (
+              <li key={link.href}>
                 <Link
-                  to={slugToRoute(page.slug)}
+                  to={link.href}
                   preload="intent"
                   className="text-muted-foreground hover:text-foreground text-sm transition-colors"
                 >
-                  {page.title}
+                  {link.label}
                 </Link>
               </li>
             ))}
@@ -121,34 +166,29 @@ export function StorefrontFooter() {
 
         <div className="space-y-3">
           <p className="text-foreground text-xs font-medium uppercase tracking-[0.15em]">Contact</p>
-          {contactInfos.length ? (
-            <ul className="text-muted-foreground space-y-2.5 text-sm">
-              {contactInfos.slice(0, 4).map((info) => (
-                <li key={info.id}>
-                  <span className="text-foreground block">{info.label}</span>
-                  {info.type === 'email' ? (
-                    <a href={`mailto:${info.value}`} className="hover:text-foreground">
-                      {info.value}
-                    </a>
-                  ) : info.type === 'phone' ? (
-                    <a href={`tel:${info.value}`} className="hover:text-foreground">
-                      {info.value}
-                    </a>
-                  ) : (
-                    info.value
-                  )}
-                </li>
-              ))}
-            </ul>
-          ) : primaryContact ? (
-            <p className="text-muted-foreground text-sm">{primaryContact.value}</p>
-          ) : (
-            <p className="text-muted-foreground text-sm">
-              {getSetting<string>(settings, 'contact.email') ??
-                getSetting<string>(settings, 'contactEmail') ??
-                'Contact details coming soon'}
-            </p>
-          )}
+          <ul className="text-muted-foreground space-y-2.5 text-sm">
+            {contactInfos.map((info) => (
+              <li key={info.id}>
+                <span className="text-foreground block text-xs font-medium uppercase tracking-wide">
+                  {info.label}
+                </span>
+                {info.type === 'email' ? (
+                  <a href={`mailto:${info.value}`} className="hover:text-foreground">
+                    {info.value}
+                  </a>
+                ) : info.type === 'phone' || info.type === 'whatsapp' ? (
+                  <a
+                    href={`tel:${info.value.replace(/\s+/g, '')}`}
+                    className="hover:text-foreground"
+                  >
+                    {info.value}
+                  </a>
+                ) : (
+                  info.value
+                )}
+              </li>
+            ))}
+          </ul>
         </div>
       </Container>
 
@@ -169,11 +209,31 @@ export function StorefrontFooter() {
           <Link to={ROUTES.terms} preload="intent" className="hover:text-foreground">
             Terms
           </Link>
-          <a href={buildAbsoluteUrl('/')} className="hover:text-foreground">
-            {buildAbsoluteUrl('/').replace(/^https?:\/\//, '')}
+          <a
+            href="https://fe.lk"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-foreground"
+          >
+            fe.lk
           </a>
         </div>
       </Container>
     </footer>
   );
+}
+
+function slugToRoute(slug: string): RoutePath {
+  switch (slug) {
+    case 'about':
+      return ROUTES.about;
+    case 'contact':
+      return ROUTES.contact;
+    case 'privacy':
+      return ROUTES.privacy;
+    case 'terms':
+      return ROUTES.terms;
+    default:
+      return ROUTES.home;
+  }
 }

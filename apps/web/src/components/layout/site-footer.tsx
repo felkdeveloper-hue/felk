@@ -1,4 +1,4 @@
-import { Facebook, Instagram, Twitter } from 'lucide-react';
+import { Facebook, Instagram } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Container } from '@/components/layout/container';
 import { Separator } from '@/components/ui/separator';
@@ -54,25 +54,18 @@ export function SiteFooter({ columns = DEFAULT_COLUMNS, className }: SiteFooterP
             FE
           </a>
           <p className="text-muted-foreground max-w-xs text-sm">
-            Considered clothing, made to last. Designed in small batches with an eye for craft.
+            Modern fashion for every day. Trend-driven pieces from Fashion Edge, Kandy.
           </p>
           <div className="flex items-center gap-3 pt-2">
             <a
-              href="https://instagram.com"
+              href="https://www.instagram.com/fashion__edge__/"
               aria-label="Instagram"
               className="border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground flex size-9 items-center justify-center rounded-full border transition-colors"
             >
               <Instagram className="size-4" />
             </a>
             <a
-              href="https://twitter.com"
-              aria-label="Twitter"
-              className="border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground flex size-9 items-center justify-center rounded-full border transition-colors"
-            >
-              <Twitter className="size-4" />
-            </a>
-            <a
-              href="https://facebook.com"
+              href="https://www.facebook.com/fashionedge.lk/"
               aria-label="Facebook"
               className="border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground flex size-9 items-center justify-center rounded-full border transition-colors"
             >

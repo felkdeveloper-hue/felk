@@ -74,11 +74,11 @@ export function CategoryShowcaseSection({
 
   return (
     <Section
-      spacing="sm"
+      spacing="default"
       className="bg-background"
       aria-label={section?.title ?? 'Shop by category'}
     >
-      <div className="mx-auto grid w-full max-w-[1100px] items-center gap-6 px-4 sm:gap-8 sm:px-6 lg:grid-cols-[minmax(0,20rem)_minmax(12rem,1fr)_minmax(0,20rem)] lg:gap-10 lg:px-8 xl:max-w-[1180px] xl:grid-cols-[minmax(0,22rem)_minmax(14rem,1fr)_minmax(0,22rem)] xl:gap-12">
+      <div className="mx-auto grid w-full max-w-[1400px] items-center gap-8 px-4 sm:gap-10 sm:px-6 lg:grid-cols-[minmax(0,26rem)_minmax(14rem,1fr)_minmax(0,26rem)] lg:gap-12 lg:px-8 xl:max-w-[1520px] xl:grid-cols-[minmax(0,28rem)_minmax(16rem,1fr)_minmax(0,28rem)] xl:gap-16">
         <ShowcasePanel
           keySide="left"
           category={active}
@@ -88,7 +88,7 @@ export function CategoryShowcaseSection({
 
         <nav
           aria-label="Category showcase"
-          className="lg:order-0 order-first flex flex-col items-center justify-center gap-3 py-2 text-center sm:gap-3.5 lg:gap-4"
+          className="lg:order-0 order-first flex flex-col items-center justify-center gap-4 py-4 text-center sm:gap-5 lg:gap-6"
         >
           {categories.map((category) => {
             const isActive = category.id === active.id;
@@ -99,8 +99,10 @@ export function CategoryShowcaseSection({
                 params={{ slug: category.slug }}
                 preload="intent"
                 className={cn(
-                  'font-display duration-250 text-lg font-semibold uppercase leading-snug tracking-[0.08em] transition-colors sm:text-xl lg:text-[1.35rem] xl:text-[1.5rem]',
-                  isActive ? 'text-[#E8C547]' : 'text-foreground hover:text-[#E8C547]',
+                  'font-display duration-250 text-xl font-semibold uppercase leading-snug tracking-[0.08em] transition-all sm:text-2xl lg:text-[1.65rem] xl:text-[1.85rem]',
+                  isActive
+                    ? 'scale-105 text-[#E8C547]'
+                    : 'text-foreground hover:scale-105 hover:text-[#E8C547]',
                 )}
                 style={isActive ? { color: GOLD } : undefined}
                 onMouseEnter={() => setActiveId(category.id)}
@@ -132,15 +134,15 @@ function ShowcasePanel({
   const src = keySide === 'left' ? category.leftImage : category.rightImage;
 
   return (
-    <div className="bg-muted aspect-3/4 relative mx-auto w-full max-w-[20rem] overflow-hidden rounded-2xl sm:rounded-[1.35rem] lg:max-w-none xl:max-h-[30rem]">
+    <div className="bg-muted aspect-3/4 relative mx-auto w-full max-w-[24rem] overflow-hidden rounded-2xl shadow-[var(--shadow-soft)] transition-shadow duration-500 hover:shadow-[var(--shadow-elevated)] sm:rounded-[1.5rem] lg:max-w-none xl:max-h-[36rem]">
       <AnimatePresence mode="sync" initial={false}>
         <motion.div
           key={`${category.id}-${keySide}`}
           className="absolute inset-0"
-          initial={reduceMotion ? false : { opacity: 0 }}
-          animate={{ opacity: 1 }}
+          initial={reduceMotion ? false : { opacity: 0, scale: 1.04 }}
+          animate={{ opacity: 1, scale: 1 }}
           exit={reduceMotion ? undefined : { opacity: 0 }}
-          transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+          transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
         >
           <Image
             src={src}
@@ -154,12 +156,12 @@ function ShowcasePanel({
       {showLabel ? (
         <span
           aria-hidden
-          className="pointer-events-none absolute inset-y-4 left-1.5 z-10 flex items-center sm:left-3"
+          className="pointer-events-none absolute inset-y-5 left-2 z-10 flex items-center sm:left-4"
         >
           <span
             className={cn(
-              'font-display rotate-180 font-bold uppercase leading-none tracking-tight text-white/35',
-              'text-[clamp(1.2rem,2.4vw,2rem)] [writing-mode:vertical-rl]',
+              'font-display rotate-180 font-bold uppercase leading-none tracking-tight text-white/40',
+              'text-[clamp(1.4rem,2.8vw,2.4rem)] [writing-mode:vertical-rl]',
             )}
           >
             {category.label}
