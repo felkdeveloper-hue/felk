@@ -52,6 +52,8 @@ export const cmsApi = {
   categories: createCmsResourceApi('/cms/categories'),
   brands: createCmsResourceApi('/cms/brands'),
   collections: createCmsResourceApi('/cms/collections'),
+  sizes: createCmsResourceApi('/cms/sizes'),
+  occasions: createCmsResourceApi('/cms/occasions'),
   pages: createCmsResourceApi('/cms/pages'),
   heroBanners: createCmsResourceApi('/cms/hero-banners'),
   promoBanners: createCmsResourceApi('/cms/promo-banners'),

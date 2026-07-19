@@ -8,6 +8,7 @@ export { OrderDetailPage } from './orders/order-detail-page';
 export { CustomersListPage } from './customers/customers-list-page';
 export { CustomerDetailPage } from './customers/customer-detail-page';
 export { InventoryPage } from './inventory/inventory-page';
+export { ReviewsListPage } from './reviews/reviews-list-page';
 export { CmsHubPage } from './cms/cms-hub-page';
 export {
   BrandsPage,
@@ -16,6 +17,8 @@ export {
   CmsBannersPage,
   CmsHomePage,
   CmsPagesPage,
+  OccasionsPage,
+  SizesPage,
 } from './catalog/catalog-pages';
 export { FinancePage } from './finance/finance-page';
 export {

@@ -18,6 +18,8 @@ export interface CatalogSearchState {
   sizeId?: string;
   materialId?: string;
   occasionId?: string;
+  gender?: string;
+  discountBand?: string;
   inStock?: boolean;
   onSale?: boolean;
   rating?: string;
@@ -64,6 +66,8 @@ export function parseCatalogSearch(search: Record<string, unknown>): CatalogSear
     sizeId: typeof search.sizeId === 'string' ? search.sizeId : undefined,
     materialId: typeof search.materialId === 'string' ? search.materialId : undefined,
     occasionId: typeof search.occasionId === 'string' ? search.occasionId : undefined,
+    gender: typeof search.gender === 'string' ? search.gender : undefined,
+    discountBand: typeof search.discountBand === 'string' ? search.discountBand : undefined,
     inStock: bool(search.inStock),
     onSale: bool(search.onSale),
     rating: typeof search.rating === 'string' ? search.rating : undefined,
@@ -83,6 +87,7 @@ export function catalogSearchToProductParams(state: CatalogSearchState): Product
     collectionId: state.collectionId,
     minPrice: state.minPrice,
     maxPrice: state.maxPrice,
+    gender: state.gender,
     isNewArrival: state.isNewArrival,
     isClearance: state.onSale ? true : undefined,
   };
@@ -101,6 +106,8 @@ export function countActiveFilters(state: CatalogSearchState): number {
   if (state.sizeId) count += 1;
   if (state.materialId) count += 1;
   if (state.occasionId) count += 1;
+  if (state.gender) count += 1;
+  if (state.discountBand) count += 1;
   if (state.inStock != null) count += 1;
   if (state.onSale != null) count += 1;
   if (state.rating) count += 1;
@@ -136,6 +143,8 @@ export function catalogSearchToUrlParams(state: CatalogSearchState): Record<stri
   assign('sizeId', state.sizeId);
   assign('materialId', state.materialId);
   assign('occasionId', state.occasionId);
+  assign('gender', state.gender);
+  assign('discountBand', state.discountBand);
   assign(
     'inStock',
     state.inStock === true ? 'true' : state.inStock === false ? 'false' : undefined,
@@ -147,6 +156,20 @@ export function catalogSearchToUrlParams(state: CatalogSearchState): Record<stri
   return params;
 }
 
+const DISCOUNT_BANDS: Record<string, { min: number; max: number }> = {
+  '0-20': { min: 0, max: 20 },
+  '21-30': { min: 21, max: 30 },
+  '31-40': { min: 31, max: 40 },
+  '41-60': { min: 41, max: 60 },
+};
+
+function salePercent(product: Product): number | null {
+  const original = product.compareAtPrice?.amount ?? product.price?.amount;
+  const sale = product.salePrice?.amount ?? product.effectivePrice?.amount;
+  if (!original || !sale || original <= sale) return null;
+  return Math.round(((original - sale) / original) * 100);
+}
+
 /** Client-side refinement for filters not supported by the list API. */
 export function applyClientCatalogFilters(products: Product[], state: CatalogSearchState) {
   return products.filter((product) => {
@@ -154,6 +177,11 @@ export function applyClientCatalogFilters(products: Product[], state: CatalogSea
     if (state.occasionId && !product.occasionIds?.includes(state.occasionId)) return false;
     if (state.inStock === true && product.status === 'out_of_stock') return false;
     if (state.onSale === true && !product.isOnSale && !product.isClearance) return false;
+    if (state.discountBand) {
+      const band = DISCOUNT_BANDS[state.discountBand];
+      const percent = salePercent(product);
+      if (!band || percent == null || percent < band.min || percent > band.max) return false;
+    }
     if (state.colorId) {
       const hasColor = product.variants?.some((variant) => variant.colorId === state.colorId);
       if (product.variants?.length && !hasColor) return false;

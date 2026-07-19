@@ -13,7 +13,12 @@ export interface AdminProduct {
   salePrice?: number;
   currency?: string;
   brandName?: string;
+  brandId?: string;
   categoryId?: string;
+  gender?: string;
+  occasionIds?: string[];
+  shortDescription?: string;
+  description?: string;
   variantCount?: number;
   thumbnailUrl?: string;
   createdAt?: string;
@@ -46,7 +51,15 @@ function normalizeProduct(raw: unknown): AdminProduct {
           ? String((price as Record<string, unknown>).currency ?? 'LKR')
           : 'LKR',
     brandName: typeof record.brandName === 'string' ? record.brandName : undefined,
+    brandId: record.brandId ? String(record.brandId) : undefined,
     categoryId: record.categoryId ? String(record.categoryId) : undefined,
+    gender: typeof record.gender === 'string' ? record.gender : undefined,
+    occasionIds: Array.isArray(record.occasionIds)
+      ? record.occasionIds.map((id) => String(id))
+      : undefined,
+    shortDescription:
+      typeof record.shortDescription === 'string' ? record.shortDescription : undefined,
+    description: typeof record.description === 'string' ? record.description : undefined,
     variantCount: Number(record.variantCount ?? 0),
     thumbnailUrl: typeof record.thumbnailUrl === 'string' ? record.thumbnailUrl : undefined,
     createdAt: typeof record.createdAt === 'string' ? record.createdAt : undefined,
@@ -69,6 +82,8 @@ export interface ProductInput {
   description?: string;
   brandId?: string;
   categoryId?: string;
+  gender?: string;
+  occasionIds?: string[];
 }
 
 export const productsApi = {

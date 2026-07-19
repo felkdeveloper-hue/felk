@@ -51,6 +51,7 @@ export function CatalogListShell({
     const add = (key: keyof CatalogSearchState, label: string) => list.push({ key, label });
 
     if (state.q) add('q', `Search: ${state.q}`);
+    if (state.gender) add('gender', `Gender: ${state.gender}`);
     if (state.categoryId) {
       const name = facets.categories.data?.data.find((item) => item.id === state.categoryId)?.name;
       add('categoryId', name ? `Category: ${name}` : 'Category');
@@ -65,6 +66,7 @@ export function CatalogListShell({
     if (state.materialId) add('materialId', 'Material');
     if (state.occasionId) add('occasionId', 'Occasion');
     if (state.minPrice != null || state.maxPrice != null) add('minPrice', 'Price range');
+    if (state.discountBand) add('discountBand', `Discount: ${state.discountBand}%`);
     if (state.inStock === true) add('inStock', 'In stock');
     if (state.onSale) add('onSale', 'On sale');
     if (state.rating) add('rating', `Rating ${state.rating}+`);
@@ -94,7 +96,7 @@ export function CatalogListShell({
         className={cn(
           'border-border/60 border-t',
           filtersOpen
-            ? 'lg:grid lg:grid-cols-[17.5rem_minmax(0,1fr)] xl:grid-cols-[19rem_minmax(0,1fr)]'
+            ? 'lg:grid lg:grid-cols-[18rem_minmax(0,1fr)] xl:grid-cols-[19rem_minmax(0,1fr)]'
             : undefined,
         )}
       >
@@ -102,9 +104,7 @@ export function CatalogListShell({
           <aside className="border-border/60 bg-background hidden self-stretch border-r lg:flex lg:flex-col">
             <div className="sticky top-16 flex max-h-[calc(100vh-4rem)] flex-col lg:top-[4.75rem] lg:max-h-[calc(100vh-4.75rem)]">
               <div className="border-border/60 flex shrink-0 items-center justify-between gap-2 border-b px-5 py-4 xl:px-6">
-                <p className="text-muted-foreground text-sm font-semibold uppercase tracking-wide">
-                  Filters
-                </p>
+                <p className="text-foreground text-sm font-bold">Refine By</p>
                 <Button
                   type="button"
                   variant="ghost"

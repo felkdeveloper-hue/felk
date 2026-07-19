@@ -14,6 +14,10 @@ export const QUERY_KEYS = {
       ['products', productId, 'relationships', type] as const,
     variants: (productId: string) => ['products', productId, 'variants'] as const,
     media: (productId: string) => ['products', productId, 'media'] as const,
+    reviews: (productId: string, params?: unknown) =>
+      ['products', productId, 'reviews', params] as const,
+    reviewEligibility: (productId: string) =>
+      ['products', productId, 'reviews', 'eligibility'] as const,
   },
   categories: {
     all: () => ['categories'] as const,

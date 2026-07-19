@@ -21,3 +21,4 @@ export * from './cart.models';
 export * from './checkout.models';
 export * from './payment.models';
 export * from './order.models';
+export * from './review.model';

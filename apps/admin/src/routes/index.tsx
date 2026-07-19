@@ -23,8 +23,11 @@ import {
   ProductFormPage,
   ProductsListPage,
   ReportsPage,
+  ReviewsListPage,
   RolesPage,
   SettingsPage,
+  SizesPage,
+  OccasionsPage,
   UsersPage,
 } from '@/pages';
 import { AdminShell, RootLayout } from './route-layouts';
@@ -142,6 +145,26 @@ const brandsRoute = createRoute({
   ),
 });
 
+const sizesRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: 'sizes',
+  component: () => (
+    <PermissionRoute permissions={[PERMISSIONS.PRODUCTS_VIEW, PERMISSIONS.CATEGORIES_MANAGE]}>
+      <SizesPage />
+    </PermissionRoute>
+  ),
+});
+
+const occasionsRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: 'occasions',
+  component: () => (
+    <PermissionRoute permissions={[PERMISSIONS.PRODUCTS_VIEW, PERMISSIONS.CATEGORIES_MANAGE]}>
+      <OccasionsPage />
+    </PermissionRoute>
+  ),
+});
+
 const inventoryRoute = createRoute({
   getParentRoute: () => adminLayoutRoute,
   path: 'inventory',
@@ -173,6 +196,16 @@ const orderDetailRoute = createRoute({
       </PermissionRoute>
     );
   },
+});
+
+const reviewsRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: 'reviews',
+  component: () => (
+    <PermissionRoute permissions={[PERMISSIONS.REVIEWS_MODERATE]}>
+      <ReviewsListPage />
+    </PermissionRoute>
+  ),
 });
 
 const customersRoute = createRoute({
@@ -323,9 +356,12 @@ const routeTree = rootRoute.addChildren([
     categoriesRoute,
     collectionsRoute,
     brandsRoute,
+    sizesRoute,
+    occasionsRoute,
     inventoryRoute,
     orderDetailRoute,
     ordersRoute,
+    reviewsRoute,
     customerDetailRoute,
     customersRoute,
     cmsPagesRoute,

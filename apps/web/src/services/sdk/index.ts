@@ -86,6 +86,15 @@ export type { InventoryItem, InventoryListParams, StockReservation, Warehouse } 
 export { catalogFacetsApi } from './catalog-facets';
 export type { CatalogFacet } from './catalog-facets';
 
+export { reviewsApi } from './reviews';
+export type {
+  ProductReview,
+  ReviewCreatePayload,
+  ReviewEligibility,
+  ReviewImage,
+  ReviewSummary,
+} from './reviews';
+
 export { cmsApi } from './cms';
 export type {
   Announcement,

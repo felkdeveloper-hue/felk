@@ -116,7 +116,7 @@ export function FeaturedCategoriesSection({ section }: FeaturedCategoriesSection
 
   return (
     <Section spacing="default" className="bg-background">
-      <div className="mx-auto mb-8 max-w-[1120px] px-6 text-center sm:mb-10 sm:px-10 lg:px-16 xl:px-20">
+      <div className="mx-auto mb-8 max-w-[1680px] px-4 text-center sm:mb-10 sm:px-6 lg:px-8 xl:px-10">
         <h2 className="font-display text-foreground text-2xl font-bold uppercase tracking-[0.08em] sm:text-3xl lg:text-4xl">
           {title}
         </h2>
@@ -129,7 +129,7 @@ export function FeaturedCategoriesSection({ section }: FeaturedCategoriesSection
         isEmpty={(items) => !items?.length}
         onRetry={() => void query.refetch()}
         skeleton={
-          <div className="mx-auto grid max-w-[1120px] grid-cols-2 gap-4 px-6 sm:grid-cols-3 sm:gap-5 sm:px-10 md:grid-cols-4 lg:grid-cols-5 lg:gap-6 lg:px-16 xl:px-20">
+          <div className="mx-auto grid max-w-[1680px] grid-cols-2 gap-3 px-4 sm:grid-cols-3 sm:gap-4 sm:px-6 md:grid-cols-4 lg:grid-cols-5 lg:gap-5 lg:px-8 xl:px-10">
             {Array.from({ length: 10 }).map((_, index) => (
               <div key={index} className="bg-muted aspect-3/4 animate-pulse rounded-2xl" />
             ))}
@@ -140,7 +140,7 @@ export function FeaturedCategoriesSection({ section }: FeaturedCategoriesSection
         {(items) => (
           <MotionReveal
             stagger
-            className="mx-auto grid max-w-[1120px] grid-cols-2 gap-4 px-6 sm:grid-cols-3 sm:gap-5 sm:px-10 md:grid-cols-4 lg:grid-cols-5 lg:gap-6 lg:px-16 xl:px-20"
+            className="mx-auto grid max-w-[1680px] grid-cols-2 gap-3 px-4 sm:grid-cols-3 sm:gap-4 sm:px-6 md:grid-cols-4 lg:grid-cols-5 lg:gap-5 lg:px-8 xl:px-10"
           >
             {showAnnouncement ? (
               <MotionItem>

@@ -16,7 +16,7 @@ import {
 } from '@/components/admin';
 import { ADMIN_ROUTES, QUERY_KEYS } from '@/constants';
 import { usePermissions } from '@/hooks';
-import { productsApi } from '@/services';
+import { cmsApi, productsApi } from '@/services';
 
 const productSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -24,6 +24,10 @@ const productSchema = z.object({
   status: z.string().default('draft'),
   shortDescription: z.string().optional(),
   description: z.string().optional(),
+  categoryId: z.string().optional(),
+  brandId: z.string().optional(),
+  gender: z.string().optional(),
+  occasionId: z.string().optional(),
 });
 
 type ProductFormValues = z.infer<typeof productSchema>;
@@ -40,6 +44,21 @@ export function ProductFormPage({ productId }: { productId?: string }) {
     enabled: isEdit,
   });
 
+  const categoriesQuery = useQuery({
+    queryKey: ['cms', 'categories', 'product-form'],
+    queryFn: () => cmsApi.categories.list({ limit: 100, status: 'active' }),
+  });
+
+  const brandsQuery = useQuery({
+    queryKey: ['cms', 'brands', 'product-form'],
+    queryFn: () => cmsApi.brands.list({ limit: 100, status: 'active' }),
+  });
+
+  const occasionsQuery = useQuery({
+    queryKey: ['cms', 'occasions', 'product-form'],
+    queryFn: () => cmsApi.occasions.list({ limit: 100, status: 'active' }),
+  });
+
   const {
     register,
     handleSubmit,
@@ -47,7 +66,17 @@ export function ProductFormPage({ productId }: { productId?: string }) {
     formState: { errors },
   } = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
-    defaultValues: { name: '', slug: '', status: 'draft', shortDescription: '', description: '' },
+    defaultValues: {
+      name: '',
+      slug: '',
+      status: 'draft',
+      shortDescription: '',
+      description: '',
+      categoryId: '',
+      brandId: '',
+      gender: '',
+      occasionId: '',
+    },
   });
 
   useEffect(() => {
@@ -56,15 +85,31 @@ export function ProductFormPage({ productId }: { productId?: string }) {
         name: detailQuery.data.name,
         slug: detailQuery.data.slug,
         status: detailQuery.data.status,
-        shortDescription: '',
-        description: '',
+        shortDescription: detailQuery.data.shortDescription ?? '',
+        description: detailQuery.data.description ?? '',
+        categoryId: detailQuery.data.categoryId ?? '',
+        brandId: detailQuery.data.brandId ?? '',
+        gender: detailQuery.data.gender ?? '',
+        occasionId: detailQuery.data.occasionIds?.[0] ?? '',
       });
     }
   }, [detailQuery.data, reset]);
 
   const saveMutation = useMutation({
-    mutationFn: (values: ProductFormValues) =>
-      isEdit ? productsApi.update(productId!, values) : productsApi.create(values),
+    mutationFn: (values: ProductFormValues) => {
+      const payload = {
+        name: values.name,
+        slug: values.slug || undefined,
+        status: values.status,
+        shortDescription: values.shortDescription || undefined,
+        description: values.description || undefined,
+        categoryId: values.categoryId || undefined,
+        brandId: values.brandId || undefined,
+        gender: values.gender || undefined,
+        occasionIds: values.occasionId ? [values.occasionId] : undefined,
+      };
+      return isEdit ? productsApi.update(productId!, payload) : productsApi.create(payload);
+    },
     onSuccess: async (product) => {
       await queryClient.invalidateQueries({ queryKey: ['products'] });
       await navigate({ to: ADMIN_ROUTES.productDetail.replace('$productId', product.id) });
@@ -85,12 +130,33 @@ export function ProductFormPage({ productId }: { productId?: string }) {
   }
 
   const readOnly = isEdit && !productPerms.update;
+  const categoryOptions = [
+    { label: 'Select category', value: '' },
+    ...(categoriesQuery.data?.data.map((item) => ({
+      label: item.name,
+      value: item.id,
+    })) ?? []),
+  ];
+  const brandOptions = [
+    { label: 'Select brand', value: '' },
+    ...(brandsQuery.data?.data.map((item) => ({
+      label: item.name,
+      value: item.id,
+    })) ?? []),
+  ];
+  const occasionOptions = [
+    { label: 'Select occasion', value: '' },
+    ...(occasionsQuery.data?.data.map((item) => ({
+      label: item.name,
+      value: item.id,
+    })) ?? []),
+  ];
 
   return (
     <PageMotion>
       <AdminPageHeader
         title={isEdit ? 'Edit product' : 'Create product'}
-        description="Manage product details, variants, media, and SEO metadata."
+        description="Manage product details, category, variants, media, and SEO metadata."
         actions={
           <>
             <Link to={ADMIN_ROUTES.products}>
@@ -138,6 +204,38 @@ export function ProductFormPage({ productId }: { productId?: string }) {
                 { label: 'Archived', value: 'archived' },
               ]}
             />
+            <AdminSelect
+              label="Category"
+              registration={register('categoryId')}
+              error={errors.categoryId}
+              disabled={readOnly}
+              options={categoryOptions}
+            />
+            <AdminSelect
+              label="Brand"
+              registration={register('brandId')}
+              error={errors.brandId}
+              disabled={readOnly}
+              options={brandOptions}
+            />
+            <AdminSelect
+              label="Gender"
+              registration={register('gender')}
+              error={errors.gender}
+              disabled={readOnly}
+              options={[
+                { label: 'Unisex / All', value: '' },
+                { label: 'Women', value: 'women' },
+                { label: 'Men', value: 'men' },
+              ]}
+            />
+            <AdminSelect
+              label="Occasion"
+              registration={register('occasionId')}
+              error={errors.occasionId}
+              disabled={readOnly}
+              options={occasionOptions}
+            />
             <AdminTextarea
               label="Short description"
               registration={register('shortDescription')}
@@ -166,7 +264,8 @@ export function ProductFormPage({ productId }: { productId?: string }) {
           </AdminPanel>
           <AdminPanel title="Media">
             <p className="text-sm text-neutral-600">
-              Media manager placeholder for product images and assets.
+              Media manager placeholder for product images and assets. Upload multiple images so the
+              storefront gallery can show thumbnails.
             </p>
           </AdminPanel>
           <AdminPanel title="SEO">
