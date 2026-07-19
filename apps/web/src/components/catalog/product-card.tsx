@@ -19,10 +19,20 @@ export interface ProductCardProps {
 }
 
 export function ProductCard({ product, className, layout = 'grid' }: ProductCardProps) {
-  const primaryImage = product.thumbnailUrl ?? product.media?.[0]?.url;
-  const hoverImage = product.hoverImageUrl ?? product.media?.[1]?.url;
+  const candidates = [
+    product.thumbnailUrl,
+    product.media?.find((item) => item.isPrimary)?.url,
+    product.media?.[0]?.url,
+    product.hoverImageUrl,
+    product.media?.[1]?.url,
+  ].filter((url): url is string => Boolean(url));
+
+  const [primaryBroken, setPrimaryBroken] = useState(false);
+  const primaryImage = primaryBroken ? (candidates[1] ?? candidates[0]) : candidates[0];
+  const hoverImage = candidates.find((url) => url && url !== primaryImage) ?? product.hoverImageUrl;
   const isList = layout === 'list';
   const [quickOpen, setQuickOpen] = useState(false);
+  const [hoverReady, setHoverReady] = useState(false);
 
   return (
     <>
@@ -46,22 +56,30 @@ export function ProductCard({ product, className, layout = 'grid' }: ProductCard
             className="block"
           >
             <Image
+              key={primaryImage}
               src={primaryImage}
               alt={product.media?.[0]?.alt ?? product.name}
               aspectRatio="3/4"
               className={cn(
                 'transition-all duration-700 ease-out group-hover:scale-[1.06]',
-                hoverImage ? 'group-hover:opacity-0' : undefined,
+                hoverImage && hoverReady ? 'group-hover:opacity-0' : undefined,
               )}
+              onError={() => setPrimaryBroken(true)}
             />
-            {hoverImage ? (
+            {hoverImage && hoverImage !== primaryImage ? (
               <Image
                 src={hoverImage}
                 alt=""
                 aspectRatio="3/4"
-                containerClassName="absolute inset-0 opacity-0 transition-opacity duration-700 ease-out group-hover:opacity-100"
+                containerClassName={cn(
+                  'absolute inset-0 transition-opacity duration-700 ease-out',
+                  hoverReady
+                    ? 'opacity-0 group-hover:opacity-100'
+                    : 'opacity-0 pointer-events-none',
+                )}
                 className="transition-transform duration-700 ease-out group-hover:scale-[1.06]"
                 aria-hidden
+                onLoad={() => setHoverReady(true)}
               />
             ) : null}
           </Link>

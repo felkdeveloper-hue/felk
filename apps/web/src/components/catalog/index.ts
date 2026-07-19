@@ -7,6 +7,7 @@ export * from './product-breadcrumb';
 export * from './product-card';
 export * from './product-gallery';
 export * from './product-grid';
+export * from './product-reviews';
 export * from './quick-view-modal';
 export * from './related-products';
 export * from './share-buttons';

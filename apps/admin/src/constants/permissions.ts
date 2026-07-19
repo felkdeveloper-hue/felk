@@ -55,6 +55,9 @@ export const PERMISSIONS = {
   ORDERS_INVOICE: 'orders.invoice',
   ORDERS_RETURN_MANAGE: 'orders.return_manage',
 
+  REVIEWS_MODERATE: 'reviews.moderate',
+  REVIEWS_CREATE: 'reviews.create',
+
   CUSTOMERS_VIEW: 'customers.view',
   CUSTOMERS_UPDATE: 'customers.update',
   CUSTOMERS_DELETE: 'customers.delete',

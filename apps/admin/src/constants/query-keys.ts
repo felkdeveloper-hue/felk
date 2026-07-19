@@ -10,6 +10,9 @@ export const QUERY_KEYS = {
     detail: (id: string) => ['orders', 'detail', id] as const,
     timeline: (id: string) => ['orders', id, 'timeline'] as const,
   },
+  reviews: {
+    list: (params?: unknown) => ['reviews', 'list', params] as const,
+  },
   customers: {
     list: (params?: unknown) => ['customers', 'list', params] as const,
     detail: (id: string) => ['customers', 'detail', id] as const,

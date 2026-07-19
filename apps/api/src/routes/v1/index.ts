@@ -11,6 +11,7 @@ import { checkoutRouter } from '@/routes/checkout/checkout.routes';
 import { paymentsRouter } from '@/routes/payments/payments.routes';
 import { ordersRouter } from '@/routes/orders/orders.routes';
 import { storefrontRouter } from '@/routes/storefront.routes';
+import { reviewsRouter } from '@/routes/reviews.routes';
 
 /**
  * API v1 root router.
@@ -18,6 +19,7 @@ import { storefrontRouter } from '@/routes/storefront.routes';
 export const v1Router = Router();
 
 v1Router.use('/storefront', storefrontRouter);
+v1Router.use(reviewsRouter);
 v1Router.use(systemRouter);
 v1Router.use('/auth', authRouter);
 v1Router.use('/cms', cmsRouter);

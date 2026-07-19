@@ -40,6 +40,32 @@ export function BrandsPage() {
   );
 }
 
+export function SizesPage() {
+  return (
+    <CmsResourceListPage
+      title="Sizes"
+      description="Create size options customers can filter by in the shop."
+      resourceKey="sizes"
+      api={cmsApi.sizes}
+      canCreate
+      canDelete
+    />
+  );
+}
+
+export function OccasionsPage() {
+  return (
+    <CmsResourceListPage
+      title="Occasions"
+      description="Create occasion tags used in shop filters and product assignments."
+      resourceKey="occasions"
+      api={cmsApi.occasions}
+      canCreate
+      canDelete
+    />
+  );
+}
+
 export function CmsPagesPage() {
   return (
     <CmsResourceListPage

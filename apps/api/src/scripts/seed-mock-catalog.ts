@@ -14,10 +14,12 @@ import {
   HeroBannerModel,
   HomeSectionModel,
   InventoryItemModel,
+  OccasionModel,
   ProductMediaModel,
   ProductModel,
   ProductVariantModel,
   PromoBannerModel,
+  SizeModel,
   SocialLinkModel,
   StoreSettingModel,
   WarehouseModel,
@@ -67,7 +69,7 @@ const products = [
   {
     name: 'Azure Pleated Midi Dress',
     slug: 'azure-pleated-midi-dress',
-    category: 'women',
+    category: 'skirts',
     brand: 'forma',
     price: 18500,
     image: 'photo-1566174053879-31528523f8ae',
@@ -94,7 +96,7 @@ const products = [
     category: 'women',
     brand: 'atelier-studio',
     price: 27900,
-    image: 'photo-1566479179817-c0b5b4b4b1e5',
+    image: 'photo-1515372039744-b8f02a3ae446',
     hover: 'photo-1596783074918-c84cb06531ca',
     color: 'Noir',
     flags: ['best', 'featured'],
@@ -103,11 +105,11 @@ const products = [
   {
     name: 'Harbour Relaxed Overshirt',
     slug: 'harbour-relaxed-overshirt',
-    category: 'men',
+    category: 'shirts',
     brand: 'north-and-loom',
     price: 14500,
     salePrice: 12500,
-    image: 'photo-1610652492500-ded49ceeb378',
+    image: 'photo-1602810318383-e386cc2a3ccf',
     hover: 'photo-1596755094514-f87e34085b2c',
     color: 'Harbour Blue',
     flags: ['trending', 'best'],
@@ -116,11 +118,11 @@ const products = [
   {
     name: 'Stone Modern Chino',
     slug: 'stone-modern-chino',
-    category: 'men',
+    category: 'jeans',
     brand: 'forma',
     price: 11900,
-    image: 'photo-1624378439575-d8705ad7ae80',
-    hover: 'photo-1473966968600-fa801b869a1a',
+    image: 'photo-1473966968600-fa801b869a1a',
+    hover: 'photo-1542272454315-4c01d7abdf4a',
     color: 'Stone',
     flags: ['new', 'featured'],
     description: 'Tapered stretch chinos balancing smart structure with everyday comfort.',
@@ -128,11 +130,11 @@ const products = [
   {
     name: 'Meridian Knit Polo',
     slug: 'meridian-knit-polo',
-    category: 'men',
+    category: 'shirts',
     brand: 'atelier-studio',
     price: 9800,
-    image: 'photo-1583743814966-8936f37f884c',
-    hover: 'photo-1602810318383-e386cc2a3ccf',
+    image: 'photo-1618354691373-d851c5c3a990',
+    hover: 'photo-1622445275576-721325763afe',
     color: 'Meridian Green',
     flags: ['best', 'new'],
     description: 'A fine-gauge knit polo with a modern open collar and rich seasonal color.',
@@ -140,7 +142,7 @@ const products = [
   {
     name: 'Everyday Premium Tee',
     slug: 'everyday-premium-tee',
-    category: 'essentials',
+    category: 't-shirts',
     brand: 'north-and-loom',
     price: 5900,
     image: 'photo-1521572163474-6864f9cf17ab',
@@ -155,7 +157,7 @@ const products = [
     category: 'accessories',
     brand: 'forma',
     price: 19800,
-    image: 'photo-1548036328-c9fa89d128fa',
+    image: 'photo-1590874103328-eac38a683ce7',
     hover: 'photo-1553062407-98eeb64c6a62',
     color: 'Cognac',
     flags: ['featured', 'trending'],
@@ -176,7 +178,7 @@ const products = [
   {
     name: 'Contour Sunglasses',
     slug: 'contour-sunglasses',
-    category: 'accessories',
+    category: 'sunglasses',
     brand: 'forma',
     price: 8900,
     salePrice: 6900,
@@ -189,7 +191,7 @@ const products = [
   {
     name: 'Cloud Studio Sneaker',
     slug: 'cloud-studio-sneaker',
-    category: 'essentials',
+    category: 'shoes',
     brand: 'north-and-loom',
     price: 15900,
     image: 'photo-1542291026-7eec264c27ff',
@@ -265,10 +267,68 @@ async function upsertMasterData() {
   return { categoryDocs, brandDocs, collection };
 }
 
+async function upsertFilterMasters() {
+  const sizes = [
+    ['S', 's'],
+    ['M', 'm'],
+    ['L', 'l'],
+    ['XL', 'xl'],
+    ['2XL', '2xl'],
+  ] as const;
+  const occasions = [
+    ['Casual', 'casual'],
+    ['Party', 'party'],
+    ['Work', 'work'],
+    ['Everyday', 'everyday'],
+  ] as const;
+
+  const sizeDocs = new Map<string, any>();
+  for (const [name, slug] of sizes) {
+    const doc = await SizeModel.findOneAndUpdate(
+      { slug },
+      {
+        $set: {
+          name,
+          slug,
+          code: name,
+          status: 'active',
+          sortOrder: sizeDocs.size,
+          isDeleted: false,
+          deletedAt: null,
+        },
+      },
+      { upsert: true, new: true },
+    );
+    sizeDocs.set(slug, doc);
+  }
+
+  const occasionDocs = new Map<string, any>();
+  for (const [name, slug] of occasions) {
+    const doc = await OccasionModel.findOneAndUpdate(
+      { slug },
+      {
+        $set: {
+          name,
+          slug,
+          status: 'active',
+          sortOrder: occasionDocs.size,
+          isDeleted: false,
+          deletedAt: null,
+        },
+      },
+      { upsert: true, new: true },
+    );
+    occasionDocs.set(slug, doc);
+  }
+
+  return { sizeDocs, occasionDocs };
+}
+
 async function seedProducts(
   categoryDocs: Map<string, any>,
   brandDocs: Map<string, any>,
   collection: any,
+  occasionDocs: Map<string, any>,
 ) {
   const warehouse = await WarehouseModel.findOneAndUpdate(
     { code: 'MAIN' },
@@ -300,9 +360,14 @@ async function seedProducts(
           categoryId: categoryDocs.get(item.category)?._id,
           brandId: brandDocs.get(item.brand)?._id,
           collectionIds: [collection._id],
+          occasionIds: [occasionDocs.get('everyday')?._id].filter(Boolean),
           tags: [item.category, item.color.toLowerCase(), 'modern'],
           searchKeywords: [item.name, item.category, item.brand, item.color],
-          gender: item.category === 'men' ? 'men' : item.category === 'women' ? 'women' : 'unisex',
+          gender: ['women', 'skirts', 'heels-boots'].includes(item.category)
+            ? 'women'
+            : ['men', 'shirts', 'jeans', 'hoodies'].includes(item.category)
+              ? 'men'
+              : 'unisex',
           isFeatured: flags.has('featured'),
           isTrending: flags.has('trending'),
           isNewArrival: flags.has('new'),
@@ -318,8 +383,12 @@ async function seedProducts(
             currency: 'LKR',
           },
           specifications: [
-            { name: 'Color', value: item.color, group: 'Details', sortOrder: 1 },
-            { name: 'Care', value: 'Gentle care', group: 'Details', sortOrder: 2 },
+            { name: 'Design', value: 'Textured', group: 'Highlights', sortOrder: 1 },
+            { name: 'Fit', value: 'Regular', group: 'Highlights', sortOrder: 2 },
+            { name: 'Material', value: 'Premium blend', group: 'Highlights', sortOrder: 3 },
+            { name: 'Occasion', value: 'Everyday', group: 'Highlights', sortOrder: 4 },
+            { name: 'Color', value: item.color, group: 'Details', sortOrder: 5 },
+            { name: 'Care', value: 'Follow care label', group: 'Details', sortOrder: 6 },
           ],
           seo: {
             title: `${item.name} | FE`,
@@ -721,7 +790,8 @@ async function main() {
   await seedStoreSettings();
   await seedBrandPresence();
   const { categoryDocs, brandDocs, collection } = await upsertMasterData();
-  await seedProducts(categoryDocs, brandDocs, collection);
+  const { occasionDocs } = await upsertFilterMasters();
+  await seedProducts(categoryDocs, brandDocs, collection, occasionDocs);
   await seedHomepage();
   await disconnectDatabase();
   logger.info({ products: products.length }, 'Mock catalog and homepage seeded');

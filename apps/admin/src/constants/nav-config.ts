@@ -2,12 +2,15 @@ import type { LucideIcon } from 'lucide-react';
 import {
   BarChart3,
   Boxes,
+  CalendarDays,
   CreditCard,
   FileText,
   FolderTree,
   LayoutDashboard,
   Megaphone,
+  MessageSquareQuote,
   Package,
+  Ruler,
   Settings,
   Shield,
   ShoppingCart,
@@ -58,6 +61,18 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     permissions: [PERMISSIONS.BRANDS_VIEW, PERMISSIONS.BRANDS_MANAGE],
   },
   {
+    label: 'Sizes',
+    to: ADMIN_ROUTES.sizes,
+    icon: Ruler,
+    permissions: [PERMISSIONS.PRODUCTS_VIEW, PERMISSIONS.CATEGORIES_MANAGE],
+  },
+  {
+    label: 'Occasions',
+    to: ADMIN_ROUTES.occasions,
+    icon: CalendarDays,
+    permissions: [PERMISSIONS.PRODUCTS_VIEW, PERMISSIONS.CATEGORIES_MANAGE],
+  },
+  {
     label: 'Inventory',
     to: ADMIN_ROUTES.inventory,
     icon: Warehouse,
@@ -68,6 +83,12 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     to: ADMIN_ROUTES.orders,
     icon: ShoppingCart,
     permissions: [PERMISSIONS.ORDERS_VIEW, PERMISSIONS.ORDERS_READ],
+  },
+  {
+    label: 'Reviews',
+    to: ADMIN_ROUTES.reviews,
+    icon: MessageSquareQuote,
+    permissions: [PERMISSIONS.REVIEWS_MODERATE],
   },
   {
     label: 'Customers',
