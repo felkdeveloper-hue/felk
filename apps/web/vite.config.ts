@@ -8,16 +8,6 @@ import { VitePWA } from 'vite-plugin-pwa';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isProduction = process.env.NODE_ENV === 'production';
 
-function manualChunks(id: string): string | undefined {
-  if (!id.includes('node_modules')) return undefined;
-  if (id.includes('react-dom') || /[/\\]react[/\\]/.test(id)) return 'vendor-react';
-  if (id.includes('@tanstack')) return 'vendor-tanstack';
-  if (id.includes('@radix-ui')) return 'vendor-radix';
-  if (id.includes('framer-motion')) return 'vendor-motion';
-  if (id.includes('lucide-react')) return 'vendor-icons';
-  return undefined;
-}
-
 export default defineConfig({
   plugins: [
     react(),
@@ -77,12 +67,9 @@ export default defineConfig({
   build: {
     sourcemap: process.env.VITE_SOURCEMAP === 'true',
     target: 'es2022',
-    chunkSizeWarningLimit: 600,
-    rollupOptions: {
-      output: {
-        manualChunks,
-      },
-    },
+    chunkSizeWarningLimit: 900,
+    // Avoid custom manualChunks that split React from its consumers —
+    // that caused blank production pages (createContext/forwardRef undefined).
   },
   esbuild: {
     drop: isProduction ? ['console', 'debugger'] : [],
