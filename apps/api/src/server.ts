@@ -1,6 +1,7 @@
 import http from 'node:http';
 import { createApp } from '@/app';
 import { appConfig, connectDatabase, logger } from '@/config';
+import { logStorageBackend } from '@/storage';
 import { registerGracefulShutdown } from '@/utils/shutdown';
 import {
   initOrderPaymentConsumer,
@@ -35,6 +36,7 @@ async function bootstrap(): Promise<void> {
   }
 
   server.listen(appConfig.server.port, appConfig.server.host, () => {
+    logStorageBackend();
     logger.info(
       {
         host: appConfig.server.host,

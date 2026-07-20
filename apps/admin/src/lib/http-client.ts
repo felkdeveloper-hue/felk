@@ -18,6 +18,9 @@ export const httpClient = axios.create({
 
 httpClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   config.headers = config.headers ?? new AxiosHeaders();
+  if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+    config.headers.delete('Content-Type');
+  }
   const { accessToken } = useAuthStore.getState();
   if (accessToken && !config.headers.get('Authorization')) {
     config.headers.set('Authorization', `Bearer ${accessToken}`);

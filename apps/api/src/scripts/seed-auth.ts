@@ -77,13 +77,22 @@ async function seedSuperAdmin() {
     throw new Error('Super admin role missing after seed');
   }
 
+  const passwordHash = await hashPassword(password);
   const existing = await UserModel.findOne({ email });
+
   if (existing) {
-    logger.info({ email }, 'Super admin already exists — skipped');
+    // Local/dev convenience: keep credentials in sync with seed defaults / env overrides.
+    existing.passwordHash = passwordHash;
+    existing.roleId = role._id;
+    existing.roleKey = ROLES.SUPER_ADMIN;
+    existing.status = USER_STATUS.ACTIVE;
+    existing.emailVerifiedAt = existing.emailVerifiedAt ?? new Date();
+    existing.firstName = firstName;
+    existing.lastName = lastName;
+    await existing.save();
+    logger.info({ email }, 'Super admin updated (password reset from seed)');
     return;
   }
-
-  const passwordHash = await hashPassword(password);
 
   await UserModel.create({
     email,

@@ -1,6 +1,7 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { appConfig } from '@/config/app.config';
+import { env } from '@/config/env';
 import type {
   StorageObject,
   StorageService,
@@ -22,7 +23,7 @@ export class LocalStorageService implements StorageService {
     await this.ensureDir(path.dirname(fullPath));
     await fs.writeFile(fullPath, input.body);
 
-    const base = appConfig.storage.publicUrl || `http://localhost:${appConfig.server.port}/uploads`;
+    const base = env.CDN_BASE_URL || `http://localhost:${appConfig.server.port}/uploads`;
 
     return {
       key: input.key,
@@ -42,7 +43,7 @@ export class LocalStorageService implements StorageService {
   }
 
   async getSignedUrl(key: string, _expiresInSeconds = 3600): Promise<string> {
-    const base = appConfig.storage.publicUrl || `http://localhost:${appConfig.server.port}/uploads`;
+    const base = env.CDN_BASE_URL || `http://localhost:${appConfig.server.port}/uploads`;
     return `${base.replace(/\/$/, '')}/${key.replace(/\\/g, '/')}`;
   }
 

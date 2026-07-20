@@ -38,6 +38,9 @@ export const httpClient = axios.create({
 httpClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const requestId = generateRequestId();
   config.headers = config.headers ?? new AxiosHeaders();
+  if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+    config.headers.delete('Content-Type');
+  }
   config.headers.set('X-Request-Id', requestId);
 
   const { accessToken } = useAuthStore.getState();

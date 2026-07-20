@@ -69,11 +69,36 @@ export const appConfig = {
     from: env.EMAIL_FROM,
   },
   storage: {
-    region: env.AWS_REGION,
-    accessKeyId: env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: env.AWS_SECRET_ACCESS_KEY,
-    bucket: env.AWS_S3_BUCKET,
-    publicUrl: env.S3_PUBLIC_URL,
+    r2: {
+      accessKeyId: env.R2_ACCESS_KEY_ID,
+      secretAccessKey: env.R2_SECRET_ACCESS_KEY,
+      accountId: env.R2_ACCOUNT_ID,
+      bucket: env.R2_BUCKET_NAME,
+      endpoint:
+        env.R2_ENDPOINT ||
+        (env.R2_ACCOUNT_ID ? `https://${env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com` : undefined),
+      publicUrl: env.R2_PUBLIC_URL || env.CDN_BASE_URL || undefined,
+      enabled: Boolean(
+        env.R2_ACCESS_KEY_ID &&
+        env.R2_SECRET_ACCESS_KEY &&
+        env.R2_BUCKET_NAME &&
+        (env.R2_ENDPOINT || env.R2_ACCOUNT_ID),
+      ),
+    },
+    s3: {
+      region: env.AWS_REGION,
+      accessKeyId: env.AWS_ACCESS_KEY_ID,
+      secretAccessKey: env.AWS_SECRET_ACCESS_KEY,
+      bucket: env.AWS_S3_BUCKET,
+      endpoint: env.AWS_S3_ENDPOINT,
+      publicUrl: env.S3_PUBLIC_URL || env.CDN_BASE_URL,
+      enabled: Boolean(
+        env.AWS_ACCESS_KEY_ID &&
+        env.AWS_SECRET_ACCESS_KEY &&
+        env.AWS_S3_BUCKET &&
+        (env.S3_PUBLIC_URL || env.CDN_BASE_URL),
+      ),
+    },
   },
   payment: {
     returnUrl: env.PAYMENT_RETURN_URL,

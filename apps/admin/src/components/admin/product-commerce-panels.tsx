@@ -113,6 +113,12 @@ export function ProductCommercePanels({
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['products'] }),
       queryClient.invalidateQueries({
+        queryKey: [...QUERY_KEYS.products.detail(productId), 'media'],
+      }),
+      queryClient.invalidateQueries({
+        queryKey: [...QUERY_KEYS.products.detail(productId), 'variants'],
+      }),
+      queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.inventory.items({ productId, limit: 100 }),
       }),
     ]);
@@ -123,6 +129,9 @@ export function ProductCommercePanels({
       mediaApi.upload(productId, file, { isPrimary: mainImages.length === 0 }),
     onSuccess: async () => {
       setError(null);
+      await queryClient.invalidateQueries({
+        queryKey: [...QUERY_KEYS.products.detail(productId), 'media'],
+      });
       await invalidate();
     },
     onError: (err) => setError(err instanceof AppError ? err.message : 'Unable to upload image.'),
@@ -274,11 +283,7 @@ export function ProductCommercePanels({
 
   const hasMainImage = mainImages.length > 0;
   const hasVariants = variants.length > 0;
-  const variantsMissingImages = variants.filter(
-    (variant) => (variantMediaMap.get(variant.id)?.length ?? 0) === 0,
-  );
-  const allVariantsHaveImages = hasVariants && variantsMissingImages.length === 0;
-  const readyToPublish = hasMainImage && hasVariants && allVariantsHaveImages;
+  const readyToPublish = hasMainImage && hasVariants;
 
   return (
     <div className="space-y-6">
@@ -618,15 +623,7 @@ export function ProductCommercePanels({
           </p>
           <ul className="space-y-2 text-sm">
             <ChecklistItem ok={hasMainImage} label="At least one product image" />
-            <ChecklistItem ok={hasVariants} label="At least one variant" />
-            <ChecklistItem
-              ok={allVariantsHaveImages}
-              label={
-                variantsMissingImages.length > 0
-                  ? `All variants have an image (${variantsMissingImages.length} missing)`
-                  : 'All variants have an image'
-              }
-            />
+            <ChecklistItem ok={hasVariants} label="At least one variant with price" />
           </ul>
 
           {canPublish ? (
