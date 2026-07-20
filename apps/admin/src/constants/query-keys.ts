@@ -28,4 +28,10 @@ export const QUERY_KEYS = {
   cms: {
     resource: (resource: string, params?: unknown) => ['cms', resource, params] as const,
   },
+  users: {
+    list: (params?: unknown) => ['users', 'list', params] as const,
+  },
+  audit: {
+    list: (params?: unknown) => ['audit', 'list', params] as const,
+  },
 } as const;

@@ -104,3 +104,29 @@ export function CmsHomePage() {
     />
   );
 }
+
+export function CmsFaqsPage() {
+  return (
+    <CmsResourceListPage
+      title="FAQs"
+      description="Help center questions shown on the storefront."
+      resourceKey="faqs"
+      api={cmsApi.faqs}
+      canCreate
+      canDelete
+    />
+  );
+}
+
+export function MarketingPromosPage() {
+  return (
+    <CmsResourceListPage
+      title="Promo banners"
+      description="Marketing promo placements for homepage and campaign pages."
+      resourceKey="promo-banners"
+      api={cmsApi.promoBanners}
+      canCreate
+      canDelete
+    />
+  );
+}

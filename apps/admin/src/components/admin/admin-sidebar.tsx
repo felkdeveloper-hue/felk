@@ -12,7 +12,7 @@ export function AdminSidebar() {
   return (
     <aside
       className={cn(
-        'relative sticky top-0 flex h-screen shrink-0 flex-col border-r border-white/5 bg-[var(--admin-ink)] text-white transition-[width] duration-200',
+        'relative sticky top-0 flex h-screen shrink-0 flex-col border-r border-white/5 bg-[var(--admin-sidebar)] text-white transition-[width] duration-200',
         collapsed ? 'w-[72px]' : 'w-64',
       )}
     >

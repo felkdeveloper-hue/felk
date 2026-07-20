@@ -15,6 +15,7 @@ import { slugify } from '@/utils/slug.helper';
 import { sanitizeRichText } from '@/utils/sanitize-html';
 import { assertSalePriceValid, buildProductJsonLd, computePricing } from '@/utils/pricing.helper';
 import { PRODUCT_AUDIT, PRODUCT_STATUS } from '@/constants/product';
+import { allocateUniqueParentSku, isSkuTaken } from '@/services/sku-allocation.service';
 
 function toPlain(doc: { toObject?: () => Record<string, unknown> } | Record<string, unknown>) {
   if (doc && typeof (doc as { toObject?: () => Record<string, unknown> }).toObject === 'function') {
@@ -150,7 +151,7 @@ export class ProductService {
         return {
           ...withComputedPricing(product as unknown as Record<string, unknown>),
           brandName: product.brandId ? brandById.get(product.brandId.toString()) : undefined,
-          sku: defaultVariant?.sku,
+          sku: product.sku ?? defaultVariant?.sku,
           thumbnailUrl: primary?.thumbnailUrl ?? primary?.url ?? defaultVariant?.thumbnailUrl,
           hoverImageUrl: hover?.url,
           media: productMedia,
@@ -185,6 +186,13 @@ export class ProductService {
     const existing = await productRepository.findBySlug(slug);
     if (existing) {
       slug = `${slug}-${Date.now().toString(36)}`;
+    }
+
+    const sku = payload.sku
+      ? String(payload.sku).trim().toUpperCase()
+      : await allocateUniqueParentSku();
+    if (payload.sku && (await isSkuTaken(sku))) {
+      throw ApiError.conflict('SKU already exists', undefined, 'SKU_EXISTS');
     }
 
     const pricing = (payload.pricing as Record<string, unknown>) ?? {
@@ -222,6 +230,7 @@ export class ProductService {
     const doc = await ProductModel.create({
       name,
       slug,
+      sku,
       shortDescription: payload.shortDescription ?? null,
       description: sanitizeRichText(payload.description as string | undefined) ?? null,
       brandId: payload.brandId ?? null,
@@ -281,6 +290,16 @@ export class ProductService {
       if (existing && existing._id.toString() !== id) {
         throw ApiError.conflict('Slug already exists', undefined, 'SLUG_EXISTS');
       }
+    }
+
+    if (payload.sku) {
+      const sku = String(payload.sku).trim().toUpperCase();
+      payload.sku = sku;
+      if (sku !== before.sku && (await isSkuTaken(sku, { excludeProductId: id }))) {
+        throw ApiError.conflict('SKU already exists', undefined, 'SKU_EXISTS');
+      }
+    } else if (!before.sku) {
+      payload.sku = await allocateUniqueParentSku();
     }
 
     if (payload.pricing) {

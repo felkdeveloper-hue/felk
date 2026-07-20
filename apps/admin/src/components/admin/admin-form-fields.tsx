@@ -3,7 +3,7 @@ import type { FieldError, UseFormRegisterReturn } from 'react-hook-form';
 import { cn } from '@/lib/utils';
 
 const fieldClassName =
-  'w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm outline-none focus:border-neutral-400';
+  'w-full rounded-lg border border-[var(--admin-line)] bg-[var(--admin-panel-soft)] px-3 py-2 text-sm text-[var(--admin-ink)] outline-none transition-colors focus:border-[var(--admin-accent)]/50';
 
 export function AdminField({
   label,
@@ -16,9 +16,11 @@ export function AdminField({
 }) {
   return (
     <label className="block space-y-1.5 text-sm">
-      <span className="font-medium text-neutral-700">{label}</span>
+      <span className="font-medium text-neutral-700 dark:text-neutral-300">{label}</span>
       {children}
-      {error ? <span className="block text-xs text-red-600">{error.message}</span> : null}
+      {error ? (
+        <span className="block text-xs text-red-600 dark:text-red-400">{error.message}</span>
+      ) : null}
     </label>
   );
 }
@@ -36,7 +38,7 @@ export function AdminTextInput({
   return (
     <AdminField label={label} error={error}>
       <input
-        className={cn(fieldClassName, error && 'border-red-300')}
+        className={cn(fieldClassName, error && 'border-red-300 dark:border-red-500/50')}
         {...registration}
         {...props}
       />
@@ -57,7 +59,7 @@ export function AdminTextarea({
   return (
     <AdminField label={label} error={error}>
       <textarea
-        className={cn(fieldClassName, 'min-h-28', error && 'border-red-300')}
+        className={cn(fieldClassName, 'min-h-28', error && 'border-red-300 dark:border-red-500/50')}
         {...registration}
         {...props}
       />
@@ -80,7 +82,7 @@ export function AdminSelect({
   return (
     <AdminField label={label} error={error}>
       <select
-        className={cn(fieldClassName, error && 'border-red-300')}
+        className={cn(fieldClassName, error && 'border-red-300 dark:border-red-500/50')}
         {...registration}
         {...props}
       >

@@ -5,7 +5,7 @@ export function CmsHubPage() {
   return (
     <ModuleHubPage
       title="CMS"
-      description="Manage storefront content, banners, and home page sections."
+      description="Manage storefront content, banners, FAQs, and home page sections."
       links={[
         {
           label: 'Pages',
@@ -13,14 +13,19 @@ export function CmsHubPage() {
           description: 'Static pages, policies, and landing content.',
         },
         {
-          label: 'Banners',
+          label: 'Hero banners',
           to: ADMIN_ROUTES.cmsBanners,
-          description: 'Hero and promotional banner slots.',
+          description: 'Primary storefront hero slideshow.',
         },
         {
           label: 'Home sections',
           to: ADMIN_ROUTES.cmsHome,
-          description: 'Composable home page sections and featured content.',
+          description: 'Composable home page sections and featured modules.',
+        },
+        {
+          label: 'FAQs',
+          to: ADMIN_ROUTES.cmsFaqs,
+          description: 'Help center questions and answers.',
         },
       ]}
     />

@@ -56,6 +56,7 @@ export const attributeLinkSchema = z.object({
 export const productCreateSchema = z.object({
   name: z.string().trim().min(1).max(200),
   slug: slugSchema.optional(),
+  sku: z.string().trim().min(1).max(64).optional(),
   shortDescription: z.string().trim().max(500).nullable().optional(),
   description: z.string().max(50000).nullable().optional(),
   brandId: objectIdSchema.nullable().optional(),
@@ -160,7 +161,7 @@ export const dimensionsSchema = z
   .optional();
 
 export const variantCreateSchema = z.object({
-  sku: z.string().trim().min(1).max(64),
+  sku: z.string().trim().min(1).max(64).optional(),
   barcode: z.string().trim().max(64).nullable().optional(),
   title: z.string().trim().min(1).max(200).optional(),
   colorId: objectIdSchema.nullable().optional(),

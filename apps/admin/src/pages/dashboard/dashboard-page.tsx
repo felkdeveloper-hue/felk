@@ -34,14 +34,11 @@ export function DashboardPage() {
           <>
             <Link
               to={ADMIN_ROUTES.productNew}
-              className="inline-flex h-9 items-center rounded-lg border border-[var(--admin-line)] bg-[var(--admin-panel)] px-3.5 text-sm font-medium transition hover:bg-white"
+              className="inline-flex h-9 items-center rounded-lg border border-[var(--admin-line)] bg-[var(--admin-panel)] px-3.5 text-sm font-medium transition hover:bg-white dark:hover:bg-white/10"
             >
               Add product
             </Link>
-            <Link
-              to={ADMIN_ROUTES.orders}
-              className="inline-flex h-9 items-center rounded-lg bg-[var(--admin-ink)] px-3.5 text-sm font-medium text-white transition hover:bg-black"
-            >
+            <Link to={ADMIN_ROUTES.orders} className="admin-btn admin-btn-primary admin-btn-lg">
               View orders
             </Link>
           </>
@@ -107,13 +104,13 @@ export function DashboardPage() {
           <AdminPanel title="Performance">
             <div className="flex h-40 flex-col items-center justify-center rounded-xl border border-dashed border-[var(--admin-line)] bg-[var(--admin-surface)] px-6 text-center">
               <p className="text-sm font-medium text-[var(--admin-ink)]">Sales trend</p>
-              <p className="mt-1 text-xs text-neutral-500">
+              <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
                 Charts will appear once report data is connected.
               </p>
             </div>
           </AdminPanel>
           <AdminPanel title="Recent activity">
-            <ul className="space-y-3 text-sm text-neutral-600">
+            <ul className="space-y-3 text-sm text-neutral-600 dark:text-neutral-300">
               {(data?.recentPayments ?? []).slice(0, 5).map((payment) => (
                 <li
                   key={payment.id}
@@ -122,12 +119,17 @@ export function DashboardPage() {
                   <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-[var(--admin-accent)]" />
                   <span>
                     Payment {payment.referenceNumber ?? payment.id}
-                    <span className="text-neutral-400"> · {payment.status}</span>
+                    <span className="text-neutral-400 dark:text-neutral-500">
+                      {' '}
+                      · {payment.status}
+                    </span>
                   </span>
                 </li>
               ))}
               {!stats.isLoading && (data?.recentPayments?.length ?? 0) === 0 ? (
-                <li className="text-neutral-500">No recent payment activity.</li>
+                <li className="text-neutral-500 dark:text-neutral-400">
+                  No recent payment activity.
+                </li>
               ) : null}
             </ul>
           </AdminPanel>

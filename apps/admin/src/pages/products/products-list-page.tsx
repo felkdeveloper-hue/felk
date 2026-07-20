@@ -19,8 +19,10 @@ function productHref(productId: string, section?: string) {
   return section ? `${base}?section=${section}` : base;
 }
 
-const actionBtn =
-  'inline-flex h-8 items-center rounded-md px-2.5 text-xs font-medium transition disabled:opacity-50';
+const actionBtn = 'admin-btn';
+const actionPrimary = 'admin-btn-primary';
+const actionSecondary = 'admin-btn-secondary';
+const actionDanger = 'admin-btn-danger';
 
 export function ProductsListPage() {
   const queryClient = useQueryClient();
@@ -106,11 +108,15 @@ export function ProductsListPage() {
   const statusTone = (value: string) => {
     const normalized = value.toLowerCase();
     if (normalized === 'published' || normalized === 'active') {
-      return 'bg-emerald-50 text-emerald-800';
+      return 'bg-emerald-50 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300';
     }
-    if (normalized === 'draft') return 'bg-amber-50 text-amber-800';
-    if (normalized === 'archived') return 'bg-neutral-100 text-neutral-600';
-    return 'bg-neutral-100 text-neutral-700';
+    if (normalized === 'draft') {
+      return 'bg-amber-50 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300';
+    }
+    if (normalized === 'archived') {
+      return 'bg-neutral-100 text-neutral-600 dark:bg-white/10 dark:text-neutral-300';
+    }
+    return 'bg-neutral-100 text-neutral-700 dark:bg-white/10 dark:text-neutral-300';
   };
 
   return (
@@ -120,11 +126,8 @@ export function ProductsListPage() {
         description="Manage catalog products, variants, media, and SEO."
         actions={
           products.create ? (
-            <Link
-              to={ADMIN_ROUTES.productNew}
-              className="inline-flex h-9 items-center rounded-lg bg-[var(--admin-ink)] px-3.5 text-sm font-medium text-white transition hover:bg-black"
-            >
-              Create product
+            <Link to={ADMIN_ROUTES.productNew} className="admin-btn admin-btn-primary admin-btn-lg">
+              Add product
             </Link>
           ) : null
         }
@@ -181,7 +184,7 @@ export function ProductsListPage() {
                   {products.update ? (
                     <button
                       type="button"
-                      className={cn(actionBtn, 'border border-[var(--admin-line)] bg-white')}
+                      className={cn(actionBtn, actionSecondary)}
                       onClick={() => archiveMutation.mutate(selectedIds)}
                     >
                       Archive
@@ -244,38 +247,32 @@ export function ProductsListPage() {
                 cell: (row) => (
                   <div className="flex flex-wrap items-center justify-end gap-1">
                     {products.update || products.view ? (
-                      <a
-                        href={productHref(row.id)}
-                        className={cn(actionBtn, 'bg-[var(--admin-ink)] text-white hover:bg-black')}
-                      >
+                      <a href={productHref(row.id)} className={cn(actionBtn, actionPrimary)}>
                         Edit
                       </a>
                     ) : null}
                     <a
+                      href={productHref(row.id, 'images')}
+                      className={cn(actionBtn, actionSecondary)}
+                    >
+                      Images
+                    </a>
+                    <a
                       href={productHref(row.id, 'variants')}
-                      className={cn(
-                        actionBtn,
-                        'border border-[var(--admin-line)] bg-white text-neutral-700 hover:bg-neutral-50',
-                      )}
+                      className={cn(actionBtn, actionSecondary)}
                     >
                       Variants
                     </a>
                     <a
                       href={productHref(row.id, 'prices')}
-                      className={cn(
-                        actionBtn,
-                        'border border-[var(--admin-line)] bg-white text-neutral-700 hover:bg-neutral-50',
-                      )}
+                      className={cn(actionBtn, actionSecondary)}
                     >
                       Prices
                     </a>
                     {(inventory.view || inventory.adjust) && (
                       <a
                         href={productHref(row.id, 'stock')}
-                        className={cn(
-                          actionBtn,
-                          'border border-[var(--admin-line)] bg-white text-neutral-700 hover:bg-neutral-50',
-                        )}
+                        className={cn(actionBtn, actionSecondary)}
                       >
                         Stock
                       </a>
@@ -283,7 +280,7 @@ export function ProductsListPage() {
                     {products.delete ? (
                       <button
                         type="button"
-                        className={cn(actionBtn, 'text-red-700 hover:bg-red-50')}
+                        className={cn(actionBtn, actionDanger)}
                         disabled={removeOneMutation.isPending}
                         onClick={() => {
                           if (window.confirm(`Delete “${row.name}”?`)) {

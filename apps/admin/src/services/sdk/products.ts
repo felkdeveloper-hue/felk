@@ -39,7 +39,7 @@ export interface AdminVariant {
 }
 
 export interface VariantInput {
-  sku: string;
+  sku?: string;
   title?: string;
   price: number;
   salePrice?: number | null;
@@ -117,6 +117,7 @@ export interface ProductListParams extends ListQueryParams {
 export interface ProductInput {
   name: string;
   slug?: string;
+  sku?: string;
   status?: string;
   shortDescription?: string;
   description?: string;

@@ -18,8 +18,10 @@ const LABELS: Record<string, string> = {
   cms: 'CMS',
   pages: 'Pages',
   banners: 'Banners',
+  faqs: 'FAQs',
   home: 'Home',
   marketing: 'Marketing',
+  promos: 'Promo banners',
   finance: 'Finance',
   reports: 'Reports',
   users: 'Users',
@@ -45,7 +47,7 @@ export function AdminBreadcrumbs() {
   return (
     <nav
       aria-label="Breadcrumb"
-      className="mb-5 flex flex-wrap items-center gap-1 text-xs text-neutral-500"
+      className="mb-5 flex flex-wrap items-center gap-1 text-xs text-neutral-500 dark:text-neutral-400"
     >
       <Link to={ADMIN_ROUTES.dashboard} className="transition hover:text-[var(--admin-ink)]">
         Dashboard
