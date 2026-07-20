@@ -4,7 +4,11 @@ import { AccountDashboard } from '@/components/account';
 export function AccountPage() {
   return (
     <>
-      <Seo title="Account" description="Your account overview." noIndex />
+      <Seo
+        title="My Account"
+        description="Manage your Fashion Edge profile, orders, and preferences."
+        noIndex
+      />
       <AccountDashboard />
     </>
   );

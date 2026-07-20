@@ -48,7 +48,6 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
 
   const cartCount = useCartStore(selectCartItemCount);
   const toggleSearch = useUiStore((state) => state.toggleSearch);
-  const toggleCartDrawer = useUiStore((state) => state.toggleCartDrawer);
   const isAuthed = useAuthStore((state) => Boolean(state.accessToken && state.user));
   const user = useAuthStore((state) => state.user);
   const logoutMutation = useLogoutMutation();
@@ -138,23 +137,28 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
                   <span className="max-w-28 truncate">{accountLabel}</span>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="rounded-2xl">
+              <DropdownMenuContent align="end" className="min-w-44 rounded-xl">
+                <div className="text-muted-foreground px-2 py-1.5 text-xs font-medium">
+                  Hi, {accountLabel}
+                </div>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
-                  <Link to={ROUTES.account}>Account overview</Link>
+                  <Link to={ROUTES.account}>My Account</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
-                  <Link to={ROUTES.accountProfile}>Profile</Link>
+                  <Link to={ROUTES.wishlist}>My Wishlist</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
-                  <Link to={ROUTES.orders}>Orders</Link>
+                  <Link to={ROUTES.accountOrders}>My Orders</Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={() => logoutMutation.mutate()}
                   disabled={logoutMutation.isPending}
+                  className="text-destructive focus:text-destructive"
                 >
                   <LogOut className="size-4" aria-hidden />
-                  Sign out
+                  Logout
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -179,18 +183,20 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
             variant="ghost"
             size="icon"
             aria-label={`Cart${cartCount ? `, ${cartCount} items` : ''}`}
-            onClick={toggleCartDrawer}
+            asChild
             className={cn(
               'relative',
               transparent ? 'text-white hover:bg-white/10 hover:text-white' : undefined,
             )}
           >
-            <ShoppingBag />
-            {cartCount > 0 ? (
-              <span className="size-4.5 bg-accent text-accent-foreground absolute right-1.5 top-1.5 flex items-center justify-center rounded-full text-[10px] font-bold">
-                {cartCount > 9 ? '9+' : cartCount}
-              </span>
-            ) : null}
+            <Link to={ROUTES.cart} preload="intent">
+              <ShoppingBag />
+              {cartCount > 0 ? (
+                <span className="size-4.5 bg-accent text-accent-foreground absolute right-1.5 top-1.5 flex items-center justify-center rounded-full text-[10px] font-bold">
+                  {cartCount > 9 ? '9+' : cartCount}
+                </span>
+              ) : null}
+            </Link>
           </Button>
           <div className="hidden sm:block">
             <ThemeToggle

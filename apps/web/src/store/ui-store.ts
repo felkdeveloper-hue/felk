@@ -4,7 +4,6 @@ export type ModalId = 'quick-view' | 'size-guide' | 'newsletter' | string;
 
 interface UiState {
   isMobileNavOpen: boolean;
-  isCartDrawerOpen: boolean;
   isSearchOpen: boolean;
   activeModal: ModalId | null;
   isGlobalLoading: boolean;
@@ -14,8 +13,6 @@ interface UiState {
 interface UiActions {
   setMobileNavOpen: (open: boolean) => void;
   toggleMobileNav: () => void;
-  setCartDrawerOpen: (open: boolean) => void;
-  toggleCartDrawer: () => void;
   setSearchOpen: (open: boolean) => void;
   toggleSearch: () => void;
   openModal: (id: ModalId) => void;
@@ -28,7 +25,6 @@ export type UiStore = UiState & UiActions;
 
 export const useUiStore = create<UiStore>((set) => ({
   isMobileNavOpen: false,
-  isCartDrawerOpen: false,
   isSearchOpen: false,
   activeModal: null,
   isGlobalLoading: false,
@@ -36,9 +32,6 @@ export const useUiStore = create<UiStore>((set) => ({
 
   setMobileNavOpen: (open) => set({ isMobileNavOpen: open }),
   toggleMobileNav: () => set((state) => ({ isMobileNavOpen: !state.isMobileNavOpen })),
-
-  setCartDrawerOpen: (open) => set({ isCartDrawerOpen: open }),
-  toggleCartDrawer: () => set((state) => ({ isCartDrawerOpen: !state.isCartDrawerOpen })),
 
   setSearchOpen: (open) => set({ isSearchOpen: open }),
   toggleSearch: () => set((state) => ({ isSearchOpen: !state.isSearchOpen })),

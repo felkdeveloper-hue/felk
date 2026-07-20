@@ -21,7 +21,6 @@ export function MobileBottomNav() {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const cartCount = useCartStore(selectCartItemCount);
   const toggleSearch = useUiStore((state) => state.toggleSearch);
-  const toggleCartDrawer = useUiStore((state) => state.toggleCartDrawer);
   const isAuthed = useAuthStore((state) => Boolean(state.accessToken && state.user));
   const { data: wishlistCount = 0 } = useWishlistItemCountQuery();
 
@@ -55,35 +54,6 @@ export function MobileBottomNav() {
             );
           }
 
-          if ('cart' in item && item.cart) {
-            return (
-              <li key={item.label}>
-                <button
-                  type="button"
-                  onClick={toggleCartDrawer}
-                  className={cn(
-                    'relative flex w-full flex-col items-center gap-1 rounded-xl px-1 py-1.5 text-[10px] font-semibold uppercase tracking-wide',
-                    active ? 'text-foreground' : 'text-muted-foreground',
-                  )}
-                >
-                  <span className="relative">
-                    <Icon className="size-5" />
-                    {cartCount > 0 ? (
-                      <motion.span
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        className="bg-accent text-accent-foreground absolute -right-2 -top-1.5 flex size-4 items-center justify-center rounded-full text-[9px] font-bold"
-                      >
-                        {cartCount > 9 ? '9+' : cartCount}
-                      </motion.span>
-                    ) : null}
-                  </span>
-                  {item.label}
-                </button>
-              </li>
-            );
-          }
-
           const href =
             'account' in item && item.account && !isAuthed ? ROUTES.authLogin : item.href;
 
@@ -99,7 +69,15 @@ export function MobileBottomNav() {
               >
                 <span className="relative">
                   <Icon className="size-5" />
-                  {'account' in item ? null : null}
+                  {'cart' in item && item.cart && cartCount > 0 ? (
+                    <motion.span
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      className="bg-accent text-accent-foreground absolute -right-2 -top-1.5 flex size-4 items-center justify-center rounded-full text-[9px] font-bold"
+                    >
+                      {cartCount > 9 ? '9+' : cartCount}
+                    </motion.span>
+                  ) : null}
                   {item.label === 'Wishlist' && wishlistCount > 0 ? (
                     <span className="bg-accent text-accent-foreground absolute -right-2 -top-1.5 flex size-4 items-center justify-center rounded-full text-[9px] font-bold">
                       {wishlistCount > 9 ? '9+' : wishlistCount}

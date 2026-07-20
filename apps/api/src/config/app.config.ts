@@ -61,44 +61,30 @@ export const appConfig = {
     allowedMimeTypes: env.uploadAllowedMimeTypes,
   },
   email: {
+    enabled: env.smtpEnabled,
     host: env.SMTP_HOST,
     port: env.SMTP_PORT,
-    secure: env.SMTP_SECURE ?? false,
+    secure: env.SMTP_SECURE ?? env.SMTP_PORT === 465,
     user: env.SMTP_USER,
     pass: env.SMTP_PASS,
     from: env.EMAIL_FROM,
+    fromEmail: env.FROM_EMAIL ?? env.EMAIL_FROM,
+    fromName: env.FROM_NAME ?? 'Fashion Edge',
   },
   storage: {
-    r2: {
-      accessKeyId: env.R2_ACCESS_KEY_ID,
-      secretAccessKey: env.R2_SECRET_ACCESS_KEY,
-      accountId: env.R2_ACCOUNT_ID,
-      bucket: env.R2_BUCKET_NAME,
-      endpoint:
-        env.R2_ENDPOINT ||
-        (env.R2_ACCOUNT_ID ? `https://${env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com` : undefined),
-      publicUrl: env.R2_PUBLIC_URL || env.CDN_BASE_URL || undefined,
-      enabled: Boolean(
-        env.R2_ACCESS_KEY_ID &&
-        env.R2_SECRET_ACCESS_KEY &&
-        env.R2_BUCKET_NAME &&
-        (env.R2_ENDPOINT || env.R2_ACCOUNT_ID),
-      ),
-    },
-    s3: {
-      region: env.AWS_REGION,
-      accessKeyId: env.AWS_ACCESS_KEY_ID,
-      secretAccessKey: env.AWS_SECRET_ACCESS_KEY,
-      bucket: env.AWS_S3_BUCKET,
-      endpoint: env.AWS_S3_ENDPOINT,
-      publicUrl: env.S3_PUBLIC_URL || env.CDN_BASE_URL,
-      enabled: Boolean(
-        env.AWS_ACCESS_KEY_ID &&
-        env.AWS_SECRET_ACCESS_KEY &&
-        env.AWS_S3_BUCKET &&
-        (env.S3_PUBLIC_URL || env.CDN_BASE_URL),
-      ),
-    },
+    provider: env.storageProvider,
+    region: env.storageProvider === 'r2' ? 'auto' : (env.AWS_REGION ?? 'ap-south-1'),
+    accessKeyId: env.storageProvider === 'r2' ? env.R2_ACCESS_KEY_ID : env.AWS_ACCESS_KEY_ID,
+    secretAccessKey:
+      env.storageProvider === 'r2' ? env.R2_SECRET_ACCESS_KEY : env.AWS_SECRET_ACCESS_KEY,
+    bucket:
+      env.storageProvider === 'r2'
+        ? env.R2_BUCKET_NAME
+        : env.storageProvider === 's3'
+          ? env.AWS_S3_BUCKET
+          : undefined,
+    endpoint: env.storageEndpoint,
+    publicUrl: env.storagePublicUrl,
   },
   payment: {
     returnUrl: env.PAYMENT_RETURN_URL,
@@ -113,13 +99,28 @@ export const appConfig = {
     koko: {
       merchantId: env.KOKO_MERCHANT_ID,
       secretKey: env.KOKO_SECRET_KEY,
+      apiKey: env.KOKO_API_KEY,
+      privateKeyPath: env.KOKO_PRIVATE_KEY_PATH,
     },
     mintpay: {
       merchantId: env.MINTPAY_MERCHANT_ID,
-      secretKey: env.MINTPAY_SECRET_KEY,
+      secretKey: env.MINTPAY_MERCHANT_SECRET ?? env.MINTPAY_SECRET_KEY,
+      mode: env.MINTPAY_MODE,
     },
     cod: {
       webhookSecret: env.COD_WEBHOOK_SECRET,
+    },
+  },
+  analytics: {
+    meta: {
+      token: env.META_CAPI_TOKEN,
+      pixelId: env.META_PIXEL_ID,
+      configured: Boolean(env.META_CAPI_TOKEN && env.META_PIXEL_ID),
+    },
+    tiktok: {
+      pixelId: env.TIKTOK_PIXEL_ID,
+      accessToken: env.TIKTOK_ACCESS_TOKEN,
+      configured: Boolean(env.TIKTOK_PIXEL_ID && env.TIKTOK_ACCESS_TOKEN),
     },
   },
 } as const;

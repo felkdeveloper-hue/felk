@@ -274,6 +274,18 @@ export const authService = {
       text: verify.text,
     });
 
+    // Track registration analytics (fire-and-forget)
+    void import('@/services/analytics/analytics.service')
+      .then(({ analyticsService }) => {
+        return analyticsService
+          .trackCompleteRegistration({
+            email: user.email,
+            ipAddress: meta.ip,
+          })
+          .catch(() => {});
+      })
+      .catch(() => {});
+
     await writeAuditLog({
       action: AUDIT_ACTIONS.USER_REGISTERED,
       resourceType: 'user',

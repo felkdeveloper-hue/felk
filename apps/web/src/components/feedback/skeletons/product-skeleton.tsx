@@ -7,10 +7,15 @@ export interface ProductSkeletonProps {
 
 export function ProductSkeleton({ className }: ProductSkeletonProps) {
   return (
-    <div className={cn('space-y-3', className)}>
-      <Skeleton className="aspect-[3/4] w-full rounded-lg" />
-      <Skeleton className="h-4 w-3/4" />
-      <Skeleton className="h-4 w-1/3" />
+    <div className={cn('space-y-2.5', className)}>
+      <Skeleton className="aspect-[3/4] w-full rounded-t-2xl" />
+      <div className="flex items-center justify-between gap-2">
+        <Skeleton className="h-4 w-2/3" />
+        <Skeleton className="size-7 shrink-0 rounded-full" />
+      </div>
+      <Skeleton className="h-3 w-4/5" />
+      <Skeleton className="h-4 w-1/2" />
+      <Skeleton className="h-6 w-3/4 rounded-md" />
     </div>
   );
 }

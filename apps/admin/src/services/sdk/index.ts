@@ -10,6 +10,8 @@ export { cmsApi, createCmsResourceApi } from './cms';
 export { mediaApi } from './media';
 export { auditApi } from './audit';
 export { reviewsApi } from './reviews';
+export { integrationsApi } from './integrations';
+export type { IntegrationsStatus, GatewayStatus, SmtpStatus } from './integrations';
 
 export type {
   AdminProduct,

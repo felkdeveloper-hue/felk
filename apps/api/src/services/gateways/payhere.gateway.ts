@@ -1,6 +1,8 @@
 import { appConfig } from '@/config/app.config';
+import { logger } from '@/config/logger';
 import { PAYMENT_METHOD, PAYMENT_STATUS } from '@/constants/payment-status';
 import { md5Hex } from '@/utils/crypto.helper';
+import { fetchWithRetry } from '@/utils/http-retry';
 import type {
   CreatePaymentSessionInput,
   PaymentGateway,
@@ -11,15 +13,25 @@ import { getHeader, parseWebhookPayload } from '@/services/gateways/gateway.util
 
 /** PayHere status_code -> our verification status mapping. */
 const STATUS_CODE_MAP: Record<string, string> = {
-  '2': PAYMENT_STATUS.PAID, // success
-  '0': PAYMENT_STATUS.PROCESSING, // pending
-  '-1': PAYMENT_STATUS.CANCELLED, // canceled by user
-  '-2': PAYMENT_STATUS.FAILED, // failed
-  '-3': PAYMENT_STATUS.REFUNDED, // chargedback
+  '2': PAYMENT_STATUS.PAID,
+  '0': PAYMENT_STATUS.PROCESSING,
+  '-1': PAYMENT_STATUS.CANCELLED,
+  '-2': PAYMENT_STATUS.FAILED,
+  '-3': PAYMENT_STATUS.REFUNDED,
 };
 
 function hashSecret(): string {
   return md5Hex(appConfig.payment.payhere.merchantSecret);
+}
+
+function baseUrl(): string {
+  return appConfig.payment.payhere.mode === 'live'
+    ? 'https://www.payhere.lk'
+    : 'https://sandbox.payhere.lk';
+}
+
+function checkoutUrl(): string {
+  return `${baseUrl()}/pay/checkout`;
 }
 
 /** PayHere merchant checkout hash: MD5(merchant_id + order_id + amount + currency + MD5(secret)). */
@@ -45,10 +57,7 @@ export class PayHereGateway implements PaymentGateway {
   async createSession(input: CreatePaymentSessionInput): Promise<PaymentSessionResult> {
     const amount = input.amount.toFixed(2);
     const hash = buildRequestHash(input.orderId, amount, input.currency);
-    const base =
-      appConfig.payment.payhere.mode === 'live'
-        ? 'https://www.payhere.lk/pay/checkout'
-        : 'https://sandbox.payhere.lk/pay/checkout';
+    const base = checkoutUrl();
 
     const params = new URLSearchParams({
       merchant_id: appConfig.payment.payhere.merchantId,
@@ -62,10 +71,27 @@ export class PayHereGateway implements PaymentGateway {
       hash,
     });
 
+    const redirectUrl = `${base}?${params.toString()}`;
+
+    logger.info(
+      {
+        gateway: 'payhere',
+        orderId: input.orderId,
+        amount,
+        currency: input.currency,
+        mode: appConfig.payment.payhere.mode,
+      },
+      'PayHere: session created',
+    );
+
     return {
       gatewayPaymentId: input.orderId,
-      redirectUrl: `${base}?${params.toString()}`,
-      raw: { merchantId: appConfig.payment.payhere.merchantId, hash },
+      redirectUrl,
+      raw: {
+        merchantId: appConfig.payment.payhere.merchantId,
+        hash,
+        mode: appConfig.payment.payhere.mode,
+      },
     };
   }
 
@@ -78,28 +104,90 @@ export class PayHereGateway implements PaymentGateway {
     const statusCode = String(payload.status_code ?? '');
     const receivedSig = String(payload.md5sig ?? getHeader(input.headers, 'md5sig') ?? '');
 
+    logger.info(
+      { gateway: 'payhere', orderId, statusCode, merchantId },
+      'PayHere: webhook received',
+    );
+
     if (!merchantId || !orderId || !statusCode || !receivedSig) {
+      logger.warn({ gateway: 'payhere', orderId }, 'PayHere: webhook missing required fields');
       return { valid: false, payload };
     }
 
     if (merchantId !== appConfig.payment.payhere.merchantId) {
+      logger.warn(
+        {
+          gateway: 'payhere',
+          received: merchantId,
+          expected: appConfig.payment.payhere.merchantId,
+        },
+        'PayHere: merchant ID mismatch',
+      );
       return { valid: false, payload };
     }
 
     const expectedSig = buildNotifyHash(orderId, payhereAmount, payhereCurrency, statusCode);
     if (expectedSig !== receivedSig.toUpperCase()) {
+      logger.warn({ gateway: 'payhere', orderId }, 'PayHere: webhook signature mismatch');
       return { valid: false, payload };
     }
+
+    const status = STATUS_CODE_MAP[statusCode] ?? PAYMENT_STATUS.FAILED;
+    logger.info({ gateway: 'payhere', orderId, statusCode, status }, 'PayHere: webhook verified');
 
     return {
       valid: true,
       gatewayTxnId: String(payload.payment_id ?? orderId),
       orderId,
-      status: STATUS_CODE_MAP[statusCode] ?? PAYMENT_STATUS.FAILED,
+      status,
       amount: Number(payhereAmount),
       currency: payhereCurrency,
       payload,
     };
+  }
+
+  /**
+   * Defense-in-depth: fetch the payment status server-to-server from PayHere.
+   * This is a read-only verification call — never authoritative over a verified webhook.
+   */
+  async verifyTransaction(
+    orderId: string,
+  ): Promise<{ status: string; amount?: number; currency?: string } | null> {
+    const merchantId = appConfig.payment.payhere.merchantId;
+    const secretHash = hashSecret();
+    const verifyHash = md5Hex(`${merchantId}${secretHash}`);
+
+    const apiBase =
+      appConfig.payment.payhere.mode === 'live'
+        ? 'https://www.payhere.lk'
+        : 'https://sandbox.payhere.lk';
+
+    const url = `${apiBase}/merchant/v1/payment/search?order_id=${encodeURIComponent(orderId)}`;
+
+    try {
+      const { data } = await fetchWithRetry<Record<string, unknown>>(url, {
+        method: 'GET',
+        headers: {
+          Authorization: `Basic ${Buffer.from(`${merchantId}:${verifyHash}`).toString('base64')}`,
+          Accept: 'application/json',
+        },
+      });
+
+      const statusRaw = String((data as Record<string, unknown>).status ?? '');
+      logger.info(
+        { gateway: 'payhere', orderId, statusRaw },
+        'PayHere: transaction verification response',
+      );
+
+      return {
+        status: STATUS_CODE_MAP[statusRaw] ?? PAYMENT_STATUS.FAILED,
+        amount: Number((data as Record<string, unknown>).amount ?? 0),
+        currency: String((data as Record<string, unknown>).currency ?? ''),
+      };
+    } catch (err) {
+      logger.warn({ gateway: 'payhere', orderId, err }, 'PayHere: transaction verification failed');
+      return null;
+    }
   }
 }
 

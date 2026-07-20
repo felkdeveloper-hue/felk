@@ -22,6 +22,8 @@ export interface CatalogFilterSidebarProps {
   onChange: (patch: Partial<CatalogSearchState>) => void;
   onClear: () => void;
   variant?: 'inline' | 'sheet';
+  /** Vertical stack (default) or multi-column top bar. */
+  layout?: 'stack' | 'top';
   /** Hide the built-in heading when the parent provides its own. */
   hideHeading?: boolean;
   priceBounds?: { min: number; max: number };
@@ -38,15 +40,19 @@ function FilterSection({
   title,
   children,
   className,
+  layout = 'stack',
 }: {
   title: string;
   children: React.ReactNode;
   className?: string;
+  layout?: 'stack' | 'top';
 }) {
   return (
     <section
       className={cn(
-        'border-border/70 space-y-3 border-b pb-5 last:border-b-0 last:pb-0',
+        'space-y-3',
+        layout === 'stack' && 'border-border/70 border-b pb-5 last:border-b-0 last:pb-0',
+        layout === 'top' && 'min-w-0',
         className,
       )}
     >
@@ -87,6 +93,7 @@ function RefineFiltersBody({
   onChange,
   onClear,
   hideHeading,
+  layout = 'stack',
   priceBounds,
 }: Omit<CatalogFilterSidebarProps, 'variant'>) {
   const facets = useCatalogFilterFacets();
@@ -111,9 +118,9 @@ function RefineFiltersBody({
   }, [state]);
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-4">
       {!hideHeading ? (
-        <div className="mb-4 flex items-center justify-between gap-2">
+        <div className="flex items-center justify-between gap-2">
           <h2 className="text-foreground text-base font-bold">Refine By</h2>
           {activeCount > 0 ? (
             <Button variant="ghost" size="sm" onClick={onClear}>
@@ -122,139 +129,157 @@ function RefineFiltersBody({
           ) : null}
         </div>
       ) : activeCount > 0 ? (
-        <div className="mb-3 flex justify-end">
+        <div className="flex justify-end">
           <Button variant="ghost" size="sm" onClick={onClear}>
             Clear
           </Button>
         </div>
       ) : null}
 
-      <FilterSection title="Gender">
-        <RadioGroup
-          value={state.gender ?? 'all'}
-          onValueChange={(value) =>
-            onChange({ gender: value === 'all' ? undefined : value, page: 1 })
-          }
-          className="gap-2"
-        >
-          {[
-            { value: 'all', label: 'All' },
-            { value: 'women', label: 'Women' },
-            { value: 'men', label: 'Men' },
-          ].map((option) => (
-            <label
-              key={option.value}
-              htmlFor={`gender-${option.value}`}
-              className="hover:bg-muted/50 flex cursor-pointer items-center gap-3 rounded-md px-1 py-1.5 text-sm"
+      <div
+        className={cn(
+          layout === 'top'
+            ? 'grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-7'
+            : 'space-y-1',
+        )}
+      >
+        <FilterSection title="Gender" layout={layout}>
+          <RadioGroup
+            value={state.gender ?? 'all'}
+            onValueChange={(value) =>
+              onChange({ gender: value === 'all' ? undefined : value, page: 1 })
+            }
+            className="gap-2"
+          >
+            {[
+              { value: 'all', label: 'All' },
+              { value: 'women', label: 'Women' },
+              { value: 'men', label: 'Men' },
+            ].map((option) => (
+              <label
+                key={option.value}
+                htmlFor={`gender-${option.value}`}
+                className="hover:bg-muted/50 flex cursor-pointer items-center gap-3 rounded-md px-1 py-1.5 text-sm"
+              >
+                <RadioGroupItem id={`gender-${option.value}`} value={option.value} />
+                <span>{option.label}</span>
+              </label>
+            ))}
+          </RadioGroup>
+        </FilterSection>
+
+        {categories.length ? (
+          <FilterSection title="Category" layout={layout}>
+            <div
+              className={cn(
+                'space-y-0.5 pr-1',
+                layout === 'top' ? 'max-h-44 overflow-y-auto' : 'max-h-56 overflow-y-auto',
+              )}
             >
-              <RadioGroupItem id={`gender-${option.value}`} value={option.value} />
-              <span>{option.label}</span>
-            </label>
-          ))}
-        </RadioGroup>
-      </FilterSection>
+              {categories.map((category) => (
+                <OptionRow
+                  key={category.id}
+                  id={`category-${category.id}`}
+                  label={category.name}
+                  checked={state.categoryId === category.id}
+                  onCheckedChange={(checked) =>
+                    onChange({ categoryId: checked ? category.id : undefined, page: 1 })
+                  }
+                />
+              ))}
+            </div>
+          </FilterSection>
+        ) : null}
 
-      {categories.length ? (
-        <FilterSection title="Category">
-          <div className="max-h-56 space-y-0.5 overflow-y-auto pr-1">
-            {categories.map((category) => (
-              <OptionRow
-                key={category.id}
-                id={`category-${category.id}`}
-                label={category.name}
-                checked={state.categoryId === category.id}
-                onCheckedChange={(checked) =>
-                  onChange({ categoryId: checked ? category.id : undefined, page: 1 })
-                }
-              />
-            ))}
-          </div>
+        <FilterSection title="Price" layout={layout}>
+          <PriceRangeSlider
+            min={bounds.min}
+            max={bounds.max}
+            valueMin={state.minPrice}
+            valueMax={state.maxPrice}
+            onChange={(minPrice, maxPrice) => onChange({ minPrice, maxPrice, page: 1 })}
+          />
         </FilterSection>
-      ) : null}
 
-      <FilterSection title="Price">
-        <PriceRangeSlider
-          min={bounds.min}
-          max={bounds.max}
-          valueMin={state.minPrice}
-          valueMax={state.maxPrice}
-          onChange={(minPrice, maxPrice) => onChange({ minPrice, maxPrice, page: 1 })}
-        />
-      </FilterSection>
+        {brands.length ? (
+          <FilterSection title="Brands" layout={layout}>
+            <div className="space-y-0.5">
+              {brands.map((brand) => (
+                <OptionRow
+                  key={brand.id}
+                  id={`brand-${brand.id}`}
+                  label={brand.name}
+                  checked={state.brandId === brand.id}
+                  onCheckedChange={(checked) =>
+                    onChange({ brandId: checked ? brand.id : undefined, page: 1 })
+                  }
+                />
+              ))}
+            </div>
+          </FilterSection>
+        ) : null}
 
-      {brands.length ? (
-        <FilterSection title="Brands">
+        {occasions.length ? (
+          <FilterSection title="Occasion" layout={layout}>
+            <div className="space-y-0.5">
+              {occasions.map((occasion) => (
+                <OptionRow
+                  key={occasion.id}
+                  id={`occasion-${occasion.id}`}
+                  label={occasion.name}
+                  checked={state.occasionId === occasion.id}
+                  onCheckedChange={(checked) =>
+                    onChange({ occasionId: checked ? occasion.id : undefined, page: 1 })
+                  }
+                />
+              ))}
+            </div>
+          </FilterSection>
+        ) : null}
+
+        <FilterSection title="Discount" layout={layout}>
           <div className="space-y-0.5">
-            {brands.map((brand) => (
+            {DISCOUNT_OPTIONS.map((option) => (
               <OptionRow
-                key={brand.id}
-                id={`brand-${brand.id}`}
-                label={brand.name}
-                checked={state.brandId === brand.id}
+                key={option.id}
+                id={`discount-${option.id}`}
+                label={option.label}
+                checked={state.discountBand === option.id}
                 onCheckedChange={(checked) =>
-                  onChange({ brandId: checked ? brand.id : undefined, page: 1 })
+                  onChange({
+                    discountBand: checked ? option.id : undefined,
+                    onSale: checked ? true : undefined,
+                    page: 1,
+                  })
                 }
               />
             ))}
           </div>
         </FilterSection>
-      ) : null}
 
-      {occasions.length ? (
-        <FilterSection title="Occasion">
-          <div className="space-y-0.5">
-            {occasions.map((occasion) => (
-              <OptionRow
-                key={occasion.id}
-                id={`occasion-${occasion.id}`}
-                label={occasion.name}
-                checked={state.occasionId === occasion.id}
-                onCheckedChange={(checked) =>
-                  onChange({ occasionId: checked ? occasion.id : undefined, page: 1 })
-                }
-              />
-            ))}
-          </div>
-        </FilterSection>
-      ) : null}
-
-      <FilterSection title="Discount">
-        <div className="space-y-0.5">
-          {DISCOUNT_OPTIONS.map((option) => (
-            <OptionRow
-              key={option.id}
-              id={`discount-${option.id}`}
-              label={option.label}
-              checked={state.discountBand === option.id}
-              onCheckedChange={(checked) =>
-                onChange({
-                  discountBand: checked ? option.id : undefined,
-                  onSale: checked ? true : undefined,
-                  page: 1,
-                })
-              }
-            />
-          ))}
-        </div>
-      </FilterSection>
-
-      {sizes.length ? (
-        <FilterSection title="Size & Fit">
-          <div className="space-y-0.5">
-            {sizes.map((size) => (
-              <OptionRow
-                key={size.id}
-                id={`size-${size.id}`}
-                label={size.name}
-                checked={state.sizeId === size.id}
-                onCheckedChange={(checked) =>
-                  onChange({ sizeId: checked ? size.id : undefined, page: 1 })
-                }
-              />
-            ))}
-          </div>
-        </FilterSection>
-      ) : null}
+        {sizes.length ? (
+          <FilterSection title="Size & Fit" layout={layout}>
+            <div
+              className={cn(
+                'space-y-0.5',
+                layout === 'top' ? 'max-h-44 overflow-y-auto pr-1' : undefined,
+              )}
+            >
+              {sizes.map((size) => (
+                <OptionRow
+                  key={size.id}
+                  id={`size-${size.id}`}
+                  label={size.name}
+                  checked={state.sizeId === size.id}
+                  onCheckedChange={(checked) =>
+                    onChange({ sizeId: checked ? size.id : undefined, page: 1 })
+                  }
+                />
+              ))}
+            </div>
+          </FilterSection>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -264,6 +289,7 @@ export function CatalogFilterSidebar({
   onChange,
   onClear,
   variant = 'inline',
+  layout = 'stack',
   hideHeading = false,
   priceBounds,
 }: CatalogFilterSidebarProps) {
@@ -325,6 +351,7 @@ export function CatalogFilterSidebar({
         onChange={onChange}
         onClear={onClear}
         hideHeading={hideHeading}
+        layout={layout}
         priceBounds={priceBounds}
       />
     </aside>

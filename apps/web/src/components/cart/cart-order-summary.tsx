@@ -12,8 +12,8 @@ export function CartOrderSummary({ totals, validation }: CartOrderSummaryProps) 
   const currency = totals.currency ?? 'LKR';
 
   return (
-    <aside className="border-border bg-card space-y-4 rounded-xl border p-5 shadow-[var(--shadow-soft)]">
-      <h2 className="font-display text-xl">Order summary</h2>
+    <aside className="border-border bg-card space-y-4 rounded-xl border p-5">
+      <h2 className="text-base font-semibold">Price summary</h2>
 
       {validation && !validation.isValid ? (
         <Alert variant="warning">
@@ -51,7 +51,7 @@ export function CartOrderSummary({ totals, validation }: CartOrderSummaryProps) 
       <Separator />
 
       <div className="flex justify-between text-base font-semibold">
-        <span>Estimated total</span>
+        <span>Total</span>
         <span>{formatCurrency(totals.total, currency)}</span>
       </div>
     </aside>

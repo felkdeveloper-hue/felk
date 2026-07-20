@@ -7,6 +7,8 @@ export interface VariantSelectorProps {
   onSelect: (variantId: string) => void;
   colorLabels?: Record<string, string>;
   sizeLabels?: Record<string, string>;
+  showColors?: boolean;
+  showSizes?: boolean;
 }
 
 export function VariantSelector({
@@ -15,6 +17,8 @@ export function VariantSelector({
   onSelect,
   colorLabels = {},
   sizeLabels = {},
+  showColors = true,
+  showSizes = true,
 }: VariantSelectorProps) {
   const colors = [
     ...new Set(variants.map((variant) => variant.colorId).filter(Boolean)),
@@ -23,7 +27,7 @@ export function VariantSelector({
 
   return (
     <div className="space-y-5">
-      {colors.length ? (
+      {showColors && colors.length ? (
         <fieldset>
           <legend className="mb-2 text-sm font-medium">Color</legend>
           <div className="flex flex-wrap gap-2">
@@ -51,9 +55,9 @@ export function VariantSelector({
         </fieldset>
       ) : null}
 
-      {sizes.length ? (
+      {showSizes && sizes.length ? (
         <fieldset>
-          <legend className="mb-2 text-sm font-medium">Size</legend>
+          <legend className="mb-2 text-sm font-medium">Select Size</legend>
           <div className="flex flex-wrap gap-2">
             {sizes.map((sizeId) => {
               const variant = variants.find((item) => item.sizeId === sizeId);

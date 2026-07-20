@@ -1,16 +1,24 @@
 import { Section } from '@/components/common/section';
 import { Container } from '@/components/layout/container';
 import { ProductGridSkeleton } from '@/components/feedback/skeletons';
+import { HorizontalCarousel } from '@/components/storefront/horizontal-carousel';
 import { useRelatedProducts } from '@/hooks/catalog';
-import { ProductGrid } from './product-grid';
+import { ProductCard } from './product-card';
 
 export interface RelatedProductsProps {
   productId: string;
   title?: string;
 }
 
-export function RelatedProducts({ productId, title = 'Related products' }: RelatedProductsProps) {
+export function RelatedProducts({ productId, title = 'You May Also Like' }: RelatedProductsProps) {
   const query = useRelatedProducts(productId);
+
+  const products =
+    query.data
+      ?.map((item) => item.relatedProduct)
+      .filter((product): product is NonNullable<typeof product> => Boolean(product)) ?? [];
+
+  if (!query.isLoading && !products.length) return null;
 
   return (
     <Section spacing="default" title={title}>
@@ -18,13 +26,15 @@ export function RelatedProducts({ productId, title = 'Related products' }: Relat
         {query.isLoading ? (
           <ProductGridSkeleton count={4} />
         ) : (
-          <ProductGrid
-            products={
-              query.data
-                ?.map((item) => item.relatedProduct)
-                .filter((product): product is NonNullable<typeof product> => Boolean(product)) ?? []
-            }
-          />
+          <HorizontalCarousel
+            label={title}
+            alwaysShowControls
+            itemClassName="w-[55%] sm:w-[35%] lg:w-[22%]"
+          >
+            {products.map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </HorizontalCarousel>
         )}
       </Container>
     </Section>
@@ -32,17 +42,5 @@ export function RelatedProducts({ productId, title = 'Related products' }: Relat
 }
 
 export function FrequentlyBoughtTogetherPlaceholder() {
-  return (
-    <Section
-      spacing="default"
-      title="Frequently bought together"
-      description="Bundle recommendations coming soon."
-    >
-      <Container>
-        <div className="border-border bg-muted/30 text-muted-foreground rounded-2xl border border-dashed px-6 py-10 text-center text-sm">
-          Placeholder — curated bundles will appear here.
-        </div>
-      </Container>
-    </Section>
-  );
+  return null;
 }

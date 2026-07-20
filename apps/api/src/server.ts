@@ -7,6 +7,7 @@ import {
   initOrderPaymentConsumer,
   catchUpUnconsumedPaymentEvents,
 } from '@/services/order-payment-consumer.service';
+import { startCronJobs } from '@/cron';
 
 async function bootstrap(): Promise<void> {
   const app = createApp();
@@ -19,6 +20,7 @@ async function bootstrap(): Promise<void> {
     // catches up on anything published while no one was listening (e.g. a
     // previous crash or restart) — never verifies the payment itself.
     initOrderPaymentConsumer();
+    startCronJobs();
     catchUpUnconsumedPaymentEvents()
       .then(({ scanned, created }) => {
         if (created > 0) {

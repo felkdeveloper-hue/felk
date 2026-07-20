@@ -2,6 +2,7 @@ import { useAddToCartMutation } from '@/hooks/cart';
 import { resolveVariantId } from '@/utils/cart';
 import { useUiStore } from '@/store/ui-store';
 import type { Product } from '@/services/sdk';
+import { trackingApi } from '@/services/sdk/tracking';
 import { Button, type ButtonProps } from '@/components/ui/button';
 import { AppError } from '@/lib/errors';
 
@@ -10,7 +11,6 @@ export interface AddToCartButtonProps extends Omit<ButtonProps, 'onClick'> {
   variantId?: string;
   quantity?: number;
   label?: string;
-  openDrawer?: boolean;
 }
 
 export function AddToCartButton({
@@ -18,13 +18,11 @@ export function AddToCartButton({
   variantId,
   quantity = 1,
   label = 'Add to cart',
-  openDrawer = true,
   disabled,
   loading,
   ...props
 }: AddToCartButtonProps) {
   const addMutation = useAddToCartMutation();
-  const setCartDrawerOpen = useUiStore((state) => state.setCartDrawerOpen);
   const setCartAnnouncement = useUiStore((state) => state.setCartAnnouncement);
 
   const resolvedVariantId = resolveVariantId(variantId, product);
@@ -38,7 +36,11 @@ export function AddToCartButton({
       {
         onSuccess: () => {
           setCartAnnouncement(`${product.name} added to cart`);
-          if (openDrawer) setCartDrawerOpen(true);
+          const price =
+            typeof product.price === 'number'
+              ? product.price
+              : ((product.price as { amount?: number })?.amount ?? 0);
+          void trackingApi.addToCart(resolvedVariantId, product.name, 'LKR', price);
         },
         onError: (error) => {
           const message = AppError.isAppError(error) ? error.message : 'Unable to add item to cart';

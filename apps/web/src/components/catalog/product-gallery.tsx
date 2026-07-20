@@ -8,10 +8,11 @@ import type { ProductMedia } from '@/services/sdk';
 export interface ProductGalleryProps {
   media: ProductMedia[];
   productName: string;
+  badgeLabel?: string;
   className?: string;
 }
 
-export function ProductGallery({ media, productName, className }: ProductGalleryProps) {
+export function ProductGallery({ media, productName, badgeLabel, className }: ProductGalleryProps) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [zoomed, setZoomed] = useState(false);
   const active = media[activeIndex] ?? media[0];
@@ -70,6 +71,12 @@ export function ProductGallery({ media, productName, className }: ProductGallery
             onMouseEnter={() => setZoomed(true)}
             onMouseLeave={() => setZoomed(false)}
           >
+            {badgeLabel ? (
+              <span className="text-foreground absolute left-3 top-3 z-10 rounded bg-amber-100/95 px-2 py-1 text-[10px] font-bold uppercase tracking-wider shadow-sm">
+                {badgeLabel}
+              </span>
+            ) : null}
+
             <AnimatePresence mode="wait">
               <motion.div
                 key={active.url}

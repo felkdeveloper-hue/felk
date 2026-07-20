@@ -114,10 +114,11 @@ async function main() {
   logger.info({ mediaId: media._id, url: media.url, key: media.key }, 'Uploaded image to R2');
 
   const variants = await productVariantService.listByProduct(productId);
-  let variant = variants[0];
+  let variantId = variants[0] ? String((variants[0] as { _id?: unknown })._id ?? '') : '';
+  let variantSku = variants[0] ? String((variants[0] as { sku?: unknown }).sku ?? '') : '';
 
-  if (!variant) {
-    variant = await productVariantService.create(
+  if (!variantId) {
+    const created = await productVariantService.create(
       productId,
       {
         title: `${PRODUCT.name} — ${PRODUCT.color} / EU ${PRODUCT.size}`,
@@ -131,20 +132,22 @@ async function main() {
       },
       actor,
     );
-    logger.info({ variantId: variant._id, sku: variant.sku }, 'Created variant');
+    variantId = String(created._id);
+    variantSku = String(created.sku);
+    logger.info({ variantId, sku: variantSku }, 'Created variant');
   }
 
   const warehouse =
     (await WarehouseModel.findOne({ isDeleted: false, status: 'active' }).sort({ createdAt: 1 })) ??
     (await WarehouseModel.findOne({ isDeleted: false }).sort({ createdAt: 1 }));
 
-  if (warehouse && variant._id) {
+  if (warehouse && variantId) {
     await InventoryItemModel.findOneAndUpdate(
-      { warehouseId: warehouse._id, variantId: variant._id },
+      { warehouseId: warehouse._id, variantId },
       {
         $set: {
           warehouseId: warehouse._id,
-          variantId: variant._id,
+          variantId,
           productId: product._id,
           quantityAvailable: 25,
           quantityReserved: 0,

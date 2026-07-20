@@ -5,8 +5,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export function CartPromotionsPanel() {
   return (
-    <section className="border-border space-y-4 rounded-xl border border-dashed p-5">
-      <h2 className="text-sm font-medium">Promotions</h2>
+    <section className="border-border bg-card space-y-4 rounded-xl border p-5">
+      <h2 className="text-sm font-semibold">Offers & coupons</h2>
 
       <Alert>
         <Tag className="size-4" aria-hidden />

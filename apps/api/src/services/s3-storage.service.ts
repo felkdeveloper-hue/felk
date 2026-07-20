@@ -1,9 +1,12 @@
 import {
   DeleteObjectCommand,
+  GetObjectCommand,
   HeadObjectCommand,
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { appConfig } from '@/config/app.config';
 import { ApiError } from '@/utils/errors/api-error';
 import type {
   StorageObject,
@@ -11,61 +14,65 @@ import type {
   StorageUploadInput,
 } from '@/services/interfaces/storage.service';
 
-export interface S3StorageOptions {
-  region: string;
-  accessKeyId: string;
-  secretAccessKey: string;
-  bucket: string;
-  publicUrl?: string;
-  endpoint?: string;
+function normalizeKey(key: string): string {
+  return key.replace(/\\/g, '/').replace(/^\/+/, '');
+}
+
+function publicObjectUrl(key: string): string {
+  const base = appConfig.storage.publicUrl;
+  if (!base) {
+    throw ApiError.badRequest(
+      'R2_PUBLIC_URL or CDN_BASE_URL is not configured. Enable public access on your R2 bucket in Cloudflare and set the public URL in your API environment variables.',
+      undefined,
+      'STORAGE_PUBLIC_URL_MISSING',
+    );
+  }
+  return `${base.replace(/\/$/, '')}/${normalizeKey(key)}`;
 }
 
 /**
- * S3-compatible object storage (AWS S3 or Cloudflare R2).
+ * S3-compatible object storage — works with AWS S3 and Cloudflare R2.
  */
 export class S3StorageService implements StorageService {
   private readonly client: S3Client;
   private readonly bucket: string;
-  private readonly publicUrlBase: string;
 
-  constructor(options: S3StorageOptions) {
-    this.bucket = options.bucket;
-    this.publicUrlBase = options.publicUrl?.replace(/\/$/, '') ?? '';
+  constructor() {
+    const { provider, region, accessKeyId, secretAccessKey, bucket, endpoint } = appConfig.storage;
+
+    if (!bucket || !accessKeyId || !secretAccessKey) {
+      throw new Error(`${provider} storage is missing bucket or credentials`);
+    }
+
+    this.bucket = bucket;
     this.client = new S3Client({
-      region: options.region,
-      endpoint: options.endpoint,
+      region: region ?? 'auto',
+      endpoint,
+      forcePathStyle: provider === 'r2',
       credentials: {
-        accessKeyId: options.accessKeyId,
-        secretAccessKey: options.secretAccessKey,
+        accessKeyId,
+        secretAccessKey,
       },
     });
   }
 
-  private objectUrl(key: string): string {
-    if (!this.publicUrlBase) {
-      throw ApiError.badRequest(
-        'R2_PUBLIC_URL or CDN_BASE_URL is not configured. Enable public access on your R2 bucket in Cloudflare and set the public URL in your API environment variables.',
-        undefined,
-        'STORAGE_PUBLIC_URL_MISSING',
-      );
-    }
-    return `${this.publicUrlBase}/${key.replace(/\\/g, '/')}`;
-  }
-
   async upload(input: StorageUploadInput): Promise<StorageObject> {
+    const key = normalizeKey(input.key);
+
     await this.client.send(
       new PutObjectCommand({
         Bucket: this.bucket,
-        Key: input.key,
+        Key: key,
         Body: input.body,
         ContentType: input.contentType,
         Metadata: input.metadata,
+        CacheControl: input.isPublic === false ? undefined : 'public, max-age=31536000, immutable',
       }),
     );
 
     return {
-      key: input.key,
-      url: this.objectUrl(input.key),
+      key,
+      url: publicObjectUrl(key),
       size: input.body.length,
       contentType: input.contentType,
     };
@@ -75,13 +82,24 @@ export class S3StorageService implements StorageService {
     await this.client.send(
       new DeleteObjectCommand({
         Bucket: this.bucket,
-        Key: key,
+        Key: normalizeKey(key),
       }),
     );
   }
 
-  async getSignedUrl(key: string): Promise<string> {
-    return this.objectUrl(key);
+  async getSignedUrl(key: string, expiresInSeconds = 3600): Promise<string> {
+    if (appConfig.storage.publicUrl) {
+      return publicObjectUrl(key);
+    }
+
+    return getSignedUrl(
+      this.client,
+      new GetObjectCommand({
+        Bucket: this.bucket,
+        Key: normalizeKey(key),
+      }),
+      { expiresIn: expiresInSeconds },
+    );
   }
 
   async exists(key: string): Promise<boolean> {
@@ -89,7 +107,7 @@ export class S3StorageService implements StorageService {
       await this.client.send(
         new HeadObjectCommand({
           Bucket: this.bucket,
-          Key: key,
+          Key: normalizeKey(key),
         }),
       );
       return true;

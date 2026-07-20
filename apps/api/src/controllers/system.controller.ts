@@ -3,6 +3,7 @@ import { databaseManager } from '@/config/database';
 import { HTTP_STATUS } from '@/constants/http';
 import { ApiResponse } from '@/utils/response/api-response';
 import { asyncHandler } from '@/utils/async-handler';
+import { emailService } from '@/services/email.service';
 
 const startedAt = Date.now();
 
@@ -19,6 +20,32 @@ export const healthController = {
   ready: asyncHandler(async (_req, res) => {
     const mongo = await databaseManager.healthCheck();
 
+    // SMTP check is cheap (connection verify); gateway/analytics are config-presence only
+    const smtpCheck = await (async () => {
+      if (!appConfig.email.enabled) return { ok: false, reason: 'disabled' };
+      const ok = await emailService.verifyConnection().catch(() => false);
+      return { ok };
+    })();
+
+    const payhereCheck = {
+      ok: Boolean(appConfig.payment.payhere.merchantId && appConfig.payment.payhere.merchantSecret),
+      mode: appConfig.payment.payhere.mode,
+    };
+    const kokoCheck = {
+      ok: Boolean(appConfig.payment.koko.merchantId),
+      apiKeyConfigured: Boolean(appConfig.payment.koko.apiKey),
+    };
+    const mintpayCheck = {
+      ok: Boolean(appConfig.payment.mintpay.merchantId),
+      mode: appConfig.payment.mintpay.mode,
+    };
+    const metaCheck = {
+      ok: appConfig.analytics.meta.configured,
+    };
+    const tiktokCheck = {
+      ok: appConfig.analytics.tiktok.configured,
+    };
+
     const ready = mongo.ok;
     const payload = {
       status: ready ? 'ready' : 'not_ready',
@@ -27,6 +54,12 @@ export const healthController = {
       version: appConfig.app.version,
       checks: {
         mongodb: mongo,
+        smtp: smtpCheck,
+        payhere: payhereCheck,
+        koko: kokoCheck,
+        mintpay: mintpayCheck,
+        meta: metaCheck,
+        tiktok: tiktokCheck,
       },
     };
 

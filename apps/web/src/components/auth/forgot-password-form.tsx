@@ -42,7 +42,7 @@ export function ForgotPasswordForm() {
             Didn&apos;t receive it? Check spam or{' '}
             <button
               type="button"
-              className="text-primary font-medium hover:underline"
+              className="text-foreground font-medium underline-offset-4 hover:underline"
               onClick={() => forgotMutation.reset()}
             >
               try again
@@ -50,7 +50,7 @@ export function ForgotPasswordForm() {
             .
           </AlertDescription>
         </Alert>
-        <Button asChild variant="outline" className="mt-6 w-full">
+        <Button asChild variant="outline" size="lg" className="mt-6 w-full">
           <Link to={ROUTES.authLogin}>Back to sign in</Link>
         </Button>
       </div>
@@ -61,17 +61,17 @@ export function ForgotPasswordForm() {
     <div>
       <AuthFormHeader
         title="Forgot password"
-        description="Enter your email and we'll send you a link to reset your password."
+        description="Enter your email and we'll send a link to reset your password."
       />
 
       {forgotMutation.error ? (
-        <div className="mb-4">
+        <div className="mb-5">
           <AuthErrorAlert error={forgotMutation.error} onRetry={() => forgotMutation.reset()} />
         </div>
       ) : null}
 
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" noValidate>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5" noValidate>
           <FormField
             control={form.control}
             name="email"
@@ -83,6 +83,7 @@ export function ForgotPasswordForm() {
                     type="email"
                     autoComplete="email"
                     placeholder="you@example.com"
+                    className="h-11 rounded-sm bg-transparent"
                     {...field}
                   />
                 </FormControl>
@@ -91,14 +92,17 @@ export function ForgotPasswordForm() {
             )}
           />
 
-          <Button type="submit" className="w-full" loading={forgotMutation.isPending}>
+          <Button type="submit" size="lg" className="w-full" loading={forgotMutation.isPending}>
             Send reset link
           </Button>
         </form>
       </Form>
 
-      <p className="text-muted-foreground mt-6 text-center text-sm">
-        <Link to={ROUTES.authLogin} className="text-primary font-medium hover:underline">
+      <p className="text-muted-foreground border-border mt-8 border-t pt-6 text-center text-sm">
+        <Link
+          to={ROUTES.authLogin}
+          className="text-foreground font-semibold underline-offset-4 hover:underline"
+        >
           Back to sign in
         </Link>
       </p>
