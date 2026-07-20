@@ -75,26 +75,8 @@ export function CatalogListShell({
 
   return (
     <div className="pb-10 sm:pb-14">
-      <Container className="pt-10 sm:pt-14">
-        {banner}
-        <header className="mb-10 space-y-3 text-center">
-          {eyebrow ? (
-            <p className="text-muted-foreground text-[11px] font-semibold uppercase tracking-[0.22em]">
-              {eyebrow}
-            </p>
-          ) : null}
-          <h1 className="font-display text-foreground text-4xl font-bold uppercase tracking-tight sm:text-6xl">
-            {title}
-          </h1>
-          {description ? (
-            <p className="text-muted-foreground mx-auto max-w-2xl">{description}</p>
-          ) : null}
-        </header>
-      </Container>
-
       <div
         className={cn(
-          'border-border/60 border-t',
           filtersOpen
             ? 'lg:grid lg:grid-cols-[18rem_minmax(0,1fr)] xl:grid-cols-[19rem_minmax(0,1fr)]'
             : undefined,
@@ -128,7 +110,23 @@ export function CatalogListShell({
         ) : null}
 
         <div className="min-w-0">
-          <Container className="space-y-6 py-6 sm:py-8">
+          <Container className="space-y-8 pt-8 sm:pt-10">
+            {banner}
+
+            <header className="space-y-3 text-center">
+              {eyebrow ? (
+                <p className="text-muted-foreground text-[11px] font-semibold uppercase tracking-[0.22em]">
+                  {eyebrow}
+                </p>
+              ) : null}
+              <h1 className="font-display text-foreground text-4xl font-bold uppercase tracking-tight sm:text-6xl">
+                {title}
+              </h1>
+              {description ? (
+                <p className="text-muted-foreground mx-auto max-w-2xl">{description}</p>
+              ) : null}
+            </header>
+
             <div className="flex flex-wrap items-center gap-3">
               <div className="lg:hidden">
                 <CatalogFilterSheet

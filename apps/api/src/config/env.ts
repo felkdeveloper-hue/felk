@@ -81,11 +81,28 @@ const envSchema = z
 
     KOKO_MERCHANT_ID: z.string().default('dev-koko-merchant-id'),
     KOKO_SECRET_KEY: z.string().default('dev-koko-secret-key'),
+    KOKO_API_KEY: z.string().optional(),
+    KOKO_PRIVATE_KEY_PATH: z.string().default('config/koko_private.pem'),
 
     MINTPAY_MERCHANT_ID: z.string().default('dev-mintpay-merchant-id'),
     MINTPAY_SECRET_KEY: z.string().default('dev-mintpay-secret-key'),
+    MINTPAY_MERCHANT_SECRET: z.string().optional(),
+    MINTPAY_MODE: z.enum(['sandbox', 'live']).default('sandbox'),
 
     COD_WEBHOOK_SECRET: z.string().default('dev-cod-webhook-secret'),
+
+    META_CAPI_TOKEN: z.string().optional(),
+    META_PIXEL_ID: z.string().optional(),
+
+    TIKTOK_PIXEL_ID: z.string().optional(),
+    TIKTOK_ACCESS_TOKEN: z.string().optional(),
+
+    SMTP_ENABLED: z
+      .enum(['true', 'false'])
+      .optional()
+      .transform((v) => (v === undefined ? undefined : v === 'true')),
+    FROM_EMAIL: z.string().optional(),
+    FROM_NAME: z.string().optional(),
   })
   .superRefine((data, ctx) => {
     const strictProduction =
@@ -158,6 +175,10 @@ export const env = {
   metricsEnabled: data.METRICS_ENABLED === undefined ? true : data.METRICS_ENABLED === 'true',
   csrfEnabled: data.CSRF_ENABLED === 'true',
   logLevel: isProd && data.LOG_LEVEL === 'debug' ? 'info' : data.LOG_LEVEL,
+  smtpEnabled:
+    data.SMTP_ENABLED !== undefined
+      ? data.SMTP_ENABLED
+      : Boolean(data.SMTP_HOST && data.SMTP_USER && data.SMTP_PASS),
   isDev,
   isProd,
   isTest,

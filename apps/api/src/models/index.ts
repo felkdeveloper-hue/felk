@@ -22,3 +22,9 @@ export * from './checkout.models';
 export * from './payment.models';
 export * from './order.models';
 export * from './review.model';
+export { EmailLogModel, type EmailLogStatus } from './email-log.model';
+export {
+  AnalyticsEventLogModel,
+  type AnalyticsProvider,
+  type AnalyticsEventStatus,
+} from './analytics.model';

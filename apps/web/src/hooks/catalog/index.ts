@@ -3,4 +3,5 @@ export * from './use-categories';
 export * from './use-products';
 export * from './use-product-reviews';
 export * from './use-recently-viewed';
+export * from './use-recently-viewed-products';
 export * from './use-search-experience';

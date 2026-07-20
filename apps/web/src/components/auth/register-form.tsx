@@ -52,19 +52,19 @@ export function RegisterForm() {
   return (
     <div>
       <AuthFormHeader
-        title="Create account"
-        description="Join us to track orders, save addresses, and personalize your experience."
+        title="Join FE"
+        description="Create an account to track orders, save favourites, and shop new drops first."
       />
 
       {registerMutation.error ? (
-        <div className="mb-4">
+        <div className="mb-5">
           <AuthErrorAlert error={registerMutation.error} onRetry={() => registerMutation.reset()} />
         </div>
       ) : null}
 
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" noValidate>
-          <div className="grid gap-4 sm:grid-cols-2">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5" noValidate>
+          <div className="grid gap-5 sm:grid-cols-2">
             <FormField
               control={form.control}
               name="firstName"
@@ -72,7 +72,11 @@ export function RegisterForm() {
                 <FormItem>
                   <FormLabel>First name</FormLabel>
                   <FormControl>
-                    <Input autoComplete="given-name" {...field} />
+                    <Input
+                      autoComplete="given-name"
+                      className="h-11 rounded-sm bg-transparent"
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -85,7 +89,11 @@ export function RegisterForm() {
                 <FormItem>
                   <FormLabel>Last name</FormLabel>
                   <FormControl>
-                    <Input autoComplete="family-name" {...field} />
+                    <Input
+                      autoComplete="family-name"
+                      className="h-11 rounded-sm bg-transparent"
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -104,6 +112,7 @@ export function RegisterForm() {
                     type="email"
                     autoComplete="email"
                     placeholder="you@example.com"
+                    className="h-11 rounded-sm bg-transparent"
                     {...field}
                   />
                 </FormControl>
@@ -119,7 +128,13 @@ export function RegisterForm() {
               <FormItem>
                 <FormLabel>Phone (optional)</FormLabel>
                 <FormControl>
-                  <Input type="tel" autoComplete="tel" placeholder="+1 555 0100" {...field} />
+                  <Input
+                    type="tel"
+                    autoComplete="tel"
+                    placeholder="+94 77 000 0000"
+                    className="h-11 rounded-sm bg-transparent"
+                    {...field}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -133,7 +148,11 @@ export function RegisterForm() {
               <FormItem>
                 <FormLabel>Password</FormLabel>
                 <FormControl>
-                  <PasswordField autoComplete="new-password" {...field} />
+                  <PasswordField
+                    autoComplete="new-password"
+                    className="h-11 rounded-sm bg-transparent"
+                    {...field}
+                  />
                 </FormControl>
                 <PasswordStrengthMeter password={password} />
                 <FormMessage />
@@ -148,7 +167,11 @@ export function RegisterForm() {
               <FormItem>
                 <FormLabel>Confirm password</FormLabel>
                 <FormControl>
-                  <PasswordField autoComplete="new-password" {...field} />
+                  <PasswordField
+                    autoComplete="new-password"
+                    className="h-11 rounded-sm bg-transparent"
+                    {...field}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -159,18 +182,24 @@ export function RegisterForm() {
             control={form.control}
             name="acceptTerms"
             render={({ field }) => (
-              <FormItem className="flex items-start gap-2 space-y-0">
+              <FormItem className="flex items-start gap-2.5 space-y-0">
                 <FormControl>
                   <Checkbox checked={field.value} onCheckedChange={field.onChange} />
                 </FormControl>
                 <div className="space-y-1 leading-none">
-                  <FormLabel className="font-normal">
+                  <FormLabel className="text-muted-foreground font-normal">
                     I agree to the{' '}
-                    <Link to={ROUTES.terms} className="text-primary hover:underline">
+                    <Link
+                      to={ROUTES.terms}
+                      className="text-foreground font-medium underline-offset-4 hover:underline"
+                    >
                       Terms of Service
                     </Link>{' '}
                     and{' '}
-                    <Link to={ROUTES.privacy} className="text-primary hover:underline">
+                    <Link
+                      to={ROUTES.privacy}
+                      className="text-foreground font-medium underline-offset-4 hover:underline"
+                    >
                       Privacy Policy
                     </Link>
                   </FormLabel>
@@ -184,24 +213,34 @@ export function RegisterForm() {
             control={form.control}
             name="newsletterOptIn"
             render={({ field }) => (
-              <FormItem className="flex items-center gap-2 space-y-0">
+              <FormItem className="flex items-center gap-2.5 space-y-0">
                 <FormControl>
                   <Checkbox checked={field.value} onCheckedChange={field.onChange} />
                 </FormControl>
-                <FormLabel className="font-normal">Send me product updates and offers</FormLabel>
+                <FormLabel className="text-muted-foreground font-normal">
+                  Email me new arrivals and offers
+                </FormLabel>
               </FormItem>
             )}
           />
 
-          <Button type="submit" className="w-full" loading={registerMutation.isPending}>
+          <Button
+            type="submit"
+            size="lg"
+            className="mt-1 w-full"
+            loading={registerMutation.isPending}
+          >
             Create account
           </Button>
         </form>
       </Form>
 
-      <p className="text-muted-foreground mt-6 text-center text-sm">
-        Already have an account?{' '}
-        <Link to={ROUTES.authLogin} className="text-primary font-medium hover:underline">
+      <p className="text-muted-foreground border-border mt-8 border-t pt-6 text-center text-sm">
+        Already a member?{' '}
+        <Link
+          to={ROUTES.authLogin}
+          className="text-foreground font-semibold underline-offset-4 hover:underline"
+        >
           Sign in
         </Link>
       </p>

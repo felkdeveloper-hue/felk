@@ -61,12 +61,15 @@ export const appConfig = {
     allowedMimeTypes: env.uploadAllowedMimeTypes,
   },
   email: {
+    enabled: env.smtpEnabled,
     host: env.SMTP_HOST,
     port: env.SMTP_PORT,
-    secure: env.SMTP_SECURE ?? false,
+    secure: env.SMTP_SECURE ?? env.SMTP_PORT === 465,
     user: env.SMTP_USER,
     pass: env.SMTP_PASS,
     from: env.EMAIL_FROM,
+    fromEmail: env.FROM_EMAIL ?? env.EMAIL_FROM,
+    fromName: env.FROM_NAME ?? 'Fashion Edge',
   },
   storage: {
     region: env.AWS_REGION,
@@ -88,13 +91,28 @@ export const appConfig = {
     koko: {
       merchantId: env.KOKO_MERCHANT_ID,
       secretKey: env.KOKO_SECRET_KEY,
+      apiKey: env.KOKO_API_KEY,
+      privateKeyPath: env.KOKO_PRIVATE_KEY_PATH,
     },
     mintpay: {
       merchantId: env.MINTPAY_MERCHANT_ID,
-      secretKey: env.MINTPAY_SECRET_KEY,
+      secretKey: env.MINTPAY_MERCHANT_SECRET ?? env.MINTPAY_SECRET_KEY,
+      mode: env.MINTPAY_MODE,
     },
     cod: {
       webhookSecret: env.COD_WEBHOOK_SECRET,
+    },
+  },
+  analytics: {
+    meta: {
+      token: env.META_CAPI_TOKEN,
+      pixelId: env.META_PIXEL_ID,
+      configured: Boolean(env.META_CAPI_TOKEN && env.META_PIXEL_ID),
+    },
+    tiktok: {
+      pixelId: env.TIKTOK_PIXEL_ID,
+      accessToken: env.TIKTOK_ACCESS_TOKEN,
+      configured: Boolean(env.TIKTOK_PIXEL_ID && env.TIKTOK_ACCESS_TOKEN),
     },
   },
 } as const;

@@ -52,7 +52,7 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
             Request a new link from the{' '}
             <Link
               to={ROUTES.authForgotPassword}
-              className="text-primary font-medium hover:underline"
+              className="text-foreground font-medium underline-offset-4 hover:underline"
             >
               forgot password
             </Link>{' '}
@@ -71,13 +71,13 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
       />
 
       {resetMutation.error ? (
-        <div className="mb-4">
+        <div className="mb-5">
           <AuthErrorAlert error={resetMutation.error} onRetry={() => resetMutation.reset()} />
         </div>
       ) : null}
 
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" noValidate>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5" noValidate>
           <FormField
             control={form.control}
             name="password"
@@ -85,7 +85,11 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
               <FormItem>
                 <FormLabel>New password</FormLabel>
                 <FormControl>
-                  <PasswordField autoComplete="new-password" {...field} />
+                  <PasswordField
+                    autoComplete="new-password"
+                    className="h-11 rounded-sm bg-transparent"
+                    {...field}
+                  />
                 </FormControl>
                 <PasswordStrengthMeter password={password} />
                 <FormMessage />
@@ -100,14 +104,18 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
               <FormItem>
                 <FormLabel>Confirm password</FormLabel>
                 <FormControl>
-                  <PasswordField autoComplete="new-password" {...field} />
+                  <PasswordField
+                    autoComplete="new-password"
+                    className="h-11 rounded-sm bg-transparent"
+                    {...field}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
 
-          <Button type="submit" className="w-full" loading={resetMutation.isPending}>
+          <Button type="submit" size="lg" className="w-full" loading={resetMutation.isPending}>
             Reset password
           </Button>
         </form>

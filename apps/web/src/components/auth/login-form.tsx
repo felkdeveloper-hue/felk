@@ -46,24 +46,24 @@ export function LoginForm({ redirect, resetSuccess }: LoginFormProps) {
     <div>
       <AuthFormHeader
         title="Sign in"
-        description="Welcome back. Enter your credentials to access your account."
+        description="Welcome back. Enter your details to continue shopping."
       />
 
       {resetSuccess ? (
-        <Alert variant="success" className="mb-4">
+        <Alert variant="success" className="mb-5">
           <AlertDescription>Your password has been reset. You can sign in now.</AlertDescription>
         </Alert>
       ) : null}
 
       {loginMutation.error ? (
-        <div className="mb-4">
+        <div className="mb-5">
           <AuthErrorAlert error={loginMutation.error} onRetry={() => loginMutation.reset()} />
           {getAuthErrorMessage(loginMutation.error) ===
           'Please verify your email before signing in.' ? (
             <p className="text-muted-foreground mt-3 text-sm">
               <Link
                 to={ROUTES.authVerifyEmail}
-                className="text-primary font-medium hover:underline"
+                className="text-foreground font-medium underline-offset-4 hover:underline"
               >
                 Resend verification email
               </Link>
@@ -73,7 +73,7 @@ export function LoginForm({ redirect, resetSuccess }: LoginFormProps) {
       ) : null}
 
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" noValidate>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5" noValidate>
           <FormField
             control={form.control}
             name="email"
@@ -85,6 +85,7 @@ export function LoginForm({ redirect, resetSuccess }: LoginFormProps) {
                     type="email"
                     autoComplete="email"
                     placeholder="you@example.com"
+                    className="h-11 rounded-sm bg-transparent"
                     {...field}
                   />
                 </FormControl>
@@ -98,17 +99,21 @@ export function LoginForm({ redirect, resetSuccess }: LoginFormProps) {
             name="password"
             render={({ field }) => (
               <FormItem>
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-3">
                   <FormLabel>Password</FormLabel>
                   <Link
                     to={ROUTES.authForgotPassword}
-                    className="text-primary text-xs font-medium hover:underline"
+                    className="text-muted-foreground hover:text-foreground text-xs font-medium underline-offset-4 transition-colors hover:underline"
                   >
                     Forgot password?
                   </Link>
                 </div>
                 <FormControl>
-                  <PasswordField autoComplete="current-password" {...field} />
+                  <PasswordField
+                    autoComplete="current-password"
+                    className="h-11 rounded-sm bg-transparent"
+                    {...field}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -119,25 +124,28 @@ export function LoginForm({ redirect, resetSuccess }: LoginFormProps) {
             control={form.control}
             name="rememberMe"
             render={({ field }) => (
-              <FormItem className="flex items-center gap-2 space-y-0">
+              <FormItem className="flex items-center gap-2.5 space-y-0">
                 <FormControl>
                   <Checkbox checked={field.value} onCheckedChange={field.onChange} />
                 </FormControl>
-                <FormLabel className="font-normal">Remember me</FormLabel>
+                <FormLabel className="text-muted-foreground font-normal">Remember me</FormLabel>
               </FormItem>
             )}
           />
 
-          <Button type="submit" className="w-full" loading={loginMutation.isPending}>
+          <Button type="submit" size="lg" className="mt-1 w-full" loading={loginMutation.isPending}>
             Sign in
           </Button>
         </form>
       </Form>
 
-      <p className="text-muted-foreground mt-6 text-center text-sm">
-        Don&apos;t have an account?{' '}
-        <Link to={ROUTES.authRegister} className="text-primary font-medium hover:underline">
-          Create one
+      <p className="text-muted-foreground border-border mt-8 border-t pt-6 text-center text-sm">
+        New here?{' '}
+        <Link
+          to={ROUTES.authRegister}
+          className="text-foreground font-semibold underline-offset-4 hover:underline"
+        >
+          Create an account
         </Link>
       </p>
     </div>

@@ -110,6 +110,7 @@ export function normalizeProduct(raw: unknown): Product {
       insights?.isOnSale ?? (salePrice != null && price != null && salePrice.amount < price.amount),
     discountPercent: insights?.discountPercent,
     brandId: record.brandId ? String(record.brandId) : undefined,
+    brandName: typeof record.brandName === 'string' ? record.brandName : undefined,
     categoryId: record.categoryId ? String(record.categoryId) : undefined,
     subcategoryId: record.subcategoryId ? String(record.subcategoryId) : undefined,
     collectionIds: Array.isArray(record.collectionIds)
@@ -125,6 +126,13 @@ export function normalizeProduct(raw: unknown): Product {
     isNewArrival: Boolean(record.isNewArrival),
     isBestSeller: Boolean(record.isBestSeller),
     isClearance: Boolean(record.isClearance),
+    averageRating:
+      typeof record.averageRating === 'number'
+        ? record.averageRating
+        : typeof record.rating === 'number'
+          ? record.rating
+          : undefined,
+    reviewCount: typeof record.reviewCount === 'number' ? record.reviewCount : undefined,
     defaultVariantId: record.defaultVariantId ? String(record.defaultVariantId) : undefined,
     variantCount: typeof record.variantCount === 'number' ? record.variantCount : undefined,
     thumbnailUrl,

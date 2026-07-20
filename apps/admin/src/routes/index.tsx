@@ -32,6 +32,7 @@ import {
   OccasionsPage,
   UsersPage,
 } from '@/pages';
+import { IntegrationsPage } from '@/pages/settings/integrations-page';
 import { AdminShell, RootLayout } from './route-layouts';
 
 const rootRoute = createRootRoute({
@@ -355,6 +356,16 @@ const settingsRoute = createRoute({
   ),
 });
 
+const integrationsRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: 'settings/integrations',
+  component: () => (
+    <PermissionRoute permissions={[PERMISSIONS.SETTINGS_MANAGE]}>
+      <IntegrationsPage />
+    </PermissionRoute>
+  ),
+});
+
 const auditRoute = createRoute({
   getParentRoute: () => adminLayoutRoute,
   path: 'audit',
@@ -398,6 +409,7 @@ const routeTree = rootRoute.addChildren([
     usersRoute,
     rolesRoute,
     settingsRoute,
+    integrationsRoute,
     auditRoute,
   ]),
 ]);

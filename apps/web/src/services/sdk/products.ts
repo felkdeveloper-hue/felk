@@ -45,6 +45,8 @@ export interface Product {
   isNewArrival?: boolean;
   isBestSeller?: boolean;
   isClearance?: boolean;
+  averageRating?: number;
+  reviewCount?: number;
   defaultVariantId?: string;
   variantCount?: number;
   thumbnailUrl?: string;

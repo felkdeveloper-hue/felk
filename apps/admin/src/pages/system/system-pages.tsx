@@ -41,6 +41,7 @@ export function SettingsPage() {
         'Checkout settings',
         'Tax and shipping defaults',
         'Notification preferences',
+        'Integrations — /admin/settings/integrations',
       ]}
     />
   );

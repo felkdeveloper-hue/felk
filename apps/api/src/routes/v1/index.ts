@@ -13,6 +13,8 @@ import { paymentsRouter } from '@/routes/payments/payments.routes';
 import { ordersRouter } from '@/routes/orders/orders.routes';
 import { storefrontRouter } from '@/routes/storefront.routes';
 import { reviewsRouter } from '@/routes/reviews.routes';
+import { trackingRouter } from '@/routes/tracking/tracking.routes';
+import { integrationsRouter } from '@/routes/integrations/integrations.routes';
 
 /**
  * API v1 root router.
@@ -33,3 +35,5 @@ v1Router.use('/cart', cartRouter);
 v1Router.use('/checkout', checkoutRouter);
 v1Router.use('/payments', paymentsRouter);
 v1Router.use('/orders', ordersRouter);
+v1Router.use('/tracking', trackingRouter);
+v1Router.use('/integrations', integrationsRouter);

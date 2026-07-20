@@ -32,6 +32,9 @@ import {
 } from '@/constants/payment';
 import { getHeader, parseWebhookPayload, rawBodyToString } from '@/services/gateways/gateway.utils';
 import type { AuthenticatedUser } from '@/types';
+import { analyticsService } from '@/services/analytics/analytics.service';
+import { emailQueueService } from '@/services/email-queue.service';
+import { paymentSuccessfulEmail, paymentFailedEmail } from '@/emails';
 
 function toPlain(doc: { toObject: () => Record<string, unknown> }) {
   return doc.toObject();
@@ -306,6 +309,21 @@ export class PaymentService {
           metadata: { redirectUrl: session.redirectUrl, gateway: payment.method },
         });
       }
+
+      // Track InitiateCheckout + AddPaymentInfo (fire-and-forget)
+      void analyticsService
+        .trackInitiateCheckout({
+          currency: payment.currency,
+          value: payment.amount,
+        })
+        .catch(() => {});
+
+      void analyticsService
+        .trackAddPaymentInfo({
+          currency: payment.currency,
+          value: payment.amount,
+        })
+        .catch(() => {});
 
       return this.toSummary(payment, { includeRedirect: true });
     } catch (error) {
@@ -627,6 +645,42 @@ export class PaymentService {
         },
         { paymentId: payment._id.toString(), checkoutId: payment.checkoutId.toString() },
       );
+
+      // Send payment success email (fire-and-forget)
+      void (async () => {
+        try {
+          const customer = await customerService
+            .getById(payment.customerId.toString())
+            .catch(() => null);
+          if (customer) {
+            const tpl = paymentSuccessfulEmail({
+              name:
+                (customer as { firstName?: string; email: string }).firstName ??
+                (customer as { email: string }).email,
+              orderNumber: payment.referenceNumber,
+              amount: payment.amount,
+              currency: payment.currency,
+              method: payment.method,
+            });
+            await emailQueueService.enqueue({
+              ...tpl,
+              to: (customer as { email: string }).email,
+              templateKey: 'payment_successful',
+            });
+          }
+        } catch {
+          /* non-blocking */
+        }
+      })();
+
+      // Track Purchase (fire-and-forget)
+      void analyticsService
+        .trackPurchase({
+          orderId: payment.referenceNumber,
+          currency: payment.currency,
+          value: payment.amount,
+        })
+        .catch(() => {});
     } else if (newStatus === PAYMENT_STATUS.AUTHORIZED) {
       await publishPaymentEvent(
         PAYMENT_EVENT_TYPE.PAYMENT_AUTHORIZED,
@@ -649,6 +703,33 @@ export class PaymentService {
         },
         { paymentId: payment._id.toString(), checkoutId: payment.checkoutId.toString() },
       );
+
+      // Send payment failed email (fire-and-forget)
+      void (async () => {
+        try {
+          const customer = await customerService
+            .getById(payment.customerId.toString())
+            .catch(() => null);
+          if (customer) {
+            const tpl = paymentFailedEmail({
+              name:
+                (customer as { firstName?: string; email: string }).firstName ??
+                (customer as { email: string }).email,
+              orderNumber: payment.referenceNumber,
+              amount: payment.amount,
+              currency: payment.currency,
+              reason: newStatus,
+            });
+            await emailQueueService.enqueue({
+              ...tpl,
+              to: (customer as { email: string }).email,
+              templateKey: 'payment_failed',
+            });
+          }
+        } catch {
+          /* non-blocking */
+        }
+      })();
     }
 
     await writePaymentLog({

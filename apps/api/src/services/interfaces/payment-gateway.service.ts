@@ -44,4 +44,9 @@ export interface PaymentGateway {
     amount: number;
     reason?: string;
   }): Promise<{ gatewayTxnId: string; status: string }>;
+  verifyTransaction?(orderId: string): Promise<{
+    status: string;
+    amount?: number;
+    currency?: string;
+  } | null>;
 }

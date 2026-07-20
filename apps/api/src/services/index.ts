@@ -21,6 +21,7 @@ export type {
 } from '@/services/interfaces/payment-gateway.service';
 
 export { emailService, NodemailerEmailService } from '@/services/email.service';
+export { emailQueueService } from '@/services/email-queue.service';
 export { authService, setAuthCookies, clearAuthCookies } from '@/services/auth.service';
 export { writeAuditLog, writeActivityLog } from '@/services/audit.service';
 export {

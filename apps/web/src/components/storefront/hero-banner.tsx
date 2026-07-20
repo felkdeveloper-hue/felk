@@ -104,7 +104,7 @@ function HeroCarousel({ banners }: { banners: HeroBanner[] }) {
     const timer = window.setInterval(() => {
       setDirection(1);
       setIndex((current) => (current + 1) % banners.length);
-    }, 6500);
+    }, 3000);
     return () => window.clearInterval(timer);
   }, [banners.length, reduceMotion, index]);
 
