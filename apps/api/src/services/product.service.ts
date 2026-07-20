@@ -102,6 +102,54 @@ function withComputedPricing<T extends { pricing?: Record<string, unknown> | nul
   };
 }
 
+function resolveListingPricing(
+  product: { pricing?: Record<string, unknown> | null },
+  variant?: {
+    price?: number;
+    salePrice?: number | null;
+    compareAtPrice?: number | null;
+    currency?: string;
+  } | null,
+) {
+  const base = (product.pricing ?? { price: 0, currency: 'LKR' }) as Record<string, unknown>;
+  const basePrice = Number(base.price ?? 0);
+  if (!variant || basePrice > 0) {
+    return base;
+  }
+
+  return {
+    ...base,
+    price: variant.price ?? basePrice,
+    salePrice: variant.salePrice ?? base.salePrice ?? null,
+    compareAtPrice: variant.compareAtPrice ?? base.compareAtPrice ?? null,
+    currency: variant.currency ?? base.currency ?? 'LKR',
+  };
+}
+
+function pickListingVariant(
+  variants: Array<{
+    productId: { toString(): string };
+    isDefault?: boolean;
+    displayOrder?: number;
+    price?: number;
+    salePrice?: number | null;
+    compareAtPrice?: number | null;
+    currency?: string;
+    sku?: string;
+    thumbnailUrl?: string | null;
+  }>,
+) {
+  const byProduct = new Map<string, (typeof variants)[number]>();
+  for (const variant of variants) {
+    const productId = variant.productId.toString();
+    const existing = byProduct.get(productId);
+    if (!existing || variant.isDefault) {
+      byProduct.set(productId, variant);
+    }
+  }
+  return byProduct;
+}
+
 export class ProductService {
   async list(options: ProductListFilters) {
     const result = await productRepository.listCatalog(options);
@@ -115,9 +163,11 @@ export class ProductService {
     const [variants, media, brands] = await Promise.all([
       ProductVariantModel.find({
         productId: { $in: productIds },
-        isDefault: true,
         isDeleted: false,
-      }).lean(),
+        status: 'active',
+      })
+        .sort({ isDefault: -1, displayOrder: 1, createdAt: 1 })
+        .lean(),
       ProductMediaModel.find({
         productId: { $in: productIds },
         isDeleted: false,
@@ -129,9 +179,7 @@ export class ProductService {
         .lean(),
     ]);
 
-    const defaultVariantByProduct = new Map(
-      variants.map((variant) => [variant.productId.toString(), variant]),
-    );
+    const listingVariantByProduct = pickListingVariant(variants);
     const mediaByProduct = new Map<string, typeof media>();
     for (const item of media) {
       const key = item.productId.toString();
@@ -143,16 +191,23 @@ export class ProductService {
       ...result,
       data: result.data.map((product) => {
         const id = product._id.toString();
-        const defaultVariant = defaultVariantByProduct.get(id);
+        const listingVariant = listingVariantByProduct.get(id);
         const productMedia = mediaByProduct.get(id) ?? [];
         const primary = productMedia.find((item) => item.isPrimary) ?? productMedia[0];
         const hover = productMedia.find((item) => item._id.toString() !== primary?._id.toString());
+        const listingPricing = resolveListingPricing(
+          product as unknown as { pricing?: Record<string, unknown> | null },
+          listingVariant,
+        );
 
         return {
-          ...withComputedPricing(product as unknown as Record<string, unknown>),
+          ...withComputedPricing({
+            ...(product as unknown as Record<string, unknown>),
+            pricing: listingPricing,
+          }),
           brandName: product.brandId ? brandById.get(product.brandId.toString()) : undefined,
-          sku: product.sku ?? defaultVariant?.sku,
-          thumbnailUrl: primary?.thumbnailUrl ?? primary?.url ?? defaultVariant?.thumbnailUrl,
+          sku: product.sku ?? listingVariant?.sku,
+          thumbnailUrl: primary?.thumbnailUrl ?? primary?.url ?? listingVariant?.thumbnailUrl,
           hoverImageUrl: hover?.url,
           media: productMedia,
         };
@@ -164,19 +219,64 @@ export class ProductService {
     const doc = await productRepository.findById(id, includeDeleted);
     if (!doc) throw ApiError.notFound('Product not found');
 
-    const [variants, media, relationships] = await Promise.all([
+    await this.ensureDefaultVariant(id);
+
+    const [variants, media, relationships, refreshed] = await Promise.all([
       ProductVariantModel.find({ productId: id, isDeleted: false }).sort({ displayOrder: 1 }),
       ProductMediaModel.find({ productId: id, isDeleted: false }).sort({ priority: 1 }),
       ProductRelationshipModel.find({ productId: id, isDeleted: false }).sort({ sortOrder: 1 }),
+      productRepository.findById(id, includeDeleted),
     ]);
 
-    const plain = toPlain(doc);
+    const plain = toPlain(refreshed ?? doc);
     return {
       ...withComputedPricing(plain),
       variants,
       media,
       relationships,
     };
+  }
+
+  /**
+   * Simple products (price only, no size/color options) still need a default variant
+   * for cart/checkout. Create one automatically when missing.
+   */
+  async ensureDefaultVariant(productId: string, actor: ActorMeta = {}) {
+    const product = await productRepository.findById(productId);
+    if (!product) return null;
+
+    const existing = await ProductVariantModel.findOne({
+      productId,
+      isDeleted: false,
+    }).sort({ isDefault: -1, displayOrder: 1, createdAt: 1 });
+
+    if (existing) {
+      if (!product.defaultVariantId) {
+        await ProductModel.updateOne(
+          { _id: productId },
+          { $set: { defaultVariantId: existing._id } },
+        );
+      }
+      return existing;
+    }
+
+    const price = Number(product.pricing?.price ?? 0);
+    if (price <= 0) return null;
+
+    const { productVariantService } = await import('@/services/product-variant.service');
+    return productVariantService.create(
+      productId,
+      {
+        title: product.name,
+        price,
+        salePrice: product.pricing?.salePrice ?? null,
+        compareAtPrice: product.pricing?.compareAtPrice ?? null,
+        currency: product.pricing?.currency ?? 'LKR',
+        isDefault: true,
+        status: 'active',
+      },
+      actor,
+    );
   }
 
   async create(payload: Record<string, unknown>, actor: ActorMeta) {
@@ -329,6 +429,21 @@ export class ProductService {
       $set: { ...payload, version: (before.version ?? 1) + 1 },
     });
 
+    const nextStatus = String((doc as { status?: string } | null)?.status ?? before.status);
+    const nextPrice = Number(
+      ((doc as { pricing?: { price?: number } } | null)?.pricing?.price ??
+        before.pricing?.price ??
+        0) as number,
+    );
+    if (
+      nextPrice > 0 &&
+      (nextStatus === PRODUCT_STATUS.ACTIVE ||
+        nextStatus === PRODUCT_STATUS.SCHEDULED ||
+        Boolean(payload.pricing))
+    ) {
+      await this.ensureDefaultVariant(id, actor);
+    }
+
     await writeAuditLog({
       action: PRODUCT_AUDIT.UPDATED,
       resourceType: 'products',
@@ -341,6 +456,27 @@ export class ProductService {
     });
 
     if (priceChanged) {
+      const defaultVariant = await ProductVariantModel.findOne({
+        productId: id,
+        isDeleted: false,
+      }).sort({ isDefault: -1, displayOrder: 1, createdAt: 1 });
+      const pricing =
+        (doc as { pricing?: Record<string, unknown> } | null)?.pricing ?? payload.pricing;
+      if (defaultVariant && pricing && typeof pricing === 'object') {
+        await ProductVariantModel.updateOne(
+          { _id: defaultVariant._id },
+          {
+            $set: {
+              price: Number((pricing as { price?: number }).price ?? defaultVariant.price),
+              salePrice: (pricing as { salePrice?: number | null }).salePrice ?? null,
+              compareAtPrice:
+                (pricing as { compareAtPrice?: number | null }).compareAtPrice ?? null,
+              currency: (pricing as { currency?: string }).currency ?? defaultVariant.currency,
+            },
+          },
+        );
+      }
+
       await writeAuditLog({
         action: PRODUCT_AUDIT.PRICE_CHANGED,
         resourceType: 'products',
@@ -349,7 +485,7 @@ export class ProductService {
         ip: actor.ip,
         requestId: actor.requestId,
         before: { pricing: before.pricing },
-        after: { pricing: doc.pricing },
+        after: { pricing: (doc as { pricing?: unknown } | null)?.pricing },
       });
     }
 
@@ -387,6 +523,8 @@ export class ProductService {
     if (status === PRODUCT_STATUS.SCHEDULED && when <= new Date()) {
       throw ApiError.badRequest('publishAt must be in the future for schedule');
     }
+
+    await this.ensureDefaultVariant(id, actor);
 
     const doc = await productRepository.updateById(id, {
       $set: { status, publishAt: when, visibility: 'public' },

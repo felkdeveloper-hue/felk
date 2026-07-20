@@ -7,6 +7,7 @@ export function VerifyEmailPage() {
     token?: string;
     email?: string;
     pending?: string | boolean;
+    devVerificationUrl?: string;
   };
 
   return (
@@ -16,6 +17,7 @@ export function VerifyEmailPage() {
         token={search.token}
         email={search.email}
         pending={search.pending === true || search.pending === 'true'}
+        devVerificationUrl={search.devVerificationUrl}
       />
     </>
   );

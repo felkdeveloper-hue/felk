@@ -5,4 +5,5 @@ export { LoginForm } from './login-form';
 export { PasswordStrengthMeter } from './password-strength-meter';
 export { RegisterForm } from './register-form';
 export { ResetPasswordForm } from './reset-password-form';
+export { DevVerificationLink } from './dev-verification-link';
 export { VerifyEmailPanel } from './verify-email-panel';

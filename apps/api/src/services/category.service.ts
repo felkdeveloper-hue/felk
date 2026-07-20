@@ -1,7 +1,10 @@
+import { randomUUID } from 'node:crypto';
 import { Types } from 'mongoose';
 import { CategoryModel } from '@/models/master-data.models';
 import { CmsCrudService, type ActorMeta } from '@/services/cms-crud.service';
+import { storageService } from '@/services/storage.factory';
 import { ApiError } from '@/utils/errors/api-error';
+import { processImage } from '@/utils/image.helper';
 import { slugify } from '@/utils/slug.helper';
 
 class CategoryService extends CmsCrudService {
@@ -100,6 +103,35 @@ class CategoryService extends CmsCrudService {
     }
 
     return roots;
+  }
+
+  async uploadImage(id: string, file: Express.Multer.File, actor: ActorMeta, alt?: string) {
+    await this.getById(id);
+
+    const webp = await processImage(file.buffer, {
+      width: 1200,
+      height: 1600,
+      quality: 82,
+      format: 'webp',
+    });
+    const key = `categories/${id}/${randomUUID()}.webp`;
+    const stored = await storageService.upload({
+      key,
+      body: webp,
+      contentType: 'image/webp',
+    });
+
+    return this.update(
+      id,
+      {
+        image: {
+          url: stored.url,
+          key: stored.key ?? key,
+          alt: alt?.trim() || file.originalname || 'Category image',
+        },
+      },
+      actor,
+    );
   }
 }
 

@@ -20,7 +20,11 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 
-export function RegisterForm() {
+export interface RegisterFormProps {
+  redirect?: string;
+}
+
+export function RegisterForm({ redirect }: RegisterFormProps) {
   const registerMutation = useRegisterMutation();
 
   const form = useForm<RegisterFormValues>({
@@ -239,6 +243,7 @@ export function RegisterForm() {
         Already a member?{' '}
         <Link
           to={ROUTES.authLogin}
+          search={redirect ? { redirect } : undefined}
           className="text-foreground font-semibold underline-offset-4 hover:underline"
         >
           Sign in

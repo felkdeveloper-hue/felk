@@ -19,3 +19,6 @@ export type {
   NotificationSeverity,
   NotificationStore,
 } from './notification-store';
+
+export { useAdminUiStore } from './admin-ui-store';
+export type { AdminTheme } from './admin-ui-store';

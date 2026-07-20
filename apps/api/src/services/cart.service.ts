@@ -15,6 +15,7 @@ import { writeAuditLog } from '@/services/audit.service';
 import type { ActorMeta } from '@/services/cms-crud.service';
 import { ApiError } from '@/utils/errors/api-error';
 import { computePricing } from '@/utils/pricing.helper';
+import { computeAvailable } from '@/utils/stock.helper';
 import {
   CART_AUDIT,
   CART_ITEM_LOCATION,
@@ -146,9 +147,20 @@ export class CartService {
     };
     if (warehouseId) filter.warehouseId = warehouseId;
 
-    const rows = await InventoryItemModel.find(filter).select('available').lean();
-    if (!rows.length) return 0;
-    return rows.reduce((sum, r) => sum + (r.available ?? 0), 0);
+    const rows = await InventoryItemModel.find(filter)
+      .select('available onHand reserved damaged')
+      .lean();
+    // No inventory rows yet = stock not tracked; allow purchase up to the cart line max.
+    if (!rows.length) return CART_QTY.MAX;
+    return rows.reduce((sum, row) => {
+      const sellable = computeAvailable(
+        Number(row.onHand ?? 0),
+        Number(row.reserved ?? 0),
+        Number(row.damaged ?? 0),
+      );
+      // Prefer bucket math; fall back to stored available when buckets are empty.
+      return sum + (sellable > 0 ? sellable : Number(row.available ?? 0));
+    }, 0);
   }
 
   private async loadVariantContext(variantId: string) {
@@ -325,6 +337,23 @@ export class CartService {
     return item;
   }
 
+  private async enrichItemsWithProductSlug(
+    items: CartItemDocument[],
+  ): Promise<Array<Record<string, unknown>>> {
+    if (!items.length) return [];
+
+    const productIds = [...new Set(items.map((item) => item.productId.toString()))];
+    const products = await ProductModel.find({ _id: { $in: productIds }, isDeleted: false })
+      .select('slug')
+      .lean();
+    const slugByProductId = new Map(products.map((product) => [String(product._id), product.slug]));
+
+    return items.map((item) => ({
+      ...toPlain(item),
+      productSlug: slugByProductId.get(item.productId.toString()) ?? null,
+    }));
+  }
+
   async buildView(
     cart: CartDocument,
     options?: { validate?: boolean; guestCartToken?: string | null },
@@ -352,11 +381,15 @@ export class CartService {
     const items = fresh.filter((i) => i.location === CART_ITEM_LOCATION.CART);
     const saved = fresh.filter((i) => i.location === CART_ITEM_LOCATION.SAVED);
     const totals = this.calculateTotals(fresh, cart.currency);
+    const [enrichedItems, enrichedSaved] = await Promise.all([
+      this.enrichItemsWithProductSlug(items),
+      this.enrichItemsWithProductSlug(saved),
+    ]);
 
     const view: CartView = {
       cart: toPlain(cart),
-      items: items.map((i) => toPlain(i)),
-      savedForLater: saved.map((i) => toPlain(i)),
+      items: enrichedItems,
+      savedForLater: enrichedSaved,
       totals,
       guestCartToken: options?.guestCartToken ?? cart.guestToken ?? null,
     };

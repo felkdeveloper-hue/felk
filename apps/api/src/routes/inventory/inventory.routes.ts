@@ -249,6 +249,18 @@ inventoryRouter.post(
 );
 
 inventoryRouter.post(
+  '/set-stock',
+  authorizeAny(...adjustPerms),
+  validate({ body: S.setStockQuantitySchema }),
+  asyncHandler(async (req, res) => {
+    ApiResponse.success(
+      res,
+      await inventoryService.setStockQuantity(req.body, actorFromRequest(req)),
+    );
+  }),
+);
+
+inventoryRouter.post(
   '/receiving',
   authorizeAny(...adjustPerms),
   validate({ body: S.receiveStockSchema }),

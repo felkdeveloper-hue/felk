@@ -4,6 +4,43 @@ import { logger } from '@/config/logger';
 
 export type DatabaseStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 
+/** Drop legacy unique barcode index that rejects multiple null barcodes. */
+async function repairVariantBarcodeIndex() {
+  const db = mongoose.connection.db;
+  if (!db) return;
+
+  const collection = db.collection('product_variants');
+  const indexes = await collection.indexes();
+  const barcodeIndexes = indexes.filter(
+    (index) =>
+      index.name === 'barcode_1' ||
+      (index.key && (index.key as { barcode?: number }).barcode === 1),
+  );
+
+  for (const index of barcodeIndexes) {
+    if (!index.name || index.name === '_id_') continue;
+    // Keep a correct partial unique index; drop everything else on barcode.
+    const isPartialStringUnique =
+      Boolean(index.unique) &&
+      Boolean(index.partialFilterExpression) &&
+      JSON.stringify(index.partialFilterExpression).includes('$type');
+    if (isPartialStringUnique) continue;
+    await collection.dropIndex(index.name);
+    logger.info({ index: index.name }, 'Dropped legacy product_variants barcode index');
+  }
+
+  const unsetResult = await collection.updateMany(
+    { $or: [{ barcode: null }, { barcode: '' }] },
+    { $unset: { barcode: '' } },
+  );
+  if (unsetResult.modifiedCount > 0) {
+    logger.info({ count: unsetResult.modifiedCount }, 'Cleared null/empty variant barcodes');
+  }
+
+  const { ProductVariantModel } = await import('@/models/product.models');
+  await ProductVariantModel.syncIndexes();
+}
+
 class DatabaseManager {
   private status: DatabaseStatus = 'disconnected';
   private lastError: Error | null = null;
@@ -58,6 +95,10 @@ class DatabaseManager {
         { host: connection.connection.host, name: connection.connection.name },
         'MongoDB connected',
       );
+
+      await repairVariantBarcodeIndex().catch((error: unknown) => {
+        logger.warn({ err: error }, 'Variant barcode index repair skipped');
+      });
 
       return connection;
     } catch (error) {

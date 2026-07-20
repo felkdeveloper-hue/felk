@@ -147,6 +147,18 @@ export const productsApi = {
     return this.getById(match.id);
   },
 
+  /** Accepts a storefront slug or MongoDB product id (legacy cart links). */
+  async getBySlugOrId(slugOrId: string): Promise<Product | null> {
+    if (/^[a-f0-9]{24}$/i.test(slugOrId)) {
+      try {
+        return await this.getById(slugOrId);
+      } catch {
+        return null;
+      }
+    }
+    return this.getBySlug(slugOrId);
+  },
+
   async listVariants(productId: string): Promise<ProductVariant[]> {
     const rows = await http.get<unknown[]>(`/storefront/products/${productId}/variants`);
     return mapList(rows, normalizeProductVariant);

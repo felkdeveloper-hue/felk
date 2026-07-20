@@ -9,6 +9,7 @@ interface AuthState {
   accessToken: string | null;
   refreshToken: string | null;
   hasHydrated: boolean;
+  permissionsHydrated: boolean;
 }
 
 interface AuthActions {
@@ -17,6 +18,7 @@ interface AuthActions {
   setUser: (user: AuthUser | null) => void;
   clearSession: () => void;
   setHasHydrated: (hydrated: boolean) => void;
+  setPermissionsHydrated: (hydrated: boolean) => void;
   hasRole: (role: string) => boolean;
   hasPermission: (permission: string) => boolean;
   hasAnyPermission: (permissions: string[]) => boolean;
@@ -30,6 +32,7 @@ const initialState: AuthState = {
   accessToken: null,
   refreshToken: null,
   hasHydrated: false,
+  permissionsHydrated: false,
 };
 
 export const useAuthStore = create<AuthStore>()(
@@ -42,6 +45,7 @@ export const useAuthStore = create<AuthStore>()(
           user: session.user,
           accessToken: session.accessToken,
           refreshToken: session.refreshToken,
+          permissionsHydrated: true,
         }),
 
       setTokens: (tokens) =>
@@ -50,11 +54,14 @@ export const useAuthStore = create<AuthStore>()(
           refreshToken: tokens.refreshToken ?? state.refreshToken,
         })),
 
-      setUser: (user) => set({ user }),
+      setUser: (user) => set({ user, permissionsHydrated: true }),
 
-      clearSession: () => set({ user: null, accessToken: null, refreshToken: null }),
+      clearSession: () =>
+        set({ user: null, accessToken: null, refreshToken: null, permissionsHydrated: false }),
 
       setHasHydrated: (hydrated) => set({ hasHydrated: hydrated }),
+
+      setPermissionsHydrated: (hydrated) => set({ permissionsHydrated: hydrated }),
 
       hasRole: (role) => Boolean(get().user?.roles.includes(role)),
 
@@ -79,7 +86,11 @@ export const useAuthStore = create<AuthStore>()(
         refreshToken: state.refreshToken,
       }),
       onRehydrateStorage: () => (state) => {
-        state?.setHasHydrated(true);
+        if (!state) return;
+        state.setHasHydrated(true);
+        if ((state.user?.permissions.length ?? 0) > 0) {
+          state.setPermissionsHydrated(true);
+        }
       },
     },
   ),

@@ -4,6 +4,7 @@ import { normalizeCartView } from '@/utils/cart';
 export interface CartLineItem {
   id: string;
   productId: string;
+  productSlug?: string;
   variantId?: string;
   name: string;
   sku?: string;

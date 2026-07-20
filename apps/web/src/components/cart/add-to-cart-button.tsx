@@ -5,6 +5,7 @@ import type { Product } from '@/services/sdk';
 import { trackingApi } from '@/services/sdk/tracking';
 import { Button, type ButtonProps } from '@/components/ui/button';
 import { AppError } from '@/lib/errors';
+import { toast } from 'sonner';
 
 export interface AddToCartButtonProps extends Omit<ButtonProps, 'onClick'> {
   product: Product;
@@ -36,6 +37,7 @@ export function AddToCartButton({
       {
         onSuccess: () => {
           setCartAnnouncement(`${product.name} added to cart`);
+          toast.success(`${product.name} added to bag`);
           const price =
             typeof product.price === 'number'
               ? product.price
@@ -45,6 +47,7 @@ export function AddToCartButton({
         onError: (error) => {
           const message = AppError.isAppError(error) ? error.message : 'Unable to add item to cart';
           setCartAnnouncement(message);
+          toast.error(message);
         },
       },
     );

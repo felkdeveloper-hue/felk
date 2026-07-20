@@ -4,7 +4,17 @@ import { buildAbsoluteUrl, siteConfig } from '@/config';
 import { Seo } from '@/components/common/seo';
 import { buildOrganizationJsonLd, buildWebsiteJsonLd } from '@/lib/seo';
 import { getSetting } from '@/utils/cms';
-import { HeroBannerSection, HomeSectionRenderer, SectionSkeleton } from '@/components/storefront';
+import {
+  BottomBannerSection,
+  CategoryShowcaseSection,
+  HeroBannerSection,
+  HomeCategoriesSection,
+  HomeSectionRenderer,
+  ProductGridSection,
+  ProductRailSection,
+  SectionSkeleton,
+  ShopYourMoodSection,
+} from '@/components/storefront';
 import { AsyncSection } from '@/components/storefront/async-section';
 
 export function HomePage() {
@@ -44,6 +54,25 @@ export function HomePage() {
       />
 
       <HeroBannerSection />
+
+      <ShopYourMoodSection />
+
+      <ProductRailSection kind="random" />
+
+      <HomeCategoriesSection />
+
+      <ProductRailSection
+        kind="random"
+        eyebrow="Keep shopping"
+        title="More to love"
+        description="Another mix of pieces picked just for you."
+      />
+
+      <BottomBannerSection />
+
+      <CategoryShowcaseSection />
+
+      <ProductGridSection />
 
       <AsyncSection
         isLoading={sectionsQuery.isLoading}

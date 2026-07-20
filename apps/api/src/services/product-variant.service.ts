@@ -114,8 +114,10 @@ export class ProductVariantService {
     const sku = payload.sku
       ? String(payload.sku).toUpperCase()
       : await allocateUniqueLinkedSku(parentSku, siblingSkus);
-    const barcode = (payload.barcode as string | null | undefined) ?? null;
-    await this.assertUniqueSkuBarcode(sku, barcode);
+    const barcodeRaw = payload.barcode;
+    const barcode =
+      typeof barcodeRaw === 'string' && barcodeRaw.trim() ? barcodeRaw.trim() : undefined;
+    await this.assertUniqueSkuBarcode(sku, barcode ?? null);
 
     const price = Number(payload.price ?? product.pricing?.price ?? 0);
     validateVariantPricing({
@@ -128,7 +130,7 @@ export class ProductVariantService {
     const variant = await ProductVariantModel.create({
       productId,
       sku,
-      barcode,
+      ...(barcode ? { barcode } : {}),
       title: payload.title ?? `${product.name} - ${sku}`,
       colorId: payload.colorId ?? null,
       sizeId: payload.sizeId ?? null,
@@ -304,7 +306,6 @@ export class ProductVariantService {
       source.productId.toString(),
       {
         sku,
-        barcode: null,
         title: `${source.title} (Clone)`,
         colorId: source.colorId,
         sizeId: source.sizeId,

@@ -19,7 +19,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const isAuthed = useAuthStore((state) => Boolean(state.accessToken && state.user));
 
   useEffect(() => {
-    if (hasHydrated && !isAuthed) {
+    if (hasHydrated && !isAuthed && !pathname.startsWith('/auth')) {
       navigate({
         to: ROUTES.authLogin,
         search: { redirect: pathname },

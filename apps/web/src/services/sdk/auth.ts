@@ -16,10 +16,14 @@ import type {
  */
 export const authApi = {
   async register(payload: RegisterPayload): Promise<RegisterResult> {
-    const raw = await http.post<{ user: unknown; message: string }>('/auth/register', payload);
+    const raw = await http.post<{ user: unknown; message: string; devVerificationUrl?: string }>(
+      '/auth/register',
+      payload,
+    );
     return {
       user: normalizeAuthUser(raw.user),
       message: raw.message,
+      devVerificationUrl: raw.devVerificationUrl,
     };
   },
 

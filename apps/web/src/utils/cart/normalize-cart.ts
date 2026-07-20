@@ -19,6 +19,7 @@ export function normalizeCartLineItem(raw: unknown): CartLineItem {
   return {
     id: String(record.id ?? record._id ?? ''),
     productId: String(record.productId ?? ''),
+    productSlug: typeof record.productSlug === 'string' ? record.productSlug : undefined,
     variantId: record.variantId ? String(record.variantId) : undefined,
     name: String(record.title ?? record.name ?? 'Product'),
     sku: typeof record.sku === 'string' ? record.sku : undefined,

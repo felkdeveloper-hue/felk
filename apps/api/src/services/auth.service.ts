@@ -12,7 +12,7 @@ import {
   type AuthPortal,
 } from '@/constants/auth';
 import { ROLES, type RoleKey } from '@/constants/roles';
-import { ERROR_MESSAGES } from '@/constants/error-messages';
+import { attachDevVerificationUrl } from '@/utils/dev-verification.helper';
 import {
   forgotPasswordEmail,
   loginAlertEmail,
@@ -129,9 +129,8 @@ function assertPortalAccess(roleKey: RoleKey, portal: AuthPortal): void {
   if (portal === AUTH_PORTAL.ADMIN && !isStaffRole(roleKey)) {
     throw ApiError.forbidden('Admin portal access denied', 'PORTAL_DENIED');
   }
-  if (portal === AUTH_PORTAL.CUSTOMER && isStaffRole(roleKey)) {
-    throw ApiError.forbidden('Use the admin portal for staff accounts', 'PORTAL_DENIED');
-  }
+  // Staff accounts may log in without specifying a portal — the frontend
+  // decides where to redirect based on the returned role.
 }
 
 async function createSessionAndTokens(
@@ -313,10 +312,13 @@ export const authService = {
       requestId: meta.requestId,
     });
 
-    return {
-      user: sanitizeUser(user),
-      message: 'Registration successful. Please verify your email.',
-    };
+    return attachDevVerificationUrl(
+      {
+        user: sanitizeUser(user),
+        message: 'Registration successful. Please verify your email.',
+      },
+      verifyUrl,
+    );
   },
 
   async login(
@@ -823,7 +825,10 @@ export const authService = {
       requestId: meta.requestId,
     });
 
-    return { message: 'If verification is required, a new email has been sent.' };
+    return attachDevVerificationUrl(
+      { message: 'If verification is required, a new email has been sent.' },
+      verifyUrl,
+    );
   },
 
   async getMe(userId: string): Promise<AuthenticatedUser> {

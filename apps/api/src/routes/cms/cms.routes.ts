@@ -41,10 +41,12 @@ import { authenticate, authorizeAny, validate } from '@/middlewares';
 import { asyncHandler } from '@/utils/async-handler';
 import { ApiResponse } from '@/utils/response/api-response';
 import { storeSettingUpsertSchema } from '@/schemas/cms.schema';
+import { singleImageUpload } from '@/utils/file-upload.helper';
 import { z } from 'zod';
 import { objectIdSchema } from '@/schemas/common.schema';
 
 const P = PERMISSIONS;
+const categoryIdParams = z.object({ id: objectIdSchema });
 
 export const cmsRouter = Router();
 
@@ -55,6 +57,26 @@ cmsRouter.get(
   authorizeAny(P.CATEGORIES_VIEW, P.CATEGORIES_MANAGE, P.CATEGORIES_READ),
   asyncHandler(async (_req, res) => {
     ApiResponse.success(res, await categoryService.tree());
+  }),
+);
+
+cmsRouter.post(
+  '/categories/:id/image',
+  authenticate,
+  authorizeAny(P.CATEGORIES_UPDATE, P.CATEGORIES_MANAGE),
+  validate({ params: categoryIdParams }),
+  singleImageUpload('file'),
+  asyncHandler(async (req, res) => {
+    if (!req.file) {
+      return ApiResponse.error(res, 'File is required', 400, 'FILE_REQUIRED');
+    }
+    const category = await categoryService.uploadImage(
+      String(req.params.id),
+      req.file,
+      actorFromRequest(req),
+      typeof req.body.alt === 'string' ? req.body.alt : undefined,
+    );
+    ApiResponse.success(res, category, 'Category image updated');
   }),
 );
 

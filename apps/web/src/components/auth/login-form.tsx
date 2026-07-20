@@ -143,6 +143,7 @@ export function LoginForm({ redirect, resetSuccess }: LoginFormProps) {
         New here?{' '}
         <Link
           to={ROUTES.authRegister}
+          search={redirect ? { redirect } : undefined}
           className="text-foreground font-semibold underline-offset-4 hover:underline"
         >
           Create an account

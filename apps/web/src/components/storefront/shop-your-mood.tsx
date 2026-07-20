@@ -1,44 +1,46 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
+import ethnicWearImage from '@/assets/images/Crousel Image/EthenicWear.png';
+import newInImage from '@/assets/images/Crousel Image/banner2.png';
+import mensCarouselImage from '@/assets/images/Crousel Image/menscrousel.png';
+import womenCarouselImage from '@/assets/images/Crousel Image/womenCrousel.png';
 import { QUERY_KEYS } from '@/constants/query-keys';
 import { Section } from '@/components/common/section';
 import { Image } from '@/components/media/image';
 import { categoriesApi, type Category } from '@/services/sdk';
-import { resolveMediaUrl } from '@/utils/cms';
 import type { HomeSection } from '@/services/sdk/cms';
 import { AsyncSection } from './async-section';
 import { HorizontalCarousel } from './horizontal-carousel';
 import { HoverLift, MotionReveal } from './motion-reveal';
 
-const unsplash = (id: string, width = 900, height = 1200) =>
-  `https://images.unsplash.com/${id}?auto=format&fit=crop&w=${width}&h=${height}&q=86`;
-
-/** Four large mood edits — 3 visible, 4th peeks in via carousel. */
+/** Four large category edits — 3 visible, 4th peeks in via carousel. */
 const MOOD_TILES = [
   {
     slug: 'women',
-    eyebrow: 'Winter specials',
-    name: 'Sweaters & jackets',
-    image: unsplash('photo-1483985988355-763728e1935b'),
-  },
-  {
-    slug: 'essentials',
-    eyebrow: 'Co-ord collection',
-    name: 'Comfy co-ords',
-    image: unsplash('photo-1490114538077-0a7f8cb49891'),
+    eyebrow: 'Women',
+    name: "Women's edit",
+    image: womenCarouselImage,
   },
   {
     slug: 'men',
-    eyebrow: 'Denim days',
-    name: 'Jeans under ₹999',
-    image: unsplash('photo-1542272454315-4c01d7abdf4a'),
+    eyebrow: 'Men',
+    name: "Men's edit",
+    image: mensCarouselImage,
   },
   {
-    slug: 'accessories',
-    eyebrow: 'Finish the look',
-    name: 'Accessories',
-    image: unsplash('photo-1511499767150-a48a237f0083'),
+    slug: 'ethnic-wear',
+    eyebrow: 'Ethnic',
+    name: 'Ethnic wear',
+    image: ethnicWearImage,
+    fallbackSlug: 'women',
+  },
+  {
+    slug: 'new-in',
+    eyebrow: 'Just dropped',
+    name: 'New in',
+    image: newInImage,
+    fallbackSlug: 'essentials',
   },
 ] as const;
 
@@ -54,13 +56,14 @@ function resolveMoodTiles(apiCategories: Category[] | undefined): MoodTile[] {
   const bySlug = new Map((apiCategories ?? []).map((category) => [category.slug, category]));
 
   return MOOD_TILES.map((tile) => {
-    const matched = bySlug.get(tile.slug);
+    const fallbackSlug = 'fallbackSlug' in tile ? tile.fallbackSlug : undefined;
+    const matched = bySlug.get(tile.slug) ?? (fallbackSlug ? bySlug.get(fallbackSlug) : undefined);
     return {
       id: matched?.id ?? tile.slug,
-      slug: matched?.slug ?? tile.slug,
+      slug: matched?.slug ?? fallbackSlug ?? tile.slug,
       eyebrow: tile.eyebrow,
       name: tile.name,
-      imageUrl: matched?.imageUrl ?? resolveMediaUrl(matched?.image) ?? tile.image,
+      imageUrl: tile.image,
     };
   });
 }

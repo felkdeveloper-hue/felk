@@ -46,7 +46,7 @@ export function useInfiniteProducts(state: CatalogSearchState) {
 export function useProductDetail(slug: string) {
   return useQuery({
     queryKey: QUERY_KEYS.products.detail(slug),
-    queryFn: () => productsApi.getBySlug(slug),
+    queryFn: () => productsApi.getBySlugOrId(slug),
     enabled: Boolean(slug),
     staleTime: 1000 * 60 * 5,
   });

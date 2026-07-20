@@ -1,16 +1,47 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
+import mainBanner1 from '@/assets/images/Crousel Image/banner1.png';
+import mainBanner2 from '@/assets/images/Crousel Image/banner2.png';
+import mainBanner3 from '@/assets/images/Crousel Image/banner3.png';
 import { useHeroBanners } from '@/hooks/cms';
+import { ROUTES } from '@/constants';
 import { CmsLink } from '@/components/common/cms-link';
 import { Container } from '@/components/layout/container';
 import { Button } from '@/components/ui/button';
 import { Image } from '@/components/media/image';
 import type { HeroBanner } from '@/services/sdk/cms';
-import { AsyncSection } from './async-section';
 import { HeroSkeleton } from './section-skeleton';
 
 const EASE = [0.16, 1, 0.3, 1] as const;
+
+/** Shown when CMS has no active hero banners yet. Rotates every 3s. */
+const FALLBACK_HERO_BANNERS: HeroBanner[] = [
+  {
+    id: 'local-main-banner-1',
+    title: 'New Edit',
+    subtitle: 'FE · Modern fashion for every day',
+    imageUrl: mainBanner1,
+    linkUrl: ROUTES.products,
+    ctaLabel: 'Shop now',
+  },
+  {
+    id: 'local-main-banner-2',
+    title: 'Shop the Look',
+    subtitle: 'FE · Fresh styles for the season',
+    imageUrl: mainBanner2,
+    linkUrl: ROUTES.products,
+    ctaLabel: 'Explore',
+  },
+  {
+    id: 'local-main-banner-3',
+    title: 'Everyday Style',
+    subtitle: 'FE · Pieces made to wear on repeat',
+    imageUrl: mainBanner3,
+    linkUrl: ROUTES.products,
+    ctaLabel: 'Shop now',
+  },
+];
 
 /** direction > 0 → enter from right; direction < 0 → enter from left */
 const slideVariants = {
@@ -150,22 +181,11 @@ function HeroCarousel({ banners }: { banners: HeroBanner[] }) {
 }
 
 export function HeroBannerSection() {
-  const { data, isLoading, isError, error, refetch } = useHeroBanners();
-  const banners = data?.data ?? [];
+  const { data, isLoading } = useHeroBanners();
+  const cmsBanners = data?.data ?? [];
+  const banners = cmsBanners.length > 0 ? cmsBanners : FALLBACK_HERO_BANNERS;
 
-  return (
-    <AsyncSection
-      isLoading={isLoading}
-      isError={isError}
-      error={error}
-      data={banners}
-      isEmpty={(value) => !value?.length}
-      onRetry={() => void refetch()}
-      skeleton={<HeroSkeleton />}
-      emptyTitle="Welcome"
-      emptyDescription="Our latest collection is coming soon."
-    >
-      {(items) => <HeroCarousel banners={items} />}
-    </AsyncSection>
-  );
+  if (isLoading) return <HeroSkeleton />;
+
+  return <HeroCarousel banners={banners} />;
 }

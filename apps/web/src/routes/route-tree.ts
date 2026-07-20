@@ -28,6 +28,7 @@ import {
   authVerifyEmailRoute,
 } from './auth.routes';
 import { authLayoutRoute, customerLayoutRoute, publicLayoutRoute } from './layout-routes';
+import { adminRouteTree } from './admin.routes';
 import { notFoundRoute } from './not-found.routes';
 import {
   aboutRoute,
@@ -98,6 +99,7 @@ export const routeTree = rootRoute.addChildren([
   authRouteTree,
   customerRouteTree,
   checkoutRouteTree,
+  adminRouteTree,
   notFoundRoute,
 ]);
 

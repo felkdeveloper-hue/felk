@@ -90,6 +90,11 @@ export const adjustStockSchema = z.object({
   unitCost: z.number().min(0).optional(),
 });
 
+export const setStockQuantitySchema = z.object({
+  variantId: objectIdSchema,
+  quantity: z.number().int().min(0),
+});
+
 export const receiveStockSchema = z.object({
   warehouseId: objectIdSchema,
   variantId: objectIdSchema,

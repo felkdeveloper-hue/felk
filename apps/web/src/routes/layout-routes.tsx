@@ -1,5 +1,4 @@
 import { createRoute } from '@tanstack/react-router';
-import { ROUTES } from '@/constants';
 import { AuthLayout, CustomerLayout, PublicLayout } from '@/layouts';
 import { GuestRoute, ProtectedRoute } from '@/guards';
 import { rootRoute } from './root-route';
@@ -17,7 +16,7 @@ export const publicLayoutRoute = createRoute({
 
 export const authLayoutRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: ROUTES.auth,
+  id: 'auth-layout',
   component: () => (
     <GuestRoute>
       <AuthLayout />

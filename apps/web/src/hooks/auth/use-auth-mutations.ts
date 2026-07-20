@@ -1,7 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { QUERY_KEYS } from '@/constants/query-keys';
-import { ROUTES } from '@/constants/routes';
+import { ADMIN_ROUTES, ROUTES } from '@/constants/routes';
+import { STAFF_ROLES } from '@/constants/admin-permissions';
+import { getAuthRedirectTarget, buildVerifyEmailSearch } from '@/utils/auth-redirect';
 import { AppError } from '@/lib/errors';
 import { authApi } from '@/services/sdk';
 import { useAuthStore } from '@/store';
@@ -9,14 +11,6 @@ import type { LoginPayload } from '@/types';
 
 export interface LoginMutationInput extends LoginPayload {
   redirect?: string;
-}
-
-function getRedirectTarget(search?: { redirect?: string }): string {
-  const redirect = search?.redirect;
-  if (redirect && redirect.startsWith('/') && !redirect.startsWith('//')) {
-    return redirect;
-  }
-  return ROUTES.account;
 }
 
 export function useLoginMutation() {
@@ -27,7 +21,14 @@ export function useLoginMutation() {
     mutationFn: ({ redirect: _redirect, ...payload }: LoginMutationInput) => authApi.login(payload),
     onSuccess: (session, variables) => {
       setSession(session);
-      navigate({ to: getRedirectTarget({ redirect: variables.redirect }) });
+      const isStaff = session.user.roles.some((role) =>
+        (STAFF_ROLES as readonly string[]).includes(role),
+      );
+      if (isStaff) {
+        navigate({ to: ADMIN_ROUTES.dashboard });
+      } else {
+        navigate({ to: getAuthRedirectTarget(variables.redirect) });
+      }
     },
   });
 }
@@ -40,7 +41,11 @@ export function useRegisterMutation() {
     onSuccess: (result) => {
       navigate({
         to: ROUTES.authVerifyEmail,
-        search: { email: result.user.email, pending: true },
+        search: buildVerifyEmailSearch({
+          email: result.user.email,
+          pending: true,
+          devVerificationUrl: result.devVerificationUrl,
+        }),
       });
     },
   });

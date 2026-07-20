@@ -1,13 +1,10 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Section } from '@/components/common/section';
 import { Image } from '@/components/media/image';
 import { cn } from '@/lib/utils';
 import type { HomeSection } from '@/services/sdk/cms';
-
-const unsplash = (id: string, width = 800, height = 960) =>
-  `https://images.unsplash.com/${id}?auto=format&fit=crop&w=${width}&h=${height}&q=86`;
 
 export interface ShowcaseCategory {
   id: string;
@@ -17,43 +14,37 @@ export interface ShowcaseCategory {
   rightImage: string;
 }
 
-const DEFAULT_CATEGORIES: ShowcaseCategory[] = [
-  {
-    id: 'sneakers',
-    label: 'Sneakers',
-    slug: 'shoes',
-    leftImage: unsplash('photo-1552346154-21d32810aba3'),
-    rightImage: unsplash('photo-1600185365926-3a2ce3cdb9eb'),
-  },
-  {
-    id: 'active-shoes',
-    label: 'Active Shoes',
-    slug: 'shoes',
-    leftImage: unsplash('photo-1542291026-7eec264c27ff'),
-    rightImage: unsplash('photo-1606107557195-0e29a4b5b4aa'),
-  },
-  {
-    id: 'adventure',
-    label: 'Adventure',
-    slug: 'essentials',
-    leftImage: unsplash('photo-1553062407-98eeb64c6a62'),
-    rightImage: unsplash('photo-1475483768296-61615e7020f8'),
-  },
-  {
-    id: 'belts-wallets',
-    label: 'Belts & Wallets',
-    slug: 'accessories',
-    leftImage: unsplash('photo-1627123424574-724758594e93'),
-    rightImage: unsplash('photo-1590874103328-eac38a674692'),
-  },
-  {
-    id: 'oversized-t-shirts',
-    label: 'Oversized T-Shirts',
-    slug: 'oversized-tees',
-    leftImage: unsplash('photo-1576566588028-4147f3842f27'),
-    rightImage: unsplash('photo-1521572163474-6864f9cf17ab'),
-  },
-];
+/** Local product photos from Product image → public/catalog/women */
+const PRODUCT_IMAGES = Array.from(
+  { length: 24 },
+  (_, index) => `/catalog/women/women-${String(index + 1).padStart(2, '0')}.jpg`,
+);
+
+const SHOWCASE_LABELS = [
+  { id: 'sneakers', label: 'Sneakers', slug: 'shoes' },
+  { id: 'active-shoes', label: 'Active Shoes', slug: 'shoes' },
+  { id: 'adventure', label: 'Adventure', slug: 'essentials' },
+  { id: 'belts-wallets', label: 'Belts & Wallets', slug: 'accessories' },
+  { id: 'oversized-t-shirts', label: 'Oversized T-Shirts', slug: 'oversized' },
+] as const;
+
+function shuffle<T>(items: T[]): T[] {
+  const next = [...items];
+  for (let i = next.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [next[i], next[j]] = [next[j]!, next[i]!];
+  }
+  return next;
+}
+
+function buildCategoriesFromProductImages(): ShowcaseCategory[] {
+  const pool = shuffle(PRODUCT_IMAGES);
+  return SHOWCASE_LABELS.map((item, index) => ({
+    ...item,
+    leftImage: pool[index * 2] ?? PRODUCT_IMAGES[0]!,
+    rightImage: pool[index * 2 + 1] ?? PRODUCT_IMAGES[1]!,
+  }));
+}
 
 const GOLD = '#E8C547';
 
@@ -64,9 +55,13 @@ export interface CategoryShowcaseSectionProps {
 
 export function CategoryShowcaseSection({
   section,
-  categories = DEFAULT_CATEGORIES,
+  categories: categoriesProp,
 }: CategoryShowcaseSectionProps) {
   const reduceMotion = useReducedMotion();
+  const categories = useMemo(
+    () => categoriesProp ?? buildCategoriesFromProductImages(),
+    [categoriesProp],
+  );
   const [activeId, setActiveId] = useState(categories[0]?.id ?? '');
   const active = categories.find((item) => item.id === activeId) ?? categories[0];
 

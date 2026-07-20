@@ -9,13 +9,11 @@
     "pnpm": ">=9.0.0"
   },
   "scripts": {
-    "dev": "turbo run dev",
+    "dev": "turbo run dev --filter=@fe-platform/web --filter=@fe-platform/api",
     "dev:web": "turbo run dev --filter=@fe-platform/web",
-    "dev:admin": "turbo run dev --filter=@fe-platform/admin",
     "dev:api": "turbo run dev --filter=@fe-platform/api",
     "build": "turbo run build",
     "build:web": "turbo run build --filter=@fe-platform/web",
-    "build:admin": "turbo run build --filter=@fe-platform/admin",
     "build:api": "turbo run build --filter=@fe-platform/api",
     "lint": "turbo run lint",
     "lint:fix": "turbo run lint:fix",

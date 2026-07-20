@@ -1,11 +1,14 @@
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { QUERY_KEYS } from '@/constants/query-keys';
 import { productsApi } from '@/services/sdk';
-import type { ProductListParams } from '@/services/sdk';
+import type { Product, ProductListParams } from '@/services/sdk';
+import type { PaginatedResult } from '@/types';
 
 const PRODUCT_STALE = 1000 * 60 * 2;
+const RANDOM_PICK = 8;
 
-export type ProductRailKind = 'trending' | 'best-sellers' | 'new-arrivals';
+export type ProductRailKind = 'trending' | 'best-sellers' | 'new-arrivals' | 'random';
 
 const railParams: Record<ProductRailKind, ProductListParams> = {
   trending: {
@@ -29,15 +32,52 @@ const railParams: Record<ProductRailKind, ProductListParams> = {
     sortOrder: 'desc',
     limit: 8,
   },
+  random: {
+    status: 'active',
+    sortBy: 'updatedAt',
+    sortOrder: 'desc',
+    limit: 24,
+  },
 };
+
+function shuffleProducts(products: Product[]): Product[] {
+  const next = [...products];
+  for (let i = next.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [next[i], next[j]] = [next[j]!, next[i]!];
+  }
+  return next;
+}
 
 export function useProductRail(kind: ProductRailKind) {
   const params = railParams[kind];
 
-  return useQuery({
+  const query = useQuery({
     queryKey: QUERY_KEYS.products.list({ rail: kind, ...params }),
     queryFn: () => productsApi.list(params),
     staleTime: PRODUCT_STALE,
     retry: 1,
   });
+
+  const data = useMemo((): PaginatedResult<Product> | undefined => {
+    if (!query.data) return undefined;
+    if (kind !== 'random') return query.data;
+
+    const picked = shuffleProducts(query.data.data).slice(0, RANDOM_PICK);
+    return {
+      ...query.data,
+      data: picked,
+      meta: {
+        ...query.data.meta,
+        page: 1,
+        limit: RANDOM_PICK,
+        total: picked.length,
+        totalPages: 1,
+        hasNextPage: false,
+        hasPrevPage: false,
+      },
+    };
+  }, [kind, query.data]);
+
+  return { ...query, data };
 }

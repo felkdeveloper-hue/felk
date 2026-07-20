@@ -2,6 +2,7 @@ import { Link } from '@tanstack/react-router';
 import { AnimatePresence } from 'framer-motion';
 import { ROUTES } from '@/constants';
 import { useCartQuery } from '@/hooks/cart';
+import { useAuthStore } from '@/store';
 import { AppError } from '@/lib/errors';
 import { CartItemRow } from '@/components/cart/cart-item-row';
 import { CartOrderSummary } from '@/components/cart/cart-order-summary';
@@ -19,6 +20,8 @@ function getIssueForItem(
 
 export function CartPageContent() {
   const cartQuery = useCartQuery();
+  const hasHydrated = useAuthStore((state) => state.hasHydrated);
+  const isAuthed = useAuthStore((state) => Boolean(state.accessToken && state.user));
 
   const cart = cartQuery.data;
   const validation = cart?.validation;
@@ -86,9 +89,21 @@ export function CartPageContent() {
       <div className="space-y-4 lg:sticky lg:top-24 lg:self-start">
         <CartPromotionsPanel />
         <CartOrderSummary totals={cart.totals} validation={validation} />
-        <Button asChild className="w-full" size="lg">
-          <Link to={ROUTES.checkout}>Proceed to checkout</Link>
-        </Button>
+        {!hasHydrated ? (
+          <Button className="w-full" size="lg" disabled loading>
+            Proceed to checkout
+          </Button>
+        ) : isAuthed ? (
+          <Button asChild className="w-full" size="lg">
+            <Link to={ROUTES.checkout}>Proceed to checkout</Link>
+          </Button>
+        ) : (
+          <Button asChild className="w-full" size="lg">
+            <Link to={ROUTES.authLogin} search={{ redirect: ROUTES.checkout }}>
+              Sign in to checkout
+            </Link>
+          </Button>
+        )}
         <Button asChild variant="ghost" className="w-full">
           <Link to={ROUTES.products}>Continue shopping</Link>
         </Button>

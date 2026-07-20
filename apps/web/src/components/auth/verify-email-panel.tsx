@@ -5,8 +5,10 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { CheckCircle2, Mail, XCircle } from 'lucide-react';
 import { ROUTES } from '@/constants';
 import { useResendVerificationMutation, useVerifyEmailMutation } from '@/hooks/auth';
+import { buildVerifyEmailSearch } from '@/utils/auth-redirect';
 import { AppError } from '@/lib/errors';
 import { resendVerificationSchema } from '@/schemas';
+import { DevVerificationLink } from '@/components/auth/dev-verification-link';
 import { AuthErrorAlert } from '@/components/auth/auth-error-alert';
 import { AuthFormHeader } from '@/components/auth/auth-form-header';
 import {
@@ -26,9 +28,15 @@ export interface VerifyEmailPanelProps {
   token?: string;
   email?: string;
   pending?: boolean;
+  devVerificationUrl?: string;
 }
 
-export function VerifyEmailPanel({ token, email, pending }: VerifyEmailPanelProps) {
+export function VerifyEmailPanel({
+  token,
+  email,
+  pending,
+  devVerificationUrl,
+}: VerifyEmailPanelProps) {
   const navigate = useNavigate();
   const verifyMutation = useVerifyEmailMutation();
   const resendMutation = useResendVerificationMutation();
@@ -107,7 +115,10 @@ export function VerifyEmailPanel({ token, email, pending }: VerifyEmailPanelProp
           mutation={resendMutation}
           defaultEmail={email}
           onSuccess={() =>
-            navigate({ to: ROUTES.authVerifyEmail, search: { email, pending: true } })
+            navigate({
+              to: ROUTES.authVerifyEmail,
+              search: buildVerifyEmailSearch({ email, pending: true }),
+            })
           }
         />
       </div>
@@ -147,7 +158,14 @@ export function VerifyEmailPanel({ token, email, pending }: VerifyEmailPanelProp
         </AlertDescription>
       </Alert>
 
-      <ResendForm form={resendForm} mutation={resendMutation} defaultEmail={email} />
+      {devVerificationUrl ? <DevVerificationLink url={devVerificationUrl} /> : null}
+
+      <ResendForm
+        form={resendForm}
+        mutation={resendMutation}
+        defaultEmail={email}
+        devVerificationUrl={devVerificationUrl}
+      />
     </div>
   );
 }
@@ -156,10 +174,17 @@ interface ResendFormProps {
   form: ReturnType<typeof useForm<{ email: string }>>;
   mutation: ReturnType<typeof useResendVerificationMutation>;
   defaultEmail?: string;
+  devVerificationUrl?: string;
   onSuccess?: () => void;
 }
 
-function ResendForm({ form, mutation, defaultEmail, onSuccess }: ResendFormProps) {
+function ResendForm({
+  form,
+  mutation,
+  defaultEmail,
+  devVerificationUrl,
+  onSuccess,
+}: ResendFormProps) {
   useEffect(() => {
     if (defaultEmail) {
       form.setValue('email', defaultEmail);
@@ -167,10 +192,18 @@ function ResendForm({ form, mutation, defaultEmail, onSuccess }: ResendFormProps
   }, [defaultEmail, form]);
 
   if (mutation.isSuccess) {
+    const verificationUrl = mutation.data?.devVerificationUrl ?? devVerificationUrl;
     return (
-      <Alert variant="success">
-        <AlertDescription>Verification email sent. Please check your inbox.</AlertDescription>
-      </Alert>
+      <div className="space-y-4">
+        <Alert variant="success">
+          <AlertDescription>
+            {verificationUrl
+              ? 'Verification link generated for local development.'
+              : 'Verification email sent. Please check your inbox.'}
+          </AlertDescription>
+        </Alert>
+        {verificationUrl ? <DevVerificationLink url={verificationUrl} /> : null}
+      </div>
     );
   }
 

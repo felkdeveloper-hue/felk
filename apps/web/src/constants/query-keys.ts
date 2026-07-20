@@ -78,4 +78,40 @@ export const QUERY_KEYS = {
     blog: (id: string) => ['cms', 'blogs', id] as const,
     blogCategories: (params?: unknown) => ['cms', 'blog-categories', params] as const,
   },
+  dashboard: {
+    stats: () => ['dashboard', 'stats'] as const,
+  },
+  adminProducts: {
+    list: (params?: unknown) => ['admin', 'products', 'list', params] as const,
+    detail: (id: string) => ['admin', 'products', 'detail', id] as const,
+  },
+  adminOrders: {
+    list: (params?: unknown) => ['admin', 'orders', 'list', params] as const,
+    detail: (id: string) => ['admin', 'orders', 'detail', id] as const,
+    timeline: (id: string) => ['admin', 'orders', id, 'timeline'] as const,
+  },
+  adminCustomers: {
+    list: (params?: unknown) => ['admin', 'customers', 'list', params] as const,
+    detail: (id: string) => ['admin', 'customers', 'detail', id] as const,
+  },
+  adminInventory: {
+    items: (params?: unknown) => ['admin', 'inventory', 'items', params] as const,
+    warehouses: () => ['admin', 'inventory', 'warehouses'] as const,
+    alerts: () => ['admin', 'inventory', 'alerts'] as const,
+  },
+  adminPayments: {
+    list: (params?: unknown) => ['admin', 'payments', 'list', params] as const,
+  },
+  adminCms: {
+    resource: (resource: string, params?: unknown) => ['admin', 'cms', resource, params] as const,
+  },
+  adminUsers: {
+    list: (params?: unknown) => ['admin', 'users', 'list', params] as const,
+  },
+  adminAudit: {
+    list: (params?: unknown) => ['admin', 'audit', 'list', params] as const,
+  },
+  adminReviews: {
+    list: (params?: unknown) => ['admin', 'reviews', 'list', params] as const,
+  },
 } as const;

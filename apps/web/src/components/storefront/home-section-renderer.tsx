@@ -7,14 +7,8 @@ import { SectionSkeleton } from './section-skeleton';
 const FeaturedCollectionsSection = lazy(() =>
   import('./featured-collections').then((m) => ({ default: m.FeaturedCollectionsSection })),
 );
-const ShopYourMoodSection = lazy(() =>
-  import('./shop-your-mood').then((m) => ({ default: m.ShopYourMoodSection })),
-);
 const FeaturedCategoriesSection = lazy(() =>
   import('./featured-categories').then((m) => ({ default: m.FeaturedCategoriesSection })),
-);
-const CategoryShowcaseSection = lazy(() =>
-  import('./category-showcase').then((m) => ({ default: m.CategoryShowcaseSection })),
 );
 const FeaturedBrandsSection = lazy(() =>
   import('./featured-brands').then((m) => ({ default: m.FeaturedBrandsSection })),
@@ -55,11 +49,8 @@ export function HomeSectionRenderer({ section }: HomeSectionRendererProps) {
         </LazySection>
       );
     case HOME_SECTION_KEYS.featuredCategories:
-      return (
-        <LazySection>
-          <ShopYourMoodSection section={section} />
-        </LazySection>
-      );
+      // Rendered directly after the hero on the home page — skip CMS duplicate.
+      return null;
     case HOME_SECTION_KEYS.trendingProducts:
       return (
         <LazySection>
@@ -71,11 +62,8 @@ export function HomeSectionRenderer({ section }: HomeSectionRendererProps) {
         </LazySection>
       );
     case HOME_SECTION_KEYS.bestSellers:
-      return (
-        <LazySection>
-          <CategoryShowcaseSection section={section} />
-        </LazySection>
-      );
+      // Rendered after the summer banner on the home page — skip CMS duplicate.
+      return null;
     case HOME_SECTION_KEYS.newArrivals:
       return (
         <LazySection>

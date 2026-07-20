@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useParams } from '@tanstack/react-router';
+import { useNavigate, useParams } from '@tanstack/react-router';
 import { motion } from 'framer-motion';
 import { Seo } from '@/components/common/seo';
 import { Container } from '@/components/layout/container';
@@ -31,6 +31,7 @@ import {
   useCategoriesList,
 } from '@/hooks/catalog';
 import { buildProductJsonLd } from '@/lib/seo';
+import { partitionProductSpecs, hasMeaningfulText } from '@/utils/catalog/specifications';
 import type { ProductVariant } from '@/services/sdk';
 
 function resolveBadgeLabel(product: {
@@ -62,11 +63,12 @@ function resolveMaterialLabel(
     return label.includes('fabric') || label.includes('material');
   }) as Record<string, unknown> | undefined;
   if (spec?.value) return String(spec.value);
-  return 'Thick Premium Fabric';
+  return undefined;
 }
 
 export function ProductDetailPage() {
   const { slug } = useParams({ strict: false }) as { slug: string };
+  const navigate = useNavigate();
   const query = useProductDetail(slug);
   const product = query.data;
   const { recentlyViewedIds } = useRecentlyViewed(product);
@@ -76,6 +78,13 @@ export function ProductDetailPage() {
   const [selectedVariantId, setSelectedVariantId] = useState<string | undefined>();
   const [selectedColorId, setSelectedColorId] = useState<string | undefined>();
   const [selectedSizeId, setSelectedSizeId] = useState<string | undefined>();
+
+  useEffect(() => {
+    if (!product?.slug || product.slug === slug) return;
+    if (/^[a-f0-9]{24}$/i.test(slug)) {
+      navigate({ to: '/products/$slug', params: { slug: product.slug }, replace: true });
+    }
+  }, [navigate, product?.slug, slug]);
 
   useEffect(() => {
     if (!product?.variants?.length) return;
@@ -148,8 +157,9 @@ export function ProductDetailPage() {
     selectedVariant?.salePrice ?? selectedVariant?.price ?? product.salePrice ?? product.price;
   const compareAt = selectedVariant?.compareAtPrice ?? product.compareAtPrice;
   const specs = Array.isArray(product.specifications) ? product.specifications : [];
+  const { gridSpecs, returnPolicy, highlightSpecs } = partitionProductSpecs(specs);
   const badgeLabel = resolveBadgeLabel(product);
-  const materialLabel = resolveMaterialLabel(product.materialId, materialList, specs);
+  const materialLabel = resolveMaterialLabel(product.materialId, materialList, gridSpecs);
 
   return (
     <>
@@ -199,9 +209,12 @@ export function ProductDetailPage() {
               badgeLabel={undefined}
             />
 
-            <ProductHighlights specifications={specs} />
-            <ProductSpecsGrid specifications={specs} />
-            <ProductInfoAccordions description={product.description} />
+            <ProductHighlights specifications={highlightSpecs} />
+            <ProductSpecsGrid specifications={gridSpecs} />
+            <ProductInfoAccordions
+              description={hasMeaningfulText(product.description) ? product.description : undefined}
+              returnPolicy={returnPolicy}
+            />
           </motion.div>
         </div>
 

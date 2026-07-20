@@ -10,6 +10,8 @@
     "start": "node dist/server.js",
     "seed:auth": "tsx src/scripts/seed-auth.ts",
     "seed:catalog": "tsx src/scripts/seed-mock-catalog.ts",
+    "seed:women": "tsx src/scripts/seed-women-products.ts",
+    "seed:home-categories": "tsx src/scripts/seed-home-categories.ts",
     "seed:r2-shoe": "tsx src/scripts/seed-r2-shoe-product.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint . --max-warnings 0",

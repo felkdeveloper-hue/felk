@@ -42,6 +42,7 @@ export interface RegisterPayload {
 export interface RegisterResult {
   user: AuthUser;
   message: string;
+  devVerificationUrl?: string;
 }
 
 export interface ChangePasswordPayload {

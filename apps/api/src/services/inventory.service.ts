@@ -479,6 +479,116 @@ export class InventoryService {
     );
   }
 
+  /** Get or create the default store warehouse (hidden from simple product stock UI). */
+  async ensureDefaultWarehouse() {
+    const existing = await WarehouseModel.findOne({
+      isDeleted: false,
+      status: 'active',
+      isDefault: true,
+    });
+    if (existing) return existing;
+
+    const anyActive = await WarehouseModel.findOne({ isDeleted: false, status: 'active' }).sort({
+      priority: 1,
+      createdAt: 1,
+    });
+    if (anyActive) {
+      if (!anyActive.isDefault) {
+        await WarehouseModel.updateMany({ isDeleted: false }, { $set: { isDefault: false } });
+        anyActive.isDefault = true;
+        await anyActive.save();
+      }
+      return anyActive;
+    }
+
+    return WarehouseModel.create({
+      name: 'Main store',
+      code: 'MAIN',
+      isDefault: true,
+      status: 'active',
+      timezone: 'Asia/Colombo',
+      priority: 1,
+    });
+  }
+
+  /**
+   * Set absolute on-hand stock for a variant. Uses the default warehouse automatically.
+   * If stock exists across warehouses, other locations are left alone and the default
+   * warehouse is adjusted so the product total matches the entered quantity when possible.
+   */
+  async setStockQuantity(payload: { variantId: string; quantity: number }, actor: ActorMeta) {
+    const quantity = Number(payload.quantity);
+    if (!Number.isInteger(quantity) || quantity < 0) {
+      throw ApiError.badRequest('Quantity must be a non-negative integer');
+    }
+
+    const warehouse = await this.ensureDefaultWarehouse();
+    const warehouseId = warehouse._id.toString();
+    const variantId = String(payload.variantId);
+
+    const items = await InventoryItemModel.find({
+      variantId,
+      isDeleted: false,
+    });
+
+    const othersOnHand = items
+      .filter((item) => item.warehouseId.toString() !== warehouseId)
+      .reduce((sum, item) => sum + item.onHand, 0);
+
+    if (othersOnHand > quantity) {
+      throw ApiError.unprocessable(
+        `Cannot set stock to ${quantity}: ${othersOnHand} units are already held in other locations`,
+        { othersOnHand, requested: quantity },
+        'INSUFFICIENT_AVAILABLE',
+      );
+    }
+
+    const targetOnDefault = quantity - othersOnHand;
+    const item = await this.getOrCreateItem(warehouseId, variantId);
+    const current = item.onHand;
+
+    if (targetOnDefault === current) {
+      return { item, movement: null };
+    }
+
+    if (targetOnDefault > current) {
+      return this.applyMovement(
+        {
+          warehouseId,
+          variantId,
+          type: MOVEMENT_TYPE.ADJUSTMENT,
+          quantity: targetOnDefault - current,
+          reason: 'increase:set-stock',
+          note: 'Set stock quantity',
+          referenceType: 'adjustment',
+        },
+        actor,
+      );
+    }
+
+    const decreaseBy = current - targetOnDefault;
+    if (item.available < decreaseBy) {
+      throw ApiError.unprocessable(
+        `Cannot set stock to ${quantity}: ${item.reserved} units are reserved`,
+        { onHand: current, reserved: item.reserved, available: item.available },
+        'INSUFFICIENT_AVAILABLE',
+      );
+    }
+
+    return this.applyMovement(
+      {
+        warehouseId,
+        variantId,
+        type: MOVEMENT_TYPE.ADJUSTMENT,
+        quantity: decreaseBy,
+        reason: 'decrease:set-stock',
+        note: 'Set stock quantity',
+        referenceType: 'adjustment',
+      },
+      actor,
+    );
+  }
+
   async receive(
     payload: {
       warehouseId: string;

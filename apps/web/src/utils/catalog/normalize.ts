@@ -44,7 +44,7 @@ export function normalizeProductMedia(raw: unknown): ProductMedia {
 
 export function normalizeProductVariant(raw: unknown): ProductVariant {
   const record = asRecord(raw);
-  const currency = String(record.currency ?? 'USD');
+  const currency = String(record.currency ?? 'LKR');
   return {
     id: pickId(record),
     productId: String(record.productId ?? ''),
@@ -66,7 +66,7 @@ export function normalizeProductVariant(raw: unknown): ProductVariant {
 export function normalizePricingInsights(raw: unknown): ProductPricingInsights | undefined {
   const record = asRecord(raw);
   if (!Object.keys(record).length) return undefined;
-  const currency = String(record.currency ?? 'USD');
+  const currency = String(record.currency ?? 'LKR');
   return {
     effectivePrice: toMoney(record.effectivePrice, currency),
     isOnSale: Boolean(record.isOnSale),
@@ -78,19 +78,35 @@ export function normalizePricingInsights(raw: unknown): ProductPricingInsights |
 export function normalizeProduct(raw: unknown): Product {
   const record = asRecord(raw);
   const pricing = asRecord(record.pricing);
-  const currency = String(pricing.currency ?? 'USD');
-  const media = Array.isArray(record.media) ? record.media.map(normalizeProductMedia) : undefined;
   const variants = Array.isArray(record.variants)
     ? record.variants.map(normalizeProductVariant)
     : undefined;
+  const defaultVariant =
+    variants?.find((variant) => variant.id === String(record.defaultVariantId ?? '')) ??
+    variants?.find((variant) => variant.isDefault) ??
+    variants?.[0];
+  const currency = String(
+    pricing.currency ??
+      defaultVariant?.price?.currency ??
+      defaultVariant?.salePrice?.currency ??
+      'LKR',
+  );
+  const media = Array.isArray(record.media) ? record.media.map(normalizeProductMedia) : undefined;
   const thumbnailUrl =
     resolveMediaUrl(record.thumbnailUrl) ??
     media?.find((item) => item.isPrimary)?.url ??
     media?.[0]?.url;
 
-  const price = toMoney(pricing.price, currency);
-  const salePrice = toMoney(pricing.salePrice, currency);
-  const compareAtPrice = toMoney(pricing.compareAtPrice, currency);
+  const productPrice = toMoney(pricing.price, currency);
+  const productSalePrice = toMoney(pricing.salePrice, currency);
+  const productCompareAtPrice = toMoney(pricing.compareAtPrice, currency);
+
+  const price =
+    productPrice && productPrice.amount > 0
+      ? productPrice
+      : (defaultVariant?.price ?? productPrice);
+  const salePrice = productSalePrice ?? defaultVariant?.salePrice;
+  const compareAtPrice = productCompareAtPrice ?? defaultVariant?.compareAtPrice;
   const insights = normalizePricingInsights(record.pricingInsights);
 
   return {
@@ -107,7 +123,11 @@ export function normalizeProduct(raw: unknown): Product {
     compareAtPrice,
     effectivePrice: insights?.effectivePrice ?? salePrice ?? price,
     isOnSale:
-      insights?.isOnSale ?? (salePrice != null && price != null && salePrice.amount < price.amount),
+      insights?.isOnSale ??
+      (salePrice != null &&
+        price != null &&
+        salePrice.amount > 0 &&
+        salePrice.amount < price.amount),
     discountPercent: insights?.discountPercent,
     brandId: record.brandId ? String(record.brandId) : undefined,
     brandName: typeof record.brandName === 'string' ? record.brandName : undefined,

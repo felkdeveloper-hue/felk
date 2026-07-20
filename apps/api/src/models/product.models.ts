@@ -250,7 +250,7 @@ const variantSchema = new Schema<ProductVariantDocument>(
   {
     productId: { type: Schema.Types.ObjectId, ref: 'Product', required: true, index: true },
     sku: { type: String, required: true, trim: true, uppercase: true },
-    barcode: { type: String, default: null, trim: true },
+    barcode: { type: String, trim: true },
     title: { type: String, required: true, trim: true },
     colorId: { type: Schema.Types.ObjectId, ref: 'Color', default: null, index: true },
     sizeId: { type: Schema.Types.ObjectId, ref: 'Size', default: null, index: true },
@@ -292,7 +292,11 @@ const variantSchema = new Schema<ProductVariantDocument>(
 );
 
 variantSchema.index({ sku: 1 }, { unique: true });
-variantSchema.index({ barcode: 1 }, { unique: true, sparse: true });
+// Only index real barcodes — sparse unique still treats multiple `null` values as duplicates.
+variantSchema.index(
+  { barcode: 1 },
+  { unique: true, partialFilterExpression: { barcode: { $type: 'string' } } },
+);
 variantSchema.index({ productId: 1, colorId: 1, sizeId: 1 });
 variantSchema.index({ productId: 1, isDeleted: 1, displayOrder: 1 });
 

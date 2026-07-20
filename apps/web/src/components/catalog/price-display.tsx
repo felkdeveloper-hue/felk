@@ -36,7 +36,7 @@ export function PriceDisplay({
   const display = salePrice ?? price;
   const original = salePrice && price ? price : compareAtPrice;
 
-  if (!display) return null;
+  if (!display || display.amount <= 0) return null;
 
   const offPercent = resolveDiscountPercent(display, original, discountPercent);
 

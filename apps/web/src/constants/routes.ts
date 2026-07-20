@@ -1,4 +1,41 @@
 /**
+ * Admin route paths — keep in sync with `src/routes/admin.routes.tsx`.
+ */
+export const ADMIN_ROUTES = {
+  root: '/admin',
+  dashboard: '/admin/dashboard',
+  products: '/admin/products',
+  productNew: '/admin/products/new',
+  productDetail: '/admin/products/$productId',
+  categories: '/admin/categories',
+  categoryDetail: '/admin/categories/$categoryId',
+  collections: '/admin/collections',
+  brands: '/admin/brands',
+  sizes: '/admin/sizes',
+  occasions: '/admin/occasions',
+  inventory: '/admin/inventory',
+  orders: '/admin/orders',
+  orderDetail: '/admin/orders/$orderId',
+  reviews: '/admin/reviews',
+  customers: '/admin/customers',
+  customerDetail: '/admin/customers/$customerId',
+  cms: '/admin/cms',
+  cmsPages: '/admin/cms/pages',
+  cmsBanners: '/admin/cms/banners',
+  cmsHome: '/admin/cms/home',
+  cmsFaqs: '/admin/cms/faqs',
+  marketing: '/admin/marketing',
+  marketingPromos: '/admin/marketing/promos',
+  finance: '/admin/finance',
+  reports: '/admin/reports',
+  users: '/admin/users',
+  roles: '/admin/roles',
+  settings: '/admin/settings',
+  audit: '/admin/audit',
+  forbidden: '/admin/forbidden',
+} as const;
+
+/**
  * Central route path registry. Keep in sync with `src/routes/`.
  */
 export const ROUTES = {

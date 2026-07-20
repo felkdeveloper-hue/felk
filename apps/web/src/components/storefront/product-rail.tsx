@@ -26,6 +26,11 @@ const railCopy: Record<ProductRailKind, { eyebrow: string; title: string; descri
     title: 'New arrivals',
     description: 'Fresh silhouettes and fabrics, added weekly.',
   },
+  random: {
+    eyebrow: 'From the edit',
+    title: 'Picked for you',
+    description: 'A mix of pieces from across the store.',
+  },
 };
 
 export interface ProductRailSectionProps {
