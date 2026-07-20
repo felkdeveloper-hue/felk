@@ -12,11 +12,6 @@ import {
   BrandsPage,
   SizesPage,
   OccasionsPage,
-  CmsPagesPage,
-  CmsBannersPage,
-  CmsHomePage,
-  CmsFaqsPage,
-  MarketingPromosPage,
 } from '@/pages/admin/catalog/catalog-pages';
 import { CategoryFormPage } from '@/pages/admin/catalog/category-form-page';
 import { InventoryPage } from '@/pages/admin/inventory/inventory-page';
@@ -191,16 +186,6 @@ const adminOrderDetailRoute = createRoute({
   ),
 });
 
-const adminReviewsRoute = createRoute({
-  getParentRoute: () => adminLayoutRoute,
-  path: 'reviews',
-  component: () => (
-    <AdminPermissionRoute permissions={[PERMISSIONS.REVIEWS_MODERATE]}>
-      <PlaceholderModulePage title="Reviews" description="Review moderation coming soon." />
-    </AdminPermissionRoute>
-  ),
-});
-
 const adminCustomersRoute = createRoute({
   getParentRoute: () => adminLayoutRoute,
   path: 'customers',
@@ -217,78 +202,6 @@ const adminCustomerDetailRoute = createRoute({
   component: () => (
     <AdminPermissionRoute permissions={[PERMISSIONS.CUSTOMERS_VIEW]}>
       <PlaceholderModulePage title="Customer" description="Customer detail coming soon." />
-    </AdminPermissionRoute>
-  ),
-});
-
-const adminCmsRoute = createRoute({
-  getParentRoute: () => adminLayoutRoute,
-  path: 'cms',
-  component: () => (
-    <AdminPermissionRoute
-      permissions={[PERMISSIONS.CMS_VIEW, PERMISSIONS.PAGES_VIEW, PERMISSIONS.BANNERS_VIEW]}
-    >
-      <PlaceholderModulePage title="CMS" description="Content management coming soon." />
-    </AdminPermissionRoute>
-  ),
-});
-
-const adminCmsPagesRoute = createRoute({
-  getParentRoute: () => adminLayoutRoute,
-  path: 'cms/pages',
-  component: () => (
-    <AdminPermissionRoute permissions={[PERMISSIONS.PAGES_VIEW]}>
-      <CmsPagesPage />
-    </AdminPermissionRoute>
-  ),
-});
-
-const adminCmsBannersRoute = createRoute({
-  getParentRoute: () => adminLayoutRoute,
-  path: 'cms/banners',
-  component: () => (
-    <AdminPermissionRoute permissions={[PERMISSIONS.BANNERS_VIEW]}>
-      <CmsBannersPage />
-    </AdminPermissionRoute>
-  ),
-});
-
-const adminCmsHomeRoute = createRoute({
-  getParentRoute: () => adminLayoutRoute,
-  path: 'cms/home',
-  component: () => (
-    <AdminPermissionRoute permissions={[PERMISSIONS.CMS_VIEW]}>
-      <CmsHomePage />
-    </AdminPermissionRoute>
-  ),
-});
-
-const adminCmsFaqsRoute = createRoute({
-  getParentRoute: () => adminLayoutRoute,
-  path: 'cms/faqs',
-  component: () => (
-    <AdminPermissionRoute permissions={[PERMISSIONS.CMS_VIEW, PERMISSIONS.FAQS_VIEW]}>
-      <CmsFaqsPage />
-    </AdminPermissionRoute>
-  ),
-});
-
-const adminMarketingRoute = createRoute({
-  getParentRoute: () => adminLayoutRoute,
-  path: 'marketing',
-  component: () => (
-    <AdminPermissionRoute permissions={[PERMISSIONS.MARKETING_VIEW, PERMISSIONS.COUPONS_READ]}>
-      <PlaceholderModulePage title="Marketing" description="Marketing tools coming soon." />
-    </AdminPermissionRoute>
-  ),
-});
-
-const adminMarketingPromosRoute = createRoute({
-  getParentRoute: () => adminLayoutRoute,
-  path: 'marketing/promos',
-  component: () => (
-    <AdminPermissionRoute permissions={[PERMISSIONS.MARKETING_VIEW, PERMISSIONS.BANNERS_VIEW]}>
-      <MarketingPromosPage />
     </AdminPermissionRoute>
   ),
 });
@@ -382,16 +295,8 @@ export const adminRouteTree = adminLayoutRoute.addChildren([
   adminInventoryRoute,
   adminOrderDetailRoute,
   adminOrdersRoute,
-  adminReviewsRoute,
   adminCustomerDetailRoute,
   adminCustomersRoute,
-  adminCmsPagesRoute,
-  adminCmsBannersRoute,
-  adminCmsHomeRoute,
-  adminCmsFaqsRoute,
-  adminCmsRoute,
-  adminMarketingPromosRoute,
-  adminMarketingRoute,
   adminFinanceRoute,
   adminReportsRoute,
   adminUsersRoute,

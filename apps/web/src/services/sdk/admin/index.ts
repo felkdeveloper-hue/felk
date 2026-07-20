@@ -30,9 +30,6 @@ export type { AdminUserRow, UserListParams } from './users';
 export { auditApi } from './audit';
 export type { AuditListParams, AuditLogRow } from './audit';
 
-export { reviewsApi } from './reviews';
-export type { AdminReview, ReviewListParams } from './reviews';
-
 export { paymentsApi } from './payments';
 export type { PaymentRow } from './payments';
 

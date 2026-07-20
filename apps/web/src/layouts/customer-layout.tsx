@@ -1,11 +1,20 @@
-import { Outlet } from '@tanstack/react-router';
+import { Navigate, Outlet } from '@tanstack/react-router';
 import { StorefrontFooter, StorefrontHeader } from '@/components/layout';
 import { FloatingSearch } from '@/components/layout/floating-search';
 import { MobileBottomNav } from '@/components/layout/mobile-bottom-nav';
 import { AccountNav } from '@/components/account';
+import { ADMIN_ROUTES } from '@/constants';
+import { useAuthStore } from '@/store';
+import { isStaffUser } from '@/utils/auth-redirect';
 
 /** Shell for authenticated account/orders pages. */
 export function CustomerLayout() {
+  const user = useAuthStore((state) => state.user);
+
+  if (isStaffUser(user)) {
+    return <Navigate to={ADMIN_ROUTES.dashboard} />;
+  }
+
   return (
     <div className="bg-background flex min-h-screen flex-col">
       <StorefrontHeader />

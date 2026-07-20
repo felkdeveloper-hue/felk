@@ -23,6 +23,9 @@ function createTransport(): Transporter | null {
     pool: true,
     maxConnections: 3,
     maxMessages: 100,
+    connectionTimeout: 8_000,
+    greetingTimeout: 8_000,
+    socketTimeout: 10_000,
     tls: { rejectUnauthorized: true },
   });
 }

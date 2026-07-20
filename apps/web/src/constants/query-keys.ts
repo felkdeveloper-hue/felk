@@ -111,7 +111,4 @@ export const QUERY_KEYS = {
   adminAudit: {
     list: (params?: unknown) => ['admin', 'audit', 'list', params] as const,
   },
-  adminReviews: {
-    list: (params?: unknown) => ['admin', 'reviews', 'list', params] as const,
-  },
 } as const;

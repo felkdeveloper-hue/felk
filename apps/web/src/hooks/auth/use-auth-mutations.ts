@@ -1,9 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { QUERY_KEYS } from '@/constants/query-keys';
-import { ADMIN_ROUTES, ROUTES } from '@/constants/routes';
-import { STAFF_ROLES } from '@/constants/admin-permissions';
-import { getAuthRedirectTarget, buildVerifyEmailSearch } from '@/utils/auth-redirect';
+import { ROUTES } from '@/constants/routes';
+import { getPostLoginDestination, buildVerifyEmailSearch } from '@/utils/auth-redirect';
 import { AppError } from '@/lib/errors';
 import { authApi } from '@/services/sdk';
 import { useAuthStore } from '@/store';
@@ -21,14 +20,7 @@ export function useLoginMutation() {
     mutationFn: ({ redirect: _redirect, ...payload }: LoginMutationInput) => authApi.login(payload),
     onSuccess: (session, variables) => {
       setSession(session);
-      const isStaff = session.user.roles.some((role) =>
-        (STAFF_ROLES as readonly string[]).includes(role),
-      );
-      if (isStaff) {
-        navigate({ to: ADMIN_ROUTES.dashboard });
-      } else {
-        navigate({ to: getAuthRedirectTarget(variables.redirect) });
-      }
+      navigate({ to: getPostLoginDestination(session.user, variables.redirect) });
     },
   });
 }

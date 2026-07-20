@@ -70,9 +70,4 @@ export const cmsApi = {
   collections: createCmsResourceApi('/cms/collections'),
   sizes: createCmsResourceApi('/cms/sizes'),
   occasions: createCmsResourceApi('/cms/occasions'),
-  pages: createCmsResourceApi('/cms/pages'),
-  heroBanners: createCmsResourceApi('/cms/hero-banners'),
-  promoBanners: createCmsResourceApi('/cms/promo-banners'),
-  homeSections: createCmsResourceApi('/cms/home-sections'),
-  faqs: createCmsResourceApi('/cms/faqs'),
 };

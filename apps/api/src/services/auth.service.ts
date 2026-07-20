@@ -11,6 +11,7 @@ import {
   USER_STATUS,
   type AuthPortal,
 } from '@/constants/auth';
+import { ERROR_MESSAGES } from '@/constants/error-messages';
 import { ROLES, type RoleKey } from '@/constants/roles';
 import { attachDevVerificationUrl } from '@/utils/dev-verification.helper';
 import {
@@ -422,12 +423,15 @@ export const authService = {
     });
 
     const alert = loginAlertEmail(user.firstName, { ip: meta.ip, userAgent: meta.userAgent });
-    await emailService.send({
-      to: user.email,
-      subject: alert.subject,
-      html: alert.html,
-      text: alert.text,
-    });
+    // Never block login on SMTP — slow/unreachable mail servers cause client timeouts.
+    void emailService
+      .send({
+        to: user.email,
+        subject: alert.subject,
+        html: alert.html,
+        text: alert.text,
+      })
+      .catch(() => undefined);
 
     return { ...tokens, rememberMe };
   },
