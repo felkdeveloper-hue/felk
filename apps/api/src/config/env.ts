@@ -67,7 +67,16 @@ const envSchema = z
     AWS_ACCESS_KEY_ID: z.string().optional(),
     AWS_SECRET_ACCESS_KEY: z.string().optional(),
     AWS_S3_BUCKET: z.string().optional(),
+    AWS_S3_ENDPOINT: z.string().optional(),
     S3_PUBLIC_URL: z.string().optional(),
+    STORAGE_PROVIDER: z.enum(['local', 'r2', 's3']).optional(),
+    R2_ACCESS_KEY_ID: z.string().optional(),
+    R2_SECRET_ACCESS_KEY: z.string().optional(),
+    R2_ACCOUNT_ID: z.string().optional(),
+    R2_BUCKET_NAME: z.string().optional(),
+    R2_ENDPOINT: z.string().optional(),
+    R2_PUBLIC_URL: z.string().optional(),
+    CDN_BASE_URL: z.string().optional(),
     SHUTDOWN_TIMEOUT_MS: z.coerce.number().int().positive().default(15_000),
 
     PAYMENT_RETURN_URL: z.string().default('http://localhost:5173/payment/return'),
@@ -159,11 +168,46 @@ const isProd = data.NODE_ENV === 'production';
 const isDev = data.NODE_ENV === 'development';
 const isTest = data.NODE_ENV === 'test';
 
+type StorageProvider = 'local' | 'r2' | 's3';
+
+function resolveStorageProvider(): StorageProvider {
+  if (data.STORAGE_PROVIDER) return data.STORAGE_PROVIDER;
+  if (data.R2_BUCKET_NAME && data.R2_ACCESS_KEY_ID && data.R2_SECRET_ACCESS_KEY) return 'r2';
+  if (data.AWS_S3_BUCKET && data.AWS_ACCESS_KEY_ID && data.AWS_SECRET_ACCESS_KEY) return 's3';
+  return 'local';
+}
+
+function resolveStoragePublicUrl(provider: StorageProvider): string | undefined {
+  if (provider === 'r2') {
+    return data.R2_PUBLIC_URL ?? data.CDN_BASE_URL ?? undefined;
+  }
+  if (provider === 's3') {
+    return data.S3_PUBLIC_URL ?? data.CDN_BASE_URL ?? undefined;
+  }
+  return undefined;
+}
+
+function resolveStorageEndpoint(provider: StorageProvider): string | undefined {
+  if (provider === 'r2') {
+    if (data.R2_ENDPOINT) return data.R2_ENDPOINT;
+    if (data.R2_ACCOUNT_ID) {
+      return `https://${data.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`;
+    }
+    return undefined;
+  }
+  return data.AWS_S3_ENDPOINT;
+}
+
+const storageProvider = resolveStorageProvider();
+
 /**
  * Validated environment configuration (single source of truth).
  */
 export const env = {
   ...data,
+  storageProvider,
+  storagePublicUrl: resolveStoragePublicUrl(storageProvider),
+  storageEndpoint: resolveStorageEndpoint(storageProvider),
   corsOrigins: data.CORS_ORIGINS.split(',')
     .map((origin) => origin.trim())
     .filter(Boolean),

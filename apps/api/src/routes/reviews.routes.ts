@@ -4,7 +4,7 @@ import { PERMISSIONS } from '@/constants/permissions';
 import { authenticate, authorizeAny, validate } from '@/middlewares';
 import { actorFromRequest } from '@/services/cms-crud.service';
 import { reviewService } from '@/services/review.service';
-import { localStorageService } from '@/services/local-storage.service';
+import { storageService } from '@/services/storage.factory';
 import { asyncHandler } from '@/utils/async-handler';
 import { ApiResponse } from '@/utils/response/api-response';
 import { ApiError } from '@/utils/errors/api-error';
@@ -98,7 +98,7 @@ reviewsRouter.post(
       files.map(async (file) => {
         const ext = file.originalname.split('.').pop() || 'jpg';
         const key = `reviews/${req.params.productId}/${randomUUID()}.${ext}`;
-        const stored = await localStorageService.upload({
+        const stored = await storageService.upload({
           key,
           body: file.buffer,
           contentType: file.mimetype,

@@ -48,6 +48,8 @@ export {
   attributeValueService,
 } from '@/services/product-attribute.service';
 export { localStorageService, LocalStorageService } from '@/services/local-storage.service';
+export { S3StorageService } from '@/services/s3-storage.service';
+export { storageService } from '@/services/storage.factory';
 export { inventoryService } from '@/services/inventory.service';
 export { warehouseService } from '@/services/warehouse.service';
 export { reservationService } from '@/services/reservation.service';

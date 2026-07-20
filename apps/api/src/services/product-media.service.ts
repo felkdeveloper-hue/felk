@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { ProductMediaModel } from '@/models/product.models';
 import { productRepository } from '@/repositories/product.repository';
-import { localStorageService } from '@/services/local-storage.service';
+import { storageService } from '@/services/storage.factory';
 import { writeAuditLog } from '@/services/audit.service';
 import type { ActorMeta } from '@/services/cms-crud.service';
 import { ApiError } from '@/utils/errors/api-error';
@@ -48,7 +48,7 @@ export class ProductMediaService {
 
     if (isVideo) {
       key = `products/${productId}/videos/${randomUUID()}-${file.originalname}`;
-      const stored = await localStorageService.upload({
+      const stored = await storageService.upload({
         key,
         body: file.buffer,
         contentType: file.mimetype,
@@ -77,13 +77,13 @@ export class ProductMediaService {
       const thumbKey = `products/${productId}/images/${id}-thumb.webp`;
 
       const [stored, storedThumb] = await Promise.all([
-        localStorageService.upload({
+        storageService.upload({
           key,
           body: webp,
           contentType: 'image/webp',
           isPublic: true,
         }),
-        localStorageService.upload({
+        storageService.upload({
           key: thumbKey,
           body: thumb,
           contentType: 'image/webp',
@@ -231,7 +231,12 @@ export class ProductMediaService {
     );
 
     if (before.key) {
-      await localStorageService.delete(before.key);
+      await storageService.delete(before.key);
+      if (before.key.endsWith('.webp') && !before.key.includes('-thumb.webp')) {
+        await storageService
+          .delete(before.key.replace(/\.webp$/, '-thumb.webp'))
+          .catch(() => undefined);
+      }
     }
 
     await writeAuditLog({

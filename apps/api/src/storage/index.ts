@@ -1,5 +1,6 @@
-/**
- * Storage adapters (local / AWS S3 / Cloudflare R2).
- * Implementations will be added when the media module is built.
- */
-export {};
+export { storageService } from '@/services/storage.factory';
+export type {
+  StorageObject,
+  StorageService,
+  StorageUploadInput,
+} from '@/services/interfaces/storage.service';

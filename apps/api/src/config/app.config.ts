@@ -72,11 +72,19 @@ export const appConfig = {
     fromName: env.FROM_NAME ?? 'Fashion Edge',
   },
   storage: {
-    region: env.AWS_REGION,
-    accessKeyId: env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: env.AWS_SECRET_ACCESS_KEY,
-    bucket: env.AWS_S3_BUCKET,
-    publicUrl: env.S3_PUBLIC_URL,
+    provider: env.storageProvider,
+    region: env.storageProvider === 'r2' ? 'auto' : (env.AWS_REGION ?? 'ap-south-1'),
+    accessKeyId: env.storageProvider === 'r2' ? env.R2_ACCESS_KEY_ID : env.AWS_ACCESS_KEY_ID,
+    secretAccessKey:
+      env.storageProvider === 'r2' ? env.R2_SECRET_ACCESS_KEY : env.AWS_SECRET_ACCESS_KEY,
+    bucket:
+      env.storageProvider === 'r2'
+        ? env.R2_BUCKET_NAME
+        : env.storageProvider === 's3'
+          ? env.AWS_S3_BUCKET
+          : undefined,
+    endpoint: env.storageEndpoint,
+    publicUrl: env.storagePublicUrl,
   },
   payment: {
     returnUrl: env.PAYMENT_RETURN_URL,
