@@ -142,7 +142,10 @@ function HeroCarousel({ banners }: { banners: HeroBanner[] }) {
   if (!active) return null;
 
   return (
-    <section aria-label="Hero" className="relative -mt-16 overflow-hidden lg:-mt-[4.75rem]">
+    <section
+      aria-label="Hero"
+      className="relative -mt-16 mb-20 overflow-hidden sm:mb-24 lg:-mt-[4.75rem] lg:mb-28 xl:mb-32"
+    >
       <div className="relative min-h-[100svh]">
         <AnimatePresence initial={!reduceMotion} custom={direction}>
           <motion.div

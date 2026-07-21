@@ -73,7 +73,7 @@ export function CategoryShowcaseSection({
       className="bg-background"
       aria-label={section?.title ?? 'Shop by category'}
     >
-      <div className="mx-auto grid w-full max-w-[1400px] items-center gap-8 px-4 sm:gap-10 sm:px-6 lg:grid-cols-[minmax(0,26rem)_minmax(14rem,1fr)_minmax(0,26rem)] lg:gap-12 lg:px-8 xl:max-w-[1520px] xl:grid-cols-[minmax(0,28rem)_minmax(16rem,1fr)_minmax(0,28rem)] xl:gap-16">
+      <div className="mx-auto grid w-full max-w-[1680px] items-center gap-8 px-4 sm:gap-10 sm:px-6 lg:grid-cols-[minmax(0,34rem)_minmax(12rem,1fr)_minmax(0,34rem)] lg:gap-10 lg:px-8 xl:max-w-[1800px] xl:grid-cols-[minmax(0,38rem)_minmax(14rem,1fr)_minmax(0,38rem)] xl:gap-12">
         <ShowcasePanel
           keySide="left"
           category={active}
@@ -129,7 +129,7 @@ function ShowcasePanel({
   const src = keySide === 'left' ? category.leftImage : category.rightImage;
 
   return (
-    <div className="bg-muted aspect-3/4 relative mx-auto w-full max-w-[24rem] overflow-hidden rounded-2xl shadow-[var(--shadow-soft)] transition-shadow duration-500 hover:shadow-[var(--shadow-elevated)] sm:rounded-[1.5rem] lg:max-w-none xl:max-h-[36rem]">
+    <div className="bg-muted aspect-3/4 relative mx-auto w-full max-w-[32rem] overflow-hidden rounded-2xl shadow-[var(--shadow-soft)] transition-shadow duration-500 hover:shadow-[var(--shadow-elevated)] sm:max-w-[36rem] sm:rounded-[1.5rem] lg:max-h-[50rem] lg:max-w-none xl:max-h-[52rem]">
       <AnimatePresence mode="sync" initial={false}>
         <motion.div
           key={`${category.id}-${keySide}`}

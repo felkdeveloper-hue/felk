@@ -67,6 +67,8 @@ export function AsyncSection<T>({
   }
 
   if (data === undefined || (isEmpty?.(data) ?? false)) {
+    // Intentionally blank empty copy → hide the block (e.g. home CMS sections).
+    if (!emptyTitle && !emptyDescription) return null;
     return <EmptyState title={emptyTitle} description={emptyDescription} />;
   }
 
