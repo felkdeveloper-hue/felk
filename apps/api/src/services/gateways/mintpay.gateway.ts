@@ -3,7 +3,7 @@ import { appConfig } from '@/config/app.config';
 import { logger } from '@/config/logger';
 import { PAYMENT_METHOD, PAYMENT_STATUS } from '@/constants/payment-status';
 import { hmacSha256Hex, safeCompare } from '@/utils/crypto.helper';
-import { fetchWithRetry } from '@/utils/http-retry';
+import { fetchWithRetry, HttpRetryError } from '@/utils/http-retry';
 import type {
   CreatePaymentSessionInput,
   PaymentGateway,
@@ -11,6 +11,7 @@ import type {
   WebhookVerificationInput,
 } from '@/services/interfaces/payment-gateway.service';
 import { getHeader, parseWebhookPayload, rawBodyToString } from '@/services/gateways/gateway.utils';
+import { ApiError } from '@/utils/errors/api-error';
 
 const MINTPAY_STATUS_MAP: Record<string, string> = {
   success: PAYMENT_STATUS.PAID,
@@ -22,16 +23,17 @@ const MINTPAY_STATUS_MAP: Record<string, string> = {
   expired: PAYMENT_STATUS.EXPIRED,
 };
 
-function mintpayApiBase(): string {
+/** Real Mintpay hosts (from official WooCommerce plugin). */
+function mintpayHosts() {
   return appConfig.payment.mintpay.mode === 'live'
-    ? 'https://api.mintpay.lk/v1'
-    : 'https://sandbox.api.mintpay.lk/v1';
-}
-
-function mintpayCheckoutBase(): string {
-  return appConfig.payment.mintpay.mode === 'live'
-    ? 'https://checkout.mintpay.lk/pay'
-    : 'https://sandbox.checkout.mintpay.lk/pay';
+    ? {
+        api: 'https://app.mintpay.lk/user-order/api/',
+        login: 'https://app.mintpay.lk/user-order/login/',
+      }
+    : {
+        api: 'https://dev.mintpay.lk/user-order/api/',
+        login: 'https://dev.mintpay.lk/user-order/login/',
+      };
 }
 
 export class MintpayGateway implements PaymentGateway {
@@ -42,107 +44,122 @@ export class MintpayGateway implements PaymentGateway {
     const { merchantId, secretKey } = appConfig.payment.mintpay;
 
     if (
-      secretKey &&
-      secretKey !== 'dev-mintpay-secret-key' &&
-      secretKey !== 'dev-mintpay-merchant-secret'
+      !secretKey ||
+      secretKey === 'dev-mintpay-secret-key' ||
+      secretKey === 'dev-mintpay-merchant-secret' ||
+      !merchantId ||
+      merchantId === 'dev-mintpay-merchant-id'
     ) {
-      try {
-        return await this.createSessionViaApi(input, gatewayPaymentId, merchantId, secretKey);
-      } catch (err) {
-        logger.warn(
-          { gateway: 'mintpay', orderId: input.orderId, err },
-          'Mintpay: API session creation failed, falling back to redirect',
-        );
-      }
+      throw ApiError.badRequest(
+        'Mintpay is not configured. Set MINTPAY_MERCHANT_ID and MINTPAY_MERCHANT_SECRET.',
+        undefined,
+        'MINTPAY_NOT_CONFIGURED',
+      );
     }
 
-    return this.fallbackSession(input, gatewayPaymentId, merchantId);
-  }
+    const hosts = mintpayHosts();
+    const now = new Date();
+    const stamp = now.toISOString().slice(0, 19).replace('T', ' ');
+    const productLabel =
+      typeof input.metadata?.description === 'string'
+        ? input.metadata.description
+        : `Order ${input.orderId}`;
 
-  private async createSessionViaApi(
-    input: CreatePaymentSessionInput,
-    gatewayPaymentId: string,
-    merchantId: string,
-    secretKey: string,
-  ): Promise<PaymentSessionResult> {
     const body = JSON.stringify({
-      merchantId,
-      orderId: input.orderId,
-      ref: gatewayPaymentId,
-      amount: input.amount.toFixed(2),
-      currency: input.currency,
-      customerEmail: input.customerEmail,
-      returnUrl: input.returnUrl,
-      cancelUrl: input.cancelUrl,
-      metadata: { idempotencyKey: input.idempotencyKey },
-    });
-
-    const signature = hmacSha256Hex(secretKey, body);
-
-    const { data } = await fetchWithRetry<{ checkoutUrl?: string; sessionId?: string }>(
-      `${mintpayApiBase()}/checkout/session`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Mintpay-Merchant': merchantId,
-          'X-Mintpay-Signature': signature,
+      merchant_id: merchantId,
+      order_id: input.orderId,
+      total_price: input.amount,
+      discount: 0,
+      customer_id: String(input.metadata?.customerId ?? ''),
+      customer_email: input.customerEmail,
+      customer_telephone: String(input.metadata?.customerPhone ?? ''),
+      ip: String(input.metadata?.ip ?? ''),
+      x_forwarded_for: String(input.metadata?.ip ?? ''),
+      delivery_street: String(input.metadata?.deliveryStreet ?? ''),
+      delivery_region: String(input.metadata?.deliveryRegion ?? ''),
+      delivery_postcode: String(input.metadata?.deliveryPostcode ?? ''),
+      cart_created_date: stamp,
+      cart_updated_date: stamp,
+      success_url: input.returnUrl,
+      fail_url: input.cancelUrl,
+      products: [
+        {
+          name: productLabel,
+          product_id: input.orderId,
+          sku: input.orderId,
+          quantity: '1',
+          unit_price: input.amount.toFixed(2),
+          discount: '0.00',
         },
-        body,
-      },
-    );
-
-    const redirectUrl =
-      data.checkoutUrl ?? `${mintpayCheckoutBase()}/${data.sessionId ?? gatewayPaymentId}`;
-
-    logger.info(
-      {
-        gateway: 'mintpay',
-        orderId: input.orderId,
-        mode: appConfig.payment.mintpay.mode,
-        gatewayPaymentId: data.sessionId ?? gatewayPaymentId,
-      },
-      'Mintpay: checkout session created via API',
-    );
-
-    return {
-      gatewayPaymentId: data.sessionId ?? gatewayPaymentId,
-      redirectUrl,
-      raw: { sessionId: data.sessionId, merchantId, mode: appConfig.payment.mintpay.mode },
-    };
-  }
-
-  private fallbackSession(
-    input: CreatePaymentSessionInput,
-    gatewayPaymentId: string,
-    merchantId: string,
-  ): PaymentSessionResult {
-    const params = new URLSearchParams({
-      merchantId,
-      orderId: input.orderId,
-      amount: input.amount.toFixed(2),
-      currency: input.currency,
-      returnUrl: input.returnUrl,
-      cancelUrl: input.cancelUrl,
-      ref: gatewayPaymentId,
+      ],
+      currency_code: input.currency,
+      currency_symbol: input.currency === 'LKR' ? 'Rs' : input.currency,
     });
 
-    const base = mintpayCheckoutBase();
+    let data: { message?: string; data?: string };
+    try {
+      const result = await fetchWithRetry<{ message?: string; data?: string }>(
+        hosts.api,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Token ${secretKey}`,
+            'Content-Type': 'application/json',
+            'User-Agent': `FE-Platform/${appConfig.app.version}; ${appConfig.cors.origins[0] ?? 'http://localhost:5173'}`,
+          },
+          body,
+        },
+        { maxAttempts: 2 },
+      );
+      data = result.data;
+    } catch (err) {
+      const status = err instanceof HttpRetryError ? err.lastStatus : undefined;
+      logger.warn(
+        { gateway: 'mintpay', orderId: input.orderId, status, err },
+        'Mintpay: order API request failed',
+      );
+      throw ApiError.badRequest(
+        status === 403
+          ? 'Mintpay rejected the request (403). Check MINTPAY_MERCHANT_ID / MINTPAY_MERCHANT_SECRET are valid sandbox credentials from Mintpay.'
+          : 'Mintpay could not create a checkout session. Check merchant credentials and network access to dev.mintpay.lk.',
+        { status, message: err instanceof Error ? err.message : String(err) },
+        'MINTPAY_SESSION_FAILED',
+      );
+    }
+
+    if (data.message !== 'Success' || !data.data) {
+      logger.warn(
+        { gateway: 'mintpay', orderId: input.orderId, response: data },
+        'Mintpay: order API rejected request',
+      );
+      throw ApiError.badRequest(
+        'Mintpay could not create a checkout session. Check merchant credentials.',
+        { response: data },
+        'MINTPAY_SESSION_FAILED',
+      );
+    }
+
+    const purchaseId = String(data.data);
 
     logger.info(
       {
         gateway: 'mintpay',
         orderId: input.orderId,
         mode: appConfig.payment.mintpay.mode,
-        fallback: true,
+        purchaseId,
       },
-      'Mintpay: using fallback redirect (credentials not configured)',
+      'Mintpay: checkout session created',
     );
 
     return {
-      gatewayPaymentId,
-      redirectUrl: `${base}?${params.toString()}`,
-      raw: { merchantId, mode: appConfig.payment.mintpay.mode, fallback: true },
+      gatewayPaymentId: purchaseId || gatewayPaymentId,
+      redirectUrl: hosts.login,
+      redirectForm: {
+        action: hosts.login,
+        method: 'POST',
+        fields: { purchase_id: purchaseId },
+      },
+      raw: { purchaseId, merchantId, mode: appConfig.payment.mintpay.mode },
     };
   }
 

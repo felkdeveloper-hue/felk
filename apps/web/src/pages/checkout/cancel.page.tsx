@@ -26,6 +26,22 @@ export function CheckoutCancelPage() {
       { checkoutToken, method: paymentMethod },
       {
         onSuccess: (payment) => {
+          if (payment.redirectForm) {
+            const form = document.createElement('form');
+            form.method = payment.redirectForm.method;
+            form.action = payment.redirectForm.action;
+            form.style.display = 'none';
+            for (const [name, value] of Object.entries(payment.redirectForm.fields)) {
+              const input = document.createElement('input');
+              input.type = 'hidden';
+              input.name = name;
+              input.value = value;
+              form.appendChild(input);
+            }
+            document.body.appendChild(form);
+            form.submit();
+            return;
+          }
           if (payment.redirectUrl) {
             window.location.assign(payment.redirectUrl);
             return;

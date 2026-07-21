@@ -16,9 +16,17 @@ export interface CreatePaymentSessionInput {
   metadata?: Record<string, unknown>;
 }
 
+/** Auto-submit HTML form redirect (used by Koko / Mintpay hosted checkout). */
+export interface PaymentRedirectForm {
+  action: string;
+  method: 'GET' | 'POST';
+  fields: Record<string, string>;
+}
+
 export interface PaymentSessionResult {
   gatewayPaymentId: string;
   redirectUrl?: string;
+  redirectForm?: PaymentRedirectForm;
   raw?: Record<string, unknown>;
 }
 

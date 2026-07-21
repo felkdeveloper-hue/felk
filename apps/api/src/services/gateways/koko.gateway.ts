@@ -5,7 +5,6 @@ import { appConfig } from '@/config/app.config';
 import { logger } from '@/config/logger';
 import { PAYMENT_METHOD, PAYMENT_STATUS } from '@/constants/payment-status';
 import { hmacSha256Hex, safeCompare } from '@/utils/crypto.helper';
-import { fetchWithRetry } from '@/utils/http-retry';
 import type {
   CreatePaymentSessionInput,
   PaymentGateway,
@@ -13,10 +12,12 @@ import type {
   WebhookVerificationInput,
 } from '@/services/interfaces/payment-gateway.service';
 import { getHeader, parseWebhookPayload, rawBodyToString } from '@/services/gateways/gateway.utils';
+import { ApiError } from '@/utils/errors/api-error';
 
 const KOKO_STATUS_MAP: Record<string, string> = {
   approved: PAYMENT_STATUS.PAID,
   completed: PAYMENT_STATUS.PAID,
+  success: PAYMENT_STATUS.PAID,
   pending: PAYMENT_STATUS.PROCESSING,
   declined: PAYMENT_STATUS.FAILED,
   failed: PAYMENT_STATUS.FAILED,
@@ -24,7 +25,15 @@ const KOKO_STATUS_MAP: Record<string, string> = {
   expired: PAYMENT_STATUS.EXPIRED,
 };
 
-const KOKO_API_BASE = 'https://api.koko.lk/v1';
+const PLUGIN_NAME = 'fe-platform';
+const PLUGIN_VERSION = '1.0.0';
+
+/** Real Paykoko hosts (from official WooCommerce plugin). */
+function kokoOrderCreateUrl(): string {
+  return appConfig.payment.koko.mode === 'live'
+    ? 'https://prodapi.paykoko.com/api/merchants/orderCreate'
+    : 'https://qaapi.paykoko.com/api/merchants/orderCreate';
+}
 
 function loadPrivateKey(): string | null {
   const keyPath = appConfig.payment.koko.privateKeyPath;
@@ -50,103 +59,97 @@ export class KokoGateway implements PaymentGateway {
     const gatewayPaymentId = `koko_${input.orderId}_${randomBytes(4).toString('hex')}`;
     const { apiKey, merchantId, privateKeyPath } = appConfig.payment.koko;
 
-    if (apiKey && privateKeyPath) {
-      const privateKey = loadPrivateKey();
-      if (privateKey) {
-        return this.createSessionViaApi(input, gatewayPaymentId, apiKey, merchantId, privateKey);
-      }
-      logger.warn(
-        { gateway: 'koko', privateKeyPath },
-        'Koko: private key file not found, falling back to redirect-only mode',
+    if (!apiKey || !merchantId || merchantId === 'dev-koko-merchant-id' || !privateKeyPath) {
+      throw ApiError.badRequest(
+        'Koko is not configured. Set KOKO_MERCHANT_ID, KOKO_API_KEY, and KOKO_PRIVATE_KEY_PATH.',
+        undefined,
+        'KOKO_NOT_CONFIGURED',
       );
     }
 
-    return this.fallbackSession(input, gatewayPaymentId, merchantId);
-  }
+    const privateKey = loadPrivateKey();
+    if (!privateKey) {
+      throw ApiError.badRequest(
+        `Koko private key not found at ${privateKeyPath}. Place the PEM file there or update KOKO_PRIVATE_KEY_PATH.`,
+        { privateKeyPath },
+        'KOKO_PRIVATE_KEY_MISSING',
+      );
+    }
 
-  private async createSessionViaApi(
-    input: CreatePaymentSessionInput,
-    gatewayPaymentId: string,
-    apiKey: string,
-    merchantId: string,
-    privateKey: string,
-  ): Promise<PaymentSessionResult> {
-    const installmentPlans = (input.metadata?.installmentPlans as number[] | undefined) ?? [];
+    const amount = input.amount.toFixed(2);
+    const currency = input.currency;
+    const email = input.customerEmail;
+    const firstName = String(input.metadata?.firstName ?? 'Customer');
+    const lastName = String(input.metadata?.lastName ?? '');
+    const mobile = String(input.metadata?.customerPhone ?? '');
+    const description =
+      typeof input.metadata?.description === 'string'
+        ? input.metadata.description
+        : `Order ${input.orderId}`;
+    const reference = `${merchantId.slice(0, 8)}${randomBytes(3).toString('hex')}-${input.orderId}`;
+    const returnUrl = input.returnUrl;
+    const cancelUrl = input.cancelUrl;
+    const responseUrl = String(input.metadata?.responseUrl ?? input.returnUrl);
 
-    const body = JSON.stringify({
-      merchantId,
-      orderId: input.orderId,
-      ref: gatewayPaymentId,
-      amount: input.amount.toFixed(2),
-      currency: input.currency,
-      customerEmail: input.customerEmail,
-      returnUrl: input.returnUrl,
-      cancelUrl: input.cancelUrl,
-      ...(installmentPlans.length > 0 && { installmentPlans }),
-      metadata: { idempotencyKey: input.idempotencyKey },
-    });
+    // Signing order must match Paykoko / official WooCommerce plugin exactly.
+    const dataString =
+      merchantId +
+      amount +
+      currency +
+      PLUGIN_NAME +
+      PLUGIN_VERSION +
+      returnUrl +
+      cancelUrl +
+      input.orderId +
+      reference +
+      firstName +
+      lastName +
+      email +
+      description +
+      apiKey +
+      responseUrl;
 
-    const signature = buildRequestSignature(body, privateKey);
-
-    const { data } = await fetchWithRetry<{
-      checkoutUrl?: string;
-      sessionId?: string;
-      ref?: string;
-    }>(`${KOKO_API_BASE}/checkout/session`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-        'X-Koko-Signature': signature,
-        'X-Koko-Merchant': merchantId,
-      },
-      body,
-    });
-
-    const redirectUrl =
-      data.checkoutUrl ?? `https://checkout.koko.lk/pay/${data.sessionId ?? gatewayPaymentId}`;
+    const signature = buildRequestSignature(dataString, privateKey);
+    const action = kokoOrderCreateUrl();
 
     logger.info(
       {
         gateway: 'koko',
         orderId: input.orderId,
-        gatewayPaymentId,
-        hasRedirect: Boolean(data.checkoutUrl),
+        mode: appConfig.payment.koko.mode,
+        action,
       },
-      'Koko: checkout session created via API',
-    );
-
-    return {
-      gatewayPaymentId: data.sessionId ?? gatewayPaymentId,
-      redirectUrl,
-      raw: { sessionId: data.sessionId, merchantId },
-    };
-  }
-
-  private fallbackSession(
-    input: CreatePaymentSessionInput,
-    gatewayPaymentId: string,
-    merchantId: string,
-  ): PaymentSessionResult {
-    const params = new URLSearchParams({
-      merchantId,
-      orderId: input.orderId,
-      amount: input.amount.toFixed(2),
-      currency: input.currency,
-      returnUrl: input.returnUrl,
-      cancelUrl: input.cancelUrl,
-      ref: gatewayPaymentId,
-    });
-
-    logger.info(
-      { gateway: 'koko', orderId: input.orderId, mode: 'redirect-only' },
-      'Koko: using fallback redirect (API key or private key not configured)',
+      'Koko: checkout form prepared',
     );
 
     return {
       gatewayPaymentId,
-      redirectUrl: `https://checkout.koko.lk/pay?${params.toString()}`,
-      raw: { merchantId, mode: 'fallback' },
+      redirectUrl: action,
+      redirectForm: {
+        action,
+        method: 'POST',
+        fields: {
+          _mId: merchantId,
+          api_key: apiKey,
+          _returnUrl: returnUrl,
+          _responseUrl: responseUrl,
+          _cancelUrl: cancelUrl,
+          _currency: currency,
+          _amount: amount,
+          _reference: reference,
+          _pluginName: PLUGIN_NAME,
+          _pluginVersion: PLUGIN_VERSION,
+          _orderId: input.orderId,
+          _firstName: firstName,
+          _lastName: lastName,
+          _email: email,
+          _description: description,
+          _mobileNo: mobile,
+          dataString,
+          signature,
+        },
+      },
+      raw: { reference, merchantId, mode: appConfig.payment.koko.mode },
     };
   }
 
@@ -177,7 +180,7 @@ export class KokoGateway implements PaymentGateway {
 
     return {
       valid: true,
-      gatewayTxnId: String(payload.transactionId ?? payload.ref ?? ''),
+      gatewayTxnId: String(payload.transactionId ?? payload.ref ?? payload.trnId ?? ''),
       orderId: String(payload.orderId ?? ''),
       status: mappedStatus,
       amount: Number(payload.amount ?? 0),

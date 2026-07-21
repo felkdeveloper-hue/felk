@@ -15,6 +15,7 @@ export * from './featured-collections';
 export * from './home-categories';
 export * from './shop-your-mood';
 export * from './hero-banner';
+export * from './mid-banner';
 export * from './home-section-renderer';
 export * from './motion-reveal';
 export * from './newsletter-signup';

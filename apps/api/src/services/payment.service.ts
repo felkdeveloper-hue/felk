@@ -334,7 +334,10 @@ export class PaymentService {
         await fulfillCodPaymentIfNeeded(payment);
       }
 
-      return this.toSummary(payment, { includeRedirect: true });
+      return {
+        ...this.toSummary(payment, { includeRedirect: true }),
+        redirectForm: session.redirectForm,
+      };
     } catch (error) {
       attempt.status = PAYMENT_ATTEMPT_STATUS.FAILED;
       attempt.errorMessage = error instanceof Error ? error.message : 'Unknown gateway error';

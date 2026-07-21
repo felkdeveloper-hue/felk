@@ -1,27 +1,35 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
-import mainBanner1 from '@/assets/images/Crousel Image/banner1.png';
-import mainBanner2 from '@/assets/images/Crousel Image/banner2.png';
-import mainBanner3 from '@/assets/images/Crousel Image/banner3.png';
+import mainBanner1 from '@/assets/images/Crousel Image/banner1.webp';
+import mainBanner2 from '@/assets/images/Crousel Image/banner2.webp';
+import mainBanner3 from '@/assets/images/Crousel Image/banner3.webp';
+import mobileBanner1 from '@/assets/images/Crousel Image/mobile-banner1.webp';
+import mobileBanner2 from '@/assets/images/Crousel Image/mobile-banner2.webp';
+import mobileBanner3 from '@/assets/images/Crousel Image/mobile-banner3.webp';
 import { useHeroBanners } from '@/hooks/cms';
 import { ROUTES } from '@/constants';
 import { CmsLink } from '@/components/common/cms-link';
 import { Container } from '@/components/layout/container';
 import { Button } from '@/components/ui/button';
-import { Image } from '@/components/media/image';
 import type { HeroBanner } from '@/services/sdk/cms';
 import { HeroSkeleton } from './section-skeleton';
 
 const EASE = [0.16, 1, 0.3, 1] as const;
 
+type StorefrontHeroBanner = HeroBanner & {
+  /** Portrait art used below the `md` breakpoint. */
+  mobileImageUrl?: string;
+};
+
 /** Shown when CMS has no active hero banners yet. Rotates every 3s. */
-const FALLBACK_HERO_BANNERS: HeroBanner[] = [
+const FALLBACK_HERO_BANNERS: StorefrontHeroBanner[] = [
   {
     id: 'local-main-banner-1',
-    title: 'New Edit',
-    subtitle: 'FE · Modern fashion for every day',
+    title: 'Summer Vibes',
+    subtitle: 'Newest drops · Effortless. Stylish. You.',
     imageUrl: mainBanner1,
+    mobileImageUrl: mobileBanner1,
     linkUrl: ROUTES.products,
     ctaLabel: 'Shop now',
   },
@@ -30,14 +38,16 @@ const FALLBACK_HERO_BANNERS: HeroBanner[] = [
     title: 'Shop the Look',
     subtitle: 'FE · Fresh styles for the season',
     imageUrl: mainBanner2,
+    mobileImageUrl: mobileBanner2,
     linkUrl: ROUTES.products,
     ctaLabel: 'Explore',
   },
   {
     id: 'local-main-banner-3',
-    title: 'Everyday Style',
+    title: 'New Edit',
     subtitle: 'FE · Pieces made to wear on repeat',
     imageUrl: mainBanner3,
+    mobileImageUrl: mobileBanner3,
     linkUrl: ROUTES.products,
     ctaLabel: 'Shop now',
   },
@@ -59,44 +69,68 @@ const slideVariants = {
   }),
 };
 
-function HeroSlide({ banner }: { banner: HeroBanner }) {
+function HeroSlide({
+  banner,
+  priority = false,
+}: {
+  banner: StorefrontHeroBanner;
+  priority?: boolean;
+}) {
+  const desktopSrc = banner.imageUrl;
+  const mobileSrc = banner.mobileImageUrl ?? banner.imageUrl;
+  // Portrait mobile creatives already carry brand messaging — hide overlay copy under md.
+  const hideCopyOnMobile = Boolean(banner.mobileImageUrl);
+
   return (
     <div className="bg-foreground relative min-h-[100svh] overflow-hidden">
-      {banner.imageUrl ? (
+      {desktopSrc || mobileSrc ? (
         <div className="absolute inset-0">
-          <Image
-            src={banner.imageUrl}
-            alt={banner.title}
-            className="absolute inset-0 h-full w-full object-cover"
-            containerClassName="absolute inset-0"
-            loading="eager"
-            fetchPriority="high"
-          />
+          <picture className="absolute inset-0 block h-full w-full">
+            {banner.mobileImageUrl ? (
+              <source media="(max-width: 767px)" srcSet={banner.mobileImageUrl} />
+            ) : null}
+            <img
+              src={desktopSrc ?? mobileSrc}
+              alt={banner.title}
+              width={1920}
+              height={1080}
+              sizes="100vw"
+              className="absolute inset-0 h-full w-full object-cover object-center"
+              loading={priority ? 'eager' : 'lazy'}
+              fetchPriority={priority ? 'high' : 'low'}
+              decoding={priority ? 'sync' : 'async'}
+            />
+          </picture>
         </div>
       ) : (
         <div className="absolute inset-0 bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-950" />
       )}
 
-      <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/35 to-transparent" />
-      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/25" />
+      {/* Desktop overlays */}
+      <div className="absolute inset-0 hidden bg-gradient-to-r from-black/75 via-black/35 to-transparent md:block" />
+      <div className="absolute inset-0 hidden bg-gradient-to-t from-black/70 via-transparent to-black/25 md:block" />
+      {/* Mobile: light bottom scrim only so portrait art stays visible */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-black/10 md:hidden" />
 
       <Container className="relative flex min-h-[100svh] flex-col justify-end pb-24 sm:pb-28 lg:pb-32">
         <div className="max-w-4xl space-y-5 text-white">
-          {banner.subtitle ? (
-            <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-white/80">
-              {banner.subtitle.includes('·')
-                ? banner.subtitle.split('·')[0]?.trim()
-                : banner.subtitle}
-            </p>
-          ) : null}
-          <h1 className="font-display max-w-5xl text-5xl font-bold uppercase leading-[0.92] tracking-[-0.05em] sm:text-7xl lg:text-8xl 2xl:text-[7.5rem]">
-            {banner.title}
-          </h1>
-          {banner.subtitle?.includes('·') ? (
-            <p className="max-w-xl text-base text-white/80 sm:text-lg">
-              {banner.subtitle.split('·').slice(1).join('·').trim()}
-            </p>
-          ) : null}
+          <div className={hideCopyOnMobile ? 'hidden md:block' : undefined}>
+            {banner.subtitle ? (
+              <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-white/80">
+                {banner.subtitle.includes('·')
+                  ? banner.subtitle.split('·')[0]?.trim()
+                  : banner.subtitle}
+              </p>
+            ) : null}
+            <h1 className="font-display max-w-5xl text-5xl font-bold uppercase leading-[0.92] tracking-[-0.05em] sm:text-7xl lg:text-8xl 2xl:text-[7.5rem]">
+              {banner.title}
+            </h1>
+            {banner.subtitle?.includes('·') ? (
+              <p className="mt-5 max-w-xl text-base text-white/80 sm:text-lg">
+                {banner.subtitle.split('·').slice(1).join('·').trim()}
+              </p>
+            ) : null}
+          </div>
           {banner.linkUrl ? (
             <div className="pt-2">
               <Button
@@ -118,7 +152,7 @@ function HeroSlide({ banner }: { banner: HeroBanner }) {
   );
 }
 
-function HeroCarousel({ banners }: { banners: HeroBanner[] }) {
+function HeroCarousel({ banners }: { banners: StorefrontHeroBanner[] }) {
   const [index, setIndex] = useState(0);
   /** -1 = from left (initial load); 1 = from right (next slides) */
   const [direction, setDirection] = useState(-1);
@@ -158,7 +192,7 @@ function HeroCarousel({ banners }: { banners: HeroBanner[] }) {
             transition={{ duration: 0.75, ease: EASE }}
             className="absolute inset-0 w-full"
           >
-            <HeroSlide banner={active} />
+            <HeroSlide banner={active} priority={index === 0} />
           </motion.div>
         </AnimatePresence>
       </div>
@@ -188,12 +222,16 @@ export function HeroBannerSection() {
   const cmsBanners = data?.data ?? [];
   // Local hero art from the repo is the storefront source of truth on localhost.
   // Keep CMS copy/CTAs when present; always use shipped banner images.
-  const banners =
+  const banners: StorefrontHeroBanner[] =
     cmsBanners.length > 0
-      ? cmsBanners.map((banner, index) => ({
-          ...banner,
-          imageUrl: FALLBACK_HERO_BANNERS[index % FALLBACK_HERO_BANNERS.length]!.imageUrl,
-        }))
+      ? cmsBanners.map((banner, index) => {
+          const fallback = FALLBACK_HERO_BANNERS[index % FALLBACK_HERO_BANNERS.length]!;
+          return {
+            ...banner,
+            imageUrl: fallback.imageUrl,
+            mobileImageUrl: fallback.mobileImageUrl,
+          };
+        })
       : FALLBACK_HERO_BANNERS;
 
   if (isLoading) return <HeroSkeleton />;

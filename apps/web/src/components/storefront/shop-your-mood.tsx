@@ -1,10 +1,10 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import ethnicWearImage from '@/assets/images/Crousel Image/EthenicWear.png';
-import newInImage from '@/assets/images/Crousel Image/banner2.png';
-import mensCarouselImage from '@/assets/images/Crousel Image/menscrousel.png';
-import womenCarouselImage from '@/assets/images/Crousel Image/womenCrousel.png';
+import ethnicWearImage from '@/assets/images/Crousel Image/EthenicWear.webp';
+import newInImage from '@/assets/images/Crousel Image/banner2.webp';
+import mensCarouselImage from '@/assets/images/Crousel Image/menscrousel.webp';
+import womenCarouselImage from '@/assets/images/Crousel Image/womenCrousel.webp';
 import { QUERY_KEYS } from '@/constants/query-keys';
 import { Section } from '@/components/common/section';
 import { Image } from '@/components/media/image';

@@ -92,6 +92,7 @@ const envSchema = z
     KOKO_SECRET_KEY: z.string().default('dev-koko-secret-key'),
     KOKO_API_KEY: z.string().optional(),
     KOKO_PRIVATE_KEY_PATH: z.string().default('config/koko_private.pem'),
+    KOKO_MODE: z.enum(['sandbox', 'live']).default('sandbox'),
 
     MINTPAY_MERCHANT_ID: z.string().default('dev-mintpay-merchant-id'),
     MINTPAY_SECRET_KEY: z.string().default('dev-mintpay-secret-key'),

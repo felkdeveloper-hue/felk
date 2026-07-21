@@ -1,6 +1,6 @@
 import { Link } from '@tanstack/react-router';
 import { ArrowRight } from 'lucide-react';
-import bottomBanner from '@/assets/images/Crousel Image/bottombanner.png';
+import bottomBanner from '@/assets/images/Crousel Image/bottombanner.webp';
 import { Container } from '@/components/layout/container';
 import { Button } from '@/components/ui/button';
 import { Image } from '@/components/media/image';

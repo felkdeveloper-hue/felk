@@ -9,6 +9,8 @@ import {
   HeroBannerSection,
   HomeCategoriesSection,
   HomeSectionRenderer,
+  MidBannerSection,
+  PreFeaturedBannerSection,
   ProductGridSection,
   ProductRailSection,
   SectionSkeleton,
@@ -58,6 +60,8 @@ export function HomePage() {
 
       <ProductRailSection kind="random" />
 
+      <MidBannerSection />
+
       <HomeCategoriesSection />
 
       <ProductRailSection
@@ -68,6 +72,8 @@ export function HomePage() {
       />
 
       <CategoryShowcaseSection />
+
+      <PreFeaturedBannerSection />
 
       <ProductGridSection />
 

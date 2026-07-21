@@ -38,6 +38,12 @@ export interface PaymentRetryPayload {
   method?: PaymentMethod;
 }
 
+export interface PaymentRedirectForm {
+  action: string;
+  method: 'GET' | 'POST';
+  fields: Record<string, string>;
+}
+
 export interface PaymentRecord {
   id: string;
   referenceNumber?: string;
@@ -48,6 +54,7 @@ export interface PaymentRecord {
   amount: number;
   currency: string;
   redirectUrl?: string;
+  redirectForm?: PaymentRedirectForm;
   failureReason?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -78,6 +85,21 @@ export interface Refund {
   reason?: string;
 }
 
+function normalizeRedirectForm(raw: unknown): PaymentRedirectForm | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const form = raw as Record<string, unknown>;
+  if (typeof form.action !== 'string') return undefined;
+  const method = form.method === 'GET' || form.method === 'POST' ? form.method : 'POST';
+  const fieldsRaw = form.fields;
+  const fields: Record<string, string> = {};
+  if (fieldsRaw && typeof fieldsRaw === 'object') {
+    for (const [key, value] of Object.entries(fieldsRaw as Record<string, unknown>)) {
+      if (value != null) fields[key] = String(value);
+    }
+  }
+  return { action: form.action, method, fields };
+}
+
 function normalizePayment(raw: unknown): PaymentRecord {
   const record = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
   return {
@@ -91,6 +113,7 @@ function normalizePayment(raw: unknown): PaymentRecord {
     amount: Number(record.amount ?? 0),
     currency: String(record.currency ?? 'LKR'),
     redirectUrl: typeof record.redirectUrl === 'string' ? record.redirectUrl : undefined,
+    redirectForm: normalizeRedirectForm(record.redirectForm),
     failureReason: typeof record.failureReason === 'string' ? record.failureReason : undefined,
     createdAt: typeof record.createdAt === 'string' ? record.createdAt : undefined,
     updatedAt: typeof record.updatedAt === 'string' ? record.updatedAt : undefined,

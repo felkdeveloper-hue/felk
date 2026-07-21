@@ -3,6 +3,8 @@ import { hmacSha256Hex } from '@/utils/crypto.helper';
 
 vi.mock('@/config/app.config', () => ({
   appConfig: {
+    app: { version: '0.1.0' },
+    cors: { origins: ['http://localhost:5173'] },
     payment: {
       payhere: { merchantId: 'pm', merchantSecret: 'ps', mode: 'sandbox' },
       koko: {
@@ -10,6 +12,7 @@ vi.mock('@/config/app.config', () => ({
         secretKey: 'koko-test-secret',
         apiKey: null,
         privateKeyPath: null,
+        mode: 'sandbox',
       },
       mintpay: {
         merchantId: 'mintpay-merchant',
@@ -25,28 +28,29 @@ vi.mock('@/config/logger', () => ({
 }));
 
 vi.mock('@/utils/http-retry', () => ({
-  fetchWithRetry: vi.fn().mockResolvedValue({ data: {}, attempts: 1 }),
+  fetchWithRetry: vi.fn().mockResolvedValue({
+    data: { message: 'Success', data: 'purchase-abc' },
+    attempts: 1,
+  }),
   HttpRetryError: class HttpRetryError extends Error {},
 }));
 
 describe('Koko gateway', () => {
-  it('returns fallback redirect when no API key configured', async () => {
+  it('rejects when API key / private key are missing', async () => {
     const { KokoGateway } = await import('@/services/gateways/koko.gateway');
     const gateway = new KokoGateway();
-    const result = await gateway.createSession({
-      orderId: 'ORD-KOKO-001',
-      amount: 2000,
-      currency: 'LKR',
-      method: 'koko',
-      customerEmail: 'test@example.com',
-      returnUrl: 'https://example.com/return',
-      cancelUrl: 'https://example.com/cancel',
-      idempotencyKey: 'idem-koko-1',
-    });
-
-    expect(result.redirectUrl).toContain('koko.lk');
-    expect(result.gatewayPaymentId).toContain('koko_ORD-KOKO-001_');
-    expect(result.raw?.mode).toBe('fallback');
+    await expect(
+      gateway.createSession({
+        orderId: 'ORD-KOKO-001',
+        amount: 2000,
+        currency: 'LKR',
+        method: 'koko',
+        customerEmail: 'test@example.com',
+        returnUrl: 'https://example.com/return',
+        cancelUrl: 'https://example.com/cancel',
+        idempotencyKey: 'idem-koko-1',
+      }),
+    ).rejects.toMatchObject({ code: 'KOKO_NOT_CONFIGURED' });
   });
 
   it('returns valid=true with correct HMAC', async () => {
@@ -91,7 +95,7 @@ describe('Koko gateway', () => {
 });
 
 describe('Mintpay gateway', () => {
-  it('returns sandbox redirect URL', async () => {
+  it('returns sandbox login form redirect', async () => {
     const { MintpayGateway } = await import('@/services/gateways/mintpay.gateway');
     const gateway = new MintpayGateway();
     const result = await gateway.createSession({
@@ -105,7 +109,9 @@ describe('Mintpay gateway', () => {
       idempotencyKey: 'idem-mp-1',
     });
 
-    expect(result.redirectUrl).toContain('mintpay.lk');
+    expect(result.redirectUrl).toContain('dev.mintpay.lk');
+    expect(result.redirectForm?.action).toContain('dev.mintpay.lk/user-order/login');
+    expect(result.redirectForm?.fields.purchase_id).toBe('purchase-abc');
     expect(result.raw?.mode).toBe('sandbox');
   });
 
