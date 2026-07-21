@@ -23,7 +23,6 @@ import {
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(scriptDir, '../../../..');
 const imagesDir = join(repoRoot, 'apps/web/public/catalog/women');
-const WEB_ORIGIN = (process.env.APP_URL ?? 'http://localhost:5173').replace(/\/+$/, '');
 
 const PRODUCT_NAMES = [
   'Ruby Oversized Sweatshirt',
@@ -52,8 +51,9 @@ const PRODUCT_NAMES = [
   'Midnight Bomber Jacket',
 ] as const;
 
+/** Relative URL so images load from whichever host serves the web app. */
 function publicImageUrl(filename: string) {
-  return `${WEB_ORIGIN}/catalog/women/${filename}`;
+  return `/catalog/women/${filename}`;
 }
 
 function slugify(value: string) {

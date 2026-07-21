@@ -17,8 +17,6 @@ const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(scriptDir, '../../../..');
 const sourceDir = join(repoRoot, 'apps/web/src/assets/images/Categories');
 const publicDir = join(repoRoot, 'apps/web/public/catalog/categories');
-const WEB_ORIGIN = (process.env.APP_URL ?? 'http://localhost:5173').replace(/\/+$/, '');
-
 const HOME_CATEGORIES = [
   { name: 'New Arrival', slug: 'new-arrivals', source: 'New Arrival.png', sortOrder: 1 },
   { name: 'Jeans', slug: 'jeans', source: 'Jeans.png', sortOrder: 2 },
@@ -30,8 +28,9 @@ const HOME_CATEGORIES = [
   { name: 'Shoes', slug: 'shoes', source: 'Shoes.png', sortOrder: 8 },
 ] as const;
 
+/** Relative URL so images load from whichever host serves the web app. */
 function publicImageUrl(filename: string) {
-  return `${WEB_ORIGIN}/catalog/categories/${filename}`;
+  return `/catalog/categories/${filename}`;
 }
 
 async function main() {

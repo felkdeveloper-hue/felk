@@ -26,10 +26,6 @@ const FALLBACK_TILES = [
   { slug: 'shoes', name: 'Shoes', image: shoesImage },
 ] as const;
 
-const FALLBACK_BY_SLUG = new Map<string, (typeof FALLBACK_TILES)[number]>(
-  FALLBACK_TILES.map((tile) => [tile.slug, tile]),
-);
-
 type HomeCategoryTile = {
   id: string;
   slug: string;
@@ -38,30 +34,23 @@ type HomeCategoryTile = {
 };
 
 function resolveHomeTiles(apiCategories: Category[] | undefined): HomeCategoryTile[] {
-  const roots = (apiCategories ?? []).filter(
-    (category) => !category.parentId && category.status !== 'archived',
+  const bySlug = new Map(
+    (apiCategories ?? [])
+      .filter((category) => category.status !== 'archived')
+      .map((category) => [category.slug, category]),
   );
 
-  if (roots.length > 0) {
-    return roots
-      .map((category) => {
-        const fallback = FALLBACK_BY_SLUG.get(category.slug);
-        return {
-          id: category.id,
-          slug: category.slug,
-          name: category.name,
-          imageUrl: category.imageUrl || fallback?.image || '',
-        };
-      })
-      .filter((tile) => Boolean(tile.imageUrl));
-  }
-
-  return FALLBACK_TILES.map((tile) => ({
-    id: tile.slug,
-    slug: tile.slug,
-    name: tile.name,
-    imageUrl: tile.image,
-  }));
+  // Always render the designed homepage grid with local images; wire up API
+  // ids/slugs when those categories exist so links stay valid.
+  return FALLBACK_TILES.map((tile) => {
+    const matched = bySlug.get(tile.slug);
+    return {
+      id: matched?.id ?? tile.slug,
+      slug: matched?.slug ?? tile.slug,
+      name: matched?.name ?? tile.name,
+      imageUrl: tile.image,
+    };
+  });
 }
 
 export function HomeCategoriesSection() {

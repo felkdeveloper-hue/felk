@@ -186,7 +186,15 @@ function HeroCarousel({ banners }: { banners: HeroBanner[] }) {
 export function HeroBannerSection() {
   const { data, isLoading } = useHeroBanners();
   const cmsBanners = data?.data ?? [];
-  const banners = cmsBanners.length > 0 ? cmsBanners : FALLBACK_HERO_BANNERS;
+  // Local hero art from the repo is the storefront source of truth on localhost.
+  // Keep CMS copy/CTAs when present; always use shipped banner images.
+  const banners =
+    cmsBanners.length > 0
+      ? cmsBanners.map((banner, index) => ({
+          ...banner,
+          imageUrl: FALLBACK_HERO_BANNERS[index % FALLBACK_HERO_BANNERS.length]!.imageUrl,
+        }))
+      : FALLBACK_HERO_BANNERS;
 
   if (isLoading) return <HeroSkeleton />;
 
