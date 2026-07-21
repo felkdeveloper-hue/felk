@@ -1,6 +1,7 @@
+import { useCallback, useMemo } from 'react';
 import { Link, useParams } from '@tanstack/react-router';
 import { Seo } from '@/components/common/seo';
-import { CatalogListShell } from '@/components/catalog';
+import { CatalogHighlightRails, CatalogListShell } from '@/components/catalog';
 import { Container } from '@/components/layout/container';
 import { Image } from '@/components/media/image';
 import { buildAbsoluteUrl, siteConfig } from '@/config';
@@ -8,8 +9,9 @@ import {
   useCatalogSearchParams,
   useCategoriesList,
   useCategoryBySlug,
-  useProductsList,
+  useInfiniteProducts,
 } from '@/hooks/catalog';
+import { CATALOG_MAX_PRODUCTS } from '@/utils/catalog';
 
 export function CategoryDetailPage() {
   const { slug } = useParams({ strict: false }) as { slug: string };
@@ -18,7 +20,20 @@ export function CategoryDetailPage() {
   const category = categoryQuery.data;
   const { state, setSearch, clearFilters } = useCatalogSearchParams();
   const mergedState = { ...state, categoryId: category?.id ?? state.categoryId };
-  const productsQuery = useProductsList(mergedState);
+  const query = useInfiniteProducts(mergedState);
+
+  const products = useMemo(() => {
+    const flat = query.data?.pages.flatMap((page) => page.data) ?? [];
+    return flat.slice(0, CATALOG_MAX_PRODUCTS);
+  }, [query.data?.pages]);
+
+  const total = query.data?.pages[0]?.meta.total;
+  const hasNextPage = Boolean(query.hasNextPage) && products.length < CATALOG_MAX_PRODUCTS;
+
+  const onLoadMore = useCallback(() => {
+    if (!query.hasNextPage || query.isFetchingNextPage) return;
+    void query.fetchNextPage();
+  }, [query]);
 
   const subcategories =
     categoriesListQuery.data?.data.filter((item) => item.parentId === category?.id) ?? [];
@@ -60,17 +75,21 @@ export function CategoryDetailPage() {
         </Container>
       ) : null}
 
+      <CatalogHighlightRails categoryId={category?.id} collectionLabel={category?.name} />
+
       <CatalogListShell
         eyebrow="Category"
         title={category?.name ?? 'Category'}
         description={category?.description}
         state={mergedState}
-        products={productsQuery.data?.data ?? []}
-        total={productsQuery.data?.meta.total}
-        totalPages={productsQuery.data?.meta.totalPages}
-        isLoading={categoryQuery.isLoading || productsQuery.isLoading}
-        isError={productsQuery.isError}
-        onRetry={() => void productsQuery.refetch()}
+        products={products}
+        total={total}
+        isLoading={categoryQuery.isLoading || query.isLoading}
+        isError={query.isError}
+        isFetchingNextPage={query.isFetchingNextPage}
+        hasNextPage={hasNextPage}
+        onLoadMore={onLoadMore}
+        onRetry={() => void query.refetch()}
         onSearchChange={setSearch}
         onClearFilters={clearFilters}
       />

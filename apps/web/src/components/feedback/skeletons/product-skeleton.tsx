@@ -27,7 +27,11 @@ export interface ProductGridSkeletonProps {
 
 export function ProductGridSkeleton({ count = 8, className }: ProductGridSkeletonProps) {
   return (
-    <div className={cn('grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-6 lg:grid-cols-4', className)}>
+    <div
+      aria-busy="true"
+      aria-label="Loading products"
+      className={cn('grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-6 lg:grid-cols-4', className)}
+    >
       {Array.from({ length: count }, (_, index) => (
         <ProductSkeleton key={index} />
       ))}

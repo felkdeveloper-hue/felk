@@ -1,11 +1,26 @@
+import { useCallback, useMemo } from 'react';
 import { Seo } from '@/components/common/seo';
-import { CatalogListShell } from '@/components/catalog';
+import { CatalogHighlightRails, CatalogListShell } from '@/components/catalog';
 import { buildAbsoluteUrl, siteConfig } from '@/config';
-import { useCatalogSearchParams, useProductsList } from '@/hooks/catalog';
+import { useCatalogSearchParams, useInfiniteProducts } from '@/hooks/catalog';
+import { CATALOG_MAX_PRODUCTS } from '@/utils/catalog';
 
 export function ProductsPage() {
   const { state, setSearch, clearFilters } = useCatalogSearchParams();
-  const query = useProductsList(state);
+  const query = useInfiniteProducts(state);
+
+  const products = useMemo(() => {
+    const flat = query.data?.pages.flatMap((page) => page.data) ?? [];
+    return flat.slice(0, CATALOG_MAX_PRODUCTS);
+  }, [query.data?.pages]);
+
+  const total = query.data?.pages[0]?.meta.total;
+  const hasNextPage = Boolean(query.hasNextPage) && products.length < CATALOG_MAX_PRODUCTS;
+
+  const onLoadMore = useCallback(() => {
+    if (!query.hasNextPage || query.isFetchingNextPage) return;
+    void query.fetchNextPage();
+  }, [query]);
 
   return (
     <>
@@ -14,16 +29,19 @@ export function ProductsPage() {
         description={`Browse the full ${siteConfig.name} collection.`}
         url={buildAbsoluteUrl('/products')}
       />
+      <CatalogHighlightRails />
       <CatalogListShell
         eyebrow="Catalog"
         title="All products"
         description="Discover considered pieces designed for everyday elegance."
         state={state}
-        products={query.data?.data ?? []}
-        total={query.data?.meta.total}
-        totalPages={query.data?.meta.totalPages}
+        products={products}
+        total={total}
         isLoading={query.isLoading}
         isError={query.isError}
+        isFetchingNextPage={query.isFetchingNextPage}
+        hasNextPage={hasNextPage}
+        onLoadMore={onLoadMore}
         onRetry={() => void query.refetch()}
         onSearchChange={setSearch}
         onClearFilters={clearFilters}

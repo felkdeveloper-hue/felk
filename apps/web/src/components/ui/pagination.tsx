@@ -37,6 +37,7 @@ export function PaginationLink({
   className,
   isActive,
   size = 'icon',
+  disabled,
   ...props
 }: PaginationLinkProps) {
   return (
@@ -45,11 +46,13 @@ export function PaginationLink({
       aria-current={isActive ? 'page' : undefined}
       data-slot="pagination-link"
       data-active={isActive}
+      disabled={disabled}
       className={cn(
-        'inline-flex h-9 min-w-9 items-center justify-center rounded-md px-3 text-sm font-medium transition-colors',
+        'inline-flex h-10 min-w-10 items-center justify-center rounded-full border px-3 text-sm font-semibold transition-colors',
         isActive
-          ? 'bg-primary text-primary-foreground'
-          : 'text-foreground hover:bg-accent hover:text-accent-foreground',
+          ? 'border-foreground bg-foreground text-background'
+          : 'border-border bg-background text-foreground hover:bg-muted',
+        disabled && 'pointer-events-none opacity-40',
         size === 'icon' && 'px-0',
         className,
       )}
@@ -66,7 +69,7 @@ export function PaginationPrevious({
     <PaginationLink
       aria-label="Go to previous page"
       size="default"
-      className={cn('gap-1 px-3', className)}
+      className={cn('gap-1.5 px-4', className)}
       {...props}
     >
       <ChevronLeft className="size-4" />
@@ -80,7 +83,7 @@ export function PaginationNext({ className, ...props }: React.ComponentPropsWith
     <PaginationLink
       aria-label="Go to next page"
       size="default"
-      className={cn('gap-1 px-3', className)}
+      className={cn('gap-1.5 px-4', className)}
       {...props}
     >
       <span className="hidden sm:inline">Next</span>
@@ -149,6 +152,7 @@ function getPageRange(
 export interface PaginationControlProps {
   page: number;
   totalPages: number;
+  totalItems?: number;
   siblingCount?: number;
   onPageChange: (page: number) => void;
   className?: string;
@@ -157,6 +161,7 @@ export interface PaginationControlProps {
 export function PaginationControl({
   page,
   totalPages,
+  totalItems,
   siblingCount = 1,
   onPageChange,
   className,
@@ -164,36 +169,52 @@ export function PaginationControl({
   if (totalPages <= 1) return null;
 
   const pages = getPageRange(page, totalPages, siblingCount);
+  const handleChange = (next: number) => {
+    onPageChange(next);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   return (
-    <Pagination className={className}>
-      <PaginationContent>
-        <PaginationItem>
-          <PaginationPrevious
-            disabled={page <= 1}
-            onClick={() => onPageChange(Math.max(page - 1, 1))}
-          />
-        </PaginationItem>
-        {pages.map((entry, index) =>
-          entry === 'ellipsis' ? (
-            <PaginationItem key={`ellipsis-${index}`}>
-              <PaginationEllipsis />
-            </PaginationItem>
-          ) : (
-            <PaginationItem key={entry}>
-              <PaginationLink isActive={entry === page} onClick={() => onPageChange(entry)}>
-                {entry}
-              </PaginationLink>
-            </PaginationItem>
-          ),
-        )}
-        <PaginationItem>
-          <PaginationNext
-            disabled={page >= totalPages}
-            onClick={() => onPageChange(Math.min(page + 1, totalPages))}
-          />
-        </PaginationItem>
-      </PaginationContent>
-    </Pagination>
+    <div className={cn('flex flex-col items-center gap-4 pt-2', className)}>
+      <p className="text-muted-foreground text-sm">
+        Page <span className="text-foreground font-semibold">{page}</span> of{' '}
+        <span className="text-foreground font-semibold">{totalPages}</span>
+        {typeof totalItems === 'number' ? (
+          <>
+            {' '}
+            · <span className="text-foreground font-semibold">{totalItems}</span> products
+          </>
+        ) : null}
+      </p>
+      <Pagination>
+        <PaginationContent className="gap-2">
+          <PaginationItem>
+            <PaginationPrevious
+              disabled={page <= 1}
+              onClick={() => handleChange(Math.max(page - 1, 1))}
+            />
+          </PaginationItem>
+          {pages.map((entry, index) =>
+            entry === 'ellipsis' ? (
+              <PaginationItem key={`ellipsis-${index}`}>
+                <PaginationEllipsis />
+              </PaginationItem>
+            ) : (
+              <PaginationItem key={entry}>
+                <PaginationLink isActive={entry === page} onClick={() => handleChange(entry)}>
+                  {entry}
+                </PaginationLink>
+              </PaginationItem>
+            ),
+          )}
+          <PaginationItem>
+            <PaginationNext
+              disabled={page >= totalPages}
+              onClick={() => handleChange(Math.min(page + 1, totalPages))}
+            />
+          </PaginationItem>
+        </PaginationContent>
+      </Pagination>
+    </div>
   );
 }

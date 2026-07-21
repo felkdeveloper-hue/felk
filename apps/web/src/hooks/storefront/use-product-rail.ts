@@ -10,6 +10,13 @@ const RANDOM_PICK = 8;
 
 export type ProductRailKind = 'trending' | 'best-sellers' | 'new-arrivals' | 'random';
 
+export interface ProductRailScope {
+  categoryId?: string;
+  gender?: string;
+  /** Newest uploads by `createdAt` (ignore `isNewArrival` flag). */
+  newestUploads?: boolean;
+}
+
 const railParams: Record<ProductRailKind, ProductListParams> = {
   trending: {
     status: 'active',
@@ -40,6 +47,20 @@ const railParams: Record<ProductRailKind, ProductListParams> = {
   },
 };
 
+function buildRailParams(kind: ProductRailKind, scope?: ProductRailScope): ProductListParams {
+  const base = { ...railParams[kind] };
+
+  if (scope?.newestUploads && kind === 'new-arrivals') {
+    delete base.isNewArrival;
+    base.sortBy = 'createdAt';
+    base.sortOrder = 'desc';
+  }
+  if (scope?.categoryId) base.categoryId = scope.categoryId;
+  if (scope?.gender) base.gender = scope.gender;
+
+  return base;
+}
+
 function shuffleProducts(products: Product[]): Product[] {
   const next = [...products];
   for (let i = next.length - 1; i > 0; i -= 1) {
@@ -49,8 +70,15 @@ function shuffleProducts(products: Product[]): Product[] {
   return next;
 }
 
-export function useProductRail(kind: ProductRailKind) {
-  const params = railParams[kind];
+export function useProductRail(kind: ProductRailKind, scope?: ProductRailScope) {
+  const categoryId = scope?.categoryId;
+  const gender = scope?.gender;
+  const newestUploads = scope?.newestUploads;
+
+  const params = useMemo(
+    () => buildRailParams(kind, { categoryId, gender, newestUploads }),
+    [kind, categoryId, gender, newestUploads],
+  );
 
   const query = useQuery({
     queryKey: QUERY_KEYS.products.list({ rail: kind, ...params }),

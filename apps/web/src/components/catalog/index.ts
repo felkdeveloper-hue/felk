@@ -1,6 +1,7 @@
 export * from './applied-filter-chips';
 export * from './back-to-top';
 export * from './catalog-filter-sidebar';
+export * from './catalog-highlight-rails';
 export * from './catalog-list-shell';
 export * from './catalog-toolbar';
 export * from './price-display';

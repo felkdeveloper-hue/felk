@@ -1,16 +1,30 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Seo } from '@/components/common/seo';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { CatalogListShell } from '@/components/catalog';
 import { buildAbsoluteUrl, siteConfig } from '@/config';
-import { useCatalogSearchParams, useProductsList, useSearchExperience } from '@/hooks/catalog';
+import { useCatalogSearchParams, useInfiniteProducts, useSearchExperience } from '@/hooks/catalog';
+import { CATALOG_MAX_PRODUCTS } from '@/utils/catalog';
 
 export function SearchPage() {
   const { state, setSearch, clearFilters } = useCatalogSearchParams();
   const [input, setInput] = useState(state.q ?? '');
   const search = useSearchExperience(input);
-  const query = useProductsList({ ...state, q: search.debouncedQuery || state.q });
+  const query = useInfiniteProducts({ ...state, q: search.debouncedQuery || state.q });
+
+  const products = useMemo(() => {
+    const flat = query.data?.pages.flatMap((page) => page.data) ?? [];
+    return flat.slice(0, CATALOG_MAX_PRODUCTS);
+  }, [query.data?.pages]);
+
+  const total = query.data?.pages[0]?.meta.total;
+  const hasNextPage = Boolean(query.hasNextPage) && products.length < CATALOG_MAX_PRODUCTS;
+
+  const onLoadMore = useCallback(() => {
+    if (!query.hasNextPage || query.isFetchingNextPage) return;
+    void query.fetchNextPage();
+  }, [query]);
 
   useEffect(() => {
     setInput(state.q ?? '');
@@ -122,17 +136,15 @@ export function SearchPage() {
 
       <CatalogListShell
         title={state.q ? `Results for “${state.q}”` : 'Search products'}
-        description={
-          query.data?.meta.total != null
-            ? `${query.data.meta.total} result${query.data.meta.total === 1 ? '' : 's'}`
-            : undefined
-        }
+        description={total != null ? `${total} result${total === 1 ? '' : 's'}` : undefined}
         state={state}
-        products={query.data?.data ?? []}
-        total={query.data?.meta.total}
-        totalPages={query.data?.meta.totalPages}
+        products={products}
+        total={total}
         isLoading={query.isLoading}
         isError={query.isError}
+        isFetchingNextPage={query.isFetchingNextPage}
+        hasNextPage={hasNextPage}
+        onLoadMore={onLoadMore}
         onRetry={() => void query.refetch()}
         onSearchChange={setSearch}
         onClearFilters={clearFilters}

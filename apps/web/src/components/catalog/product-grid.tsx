@@ -3,6 +3,7 @@ import { ProductGridSkeleton } from '@/components/feedback/skeletons';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { cn } from '@/lib/utils';
+import { CATALOG_BATCH_SIZE } from '@/utils/catalog';
 import { ProductCard } from './product-card';
 
 export interface ProductGridProps {
@@ -11,6 +12,13 @@ export interface ProductGridProps {
   /** When true, cap the grid at 4 columns so cards stay larger beside the sidebar. */
   filtersOpen?: boolean;
   className?: string;
+}
+
+function gridClassName(view: 'grid' | 'list', filtersOpen: boolean) {
+  if (view === 'list') return 'flex flex-col gap-4';
+  return filtersOpen
+    ? 'grid grid-cols-2 gap-4 sm:gap-6 md:grid-cols-3 xl:grid-cols-4'
+    : 'grid grid-cols-2 gap-5 sm:gap-7 md:grid-cols-3 xl:grid-cols-4';
 }
 
 export function ProductGrid({
@@ -29,17 +37,7 @@ export function ProductGrid({
   }
 
   return (
-    <div
-      data-virtual-ready
-      className={cn(
-        view === 'grid'
-          ? filtersOpen
-            ? 'grid grid-cols-2 gap-4 sm:gap-6 md:grid-cols-3 xl:grid-cols-4'
-            : 'grid grid-cols-2 gap-5 sm:gap-7 md:grid-cols-3 xl:grid-cols-4'
-          : 'flex flex-col gap-4',
-        className,
-      )}
-    >
+    <div data-virtual-ready className={cn(gridClassName(view, filtersOpen), className)}>
       {products.map((product) => (
         <ProductCard key={product.id} product={product} layout={view} />
       ))}
@@ -49,20 +47,24 @@ export function ProductGrid({
 
 export function ProductGridSkeletonWrapper({
   view = 'grid',
+  filtersOpen = false,
+  count = CATALOG_BATCH_SIZE,
 }: {
   view?: 'grid' | 'list';
   filtersOpen?: boolean;
+  count?: number;
 }) {
   if (view === 'list') {
     return (
-      <div className="flex flex-col gap-4">
-        {Array.from({ length: 6 }, (_, index) => (
+      <div className="flex flex-col gap-4" aria-busy="true" aria-label="Loading products">
+        {Array.from({ length: Math.min(count, 6) }, (_, index) => (
           <ProductGridSkeleton key={index} count={1} className="grid-cols-1" />
         ))}
       </div>
     );
   }
-  return <ProductGridSkeleton count={8} />;
+
+  return <ProductGridSkeleton count={count} className={cn(gridClassName('grid', filtersOpen))} />;
 }
 
 export function ProductGridError({ onRetry }: { onRetry?: () => void }) {

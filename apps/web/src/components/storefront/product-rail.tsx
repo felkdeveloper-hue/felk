@@ -1,6 +1,10 @@
 import { Link } from '@tanstack/react-router';
 import { ArrowRight } from 'lucide-react';
-import { useProductRail, type ProductRailKind } from '@/hooks/storefront/use-product-rail';
+import {
+  useProductRail,
+  type ProductRailKind,
+  type ProductRailScope,
+} from '@/hooks/storefront/use-product-rail';
 import { Section } from '@/components/common/section';
 import { Button } from '@/components/ui/button';
 import { ProductGridSkeleton } from '@/components/feedback/skeletons';
@@ -38,11 +42,24 @@ export interface ProductRailSectionProps {
   title?: string;
   description?: string;
   eyebrow?: string;
+  scope?: ProductRailScope;
+  /** Hide the whole section when the rail has no products. */
+  hideWhenEmpty?: boolean;
 }
 
-export function ProductRailSection({ kind, title, description, eyebrow }: ProductRailSectionProps) {
+export function ProductRailSection({
+  kind,
+  title,
+  description,
+  eyebrow,
+  scope,
+  hideWhenEmpty = false,
+}: ProductRailSectionProps) {
   const copy = railCopy[kind];
-  const query = useProductRail(kind);
+  const query = useProductRail(kind, scope);
+  const isEmpty = !query.isLoading && !query.isError && !query.data?.data?.length;
+
+  if (hideWhenEmpty && isEmpty) return null;
 
   return (
     <Section
@@ -78,8 +95,8 @@ export function ProductRailSection({ kind, title, description, eyebrow }: Produc
             <ProductGridSkeleton count={4} />
           </div>
         }
-        emptyTitle="Products coming soon"
-        emptyDescription="Our catalog is being curated. Check back shortly."
+        emptyTitle={hideWhenEmpty ? '' : 'Products coming soon'}
+        emptyDescription={hideWhenEmpty ? '' : 'Our catalog is being curated. Check back shortly.'}
       >
         {(result) => (
           <MotionReveal>

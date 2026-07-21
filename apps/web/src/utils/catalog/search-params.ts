@@ -28,11 +28,16 @@ export interface CatalogSearchState {
 
 export const DEFAULT_CATALOG_SEARCH: CatalogSearchState = {
   page: 1,
-  limit: 24,
+  limit: 16,
   sortBy: 'createdAt',
   sortOrder: 'desc',
   view: 'grid',
 };
+
+/** Products fetched per scroll batch on shop pages. */
+export const CATALOG_BATCH_SIZE = 16;
+/** Soft cap for products shown via infinite scroll on a catalog page. */
+export const CATALOG_MAX_PRODUCTS = 50;
 
 export function parseCatalogSearch(search: Record<string, unknown>): CatalogSearchState {
   const num = (value: unknown) => {

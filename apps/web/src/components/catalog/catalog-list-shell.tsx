@@ -1,17 +1,16 @@
 import type { ReactNode } from 'react';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { Container } from '@/components/layout/container';
 import { Button } from '@/components/ui/button';
-import { PaginationControl } from '@/components/ui/pagination';
 import { useDisclosure } from '@/hooks';
+import { useCatalogFilterFacets } from '@/hooks/catalog';
 import { cn } from '@/lib/utils';
+import { CATALOG_BATCH_SIZE, CATALOG_MAX_PRODUCTS, type CatalogSearchState } from '@/utils/catalog';
+import type { Product } from '@/services/sdk';
 import { CatalogFilterSheet, CatalogFilterSidebar } from './catalog-filter-sidebar';
 import { AppliedFilterChips, type AppliedFilterChip } from './applied-filter-chips';
 import { ProductGrid, ProductGridError, ProductGridSkeletonWrapper } from './product-grid';
-import { useCatalogFilterFacets } from '@/hooks/catalog';
-import type { CatalogSearchState } from '@/utils/catalog';
-import type { Product } from '@/services/sdk';
 
 export interface CatalogListShellProps {
   title: string;
@@ -21,9 +20,11 @@ export interface CatalogListShellProps {
   state: CatalogSearchState;
   products: Product[];
   total?: number;
-  totalPages?: number;
   isLoading: boolean;
   isError: boolean;
+  isFetchingNextPage?: boolean;
+  hasNextPage?: boolean;
+  onLoadMore?: () => void;
   onRetry?: () => void;
   onSearchChange: (patch: Partial<CatalogSearchState>) => void;
   onClearFilters: () => void;
@@ -36,15 +37,19 @@ export function CatalogListShell({
   banner,
   state,
   products,
-  totalPages = 1,
+  total,
   isLoading,
   isError,
+  isFetchingNextPage = false,
+  hasNextPage = false,
+  onLoadMore,
   onRetry,
   onSearchChange,
   onClearFilters,
 }: CatalogListShellProps) {
   const facets = useCatalogFilterFacets();
   const { isOpen: filtersOpen, open: openFilters, close: closeFilters } = useDisclosure(true);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
   const chips = useMemo(() => {
     const list: AppliedFilterChip[] = [];
@@ -72,6 +77,30 @@ export function CatalogListShell({
     if (state.rating) add('rating', `Rating ${state.rating}+`);
     return list;
   }, [facets.brands.data?.data, facets.categories.data?.data, state]);
+
+  useEffect(() => {
+    if (!onLoadMore || !hasNextPage || isFetchingNextPage || isLoading) return;
+
+    const node = loadMoreRef.current;
+    if (!node) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          onLoadMore();
+        }
+      },
+      { rootMargin: '320px 0px' },
+    );
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, isLoading, onLoadMore, products.length]);
+
+  const shown = products.length;
+  const catalogTotal = typeof total === 'number' ? total : undefined;
+  const cappedTotal =
+    catalogTotal != null ? Math.min(catalogTotal, CATALOG_MAX_PRODUCTS) : CATALOG_MAX_PRODUCTS;
 
   return (
     <div className="pb-10 sm:pb-14">
@@ -155,18 +184,36 @@ export function CatalogListShell({
             </div>
 
             {isLoading ? (
-              <ProductGridSkeletonWrapper view={state.view} />
+              <ProductGridSkeletonWrapper
+                view={state.view}
+                filtersOpen={filtersOpen}
+                count={CATALOG_BATCH_SIZE}
+              />
             ) : isError ? (
               <ProductGridError onRetry={onRetry} />
             ) : (
-              <ProductGrid products={products} view={state.view} filtersOpen={filtersOpen} />
-            )}
+              <>
+                <ProductGrid products={products} view={state.view} filtersOpen={filtersOpen} />
 
-            <PaginationControl
-              page={state.page ?? 1}
-              totalPages={totalPages}
-              onPageChange={(page) => onSearchChange({ page })}
-            />
+                {isFetchingNextPage ? (
+                  <ProductGridSkeletonWrapper
+                    view={state.view}
+                    filtersOpen={filtersOpen}
+                    count={Math.min(CATALOG_BATCH_SIZE, Math.max(cappedTotal - shown, 4))}
+                  />
+                ) : null}
+
+                {hasNextPage ? (
+                  <div ref={loadMoreRef} className="h-8 w-full" aria-hidden />
+                ) : shown > 0 ? (
+                  <p className="text-muted-foreground pt-2 text-center text-sm">
+                    Showing {shown}
+                    {catalogTotal != null ? ` of ${Math.min(catalogTotal, cappedTotal)}` : ''}{' '}
+                    products
+                  </p>
+                ) : null}
+              </>
+            )}
           </Container>
         </div>
       </div>

@@ -4,6 +4,8 @@ import { productsApi } from '@/services/sdk';
 import {
   applyClientCatalogFilters,
   catalogSearchToProductParams,
+  CATALOG_BATCH_SIZE,
+  CATALOG_MAX_PRODUCTS,
   type CatalogSearchState,
 } from '@/utils/catalog';
 
@@ -25,10 +27,19 @@ export function useProductsList(state: CatalogSearchState) {
 }
 
 export function useInfiniteProducts(state: CatalogSearchState) {
-  const baseParams = catalogSearchToProductParams({ ...state, page: undefined });
+  const baseParams = catalogSearchToProductParams({
+    ...state,
+    page: undefined,
+    limit: CATALOG_BATCH_SIZE,
+  });
 
   return useInfiniteQuery({
-    queryKey: QUERY_KEYS.products.list({ ...baseParams, infinite: true, client: state }),
+    queryKey: QUERY_KEYS.products.list({
+      ...baseParams,
+      infinite: true,
+      max: CATALOG_MAX_PRODUCTS,
+      client: state,
+    }),
     initialPageParam: 1,
     queryFn: async ({ pageParam }) => {
       const result = await productsApi.list({ ...baseParams, page: pageParam });
@@ -37,8 +48,12 @@ export function useInfiniteProducts(state: CatalogSearchState) {
         data: applyClientCatalogFilters(result.data, state),
       };
     },
-    getNextPageParam: (lastPage) =>
-      lastPage.meta.hasNextPage ? lastPage.meta.page + 1 : undefined,
+    getNextPageParam: (lastPage, allPages) => {
+      const loaded = allPages.reduce((sum, page) => sum + page.data.length, 0);
+      if (loaded >= CATALOG_MAX_PRODUCTS) return undefined;
+      if (!lastPage.meta.hasNextPage) return undefined;
+      return lastPage.meta.page + 1;
+    },
     staleTime: 1000 * 60 * 2,
   });
 }
