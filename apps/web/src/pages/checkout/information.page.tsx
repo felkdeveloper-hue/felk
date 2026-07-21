@@ -11,6 +11,7 @@ import {
 } from '@/components/checkout';
 import { AuthErrorAlert } from '@/components/auth/auth-error-alert';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -31,7 +32,6 @@ export function CheckoutInformationPage() {
     typeof navigator !== 'undefined' ? !navigator.onLine : false,
   );
 
-  const checkoutToken = useCheckoutStore((state) => state.checkoutToken);
   const billingSameAsShipping = useCheckoutStore((state) => state.billingSameAsShipping);
   const shippingAddressId = useCheckoutStore((state) => state.selectedShippingAddressId);
   const billingAddressId = useCheckoutStore((state) => state.selectedBillingAddressId);
@@ -69,8 +69,9 @@ export function CheckoutInformationPage() {
           return;
         }
 
-        if (!checkoutToken) {
-          const defaultShipping = addresses?.find((address) => address.isDefaultShipping);
+        if (!useCheckoutStore.getState().checkoutToken) {
+          const latestAddresses = addresses;
+          const defaultShipping = latestAddresses?.find((address) => address.isDefaultShipping);
           await startCheckout.mutateAsync({
             shippingAddressId: defaultShipping?.id,
             autoReserve: true,
@@ -80,12 +81,15 @@ export function CheckoutInformationPage() {
         /* surfaced via mutation state */
       }
     })();
-  }, [addresses, checkoutToken, navigate, startCheckout, validateCart]);
+  }, [addresses, navigate, startCheckout, validateCart]);
 
   useEffect(() => {
-    if (!addresses?.length || shippingAddressId) return;
+    if (!addresses?.length) return;
+    const hasValidSelection =
+      Boolean(shippingAddressId) && addresses.some((address) => address.id === shippingAddressId);
+    if (hasValidSelection) return;
     const defaultShipping = addresses.find((address) => address.isDefaultShipping) ?? addresses[0];
-    if (defaultShipping) setShippingAddressId(defaultShipping.id);
+    if (defaultShipping?.id) setShippingAddressId(defaultShipping.id);
   }, [addresses, shippingAddressId, setShippingAddressId]);
 
   useEffect(() => {
@@ -93,8 +97,9 @@ export function CheckoutInformationPage() {
     setBillingAddressId(shippingAddressId);
   }, [billingSameAsShipping, shippingAddressId, setBillingAddressId]);
 
+  // Session already loaded (e.g. resumed token) — show the form even if validate/start is still running.
   const bootstrapPending =
-    validateCart.isPending || startCheckout.isPending || sessionQuery.isLoading;
+    !session && (validateCart.isPending || startCheckout.isPending || sessionQuery.isLoading);
   const bootstrapError = validateCart.error ?? startCheckout.error ?? sessionQuery.error;
 
   const handleContinue = () => {
@@ -210,9 +215,27 @@ export function CheckoutInformationPage() {
                 showBack={false}
                 onNext={handleContinue}
                 nextLabel="Continue to shipping"
-                nextDisabled={!shippingAddressId || (!billingSameAsShipping && !billingAddressId)}
+                nextDisabled={
+                  !shippingAddressId ||
+                  (!billingSameAsShipping && !billingAddressId) ||
+                  !addresses?.some((address) => address.id === shippingAddressId)
+                }
                 isSubmitting={refreshCheckout.isPending}
               />
+            </div>
+          ) : !bootstrapError ? (
+            <div className="border-border mt-6 rounded-lg border border-dashed p-6 text-center">
+              <p className="text-sm font-medium">Unable to start checkout</p>
+              <p className="text-muted-foreground mt-1 text-sm">
+                Return to your cart and try again.
+              </p>
+              <Button
+                className="mt-4"
+                variant="outline"
+                onClick={() => void navigate({ to: ROUTES.cart })}
+              >
+                Back to cart
+              </Button>
             </div>
           ) : null}
         </section>

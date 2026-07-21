@@ -17,6 +17,7 @@ export interface DataTableProps<T> {
   selectedIds?: string[];
   onToggleRow?: (id: string) => void;
   onToggleAll?: () => void;
+  onRowClick?: (row: T) => void;
   getRowId: (row: T) => string;
 }
 
@@ -28,6 +29,7 @@ export function DataTable<T>({
   selectedIds = [],
   onToggleRow,
   onToggleAll,
+  onRowClick,
   getRowId,
 }: DataTableProps<T>) {
   const allSelected = data.length > 0 && data.every((row) => selectedIds.includes(getRowId(row)));
@@ -88,7 +90,19 @@ export function DataTable<T>({
                 return (
                   <tr
                     key={rowId}
-                    className="border-t border-[var(--admin-line)] hover:bg-neutral-50 dark:hover:bg-white/[0.04]"
+                    className={cn(
+                      'border-t border-[var(--admin-line)] hover:bg-neutral-50 dark:hover:bg-white/[0.04]',
+                      onRowClick && 'cursor-pointer',
+                    )}
+                    onClick={
+                      onRowClick
+                        ? (event) => {
+                            const target = event.target as HTMLElement;
+                            if (target.closest('a, button, input, label, textarea, select')) return;
+                            onRowClick(row);
+                          }
+                        : undefined
+                    }
                   >
                     {onToggleRow ? (
                       <td className="px-4 py-3">

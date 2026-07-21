@@ -5,7 +5,6 @@ import { Seo } from '@/components/common/seo';
 import { buildOrganizationJsonLd, buildWebsiteJsonLd } from '@/lib/seo';
 import { getSetting } from '@/utils/cms';
 import {
-  BottomBannerSection,
   CategoryShowcaseSection,
   HeroBannerSection,
   HomeCategoriesSection,
@@ -67,8 +66,6 @@ export function HomePage() {
         title="More to love"
         description="Another mix of pieces picked just for you."
       />
-
-      <BottomBannerSection />
 
       <CategoryShowcaseSection />
 

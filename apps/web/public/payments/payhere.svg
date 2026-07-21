@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 40" role="img" aria-label="PayHere">
+  <rect width="40" height="40" rx="10" fill="#1A73E8"/>
+  <path fill="#fff" d="M12 11h10.5c4.2 0 7 2.4 7 6.1 0 3.8-2.8 6.2-7.1 6.2H17.6V29h-5.6V11zm5.6 8.4h4.3c1.7 0 2.7-.9 2.7-2.3s-1-2.2-2.7-2.2h-4.3v4.5z"/>
+  <text x="52" y="26" font-family="Inter, Arial, sans-serif" font-size="18" font-weight="700" fill="#1A73E8">PayHere</text>
+</svg>

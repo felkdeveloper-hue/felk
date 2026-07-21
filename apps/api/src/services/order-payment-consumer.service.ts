@@ -10,10 +10,15 @@ import { recordOrderTimeline } from '@/services/order-timeline.service';
 import { publishOrderEvent } from '@/services/order-event-publisher';
 import { writeAuditLog } from '@/services/audit.service';
 import { domainEventBus } from '@/services/events/event-bus';
+import { cartService } from '@/services/cart.service';
 import type { ActorMeta } from '@/services/cms-crud.service';
 import { logger } from '@/config/logger';
 import { ORDER_STATUS } from '@/constants/order-status';
 import { ORDER_AUDIT, ORDER_EVENT_TYPE, CONSUMED_PAYMENT_EVENT_TYPES } from '@/constants/order';
+import { PAYMENT_METHOD } from '@/constants/payment-status';
+import { PAYMENT_EVENT_TYPE } from '@/constants/payment';
+import { publishPaymentEvent } from '@/services/payment-event-publisher';
+import type { PaymentDocument } from '@/models/payment.models';
 
 const SYSTEM_ACTOR: ActorMeta = {};
 const PAYMENT_SUCCEEDED = CONSUMED_PAYMENT_EVENT_TYPES[0];
@@ -210,7 +215,23 @@ export async function handlePaymentSucceededEvent(payload: Record<string, unknow
       note: 'Order created from a verified payment',
     });
 
-    await invoiceService.generate(order);
+    try {
+      await cartService.clear({ customerId: checkout.customerId.toString() }, SYSTEM_ACTOR);
+    } catch (error) {
+      logger.warn(
+        { err: error, customerId: checkout.customerId.toString(), orderId: order._id.toString() },
+        'Failed to clear cart after order creation — continuing',
+      );
+    }
+
+    try {
+      await invoiceService.generate(order);
+    } catch (error) {
+      logger.warn(
+        { err: error, orderId: order._id.toString(), paymentId },
+        'Failed to generate invoice after order creation — continuing',
+      );
+    }
 
     await publishOrderEvent(
       ORDER_EVENT_TYPE.ORDER_CREATED,
@@ -229,6 +250,50 @@ export async function handlePaymentSucceededEvent(payload: Record<string, unknow
   } catch (error) {
     logger.error({ err: error, paymentId }, 'Failed to process PaymentSucceeded event');
   }
+}
+
+/**
+ * COD has no online gateway step — create the order as soon as payment is placed.
+ * Safe to call multiple times (idempotent).
+ */
+export async function fulfillCodPaymentIfNeeded(payment: PaymentDocument): Promise<void> {
+  if (payment.method !== PAYMENT_METHOD.COD) return;
+
+  const paymentId = payment._id.toString();
+  const alreadyExists = await OrderModel.exists({ paymentId });
+  if (alreadyExists) return;
+
+  const succeededPayload = {
+    paymentId,
+    checkoutToken: payment.checkoutToken,
+    amount: payment.amount,
+    currency: payment.currency,
+    method: payment.method,
+  };
+
+  await publishPaymentEvent(PAYMENT_EVENT_TYPE.PAYMENT_SUCCEEDED, succeededPayload, {
+    paymentId,
+    checkoutId: payment.checkoutId.toString(),
+  });
+  await handlePaymentSucceededEvent(succeededPayload);
+}
+
+/** Backfill orders for COD payments that were created before fulfillment ran. */
+export async function catchUpOrphanCodPayments(): Promise<{ scanned: number; fulfilled: number }> {
+  const payments = await PaymentModel.find({
+    method: PAYMENT_METHOD.COD,
+    isDeleted: false,
+  }).limit(200);
+
+  let fulfilled = 0;
+  for (const payment of payments) {
+    const exists = await OrderModel.exists({ paymentId: payment._id });
+    if (exists) continue;
+    await fulfillCodPaymentIfNeeded(payment);
+    fulfilled += 1;
+  }
+
+  return { scanned: payments.length, fulfilled };
 }
 
 /** Registers the real-time, in-process subscription. Call once at bootstrap. */

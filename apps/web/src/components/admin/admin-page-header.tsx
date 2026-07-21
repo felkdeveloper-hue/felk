@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Link } from '@tanstack/react-router';
 import { cn } from '@/lib/utils';
 
 export function AdminPageHeader({
@@ -35,16 +36,19 @@ export function AdminStatCard({
   value,
   hint,
   className,
+  to,
 }: {
   title: string;
   value: string | number;
   hint?: string;
   className?: string;
+  to?: string;
 }) {
-  return (
+  const card = (
     <article
       className={cn(
         'rounded-2xl border border-[var(--admin-line)] bg-[var(--admin-panel)] p-5 shadow-[var(--admin-shadow)] transition-colors',
+        to && 'hover:border-[var(--admin-accent)]/40 hover:bg-[var(--admin-surface)]',
         className,
       )}
     >
@@ -57,6 +61,19 @@ export function AdminStatCard({
       {hint ? <p className="mt-2 text-xs text-neutral-500 dark:text-neutral-400">{hint}</p> : null}
     </article>
   );
+
+  if (to) {
+    return (
+      <Link
+        to={to}
+        className="block rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--admin-accent)]"
+      >
+        {card}
+      </Link>
+    );
+  }
+
+  return card;
 }
 
 export function AdminPanel({ title, children }: { title?: string; children: ReactNode }) {

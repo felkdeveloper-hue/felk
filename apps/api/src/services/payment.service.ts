@@ -8,6 +8,7 @@ import {
   type PaymentDocument,
 } from '@/models/payment.models';
 import { CheckoutSessionModel } from '@/models/checkout.models';
+import { OrderModel } from '@/models/order.models';
 import { checkoutService } from '@/services/checkout.service';
 import { customerService } from '@/services/customer.service';
 import { getGateway, isKnownGateway } from '@/services/gateways/registry';
@@ -21,6 +22,7 @@ import { buildPaginationMeta, getPaginationSkip, parsePagination } from '@/utils
 import {
   PAYMENT_STATUS,
   PAYMENT_TERMINAL_SUCCESS_STATUSES,
+  PAYMENT_METHOD,
   type PaymentMethod,
 } from '@/constants/payment-status';
 import { CHECKOUT_STATUS } from '@/constants/checkout';
@@ -35,6 +37,7 @@ import type { AuthenticatedUser } from '@/types';
 import { analyticsService } from '@/services/analytics/analytics.service';
 import { emailQueueService } from '@/services/email-queue.service';
 import { paymentSuccessfulEmail, paymentFailedEmail } from '@/emails';
+import { fulfillCodPaymentIfNeeded } from '@/services/order-payment-consumer.service';
 
 function toPlain(doc: { toObject: () => Record<string, unknown> }) {
   return doc.toObject();
@@ -128,7 +131,8 @@ export class PaymentService {
           // between create() and createAttempt()) — finish creating it now.
           return this.createAttempt(payment, customer.email, actor);
         }
-        // Idempotent — same in-flight payment, no new attempt needed.
+        // Idempotent — same in-flight payment. For COD, still ensure order exists.
+        await fulfillCodPaymentIfNeeded(payment);
         return this.toSummary(payment, { includeRedirect: true });
       }
       if (!RETRYABLE_STATUSES.includes(payment.status as never)) {
@@ -325,6 +329,11 @@ export class PaymentService {
         })
         .catch(() => {});
 
+      // COD has no gateway redirect — create order + clear cart immediately.
+      if (payment.method === PAYMENT_METHOD.COD) {
+        await fulfillCodPaymentIfNeeded(payment);
+      }
+
       return this.toSummary(payment, { includeRedirect: true });
     } catch (error) {
       attempt.status = PAYMENT_ATTEMPT_STATUS.FAILED;
@@ -377,12 +386,19 @@ export class PaymentService {
     });
     if (!payment) throw ApiError.notFound('No payment found for this checkout');
 
+    // Heal stuck COD checkouts where payment exists but order was never created.
+    await fulfillCodPaymentIfNeeded(payment);
+
+    const order = await OrderModel.findOne({ paymentId: payment._id });
+
     return {
       checkoutToken: payment.checkoutToken,
       status: payment.status,
       method: payment.method,
       amount: payment.amount,
       currency: payment.currency,
+      orderId: order?._id.toString() ?? null,
+      orderNumber: order?.orderNumber ?? null,
       redirectUrl:
         NON_TERMINAL_STATUSES.includes(payment.status as never) && payment.expiresAt > new Date()
           ? payment.redirectUrl

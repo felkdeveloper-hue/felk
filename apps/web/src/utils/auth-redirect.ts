@@ -28,7 +28,7 @@ export function getAuthRedirectTarget(redirect?: string): string {
   ) {
     return redirect;
   }
-  return ROUTES.account;
+  return ROUTES.home;
 }
 
 export function parseAuthRedirectSearch(search: Record<string, unknown>) {

@@ -20,8 +20,12 @@ export function usePaymentStatusQuery(checkoutToken?: string | null, options?: {
     enabled: Boolean(checkoutToken),
     refetchInterval: (query) => {
       if (!options?.poll) return false;
-      const status = query.state.data?.status;
-      if (status && TERMINAL_STATUSES.includes(status)) return false;
+      const data = query.state.data;
+      if (!data) return 2000;
+      // COD is confirmed once an order exists (fulfilled at placement or on status probe).
+      if (data.method === 'cod') return data.orderNumber ? false : 2000;
+      if (TERMINAL_STATUSES.includes(data.status)) return false;
+      if (data.status === 'paid' || data.status === 'authorized') return false;
       return 2000;
     },
   });
@@ -67,7 +71,10 @@ export function usePlaceOrderMutation() {
         ...urls,
       });
     },
-    onMutate: () => setRedirecting(true),
+    onMutate: ({ method }) => {
+      // Only gateways need the redirect overlay; COD navigates straight to success.
+      if (method !== 'cod') setRedirecting(true);
+    },
     onSettled: () => setRedirecting(false),
   });
 }

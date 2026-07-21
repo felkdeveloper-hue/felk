@@ -6,6 +6,7 @@ import { registerGracefulShutdown } from '@/utils/shutdown';
 import {
   initOrderPaymentConsumer,
   catchUpUnconsumedPaymentEvents,
+  catchUpOrphanCodPayments,
 } from '@/services/order-payment-consumer.service';
 import { startCronJobs } from '@/cron';
 
@@ -32,6 +33,18 @@ async function bootstrap(): Promise<void> {
       })
       .catch((error) => {
         logger.error({ err: error }, 'Order catch-up scan failed');
+      });
+    catchUpOrphanCodPayments()
+      .then(({ scanned, fulfilled }) => {
+        if (fulfilled > 0) {
+          logger.info(
+            { scanned, fulfilled },
+            'COD catch-up: created orders from orphan cash-on-delivery payments',
+          );
+        }
+      })
+      .catch((error) => {
+        logger.error({ err: error }, 'COD catch-up scan failed');
       });
   } catch (error) {
     logger.warn({ err: error }, 'MongoDB unavailable — starting in degraded mode');

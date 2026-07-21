@@ -18,8 +18,8 @@ export type {
 export { cmsApi, createCmsResourceApi } from './cms';
 export type { CmsResource } from './cms';
 
-export { ordersApi } from './orders';
-export type { AdminOrder, OrderListParams } from './orders';
+export { ordersApi, formatOrderAddress } from './orders';
+export type { AdminOrder, AdminOrderAddress, OrderListParams } from './orders';
 
 export { customersApi } from './customers';
 export type { AdminCustomer } from './customers';

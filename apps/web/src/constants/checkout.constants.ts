@@ -21,32 +21,25 @@ export interface ShippingMethodOption {
   label: string;
   description: string;
   deliveryMethod?: 'delivery' | 'pickup';
+  eta: string;
+  badge?: string;
 }
 
 export const SHIPPING_METHOD_OPTIONS: ShippingMethodOption[] = [
   {
     id: 'standard',
     label: 'Standard shipping',
-    description: 'Delivered in 3–7 business days',
+    description: 'Reliable doorstep delivery across Sri Lanka',
     deliveryMethod: 'delivery',
-  },
-  {
-    id: 'express',
-    label: 'Express shipping',
-    description: 'Delivered in 1–2 business days',
-    deliveryMethod: 'delivery',
+    eta: '3–7 business days',
   },
   {
     id: 'free',
     label: 'Free shipping',
     description: 'Economy delivery at no extra cost',
     deliveryMethod: 'delivery',
-  },
-  {
-    id: 'pickup',
-    label: 'Store pickup',
-    description: 'Collect from our warehouse',
-    deliveryMethod: 'pickup',
+    eta: '5–10 business days',
+    badge: 'Best value',
   },
 ];
 
@@ -55,61 +48,42 @@ export interface PaymentMethodOption {
   label: string;
   description: string;
   enabled: boolean;
-  comingSoon?: boolean;
+  logoSrc: string;
+  accent: string;
 }
 
 export const PAYMENT_METHOD_OPTIONS: PaymentMethodOption[] = [
   {
     id: 'payhere',
     label: 'PayHere',
-    description: 'Cards and local payment methods via PayHere',
+    description: 'Visa, Mastercard & local banking',
     enabled: true,
+    logoSrc: '/payments/payhere.svg',
+    accent: '#1A73E8',
   },
   {
     id: 'koko',
     label: 'Koko',
-    description: 'Buy now, pay later with Koko',
+    description: 'Buy now, pay later in installments',
     enabled: true,
+    logoSrc: '/payments/koko.svg',
+    accent: '#6C2BD9',
   },
   {
     id: 'mintpay',
     label: 'Mintpay',
-    description: 'Flexible installments with Mintpay',
+    description: 'Flexible interest-free payments',
     enabled: true,
+    logoSrc: '/payments/mintpay.svg',
+    accent: '#00A86B',
   },
   {
     id: 'cod',
     label: 'Cash on delivery',
-    description: 'Pay when your order arrives',
+    description: 'Pay in cash when your order arrives',
     enabled: true,
-  },
-  {
-    id: 'stripe',
-    label: 'Stripe',
-    description: 'International cards',
-    enabled: false,
-    comingSoon: true,
-  },
-  {
-    id: 'paypal',
-    label: 'PayPal',
-    description: 'Pay with your PayPal balance',
-    enabled: false,
-    comingSoon: true,
-  },
-  {
-    id: 'apple_pay',
-    label: 'Apple Pay',
-    description: 'One-tap checkout on Apple devices',
-    enabled: false,
-    comingSoon: true,
-  },
-  {
-    id: 'google_pay',
-    label: 'Google Pay',
-    description: 'Fast checkout with Google Pay',
-    enabled: false,
-    comingSoon: true,
+    logoSrc: '/payments/cod.svg',
+    accent: '#C45C26',
   },
 ];
 

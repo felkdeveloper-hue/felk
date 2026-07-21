@@ -7,14 +7,8 @@ import { SectionSkeleton } from './section-skeleton';
 const FeaturedCollectionsSection = lazy(() =>
   import('./featured-collections').then((m) => ({ default: m.FeaturedCollectionsSection })),
 );
-const FeaturedCategoriesSection = lazy(() =>
-  import('./featured-categories').then((m) => ({ default: m.FeaturedCategoriesSection })),
-);
 const FeaturedBrandsSection = lazy(() =>
   import('./featured-brands').then((m) => ({ default: m.FeaturedBrandsSection })),
-);
-const PromoBannerSection = lazy(() =>
-  import('./promo-banner').then((m) => ({ default: m.PromoBannerSection })),
 );
 const EditorialSection = lazy(() =>
   import('./editorial-section').then((m) => ({ default: m.EditorialSection })),
@@ -65,11 +59,7 @@ export function HomeSectionRenderer({ section }: HomeSectionRendererProps) {
       // Rendered after the summer banner on the home page — skip CMS duplicate.
       return null;
     case HOME_SECTION_KEYS.newArrivals:
-      return (
-        <LazySection>
-          <FeaturedCategoriesSection section={section} />
-        </LazySection>
-      );
+      return null;
     case HOME_SECTION_KEYS.featuredBrands:
       return (
         <LazySection>
@@ -77,14 +67,7 @@ export function HomeSectionRenderer({ section }: HomeSectionRendererProps) {
         </LazySection>
       );
     case HOME_SECTION_KEYS.promotionalBanner:
-      return (
-        <LazySection>
-          <PromoBannerSection
-            section={section}
-            placement={(section.config?.placement as string) ?? 'home'}
-          />
-        </LazySection>
-      );
+      return null;
     case HOME_SECTION_KEYS.editorial:
       return (
         <LazySection>

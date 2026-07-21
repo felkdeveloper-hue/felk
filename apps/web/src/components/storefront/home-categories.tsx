@@ -36,7 +36,7 @@ type HomeCategoryTile = {
 function resolveHomeTiles(apiCategories: Category[] | undefined): HomeCategoryTile[] {
   const bySlug = new Map(
     (apiCategories ?? [])
-      .filter((category) => category.status !== 'archived')
+      .filter((category) => !category.parentId && category.status !== 'archived')
       .map((category) => [category.slug, category]),
   );
 

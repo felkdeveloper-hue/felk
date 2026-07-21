@@ -28,6 +28,18 @@ import {
 const image = (id: string, width = 1200, height = 1600) =>
   `https://images.unsplash.com/${id}?auto=format&fit=crop&w=${width}&h=${height}&q=86`;
 
+/** Homepage tiles managed by seed-home-categories — do not overwrite images here. */
+const HOME_CATEGORY_SLUGS = new Set([
+  'new-arrivals',
+  'jeans',
+  'oversized',
+  'corset',
+  'hoodies',
+  'jackets',
+  'bags',
+  'shoes',
+]);
+
 const categories = [
   ['Shirts', 'shirts', 'photo-1596755094514-f87e34085b2c'],
   ['Shoes', 'shoes', 'photo-1542291026-7eec264c27ff'],
@@ -205,6 +217,9 @@ const products = [
 async function upsertMasterData() {
   const categoryDocs = new Map<string, any>();
   for (const [name, slug, imageId] of categories) {
+    const existing = await CategoryModel.findOne({ slug }).lean();
+    const preserveHomeImage = HOME_CATEGORY_SLUGS.has(slug) && existing?.image?.url;
+
     const doc = await CategoryModel.findOneAndUpdate(
       { slug },
       {
@@ -212,7 +227,9 @@ async function upsertMasterData() {
           name,
           slug,
           description: `Shop the latest ${name.toLowerCase()} edit.`,
-          image: { url: image(imageId, 1000, 1000), alt: `${name} collection` },
+          ...(preserveHomeImage
+            ? {}
+            : { image: { url: image(imageId, 1000, 1000), alt: `${name} collection` } }),
           status: 'active',
           sortOrder: categoryDocs.size,
           isDeleted: false,
@@ -521,38 +538,40 @@ async function seedHomepage() {
     },
   ] as const;
 
-  for (const slide of heroSlides) {
-    const desktop = image(slide.photo, 2200, 1400);
-    await HeroBannerModel.findOneAndUpdate(
-      { title: slide.title },
-      {
-        $set: {
-          title: slide.title,
-          subtitle: slide.subtitle,
-          images: {
-            desktop: { url: desktop, alt: slide.alt },
-            tablet: { url: desktop, alt: slide.alt },
-            mobile: {
-              url: image(slide.photo, 900, 1400),
-              alt: slide.alt,
-            },
-          },
-          ctaLabel: slide.ctaLabel,
-          ctaUrl: '/products',
-          priority: slide.priority,
-          status: 'active',
-          isDeleted: false,
-          deletedAt: null,
-        },
-      },
-      { upsert: true },
-    );
-  }
+  const existingHeroCount = await HeroBannerModel.countDocuments({
+    status: 'active',
+    isDeleted: false,
+  });
 
-  await HeroBannerModel.updateMany(
-    { title: { $nin: heroSlides.map((slide) => slide.title) } },
-    { $set: { status: 'inactive' } },
-  );
+  if (existingHeroCount === 0) {
+    for (const slide of heroSlides) {
+      const desktop = image(slide.photo, 2200, 1400);
+      await HeroBannerModel.findOneAndUpdate(
+        { title: slide.title },
+        {
+          $set: {
+            title: slide.title,
+            subtitle: slide.subtitle,
+            images: {
+              desktop: { url: desktop, alt: slide.alt },
+              tablet: { url: desktop, alt: slide.alt },
+              mobile: {
+                url: image(slide.photo, 900, 1400),
+                alt: slide.alt,
+              },
+            },
+            ctaLabel: slide.ctaLabel,
+            ctaUrl: '/products',
+            priority: slide.priority,
+            status: 'active',
+            isDeleted: false,
+            deletedAt: null,
+          },
+        },
+        { upsert: true },
+      );
+    }
+  }
 
   await PromoBannerModel.findOneAndUpdate(
     { placement: 'home' },

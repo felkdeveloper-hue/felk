@@ -4,6 +4,8 @@ import { AdminLayout } from '@/layouts';
 import { AdminStaffRoute, AdminPermissionRoute } from '@/guards';
 import { PlaceholderModulePage } from '@/components/admin';
 import { DashboardPage } from '@/pages/admin/dashboard/dashboard-page';
+import { OrdersListPage } from '@/pages/admin/orders/orders-list-page';
+import { OrderDetailPage } from '@/pages/admin/orders/order-detail-page';
 import { ProductsListPage } from '@/pages/admin/products/products-list-page';
 import { ProductFormPage } from '@/pages/admin/products/product-form-page';
 import {
@@ -171,7 +173,7 @@ const adminOrdersRoute = createRoute({
   path: 'orders',
   component: () => (
     <AdminPermissionRoute permissions={[PERMISSIONS.ORDERS_VIEW, PERMISSIONS.ORDERS_READ]}>
-      <PlaceholderModulePage title="Orders" description="Full order management coming soon." />
+      <OrdersListPage />
     </AdminPermissionRoute>
   ),
 });
@@ -179,11 +181,14 @@ const adminOrdersRoute = createRoute({
 const adminOrderDetailRoute = createRoute({
   getParentRoute: () => adminLayoutRoute,
   path: 'orders/$orderId',
-  component: () => (
-    <AdminPermissionRoute permissions={[PERMISSIONS.ORDERS_VIEW, PERMISSIONS.ORDERS_READ]}>
-      <PlaceholderModulePage title="Order detail" description="Order detail view coming soon." />
-    </AdminPermissionRoute>
-  ),
+  component: function AdminOrderDetailRoute() {
+    const { orderId } = adminOrderDetailRoute.useParams();
+    return (
+      <AdminPermissionRoute permissions={[PERMISSIONS.ORDERS_VIEW, PERMISSIONS.ORDERS_READ]}>
+        <OrderDetailPage orderId={orderId} />
+      </AdminPermissionRoute>
+    );
+  },
 });
 
 const adminCustomersRoute = createRoute({

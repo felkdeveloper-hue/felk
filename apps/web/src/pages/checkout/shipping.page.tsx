@@ -11,6 +11,7 @@ import {
 import { AuthErrorAlert } from '@/components/auth/auth-error-alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ROUTES } from '@/constants';
+import { SHIPPING_METHOD_OPTIONS } from '@/constants/checkout.constants';
 import { useCheckoutSessionQuery, useRefreshCheckoutMutation } from '@/hooks/checkout';
 import { useCheckoutStore } from '@/store';
 
@@ -31,10 +32,19 @@ export function CheckoutShippingPage() {
   }, [checkoutToken, navigate, sessionQuery.isLoading]);
 
   useEffect(() => {
-    if (session?.shippingMethod) {
-      setShippingMethod(session.shippingMethod);
-    }
+    if (!session?.shippingMethod) return;
+    const allowed = new Set(SHIPPING_METHOD_OPTIONS.map((option) => option.id));
+    setShippingMethod(allowed.has(session.shippingMethod) ? session.shippingMethod : 'standard');
   }, [session?.shippingMethod, setShippingMethod]);
+
+  useEffect(() => {
+    const allowed = new Set(SHIPPING_METHOD_OPTIONS.map((option) => option.id));
+    if (!allowed.has(shippingMethod)) {
+      setShippingMethod('standard');
+    }
+    // Only normalize a persisted invalid method once on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleContinue = () => {
     if (!session?.checkoutToken) return;

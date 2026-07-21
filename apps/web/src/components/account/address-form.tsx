@@ -22,6 +22,31 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
+/** Convert ISO 3166-1 alpha-2 code to a regional-indicator flag emoji. */
+function countryFlag(code: string) {
+  return [...code.toUpperCase()]
+    .map((char) => String.fromCodePoint(0x1f1e6 + char.charCodeAt(0) - 65))
+    .join('');
+}
+
+const COUNTRY_OPTIONS = [
+  { value: 'LK', label: 'Sri Lanka' },
+  { value: 'IN', label: 'India' },
+  { value: 'AE', label: 'United Arab Emirates' },
+  { value: 'SG', label: 'Singapore' },
+  { value: 'MY', label: 'Malaysia' },
+  { value: 'GB', label: 'United Kingdom' },
+  { value: 'US', label: 'United States' },
+  { value: 'AU', label: 'Australia' },
+  { value: 'CA', label: 'Canada' },
+  { value: 'DE', label: 'Germany' },
+  { value: 'FR', label: 'France' },
+  { value: 'JP', label: 'Japan' },
+].map((country) => ({
+  ...country,
+  flag: countryFlag(country.value),
+}));
+
 export interface AddressFormProps {
   address?: CustomerAddress;
   onSubmit: (values: CustomerAddressInput) => void;
@@ -42,7 +67,7 @@ export function AddressForm({ address, onSubmit, onCancel, isSubmitting }: Addre
       city: '',
       state: '',
       postalCode: '',
-      country: 'US',
+      country: 'LK',
       isDefaultShipping: false,
       isDefaultBilling: false,
     },
@@ -185,9 +210,36 @@ export function AddressForm({ address, onSubmit, onCancel, isSubmitting }: Addre
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Country</FormLabel>
-                <FormControl>
-                  <Input autoComplete="country" maxLength={2} {...field} />
-                </FormControl>
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <FormControl>
+                    <SelectTrigger aria-label="Country">
+                      <SelectValue placeholder="Select country" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {COUNTRY_OPTIONS.map((country) => (
+                      <SelectItem key={country.value} value={country.value}>
+                        <span className="flex items-center gap-2">
+                          <span aria-hidden className="text-base leading-none">
+                            {country.flag}
+                          </span>
+                          <span>{country.label}</span>
+                        </span>
+                      </SelectItem>
+                    ))}
+                    {field.value &&
+                    !COUNTRY_OPTIONS.some((country) => country.value === field.value) ? (
+                      <SelectItem value={field.value}>
+                        <span className="flex items-center gap-2">
+                          <span aria-hidden className="text-base leading-none">
+                            {countryFlag(field.value)}
+                          </span>
+                          <span>{field.value}</span>
+                        </span>
+                      </SelectItem>
+                    ) : null}
+                  </SelectContent>
+                </Select>
                 <FormMessage />
               </FormItem>
             )}

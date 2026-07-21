@@ -1,4 +1,5 @@
 import { http } from '@/lib/http-client';
+import { normalizeId } from '@/lib/utils';
 import type { MessageResult } from '@/types';
 
 export interface CustomerProfile {
@@ -105,6 +106,31 @@ export interface ReferralSummary {
   [key: string]: unknown;
 }
 
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+}
+
+/** API returns Mongo `_id`; storefront always uses `id`. */
+function normalizeAddress(raw: unknown): CustomerAddress {
+  const record = asRecord(raw);
+  return {
+    ...record,
+    id: normalizeId(record),
+    type: typeof record.type === 'string' ? record.type : undefined,
+    label: typeof record.label === 'string' ? record.label : undefined,
+    fullName: String(record.fullName ?? ''),
+    phone: typeof record.phone === 'string' ? record.phone : undefined,
+    line1: String(record.line1 ?? ''),
+    line2: typeof record.line2 === 'string' ? record.line2 : null,
+    city: String(record.city ?? ''),
+    state: typeof record.state === 'string' ? record.state : null,
+    postalCode: typeof record.postalCode === 'string' ? record.postalCode : undefined,
+    country: String(record.country ?? ''),
+    isDefaultShipping: Boolean(record.isDefaultShipping),
+    isDefaultBilling: Boolean(record.isDefaultBilling),
+  };
+}
+
 /** Typed SDK for `/customers/me/*` (self-service storefront account). */
 export const customersApi = {
   getMe(): Promise<CustomerProfile> {
@@ -123,19 +149,22 @@ export const customersApi = {
     return http.patch<CustomerPreferences>('/customers/me/preferences', payload);
   },
 
-  listAddresses(): Promise<CustomerAddress[]> {
-    return http.get<CustomerAddress[]>('/customers/me/addresses');
+  async listAddresses(): Promise<CustomerAddress[]> {
+    const rows = await http.get<unknown[]>('/customers/me/addresses');
+    return (Array.isArray(rows) ? rows : []).map(normalizeAddress);
   },
 
-  createAddress(payload: CustomerAddressInput): Promise<CustomerAddress> {
-    return http.post<CustomerAddress>('/customers/me/addresses', payload);
+  async createAddress(payload: CustomerAddressInput): Promise<CustomerAddress> {
+    const created = await http.post<unknown>('/customers/me/addresses', payload);
+    return normalizeAddress(created);
   },
 
-  updateAddress(
+  async updateAddress(
     addressId: string,
     payload: Partial<CustomerAddressInput>,
   ): Promise<CustomerAddress> {
-    return http.patch<CustomerAddress>(`/customers/me/addresses/${addressId}`, payload);
+    const updated = await http.patch<unknown>(`/customers/me/addresses/${addressId}`, payload);
+    return normalizeAddress(updated);
   },
 
   removeAddress(addressId: string): Promise<MessageResult> {

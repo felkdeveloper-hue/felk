@@ -59,6 +59,8 @@ export interface PaymentStatusResult {
   method: string;
   amount: number;
   currency: string;
+  orderId?: string | null;
+  orderNumber?: string | null;
   redirectUrl?: string | null;
   updatedAt?: string;
 }
@@ -103,6 +105,18 @@ function normalizePaymentStatus(raw: unknown): PaymentStatusResult {
     method: String(record.method ?? ''),
     amount: Number(record.amount ?? 0),
     currency: String(record.currency ?? 'LKR'),
+    orderId:
+      typeof record.orderId === 'string'
+        ? record.orderId
+        : record.orderId === null
+          ? null
+          : undefined,
+    orderNumber:
+      typeof record.orderNumber === 'string'
+        ? record.orderNumber
+        : record.orderNumber === null
+          ? null
+          : undefined,
     redirectUrl:
       typeof record.redirectUrl === 'string'
         ? record.redirectUrl

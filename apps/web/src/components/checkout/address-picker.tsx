@@ -82,7 +82,7 @@ export function AddressPicker({ label, selectedId, onSelect, filter }: AddressPi
               htmlFor={`address-${address.id}`}
               className={cn(
                 'flex cursor-pointer gap-3 rounded-lg border p-4 transition-colors',
-                selectedId === address.id
+                selectedId && selectedId === address.id
                   ? 'border-primary ring-primary/30 ring-1'
                   : 'border-border',
               )}

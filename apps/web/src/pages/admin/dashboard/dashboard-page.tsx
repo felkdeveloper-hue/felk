@@ -1,4 +1,4 @@
-import { Link } from '@tanstack/react-router';
+import { Link, useNavigate } from '@tanstack/react-router';
 import {
   AdminErrorState,
   AdminPageHeader,
@@ -12,6 +12,7 @@ import { useDashboardStatsQuery } from '@/hooks/admin';
 import { formatCurrency, formatDate } from '@/lib/utils';
 
 export function DashboardPage() {
+  const navigate = useNavigate();
   const stats = useDashboardStatsQuery();
 
   if (stats.isError) {
@@ -50,10 +51,19 @@ export function DashboardPage() {
           title="Revenue"
           value={formatCurrency(data?.revenue ?? 0)}
           hint="From recent payments"
+          to={ADMIN_ROUTES.finance}
         />
-        <AdminStatCard title="Orders" value={data?.orderCount ?? 0} />
-        <AdminStatCard title="Customers" value={data?.customerCount ?? 0} />
-        <AdminStatCard title="Products" value={data?.productCount ?? 0} />
+        <AdminStatCard title="Orders" value={data?.orderCount ?? 0} to={ADMIN_ROUTES.orders} />
+        <AdminStatCard
+          title="Customers"
+          value={data?.customerCount ?? 0}
+          to={ADMIN_ROUTES.customers}
+        />
+        <AdminStatCard
+          title="Products"
+          value={data?.productCount ?? 0}
+          to={ADMIN_ROUTES.products}
+        />
       </div>
 
       <div className="mt-4 grid gap-4 md:grid-cols-3">
@@ -61,9 +71,18 @@ export function DashboardPage() {
           title="Low stock"
           value={data?.lowStock ?? 0}
           hint="SKUs at or below threshold"
+          to={ADMIN_ROUTES.inventory}
         />
-        <AdminStatCard title="Pending returns" value={data?.pendingReturns ?? 0} />
-        <AdminStatCard title="Inventory alerts" value={data?.alertCount ?? 0} />
+        <AdminStatCard
+          title="Pending returns"
+          value={data?.pendingReturns ?? 0}
+          to={ADMIN_ROUTES.orders}
+        />
+        <AdminStatCard
+          title="Inventory alerts"
+          value={data?.alertCount ?? 0}
+          to={ADMIN_ROUTES.inventory}
+        />
       </div>
 
       <div className="mt-6 grid gap-6 xl:grid-cols-[2fr_1fr]">
@@ -72,13 +91,17 @@ export function DashboardPage() {
             data={data?.recentOrders ?? []}
             isLoading={stats.isLoading}
             getRowId={(row) => row.id}
+            onRowClick={(row) => {
+              void navigate({ to: ADMIN_ROUTES.orderDetail, params: { orderId: row.id } });
+            }}
             columns={[
               {
                 id: 'order',
                 header: 'Order',
                 cell: (row) => (
                   <Link
-                    to={ADMIN_ROUTES.orderDetail.replace('$orderId', row.id)}
+                    to={ADMIN_ROUTES.orderDetail}
+                    params={{ orderId: row.id }}
                     className="font-medium hover:underline"
                   >
                     {row.orderNumber}
@@ -112,18 +135,20 @@ export function DashboardPage() {
           <AdminPanel title="Recent activity">
             <ul className="space-y-3 text-sm text-neutral-600 dark:text-neutral-300">
               {(data?.recentPayments ?? []).slice(0, 5).map((payment) => (
-                <li
-                  key={payment.id}
-                  className="flex items-start gap-3 border-b border-[var(--admin-line)] pb-3 last:border-0 last:pb-0"
-                >
-                  <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-[var(--admin-accent)]" />
-                  <span>
-                    Payment {payment.referenceNumber ?? payment.id}
-                    <span className="text-neutral-400 dark:text-neutral-500">
-                      {' '}
-                      · {payment.status}
+                <li key={payment.id}>
+                  <Link
+                    to={ADMIN_ROUTES.finance}
+                    className="flex items-start gap-3 border-b border-[var(--admin-line)] pb-3 transition last:border-0 last:pb-0 hover:text-[var(--admin-accent)]"
+                  >
+                    <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-[var(--admin-accent)]" />
+                    <span>
+                      Payment {payment.referenceNumber ?? payment.id}
+                      <span className="text-neutral-400 dark:text-neutral-500">
+                        {' '}
+                        · {payment.status}
+                      </span>
                     </span>
-                  </span>
+                  </Link>
                 </li>
               ))}
               {!stats.isLoading && (data?.recentPayments?.length ?? 0) === 0 ? (

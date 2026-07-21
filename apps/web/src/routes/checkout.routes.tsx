@@ -23,7 +23,7 @@ export const checkoutLayoutRoute = createRoute({
 
 export const checkoutIndexRoute = createRoute({
   getParentRoute: () => checkoutLayoutRoute,
-  id: 'checkout-index',
+  path: '/',
   component: CheckoutInformationPage,
 });
 
