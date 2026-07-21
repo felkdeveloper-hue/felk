@@ -129,7 +129,7 @@ function ShowcasePanel({
   const src = keySide === 'left' ? category.leftImage : category.rightImage;
 
   return (
-    <div className="bg-muted aspect-3/4 relative mx-auto w-full max-w-[32rem] overflow-hidden rounded-2xl shadow-[var(--shadow-soft)] transition-shadow duration-500 hover:shadow-[var(--shadow-elevated)] sm:max-w-[36rem] sm:rounded-[1.5rem] lg:max-h-[50rem] lg:max-w-none xl:max-h-[52rem]">
+    <div className="bg-muted aspect-3/4 relative mx-auto w-full max-w-[32rem] overflow-hidden rounded-2xl shadow-[var(--shadow-soft)] transition-shadow duration-500 hover:shadow-[var(--shadow-elevated)] sm:max-w-[36rem] sm:rounded-[1.5rem] lg:max-h-[46rem] lg:max-w-none xl:max-h-[47rem]">
       <AnimatePresence mode="sync" initial={false}>
         <motion.div
           key={`${category.id}-${keySide}`}
