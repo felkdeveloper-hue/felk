@@ -73,7 +73,50 @@ export function CategoryShowcaseSection({
       className="bg-background"
       aria-label={section?.title ?? 'Shop by category'}
     >
-      <div className="mx-auto grid w-full max-w-[1680px] items-center gap-8 px-4 sm:gap-10 sm:px-6 lg:grid-cols-[minmax(0,34rem)_minmax(12rem,1fr)_minmax(0,34rem)] lg:gap-10 lg:px-8 xl:max-w-[1800px] xl:grid-cols-[minmax(0,38rem)_minmax(14rem,1fr)_minmax(0,38rem)] xl:gap-12">
+      {/* Mobile: tabs + one image */}
+      <div className="mx-auto flex w-full max-w-[1680px] flex-col gap-8 px-4 sm:px-6 lg:hidden">
+        <nav
+          aria-label="Category showcase"
+          className="flex flex-col items-center justify-center gap-4 py-2 text-center sm:gap-5"
+        >
+          {categories.map((category) => {
+            const isActive = category.id === active.id;
+            return (
+              <button
+                key={category.id}
+                type="button"
+                aria-pressed={isActive}
+                className={cn(
+                  'font-display duration-250 text-xl font-semibold uppercase leading-snug tracking-[0.08em] transition-all sm:text-2xl',
+                  isActive ? 'scale-105' : 'text-foreground',
+                )}
+                style={isActive ? { color: GOLD } : undefined}
+                onClick={() => setActiveId(category.id)}
+              >
+                {category.label}
+              </button>
+            );
+          })}
+        </nav>
+
+        <Link
+          to="/categories/$slug"
+          params={{ slug: active.slug }}
+          preload="intent"
+          className="block"
+          aria-label={`Shop ${active.label}`}
+        >
+          <ShowcasePanel
+            category={active}
+            keySide="left"
+            reduceMotion={Boolean(reduceMotion)}
+            showLabel
+          />
+        </Link>
+      </div>
+
+      {/* Desktop: two images + center links */}
+      <div className="mx-auto hidden w-full max-w-[1680px] items-center gap-8 px-4 sm:gap-10 sm:px-6 lg:grid lg:grid-cols-[minmax(0,34rem)_minmax(12rem,1fr)_minmax(0,34rem)] lg:gap-10 lg:px-8 xl:max-w-[1800px] xl:grid-cols-[minmax(0,38rem)_minmax(14rem,1fr)_minmax(0,38rem)] xl:gap-12">
         <ShowcasePanel
           keySide="left"
           category={active}
@@ -83,7 +126,7 @@ export function CategoryShowcaseSection({
 
         <nav
           aria-label="Category showcase"
-          className="lg:order-0 order-first flex flex-col items-center justify-center gap-4 py-4 text-center sm:gap-5 lg:gap-6"
+          className="flex flex-col items-center justify-center gap-4 py-4 text-center sm:gap-5 lg:gap-6"
         >
           {categories.map((category) => {
             const isActive = category.id === active.id;
