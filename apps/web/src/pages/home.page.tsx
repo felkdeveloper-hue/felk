@@ -5,16 +5,15 @@ import { Seo } from '@/components/common/seo';
 import { buildOrganizationJsonLd, buildWebsiteJsonLd } from '@/lib/seo';
 import { getSetting } from '@/utils/cms';
 import {
-  CategoryShowcaseSection,
   HeroBannerSection,
+  HomeBeforeFeaturedBannerSection,
   HomeCategoriesSection,
+  HomeEditorialBannerSection,
   HomeSectionRenderer,
-  MidBannerSection,
-  PreFeaturedBannerSection,
+  HomeSplitBannersSection,
   ProductGridSection,
   ProductRailSection,
   SectionSkeleton,
-  ShopYourMoodSection,
 } from '@/components/storefront';
 import { AsyncSection } from '@/components/storefront/async-section';
 
@@ -54,28 +53,29 @@ export function HomePage() {
         ]}
       />
 
+      {/* Section 1 — full-bleed hero (existing images kept) */}
       <HeroBannerSection />
 
-      <ShopYourMoodSection />
+      {/* Section 2 — zero-gap dual women’s banners */}
+      <HomeSplitBannersSection />
 
-      <ProductRailSection kind="random" />
+      {/* Section 3 — full-viewport women’s editorial */}
+      <HomeEditorialBannerSection />
 
-      <MidBannerSection />
+      <div className="flex flex-col gap-8 pt-10 sm:gap-10 sm:pt-12">
+        <ProductRailSection kind="best-sellers" eager spacing="none" title="Best Sellers" />
+        <HomeCategoriesSection />
+        <div className="pt-2 sm:pt-3">
+          <ProductRailSection kind="random" eager={false} spacing="none" title="More to love" />
+        </div>
+      </div>
 
-      <HomeCategoriesSection />
+      {/* Full-viewport banner before Featured Products — admin: home_before_featured */}
+      <HomeBeforeFeaturedBannerSection />
 
-      <ProductRailSection
-        kind="random"
-        eyebrow="Keep shopping"
-        title="More to love"
-        description="Another mix of pieces picked just for you."
-      />
-
-      <CategoryShowcaseSection />
-
-      <PreFeaturedBannerSection />
-
-      <ProductGridSection />
+      <div className="pt-8 sm:pt-10">
+        <ProductGridSection spacing="none" />
+      </div>
 
       <AsyncSection
         isLoading={sectionsQuery.isLoading}
@@ -84,6 +84,7 @@ export function HomePage() {
         data={sectionsQuery.data}
         isEmpty={(result) => !result?.data?.length}
         onRetry={() => void sectionsQuery.refetch()}
+        failMode="hide"
         skeleton={<SectionSkeleton />}
         emptyTitle=""
         emptyDescription=""

@@ -66,17 +66,37 @@ export function CatalogListShell({
       add('brandId', name ? `Brand: ${name}` : 'Brand');
     }
     if (state.collectionId) add('collectionId', 'Collection');
-    if (state.colorId) add('colorId', 'Color');
-    if (state.sizeId) add('sizeId', 'Size');
-    if (state.materialId) add('materialId', 'Material');
-    if (state.occasionId) add('occasionId', 'Occasion');
+    if (state.colorId) {
+      const name = facets.colors.data?.data.find((item) => item.id === state.colorId)?.name;
+      add('colorId', name ? `Color: ${name}` : 'Color');
+    }
+    if (state.sizeId) {
+      const name = facets.sizes.data?.data.find((item) => item.id === state.sizeId)?.name;
+      add('sizeId', name ? `Size: ${name}` : 'Size');
+    }
+    if (state.materialId) {
+      const name = facets.materials.data?.data.find((item) => item.id === state.materialId)?.name;
+      add('materialId', name ? `Material: ${name}` : 'Material');
+    }
+    if (state.occasionId) {
+      const name = facets.occasions.data?.data.find((item) => item.id === state.occasionId)?.name;
+      add('occasionId', name ? `Occasion: ${name}` : 'Occasion');
+    }
     if (state.minPrice != null || state.maxPrice != null) add('minPrice', 'Price range');
     if (state.discountBand) add('discountBand', `Discount: ${state.discountBand}%`);
     if (state.inStock === true) add('inStock', 'In stock');
     if (state.onSale) add('onSale', 'On sale');
     if (state.rating) add('rating', `Rating ${state.rating}+`);
     return list;
-  }, [facets.brands.data?.data, facets.categories.data?.data, state]);
+  }, [
+    facets.brands.data?.data,
+    facets.categories.data?.data,
+    facets.colors.data?.data,
+    facets.materials.data?.data,
+    facets.occasions.data?.data,
+    facets.sizes.data?.data,
+    state,
+  ]);
 
   useEffect(() => {
     if (!onLoadMore || !hasNextPage || isFetchingNextPage || isLoading) return;

@@ -76,7 +76,7 @@ export function CategoryFormPage({ categoryId }: { categoryId: string }) {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['cms', 'categories'] });
       toast.success('Category updated');
-      void navigate({ to: ADMIN_ROUTES.categories });
+      void navigate({ to: ADMIN_ROUTES.filters, search: { tab: 'categories' } });
     },
     onError: (error) => {
       toast.error(error instanceof AppError ? error.message : 'Unable to update category');
@@ -111,8 +111,8 @@ export function CategoryFormPage({ categoryId }: { categoryId: string }) {
         title={query.data?.name ? `Edit ${query.data.name}` : 'Edit category'}
         description="Update the category name and homepage tile image."
         actions={
-          <Link to={ADMIN_ROUTES.categories} className="admin-btn">
-            Back to list
+          <Link to={ADMIN_ROUTES.filters} search={{ tab: 'categories' }} className="admin-btn">
+            Back to filters
           </Link>
         }
       />
@@ -198,7 +198,7 @@ export function CategoryFormPage({ categoryId }: { categoryId: string }) {
         </AdminPanel>
 
         <div className="flex justify-end gap-3">
-          <Link to={ADMIN_ROUTES.categories} className="admin-btn">
+          <Link to={ADMIN_ROUTES.filters} search={{ tab: 'categories' }} className="admin-btn">
             Cancel
           </Link>
           <button

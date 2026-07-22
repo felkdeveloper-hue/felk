@@ -121,7 +121,8 @@ httpClient.interceptors.response.use(
     return response;
   },
   async (error: AxiosError<ApiErrorBody>) => {
-    const originalRequest = error.config as (AxiosRequestConfig & { _retry?: boolean }) | undefined;
+    const originalRequest = error.config as
+      (AxiosRequestConfig & { _retry?: boolean; _retryCount?: number }) | undefined;
 
     if (env.isDev) {
       // eslint-disable-next-line no-console
@@ -130,6 +131,25 @@ httpClient.interceptors.response.use(
         'color:#ef4444',
         error.response?.data,
       );
+    }
+
+    const status = error.response?.status;
+    const method = (originalRequest?.method ?? 'get').toLowerCase();
+    const retryCount = originalRequest?._retryCount ?? 0;
+    const isTransient =
+      !error.response ||
+      status === 408 ||
+      status === 429 ||
+      status === 500 ||
+      status === 502 ||
+      status === 503 ||
+      status === 504;
+
+    // Idempotent GETs: one quick transport-level retry before React Query takes over.
+    if (originalRequest && method === 'get' && isTransient && retryCount < 1) {
+      originalRequest._retryCount = retryCount + 1;
+      await new Promise((resolve) => setTimeout(resolve, 400 + Math.random() * 400));
+      return httpClient(originalRequest);
     }
 
     const isAuthRefreshCall = originalRequest?.url?.includes('/auth/refresh');

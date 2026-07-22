@@ -96,6 +96,7 @@ export type {
 } from './reviews';
 
 export { cmsApi } from './cms';
+export { storefrontApi } from './storefront';
 export type {
   Announcement,
   BlogCategory,

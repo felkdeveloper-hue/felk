@@ -31,6 +31,14 @@ function resolveMediaUrl(value: unknown): string | undefined {
 
 export function normalizeProductMedia(raw: unknown): ProductMedia {
   const record = asRecord(raw);
+  const variantRaw = record.variantId;
+  const variantId =
+    typeof variantRaw === 'string' || typeof variantRaw === 'number'
+      ? String(variantRaw)
+      : variantRaw && typeof variantRaw === 'object'
+        ? pickId(asRecord(variantRaw)) || undefined
+        : undefined;
+
   return {
     id: pickId(record),
     url: resolveMediaUrl(record.url) ?? '',
@@ -39,6 +47,7 @@ export function normalizeProductMedia(raw: unknown): ProductMedia {
     isPrimary: Boolean(record.isPrimary),
     priority: typeof record.priority === 'number' ? record.priority : undefined,
     type: typeof record.type === 'string' ? record.type : undefined,
+    variantId: variantId || undefined,
   };
 }
 
@@ -137,6 +146,8 @@ export function normalizeProduct(raw: unknown): Product {
       ? record.collectionIds.map((id) => String(id))
       : undefined,
     materialId: record.materialId ? String(record.materialId) : undefined,
+    gender: typeof record.gender === 'string' ? record.gender : undefined,
+    ageGroup: typeof record.ageGroup === 'string' ? record.ageGroup : undefined,
     occasionIds: Array.isArray(record.occasionIds)
       ? record.occasionIds.map((id) => String(id))
       : undefined,
@@ -146,6 +157,18 @@ export function normalizeProduct(raw: unknown): Product {
     isNewArrival: Boolean(record.isNewArrival),
     isBestSeller: Boolean(record.isBestSeller),
     isClearance: Boolean(record.isClearance),
+    paymentOption:
+      record.paymentOption === 'cod' ||
+      record.paymentOption === 'prepaid' ||
+      record.paymentOption === 'both'
+        ? record.paymentOption
+        : 'both',
+    returnsAvailable: typeof record.returnsAvailable === 'boolean' ? record.returnsAvailable : true,
+    returnsCriteria:
+      typeof record.returnsCriteria === 'string' ? record.returnsCriteria : undefined,
+    warrantyAvailable: Boolean(record.warrantyAvailable),
+    warrantyDetails:
+      typeof record.warrantyDetails === 'string' ? record.warrantyDetails : undefined,
     averageRating:
       typeof record.averageRating === 'number'
         ? record.averageRating

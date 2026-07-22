@@ -21,6 +21,16 @@ export function actorFromRequest(req: Request): ActorMeta {
   };
 }
 
+/** Resources that use title/name only — no slug uniqueness. */
+const SLUGLESS_RESOURCES = new Set([
+  'hero_banners',
+  'promo_banners',
+  'announcements',
+  'faqs',
+  'social_links',
+  'contact_infos',
+]);
+
 /** eslint-disable @typescript-eslint/no-explicit-any */
 export class CmsCrudService {
   protected readonly repo: BaseRepository;
@@ -34,8 +44,27 @@ export class CmsCrudService {
     this.repo = new BaseRepository(model, searchFields, sortableFields);
   }
 
-  list(options: ListOptions) {
-    return this.repo.list(options);
+  list(options: ListOptions & Record<string, unknown>) {
+    const { page, limit, sortBy, sortOrder, q, status, includeDeleted, filters, ...rest } = options;
+
+    const mergedFilters: Record<string, unknown> = { ...(filters ?? {}) };
+    for (const key of ['placement', 'type', 'key'] as const) {
+      const value = rest[key];
+      if (typeof value === 'string' && value.length > 0) {
+        mergedFilters[key] = value;
+      }
+    }
+
+    return this.repo.list({
+      page,
+      limit,
+      sortBy,
+      sortOrder,
+      q,
+      status,
+      includeDeleted,
+      filters: mergedFilters,
+    });
   }
 
   async getById(id: string, includeDeleted = false) {
@@ -45,17 +74,21 @@ export class CmsCrudService {
   }
 
   async create(payload: Record<string, unknown>, actor: ActorMeta) {
-    if (payload.name && !payload.slug) {
-      payload.slug = slugify(String(payload.name));
-    }
-    if (payload.title && !payload.slug) {
-      payload.slug = slugify(String(payload.title));
-    }
+    if (SLUGLESS_RESOURCES.has(this.resource)) {
+      delete payload.slug;
+    } else {
+      if (payload.name && !payload.slug) {
+        payload.slug = slugify(String(payload.name));
+      }
+      if (payload.title && !payload.slug) {
+        payload.slug = slugify(String(payload.title));
+      }
 
-    if (payload.slug) {
-      const existing = await this.repo.findBySlug(String(payload.slug));
-      if (existing) {
-        throw ApiError.conflict('Slug already exists', undefined, 'SLUG_EXISTS');
+      if (payload.slug) {
+        const existing = await this.repo.findBySlug(String(payload.slug));
+        if (existing) {
+          throw ApiError.conflict('Slug already exists', undefined, 'SLUG_EXISTS');
+        }
       }
     }
 

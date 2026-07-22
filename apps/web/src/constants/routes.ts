@@ -7,6 +7,8 @@ export const ADMIN_ROUTES = {
   products: '/admin/products',
   productNew: '/admin/products/new',
   productDetail: '/admin/products/$productId',
+  filters: '/admin/filters',
+  banners: '/admin/banners',
   categories: '/admin/categories',
   categoryDetail: '/admin/categories/$categoryId',
   collections: '/admin/collections',

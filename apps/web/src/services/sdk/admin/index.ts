@@ -4,6 +4,7 @@ export type {
   AdminVariant,
   ProductInput,
   ProductListParams,
+  ProductSpecification,
   VariantInput,
 } from './products';
 

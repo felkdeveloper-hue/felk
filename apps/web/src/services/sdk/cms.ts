@@ -161,8 +161,8 @@ export const cmsApi = {
   },
 
   async listPages(params?: ListQueryParams): Promise<PaginatedResult<CmsPage>> {
-    const result = await http.getPaginated<unknown>('/cms/pages', {
-      params: { ...publishedParams, ...params },
+    const result = await http.getPaginated<unknown>('/storefront/pages', {
+      params: { status: 'published', limit: 100, ...params },
     });
     return { ...result, data: mapList(result.data, normalizeCmsPage) };
   },

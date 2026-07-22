@@ -78,7 +78,7 @@ export function AdminStatCard({
 
 export function AdminPanel({ title, children }: { title?: string; children: ReactNode }) {
   return (
-    <section className="rounded-2xl border border-[var(--admin-line)] bg-[var(--admin-panel)] shadow-[var(--admin-shadow)] transition-colors">
+    <section className="rounded-none border border-[var(--admin-line)] bg-[var(--admin-panel)] shadow-[var(--admin-shadow)] transition-colors">
       {title ? (
         <header className="flex items-center justify-between border-b border-[var(--admin-line)] px-5 py-4">
           <h2 className="text-sm font-semibold tracking-tight text-[var(--admin-ink)]">{title}</h2>
@@ -91,7 +91,7 @@ export function AdminPanel({ title, children }: { title?: string; children: Reac
 
 export function AdminEmptyState({ title, description }: { title: string; description?: string }) {
   return (
-    <div className="rounded-2xl border border-dashed border-[var(--admin-line)] bg-[var(--admin-panel)] px-8 py-12 text-center">
+    <div className="rounded-none border border-dashed border-[var(--admin-line)] bg-[var(--admin-panel)] px-8 py-12 text-center">
       <h3 className="font-serif text-2xl text-[var(--admin-ink)]">{title}</h3>
       {description ? (
         <p className="mx-auto mt-2 max-w-md text-sm text-neutral-500 dark:text-neutral-400">
@@ -104,7 +104,7 @@ export function AdminEmptyState({ title, description }: { title: string; descrip
 
 export function AdminErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
-    <div className="rounded-2xl border border-red-200/80 bg-red-50/80 p-5 text-sm text-red-800 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
+    <div className="rounded-none border border-red-200/80 bg-red-50/80 p-5 text-sm text-red-800 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
       <p>{message}</p>
       {onRetry ? (
         <button

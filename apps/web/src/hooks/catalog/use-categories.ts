@@ -15,7 +15,9 @@ export function useCategoriesList() {
     queryKey: QUERY_KEYS.categories.list({ active: true }),
     queryFn: () =>
       categoriesApi.list({ status: 'active', limit: 100, sortBy: 'sortOrder', sortOrder: 'asc' }),
-    staleTime: 1000 * 60 * 10,
+    // Prefer a fresh list over bootstrap prefetch when data may have been reseeded.
+    staleTime: 1000 * 30,
+    refetchOnMount: 'always',
   });
 }
 

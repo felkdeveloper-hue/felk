@@ -64,8 +64,8 @@ export function HomeCategoriesSection() {
   if (!tiles.length) return null;
 
   return (
-    <Section spacing="default" className="bg-background" aria-label="Shop by category">
-      <div className="mx-auto mb-8 max-w-[1680px] px-4 text-center sm:mb-10 sm:px-6 lg:px-8 xl:px-10">
+    <Section spacing="none" className="bg-background" aria-label="Shop by category">
+      <div className="mx-auto mb-3 max-w-[1680px] px-4 text-center sm:mb-4 sm:px-6 lg:px-8 xl:px-10">
         <h2 className="font-display text-foreground text-2xl font-bold uppercase tracking-[0.08em] sm:text-3xl lg:text-4xl">
           Categories
         </h2>

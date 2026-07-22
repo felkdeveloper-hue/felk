@@ -94,6 +94,12 @@ export interface ProductDocument extends Document {
   ageGroup?: string | null;
   occasionIds: Types.ObjectId[];
   tags: string[];
+  /** Payment acceptance: cod | prepaid | both */
+  paymentOption: string;
+  returnsAvailable: boolean;
+  returnsCriteria?: string | null;
+  warrantyAvailable: boolean;
+  warrantyDetails?: string | null;
   isFeatured: boolean;
   isTrending: boolean;
   isNewArrival: boolean;
@@ -147,6 +153,15 @@ const productSchema = new Schema<ProductDocument>(
     ageGroup: { type: String, default: null },
     occasionIds: [{ type: Schema.Types.ObjectId, ref: 'Occasion' }],
     tags: { type: [String], default: [], index: true },
+    paymentOption: {
+      type: String,
+      enum: ['cod', 'prepaid', 'both'],
+      default: 'both',
+    },
+    returnsAvailable: { type: Boolean, default: true },
+    returnsCriteria: { type: String, default: null },
+    warrantyAvailable: { type: Boolean, default: false },
+    warrantyDetails: { type: String, default: null },
     isFeatured: { type: Boolean, default: false, index: true },
     isTrending: { type: Boolean, default: false },
     isNewArrival: { type: Boolean, default: false },

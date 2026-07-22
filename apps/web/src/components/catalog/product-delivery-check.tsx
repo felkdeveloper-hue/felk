@@ -1,10 +1,15 @@
 import { useState } from 'react';
-import { Truck } from 'lucide-react';
+import { Banknote, CreditCard, Truck } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import type { ProductPaymentOption } from './product-trust-badges';
 
-export function ProductDeliveryCheck() {
+export function ProductDeliveryCheck({
+  paymentOption = 'both',
+}: {
+  paymentOption?: ProductPaymentOption;
+}) {
   const [pincode, setPincode] = useState('');
   const [result, setResult] = useState<'idle' | 'valid' | 'invalid'>('idle');
 
@@ -16,6 +21,8 @@ export function ProductDeliveryCheck() {
       setResult('invalid');
     }
   };
+
+  const codAvailable = paymentOption === 'cod' || paymentOption === 'both';
 
   return (
     <section aria-labelledby="delivery-check" className="space-y-3">
@@ -60,11 +67,31 @@ export function ProductDeliveryCheck() {
 
       <div
         className={cn(
-          'flex items-center gap-2.5 rounded-lg bg-sky-50 px-4 py-3 text-sm font-medium text-sky-950',
+          'flex items-center gap-2.5 rounded-lg bg-sky-50 px-4 py-3 text-sm font-medium text-sky-950 dark:bg-sky-950/40 dark:text-sky-100',
         )}
       >
-        <Truck className="size-5 shrink-0 text-sky-600" />
+        <Truck className="size-5 shrink-0 text-sky-600 dark:text-sky-300" />
         This product is eligible for FREE SHIPPING
+      </div>
+
+      <div
+        className={cn(
+          'flex items-center gap-2.5 rounded-lg px-4 py-3 text-sm font-medium',
+          codAvailable
+            ? 'bg-emerald-50 text-emerald-950 dark:bg-emerald-950/40 dark:text-emerald-100'
+            : 'bg-amber-50 text-amber-950 dark:bg-amber-950/40 dark:text-amber-100',
+        )}
+      >
+        {codAvailable ? (
+          <Banknote className="size-5 shrink-0 text-emerald-600 dark:text-emerald-300" />
+        ) : (
+          <CreditCard className="size-5 shrink-0 text-amber-600 dark:text-amber-300" />
+        )}
+        {codAvailable
+          ? paymentOption === 'cod'
+            ? 'Cash on Delivery (COD) available'
+            : 'COD & prepaid payment both available'
+          : 'Prepaid payment only — COD not available'}
       </div>
     </section>
   );

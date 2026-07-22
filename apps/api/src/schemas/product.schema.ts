@@ -12,6 +12,17 @@ import {
 const priceNumber = z.number().min(0);
 const nullablePrice = z.number().min(0).nullable().optional();
 
+/** Accept ObjectId, null, or empty string (common from HTML selects). */
+const nullableObjectId = z.preprocess((value) => {
+  if (value === '' || value === undefined) return null;
+  return value;
+}, objectIdSchema.nullable());
+
+const optionalSlug = z.preprocess((value) => {
+  if (value === '' || value === null || value === undefined) return undefined;
+  return value;
+}, slugSchema.optional());
+
 export const pricingZodSchema = z
   .object({
     price: priceNumber,
@@ -55,20 +66,31 @@ export const attributeLinkSchema = z.object({
 
 export const productCreateSchema = z.object({
   name: z.string().trim().min(1).max(200),
-  slug: slugSchema.optional(),
+  slug: optionalSlug,
   sku: z.string().trim().min(1).max(64).optional(),
   shortDescription: z.string().trim().max(500).nullable().optional(),
   description: z.string().max(50000).nullable().optional(),
-  brandId: objectIdSchema.nullable().optional(),
-  categoryId: objectIdSchema.nullable().optional(),
-  subcategoryId: objectIdSchema.nullable().optional(),
+  brandId: nullableObjectId,
+  categoryId: nullableObjectId,
+  subcategoryId: nullableObjectId,
   collectionIds: z.array(objectIdSchema).optional(),
-  seasonId: objectIdSchema.nullable().optional(),
-  materialId: objectIdSchema.nullable().optional(),
-  gender: z.string().trim().max(40).nullable().optional(),
-  ageGroup: z.string().trim().max(40).nullable().optional(),
+  seasonId: nullableObjectId,
+  materialId: nullableObjectId,
+  gender: z.preprocess(
+    (value) => (value === '' ? null : value),
+    z.string().trim().max(40).nullable().optional(),
+  ),
+  ageGroup: z.preprocess(
+    (value) => (value === '' ? null : value),
+    z.string().trim().max(40).nullable().optional(),
+  ),
   occasionIds: z.array(objectIdSchema).optional(),
   tags: z.array(z.string().trim().max(60)).optional(),
+  paymentOption: z.enum(['cod', 'prepaid', 'both']).optional(),
+  returnsAvailable: z.boolean().optional(),
+  returnsCriteria: z.string().trim().max(500).nullable().optional(),
+  warrantyAvailable: z.boolean().optional(),
+  warrantyDetails: z.string().trim().max(500).nullable().optional(),
   isFeatured: z.boolean().optional(),
   isTrending: z.boolean().optional(),
   isNewArrival: z.boolean().optional(),
@@ -164,8 +186,8 @@ export const variantCreateSchema = z.object({
   sku: z.string().trim().min(1).max(64).optional(),
   barcode: z.string().trim().max(64).nullable().optional(),
   title: z.string().trim().min(1).max(200).optional(),
-  colorId: objectIdSchema.nullable().optional(),
-  sizeId: objectIdSchema.nullable().optional(),
+  colorId: nullableObjectId,
+  sizeId: nullableObjectId,
   optionValues: z.record(z.string()).optional(),
   weightGrams: z.number().min(0).nullable().optional(),
   dimensions: dimensionsSchema,

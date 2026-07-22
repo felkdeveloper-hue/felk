@@ -15,7 +15,24 @@ export function PublicLayout() {
   const location = useLocation();
 
   useEffect(() => {
-    void trackingApi.pageView(window.location.href);
+    const send = () => {
+      void trackingApi.pageView(window.location.href);
+    };
+    const idle = (
+      window as Window & {
+        requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+        cancelIdleCallback?: (id: number) => void;
+      }
+    ).requestIdleCallback;
+
+    if (typeof idle === 'function') {
+      const id = idle(send, { timeout: 3000 });
+      return () =>
+        (window as Window & { cancelIdleCallback?: (id: number) => void }).cancelIdleCallback?.(id);
+    }
+
+    const timer = globalThis.setTimeout(send, 800);
+    return () => globalThis.clearTimeout(timer);
   }, [location.pathname]);
 
   return (

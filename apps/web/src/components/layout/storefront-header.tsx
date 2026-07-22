@@ -29,8 +29,8 @@ import { MegaMenuPlaceholder } from '@/components/navigation/mega-menu-placehold
 
 const DEFAULT_NAV: NavItem[] = [
   { label: 'Shop', href: ROUTES.products },
-  { label: 'Women', href: '/categories/women' },
-  { label: 'Men', href: '/categories/men' },
+  { label: 'Women', href: ROUTES.products, gender: 'women' },
+  { label: 'Men', href: ROUTES.products, gender: 'men' },
   { label: 'Browse', href: ROUTES.categories },
   { label: 'Contact', href: ROUTES.contact },
 ];
@@ -40,11 +40,14 @@ export interface StorefrontHeaderProps {
 }
 
 export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderProps) {
-  const isScrolled = useScrollHeader({ threshold: 48 });
+  const isScrolled = useScrollHeader({ threshold: 36 });
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const navigate = useNavigate();
   const isHome = pathname === ROUTES.home;
   const transparent = isHome && !isScrolled;
+  const frosted = isHome && isScrolled;
+  // Home chrome is always white text/icons (clear at top, dark glass when scrolled).
+  const lightChrome = transparent || frosted;
 
   const { data: settings } = usePublicSettings();
   const storeName =
@@ -59,6 +62,9 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
   const [searchQuery, setSearchQuery] = useState('');
 
   const accountLabel = user?.firstName ?? user?.email?.split('@')[0] ?? 'Account';
+  const iconBtn = lightChrome
+    ? 'text-white hover:bg-white/10 hover:text-white'
+    : 'text-foreground hover:bg-muted/70 hover:text-foreground';
 
   const submitSearch = (event: FormEvent) => {
     event.preventDefault();
@@ -71,21 +77,23 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
     <header
       data-slot="storefront-header"
       className={cn(
-        'sticky top-0 z-50 transition-all duration-300',
+        'sticky top-0 z-[100] transition-[background-color,box-shadow,border-color,backdrop-filter,color] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]',
         transparent
           ? 'border-transparent bg-transparent text-white'
-          : 'glass-panel border-border/60 text-foreground border-b shadow-[var(--shadow-soft)]',
+          : frosted
+            ? 'border-b border-white/5 bg-black/20 text-white shadow-none backdrop-blur-[4px]'
+            : 'bg-background text-foreground border-border/70 border-b shadow-[0_8px_28px_-20px_rgba(0,0,0,0.28)]',
       )}
     >
       <Container className="relative flex h-16 items-center justify-between gap-3 lg:h-[4.75rem] lg:gap-5">
         <div className="flex shrink-0 items-center gap-2">
-          <MobileNav items={navItems} activeHref={pathname} transparent={transparent} />
+          <MobileNav items={navItems} activeHref={pathname} transparent={lightChrome} />
           <Link
             to={ROUTES.home}
             preload="intent"
             className={cn(
               'font-display text-2xl font-bold uppercase tracking-[-0.04em] transition-colors lg:text-[1.85rem]',
-              transparent ? 'text-white' : 'text-foreground',
+              lightChrome ? 'text-white' : 'text-foreground',
             )}
           >
             {storeName}
@@ -95,21 +103,21 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
         <MainNav
           items={navItems}
           activeHref={pathname}
-          transparent={transparent}
+          transparent={lightChrome}
           className="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2"
           renderItem={(item) => {
             if (item.label === 'Women') {
               return (
-                <GenderMegaMenu gender="women" transparent={transparent} activeHref={pathname} />
+                <GenderMegaMenu gender="women" transparent={lightChrome} activeHref={pathname} />
               );
             }
             if (item.label === 'Men') {
               return (
-                <GenderMegaMenu gender="men" transparent={transparent} activeHref={pathname} />
+                <GenderMegaMenu gender="men" transparent={lightChrome} activeHref={pathname} />
               );
             }
             if (item.label === 'Browse') {
-              return <MegaMenuPlaceholder transparent={transparent} />;
+              return <MegaMenuPlaceholder transparent={lightChrome} />;
             }
             return undefined;
           }}
@@ -127,12 +135,12 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
               onClear={() => setSearchQuery('')}
               placeholder="Search by products"
               aria-label="Search products"
-              containerClassName={transparent ? '[&_svg]:text-white/65' : undefined}
+              containerClassName={lightChrome ? '[&_svg]:text-white/65' : undefined}
               className={cn(
-                'h-10 rounded-md border-0 shadow-none focus-visible:shadow-[var(--shadow-focus)]',
-                transparent
-                  ? 'bg-white/15 text-white placeholder:text-white/55 focus-visible:border-white/35'
-                  : 'bg-muted/80 focus-visible:bg-background',
+                'h-10 rounded-none border-0 shadow-none focus-visible:shadow-[var(--shadow-focus)]',
+                lightChrome
+                  ? 'border border-white/35 bg-white/10 text-white placeholder:text-white/55 focus-visible:border-white/50 focus-visible:bg-white/15'
+                  : 'bg-muted text-foreground placeholder:text-muted-foreground focus-visible:bg-card',
               )}
             />
           </form>
@@ -143,10 +151,7 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
               size="icon"
               aria-label="Search"
               onClick={toggleSearch}
-              className={cn(
-                'md:hidden',
-                transparent ? 'text-white hover:bg-white/10 hover:text-white' : undefined,
-              )}
+              className={cn('md:hidden', iconBtn)}
             >
               <Search />
             </Button>
@@ -155,10 +160,7 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
               size="icon"
               aria-label={`Wishlist${wishlistCount ? `, ${wishlistCount} items` : ''}`}
               asChild
-              className={cn(
-                'relative hidden sm:inline-flex',
-                transparent ? 'text-white hover:bg-white/10 hover:text-white' : undefined,
-              )}
+              className={cn('relative hidden sm:inline-flex', iconBtn)}
             >
               <Link to={ROUTES.wishlist} preload="intent">
                 <Heart />
@@ -176,16 +178,13 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
                   <Button
                     variant="ghost"
                     size="sm"
-                    className={cn(
-                      'hidden gap-2 sm:inline-flex',
-                      transparent ? 'text-white hover:bg-white/10 hover:text-white' : undefined,
-                    )}
+                    className={cn('hidden gap-2 sm:inline-flex', iconBtn)}
                   >
                     <User className="size-4" aria-hidden />
                     <span className="max-w-28 truncate">{accountLabel}</span>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="min-w-44 rounded-xl">
+                <DropdownMenuContent align="end" className="min-w-44 rounded-none">
                   <div className="text-muted-foreground px-2 py-1.5 text-xs font-medium">
                     Hi, {accountLabel}
                   </div>
@@ -216,10 +215,7 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
                 size="icon"
                 aria-label="Sign in"
                 asChild
-                className={cn(
-                  'hidden sm:inline-flex',
-                  transparent ? 'text-white hover:bg-white/10 hover:text-white' : undefined,
-                )}
+                className={cn('hidden sm:inline-flex', iconBtn)}
               >
                 <Link to={ROUTES.authLogin} preload="intent">
                   <User />
@@ -232,10 +228,7 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
               size="icon"
               aria-label={`Cart${cartCount ? `, ${cartCount} items` : ''}`}
               asChild
-              className={cn(
-                'relative',
-                transparent ? 'text-white hover:bg-white/10 hover:text-white' : undefined,
-              )}
+              className={cn('relative', iconBtn)}
             >
               <Link to={ROUTES.cart} preload="intent">
                 <ShoppingBag />
@@ -247,11 +240,7 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
               </Link>
             </Button>
             <div className="hidden sm:block">
-              <ThemeToggle
-                className={
-                  transparent ? 'text-white hover:bg-white/10 hover:text-white' : undefined
-                }
-              />
+              <ThemeToggle className={iconBtn} />
             </div>
           </div>
         </div>

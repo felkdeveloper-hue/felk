@@ -84,13 +84,21 @@ export class ProductRepository extends BaseRepository {
     } else if (options.excludeVisibility?.length) {
       filter.visibility = { $nin: options.excludeVisibility };
     }
-    if (options.brandId) filter.brandId = new Types.ObjectId(options.brandId);
-    if (options.categoryId) filter.categoryId = new Types.ObjectId(options.categoryId);
+    if (options.brandId) {
+      const brandId = toObjectId(options.brandId);
+      if (brandId) filter.brandId = brandId;
+    }
+    if (options.categoryId) {
+      const categoryId = toObjectId(options.categoryId);
+      if (categoryId) filter.categoryId = categoryId;
+    }
     if (options.subcategoryId) {
-      filter.subcategoryId = new Types.ObjectId(options.subcategoryId);
+      const subcategoryId = toObjectId(options.subcategoryId);
+      if (subcategoryId) filter.subcategoryId = subcategoryId;
     }
     if (options.collectionId) {
-      filter.collectionIds = new Types.ObjectId(options.collectionId);
+      const collectionId = toObjectId(options.collectionId);
+      if (collectionId) filter.collectionIds = collectionId;
     }
     if (options.tag) filter.tags = options.tag;
     if (options.tags?.length) filter.tags = { $all: options.tags };
@@ -162,6 +170,31 @@ export class ProductRepository extends BaseRepository {
 
     const [data, total] = await Promise.all([
       ProductModel.find(filter as FilterQuery<ProductDocument>)
+        .select(
+          [
+            'name',
+            'slug',
+            'shortDescription',
+            'status',
+            'visibility',
+            'pricing',
+            'brandId',
+            'categoryId',
+            'gender',
+            'isFeatured',
+            'isTrending',
+            'isNewArrival',
+            'isBestSeller',
+            'isClearance',
+            'averageRating',
+            'reviewCount',
+            'defaultVariantId',
+            'variantCount',
+            'sku',
+            'createdAt',
+            'updatedAt',
+          ].join(' '),
+        )
         .sort(sort)
         .skip(skip)
         .limit(limit)
@@ -178,6 +211,12 @@ export class ProductRepository extends BaseRepository {
 
 function escapeRegex(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function toObjectId(value?: string): Types.ObjectId | undefined {
+  if (!value || typeof value !== 'string') return undefined;
+  if (!Types.ObjectId.isValid(value)) return undefined;
+  return new Types.ObjectId(value);
 }
 
 export const productRepository = new ProductRepository();

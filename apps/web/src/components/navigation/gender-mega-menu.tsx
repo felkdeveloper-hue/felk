@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { Link } from '@tanstack/react-router';
+import { Link, useRouterState } from '@tanstack/react-router';
 import bagsImage from '@/assets/images/Categories/Bags.png';
 import corsetImage from '@/assets/images/Categories/Corset.png';
 import hoodieImage from '@/assets/images/Categories/Hoddiewomen.png';
@@ -8,6 +8,7 @@ import newArrivalImage from '@/assets/images/Categories/New Arrival.png';
 import oversizedImage from '@/assets/images/Categories/Oversized.png';
 import shoesImage from '@/assets/images/Categories/Shoes.png';
 import jacketImage from '@/assets/images/Categories/WomenJacket.png';
+import { ROUTES } from '@/constants';
 import { Image } from '@/components/media/image';
 import { cn } from '@/lib/utils';
 
@@ -30,7 +31,7 @@ type MegaMenuSpecial = {
 };
 
 type GenderMegaMenuConfig = {
-  href: string;
+  gender: MegaMenuGender;
   label: string;
   columns: MegaMenuColumn[];
   specials: MegaMenuSpecial[];
@@ -59,7 +60,7 @@ const SHARED_SPECIALS: MegaMenuSpecial[] = [
 
 const MEGA_MENUS: Record<MegaMenuGender, GenderMegaMenuConfig> = {
   women: {
-    href: '/categories/women',
+    gender: 'women',
     label: 'Women',
     columns: [
       {
@@ -86,7 +87,7 @@ const MEGA_MENUS: Record<MegaMenuGender, GenderMegaMenuConfig> = {
     ],
   },
   men: {
-    href: '/categories/men',
+    gender: 'men',
     label: 'Men',
     columns: [
       {
@@ -106,6 +107,15 @@ const MEGA_MENUS: Record<MegaMenuGender, GenderMegaMenuConfig> = {
   },
 };
 
+const GENDER_SLUGS = new Set(['women', 'men']);
+
+function megaMenuLinkTarget(slug: string, gender: MegaMenuGender) {
+  if (GENDER_SLUGS.has(slug)) {
+    return { to: ROUTES.products, search: { gender: slug as MegaMenuGender } } as const;
+  }
+  return { to: '/categories/$slug' as const, params: { slug } };
+}
+
 const CLOSE_DELAY_MS = 160;
 
 export interface GenderMegaMenuProps {
@@ -120,7 +130,13 @@ export function GenderMegaMenu({ gender, transparent, activeHref }: GenderMegaMe
   const panelId = useId();
   const [open, setOpen] = useState(false);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const isActive = activeHref === config.href;
+  const searchGender = useRouterState({
+    select: (state) => {
+      const search = state.location.search as Record<string, unknown>;
+      return typeof search.gender === 'string' ? search.gender : undefined;
+    },
+  });
+  const isActive = activeHref === ROUTES.products && searchGender === config.gender;
   const showUnderline = open || isActive;
 
   const clearCloseTimer = () => {
@@ -154,7 +170,8 @@ export function GenderMegaMenu({ gender, transparent, activeHref }: GenderMegaMe
   return (
     <div className="relative" onMouseEnter={show} onMouseLeave={hide}>
       <Link
-        to={config.href}
+        to={ROUTES.products}
+        search={{ gender: config.gender }}
         preload="intent"
         aria-expanded={open}
         aria-controls={panelId}
@@ -199,19 +216,34 @@ export function GenderMegaMenu({ gender, transparent, activeHref }: GenderMegaMe
             <div key={column.title} className="border-border/50 border-r px-5 py-5 last:border-r-0">
               <p className="text-foreground mb-3 text-sm font-bold">{column.title}</p>
               <ul className="space-y-2">
-                {column.links.map((link) => (
-                  <li key={`${column.title}-${link.label}`}>
-                    <Link
-                      to="/categories/$slug"
-                      params={{ slug: link.slug }}
-                      preload="intent"
-                      className="text-muted-foreground hover:text-foreground text-[13px] transition-colors"
-                      onClick={() => setOpen(false)}
-                    >
-                      {link.label}
-                    </Link>
-                  </li>
-                ))}
+                {column.links.map((link) => {
+                  const target = megaMenuLinkTarget(link.slug, config.gender);
+                  return (
+                    <li key={`${column.title}-${link.label}`}>
+                      {'params' in target ? (
+                        <Link
+                          to={target.to}
+                          params={target.params}
+                          preload="intent"
+                          className="text-muted-foreground hover:text-foreground text-[13px] transition-colors"
+                          onClick={() => setOpen(false)}
+                        >
+                          {link.label}
+                        </Link>
+                      ) : (
+                        <Link
+                          to={target.to}
+                          search={target.search}
+                          preload="intent"
+                          className="text-muted-foreground hover:text-foreground text-[13px] transition-colors"
+                          onClick={() => setOpen(false)}
+                        >
+                          {link.label}
+                        </Link>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           ))}
@@ -221,28 +253,52 @@ export function GenderMegaMenu({ gender, transparent, activeHref }: GenderMegaMe
               Specials
             </p>
             <div className="grid grid-cols-3 gap-x-3 gap-y-4 md:grid-cols-2">
-              {config.specials.map((special) => (
-                <Link
-                  key={special.label}
-                  to="/categories/$slug"
-                  params={{ slug: special.slug }}
-                  preload="intent"
-                  className="group flex flex-col items-center gap-1.5 text-center"
-                  onClick={() => setOpen(false)}
-                >
-                  <span className="bg-muted relative size-14 overflow-hidden rounded-full ring-1 ring-black/5 transition-transform duration-300 group-hover:scale-105 sm:size-16">
-                    <Image
-                      src={special.image}
-                      alt=""
-                      className="size-full object-cover"
-                      containerClassName="size-full rounded-none"
-                    />
-                  </span>
-                  <span className="text-muted-foreground group-hover:text-foreground max-w-[5.5rem] text-[11px] font-medium leading-tight transition-colors">
-                    {special.label}
-                  </span>
-                </Link>
-              ))}
+              {config.specials.map((special) => {
+                const target = megaMenuLinkTarget(special.slug, config.gender);
+                return 'params' in target ? (
+                  <Link
+                    key={special.label}
+                    to={target.to}
+                    params={target.params}
+                    preload="intent"
+                    className="group flex flex-col items-center gap-1.5 text-center"
+                    onClick={() => setOpen(false)}
+                  >
+                    <span className="bg-muted relative size-14 overflow-hidden rounded-full ring-1 ring-black/5 transition-transform duration-300 group-hover:scale-105 sm:size-16">
+                      <Image
+                        src={special.image}
+                        alt=""
+                        className="size-full object-cover"
+                        containerClassName="size-full rounded-none"
+                      />
+                    </span>
+                    <span className="text-muted-foreground group-hover:text-foreground max-w-[5.5rem] text-[11px] font-medium leading-tight transition-colors">
+                      {special.label}
+                    </span>
+                  </Link>
+                ) : (
+                  <Link
+                    key={special.label}
+                    to={target.to}
+                    search={target.search}
+                    preload="intent"
+                    className="group flex flex-col items-center gap-1.5 text-center"
+                    onClick={() => setOpen(false)}
+                  >
+                    <span className="bg-muted relative size-14 overflow-hidden rounded-full ring-1 ring-black/5 transition-transform duration-300 group-hover:scale-105 sm:size-16">
+                      <Image
+                        src={special.image}
+                        alt=""
+                        className="size-full object-cover"
+                        containerClassName="size-full rounded-none"
+                      />
+                    </span>
+                    <span className="text-muted-foreground group-hover:text-foreground max-w-[5.5rem] text-[11px] font-medium leading-tight transition-colors">
+                      {special.label}
+                    </span>
+                  </Link>
+                );
+              })}
             </div>
           </div>
         </div>

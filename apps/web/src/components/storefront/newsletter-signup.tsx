@@ -59,21 +59,21 @@ export function NewsletterSignupSection({ section }: NewsletterSignupSectionProp
   });
 
   return (
-    <Section spacing="default" className="bg-zinc-800 text-zinc-50">
+    <Section spacing="none" className="bg-zinc-800 py-16 text-zinc-50 sm:py-24 lg:py-28">
       <Container>
         <MotionReveal>
           <div className="mx-auto max-w-2xl text-center">
             <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-50/65">
               Stay in touch
             </p>
-            <h2 className="font-display mt-2 text-3xl font-bold uppercase tracking-tight text-zinc-50 sm:text-5xl">
+            <h2 className="font-display mt-3 text-4xl font-bold uppercase tracking-tight text-zinc-50 sm:text-5xl lg:text-6xl">
               {title}
             </h2>
-            <p className="mt-3 text-zinc-50/70">{description}</p>
+            <p className="mt-4 text-base text-zinc-50/70 sm:text-lg">{description}</p>
 
             <form
               onSubmit={onSubmit}
-              className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-start"
+              className="mt-10 flex flex-col gap-3 sm:flex-row sm:items-start"
             >
               <div className="flex-1 text-left">
                 <label htmlFor="newsletter-email" className="sr-only">

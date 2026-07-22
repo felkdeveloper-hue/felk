@@ -6,10 +6,18 @@ export interface CmsLinkProps {
   children: ReactNode;
   className?: string;
   preload?: 'intent' | 'render' | false;
+  /** Opt-in radius token for global sharp-corner override (e.g. hero pill CTA). */
+  'data-radius'?: 'pill' | 'soft';
 }
 
 /** Internal routes use TanStack Router; external CMS URLs use a plain anchor. */
-export function CmsLink({ href, children, className, preload = 'intent' }: CmsLinkProps) {
+export function CmsLink({
+  href,
+  children,
+  className,
+  preload = 'intent',
+  'data-radius': dataRadius,
+}: CmsLinkProps) {
   if (
     href.startsWith('http://') ||
     href.startsWith('https://') ||
@@ -20,6 +28,7 @@ export function CmsLink({ href, children, className, preload = 'intent' }: CmsLi
       <a
         href={href}
         className={className}
+        data-radius={dataRadius}
         target={href.startsWith('http') ? '_blank' : undefined}
         rel={href.startsWith('http') ? 'noopener noreferrer' : undefined}
       >
@@ -29,7 +38,7 @@ export function CmsLink({ href, children, className, preload = 'intent' }: CmsLi
   }
 
   return (
-    <Link to={href} preload={preload} className={className}>
+    <Link to={href} preload={preload} className={className} data-radius={dataRadius}>
       {children}
     </Link>
   );

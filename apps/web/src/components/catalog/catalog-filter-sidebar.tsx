@@ -99,9 +99,17 @@ function RefineFiltersBody({
   const facets = useCatalogFilterFacets();
   const bounds = priceBounds ?? { min: 0, max: 50000 };
 
-  const categories = facets.categories.data?.data ?? [];
+  const categories = useMemo(
+    () =>
+      (facets.categories.data?.data ?? []).filter(
+        (category) => category.slug !== 'men' && category.slug !== 'women',
+      ),
+    [facets.categories.data?.data],
+  );
   const brands = facets.brands.data?.data ?? [];
   const occasions = facets.occasions.data?.data ?? [];
+  const colors = facets.colors.data?.data ?? [];
+  const materials = facets.materials.data?.data ?? [];
   const sizes = facets.sizes.data?.data ?? [];
 
   const activeCount = useMemo(() => {
@@ -110,6 +118,8 @@ function RefineFiltersBody({
     if (state.categoryId) count += 1;
     if (state.brandId) count += 1;
     if (state.occasionId) count += 1;
+    if (state.colorId) count += 1;
+    if (state.materialId) count += 1;
     if (state.sizeId) count += 1;
     if (state.minPrice != null || state.maxPrice != null) count += 1;
     if (state.discountBand) count += 1;
@@ -219,6 +229,56 @@ function RefineFiltersBody({
           </FilterSection>
         ) : null}
 
+        {colors.length ? (
+          <FilterSection title="Color" layout={layout}>
+            <div
+              className={cn(
+                'space-y-0.5',
+                layout === 'top'
+                  ? 'max-h-44 overflow-y-auto pr-1'
+                  : 'max-h-56 overflow-y-auto pr-1',
+              )}
+            >
+              {colors.map((color) => (
+                <OptionRow
+                  key={color.id}
+                  id={`color-${color.id}`}
+                  label={color.name}
+                  checked={state.colorId === color.id}
+                  onCheckedChange={(checked) =>
+                    onChange({ colorId: checked ? color.id : undefined, page: 1 })
+                  }
+                />
+              ))}
+            </div>
+          </FilterSection>
+        ) : null}
+
+        {materials.length ? (
+          <FilterSection title="Material" layout={layout}>
+            <div
+              className={cn(
+                'space-y-0.5',
+                layout === 'top'
+                  ? 'max-h-44 overflow-y-auto pr-1'
+                  : 'max-h-56 overflow-y-auto pr-1',
+              )}
+            >
+              {materials.map((material) => (
+                <OptionRow
+                  key={material.id}
+                  id={`material-${material.id}`}
+                  label={material.name}
+                  checked={state.materialId === material.id}
+                  onCheckedChange={(checked) =>
+                    onChange({ materialId: checked ? material.id : undefined, page: 1 })
+                  }
+                />
+              ))}
+            </div>
+          </FilterSection>
+        ) : null}
+
         {occasions.length ? (
           <FilterSection title="Occasion" layout={layout}>
             <div className="space-y-0.5">
@@ -299,6 +359,8 @@ export function CatalogFilterSidebar({
       state.categoryId,
       state.brandId,
       state.occasionId,
+      state.colorId,
+      state.materialId,
       state.sizeId,
       state.minPrice != null || state.maxPrice != null ? true : undefined,
       state.discountBand,

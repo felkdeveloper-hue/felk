@@ -2,6 +2,13 @@ import { http } from '@/lib/http-client';
 import { normalizeId, normalizeList } from '@/lib/utils';
 import type { ListQueryParams, PaginatedResult } from '@/types';
 
+export interface ProductSpecification {
+  name: string;
+  value: string;
+  group?: string;
+  sortOrder?: number;
+}
+
 export interface AdminProduct {
   id: string;
   name: string;
@@ -11,14 +18,33 @@ export interface AdminProduct {
   visibility?: string;
   price?: number;
   salePrice?: number;
+  compareAtPrice?: number;
   currency?: string;
   brandName?: string;
   brandId?: string;
   categoryId?: string;
+  materialId?: string;
+  collectionIds?: string[];
   gender?: string;
+  ageGroup?: string;
   occasionIds?: string[];
+  tags?: string[];
+  searchKeywords?: string[];
+  paymentOption?: 'cod' | 'prepaid' | 'both';
+  returnsAvailable?: boolean;
+  returnsCriteria?: string;
+  warrantyAvailable?: boolean;
+  warrantyDetails?: string;
   shortDescription?: string;
   description?: string;
+  isFeatured?: boolean;
+  isTrending?: boolean;
+  isNewArrival?: boolean;
+  isBestSeller?: boolean;
+  isClearance?: boolean;
+  specifications?: ProductSpecification[];
+  seoTitle?: string;
+  seoDescription?: string;
   variantCount?: number;
   thumbnailUrl?: string;
   createdAt?: string;
@@ -30,6 +56,9 @@ export interface AdminVariant {
   productId: string;
   sku: string;
   title?: string;
+  colorId?: string;
+  sizeId?: string;
+  optionValues?: Record<string, string>;
   price: number;
   salePrice?: number | null;
   costPrice?: number | null;
@@ -41,6 +70,8 @@ export interface AdminVariant {
 export interface VariantInput {
   sku?: string;
   title?: string;
+  colorId?: string | null;
+  sizeId?: string | null;
   price: number;
   salePrice?: number | null;
   costPrice?: number | null;
@@ -67,6 +98,13 @@ function normalizeProduct(raw: unknown): AdminProduct {
   const price = readMoneyAmount(record.price) ?? readMoneyAmount(pricing?.price) ?? 0;
   const salePrice =
     readMoneyAmount(record.salePrice) ?? readMoneyAmount(pricing?.salePrice) ?? undefined;
+  const seo =
+    record.seo && typeof record.seo === 'object'
+      ? (record.seo as Record<string, unknown>)
+      : undefined;
+  const compareAtPrice =
+    readMoneyAmount(record.compareAtPrice) ?? readMoneyAmount(pricing?.compareAtPrice);
+
   return {
     id: normalizeId(record),
     name: String(record.name ?? ''),
@@ -76,6 +114,7 @@ function normalizeProduct(raw: unknown): AdminProduct {
     visibility: typeof record.visibility === 'string' ? record.visibility : undefined,
     price,
     salePrice,
+    compareAtPrice,
     currency:
       typeof record.currency === 'string'
         ? record.currency
@@ -85,13 +124,53 @@ function normalizeProduct(raw: unknown): AdminProduct {
     brandName: typeof record.brandName === 'string' ? record.brandName : undefined,
     brandId: record.brandId ? String(record.brandId) : undefined,
     categoryId: record.categoryId ? String(record.categoryId) : undefined,
+    materialId: record.materialId ? String(record.materialId) : undefined,
+    collectionIds: Array.isArray(record.collectionIds)
+      ? record.collectionIds.map((id) => String(id))
+      : undefined,
     gender: typeof record.gender === 'string' ? record.gender : undefined,
+    ageGroup: typeof record.ageGroup === 'string' ? record.ageGroup : undefined,
     occasionIds: Array.isArray(record.occasionIds)
       ? record.occasionIds.map((id) => String(id))
       : undefined,
+    tags: Array.isArray(record.tags) ? record.tags.map((tag) => String(tag)) : undefined,
+    searchKeywords: Array.isArray(record.searchKeywords)
+      ? record.searchKeywords.map((kw) => String(kw))
+      : undefined,
+    paymentOption:
+      record.paymentOption === 'cod' ||
+      record.paymentOption === 'prepaid' ||
+      record.paymentOption === 'both'
+        ? record.paymentOption
+        : undefined,
+    returnsAvailable:
+      typeof record.returnsAvailable === 'boolean' ? record.returnsAvailable : undefined,
+    returnsCriteria:
+      typeof record.returnsCriteria === 'string' ? record.returnsCriteria : undefined,
+    warrantyAvailable:
+      typeof record.warrantyAvailable === 'boolean' ? record.warrantyAvailable : undefined,
+    warrantyDetails:
+      typeof record.warrantyDetails === 'string' ? record.warrantyDetails : undefined,
     shortDescription:
       typeof record.shortDescription === 'string' ? record.shortDescription : undefined,
     description: typeof record.description === 'string' ? record.description : undefined,
+    isFeatured: Boolean(record.isFeatured),
+    isTrending: Boolean(record.isTrending),
+    isNewArrival: Boolean(record.isNewArrival),
+    isBestSeller: Boolean(record.isBestSeller),
+    isClearance: Boolean(record.isClearance),
+    specifications: Array.isArray(record.specifications)
+      ? (record.specifications as ProductSpecification[])
+          .filter((row) => row && typeof row === 'object')
+          .map((row) => ({
+            name: String(row.name ?? ''),
+            value: String(row.value ?? ''),
+            group: typeof row.group === 'string' ? row.group : undefined,
+            sortOrder: typeof row.sortOrder === 'number' ? row.sortOrder : undefined,
+          }))
+      : undefined,
+    seoTitle: typeof seo?.title === 'string' ? seo.title : undefined,
+    seoDescription: typeof seo?.description === 'string' ? seo.description : undefined,
     variantCount: Number(record.variantCount ?? 0),
     thumbnailUrl: typeof record.thumbnailUrl === 'string' ? record.thumbnailUrl : undefined,
     createdAt: typeof record.createdAt === 'string' ? record.createdAt : undefined,
@@ -106,6 +185,12 @@ function normalizeVariant(raw: unknown): AdminVariant {
     productId: String(record.productId ?? ''),
     sku: String(record.sku ?? ''),
     title: typeof record.title === 'string' ? record.title : undefined,
+    colorId: record.colorId ? String(record.colorId) : undefined,
+    sizeId: record.sizeId ? String(record.sizeId) : undefined,
+    optionValues:
+      record.optionValues && typeof record.optionValues === 'object'
+        ? (record.optionValues as Record<string, string>)
+        : undefined,
     price: Number(record.price ?? 0),
     salePrice: record.salePrice == null ? null : Number(record.salePrice),
     costPrice: record.costPrice == null ? null : Number(record.costPrice),
@@ -127,18 +212,38 @@ export interface ProductInput {
   slug?: string;
   sku?: string;
   status?: string;
+  visibility?: string;
   shortDescription?: string;
   description?: string;
-  brandId?: string;
-  categoryId?: string;
-  gender?: string;
+  brandId?: string | null;
+  categoryId?: string | null;
+  materialId?: string | null;
+  collectionIds?: string[];
+  gender?: string | null;
+  ageGroup?: string | null;
   occasionIds?: string[];
+  tags?: string[];
+  searchKeywords?: string[];
+  paymentOption?: 'cod' | 'prepaid' | 'both';
+  returnsAvailable?: boolean;
+  returnsCriteria?: string | null;
+  warrantyAvailable?: boolean;
+  warrantyDetails?: string | null;
+  isFeatured?: boolean;
+  isTrending?: boolean;
+  isNewArrival?: boolean;
+  isBestSeller?: boolean;
+  isClearance?: boolean;
+  specifications?: ProductSpecification[];
+  seo?: { title?: string; description?: string };
   price?: number;
   salePrice?: number | null;
+  compareAtPrice?: number | null;
   currency?: string;
   pricing?: {
     price: number;
     salePrice?: number | null;
+    compareAtPrice?: number | null;
     currency?: string;
   };
 }

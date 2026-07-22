@@ -42,7 +42,8 @@
   --input: 40 12% 88%;
   --ring: 0 0% 7%;
 
-  --radius: 1rem;
+  /* Sharp / editorial corners — no soft radius */
+  --radius: 0;
 
   --font-display: 'Syne', ui-sans-serif, system-ui, sans-serif;
   --font-sans: 'Figtree', ui-sans-serif, system-ui, sans-serif;
@@ -126,11 +127,14 @@
   --color-ring: hsl(var(--ring));
   --font-display: var(--font-display);
   --font-sans: var(--font-sans);
-  --radius-sm: calc(var(--radius) - 6px);
-  --radius-md: calc(var(--radius) - 3px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --radius-2xl: calc(var(--radius) + 12px);
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-xl: 0;
+  --radius-2xl: 0;
+  --radius-3xl: 0;
+  --radius-4xl: 0;
+  --radius-full: 0;
   --shadow-soft: var(--shadow-soft);
   --shadow-elevated: var(--shadow-elevated);
   --shadow-focus: var(--shadow-focus);
@@ -182,6 +186,12 @@
   }
   to {
     transform: translateX(-50%);
+  }
+}
+
+@keyframes hero-dot-progress {
+  to {
+    stroke-dashoffset: 0;
   }
 }
 
@@ -279,6 +289,26 @@
     @apply border-border;
   }
 
+  /* Force sharp corners everywhere — overrides rounded-*, rounded-full, arbitrary radii */
+  *,
+  *::before,
+  *::after {
+    border-radius: 0 !important;
+  }
+
+  /* Opt-in radii for hero CTA / progress dots (reference design) */
+  [data-radius='pill'],
+  [data-radius='pill']::before,
+  [data-radius='pill']::after {
+    border-radius: 9999px !important;
+  }
+
+  [data-radius='soft'],
+  [data-radius='soft']::before,
+  [data-radius='soft']::after {
+    border-radius: 2px !important;
+  }
+
   html {
     @apply scroll-smooth;
   }
@@ -309,6 +339,12 @@
     background: hsl(var(--glass));
     backdrop-filter: blur(18px) saturate(1.2);
     -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  }
+
+  .hero-dot-progress {
+    stroke-dasharray: var(--hero-dot-c);
+    stroke-dashoffset: var(--hero-dot-c);
+    animation: hero-dot-progress var(--hero-dot-duration, 4.5s) linear forwards;
   }
 
   .skeleton-shimmer {
@@ -385,7 +421,7 @@ body,
   height: 2rem;
   align-items: center;
   justify-content: center;
-  border-radius: 0.375rem;
+  border-radius: 0;
   padding: 0 0.625rem;
   font-size: 0.75rem;
   font-weight: 500;
@@ -422,7 +458,7 @@ body,
 
 .admin-btn-lg {
   height: 2.25rem;
-  border-radius: 0.5rem;
+  border-radius: 0;
   padding: 0 0.875rem;
   font-size: 0.875rem;
 }

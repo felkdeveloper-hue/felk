@@ -49,7 +49,10 @@ export function AdminSidebar() {
       <nav className="relative flex-1 space-y-0.5 overflow-y-auto px-2.5 py-4" aria-label="Admin">
         {items.map((item) => {
           const Icon = item.icon;
-          const active = pathname === item.to || pathname.startsWith(`${item.to}/`);
+          const active =
+            pathname === item.to ||
+            pathname.startsWith(`${item.to}/`) ||
+            (item.to === ADMIN_ROUTES.filters && pathname.startsWith('/admin/categories/'));
           return (
             <Link
               key={item.to}

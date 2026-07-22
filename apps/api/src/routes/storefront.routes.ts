@@ -1,9 +1,10 @@
-import { Router } from 'express';
+import { Router, type Response } from 'express';
 import type { Model } from 'mongoose';
 import {
   AnnouncementBarModel,
   BrandModel,
   CategoryModel,
+  CmsPageModel,
   CollectionModel,
   ColorModel,
   ContactInfoModel,
@@ -21,12 +22,24 @@ import {
 } from '@/models';
 import { productService } from '@/services/product.service';
 import { CmsCrudService } from '@/services/cms-crud.service';
+import { settingsService } from '@/services/settings.service';
 import { PRODUCT_STATUS, PRODUCT_VISIBILITY } from '@/constants/product';
 import { asyncHandler } from '@/utils/async-handler';
 import { ApiResponse } from '@/utils/response/api-response';
 import { ApiError } from '@/utils/errors/api-error';
+import { getCached, setCache } from '@/utils/simple-cache';
 
 export const storefrontRouter = Router();
+
+const PUBLIC_CACHE_MAX_AGE = 300;
+
+function setPublicCache(res: Response, maxAge = PUBLIC_CACHE_MAX_AGE): void {
+  if (process.env.NODE_ENV !== 'production') {
+    res.set('Cache-Control', 'no-store');
+    return;
+  }
+  res.set('Cache-Control', `public, max-age=${maxAge}, s-maxage=${maxAge}`);
+}
 
 function publicList(path: string, resource: string, model: Model<any>, status = 'active') {
   const service = new CmsCrudService(resource, model);
@@ -38,15 +51,114 @@ function publicList(path: string, resource: string, model: Model<any>, status = 
         includeDeleted: false,
         status,
       } as never);
+      setPublicCache(res);
       ApiResponse.success(res, result.data, 'OK', 200, result.meta);
     }),
   );
 }
 
+const BOOTSTRAP_CACHE_KEY = 'storefront:bootstrap';
+
+storefrontRouter.get(
+  '/bootstrap',
+  asyncHandler(async (_req, res) => {
+    const skipCache = process.env.NODE_ENV !== 'production';
+    if (!skipCache) {
+      const cached = getCached<Record<string, unknown>>(BOOTSTRAP_CACHE_KEY);
+      if (cached) {
+        setPublicCache(res);
+        return ApiResponse.success(res, cached);
+      }
+    }
+
+    const categoryService = new CmsCrudService('categories', CategoryModel as Model<any>);
+    const heroService = new CmsCrudService('hero-banners', HeroBannerModel as Model<any>);
+    const sectionService = new CmsCrudService('home-sections', HomeSectionModel as Model<any>);
+    const announcementService = new CmsCrudService(
+      'announcements',
+      AnnouncementBarModel as Model<any>,
+    );
+    const socialService = new CmsCrudService('social-links', SocialLinkModel as Model<any>);
+    const contactService = new CmsCrudService('contact-infos', ContactInfoModel as Model<any>);
+    const pageService = new CmsCrudService('pages', CmsPageModel as Model<any>);
+
+    const listBase = { includeDeleted: false, status: 'active' as const, limit: 100 };
+    const pageBase = { includeDeleted: false, status: 'published' as const, limit: 100 };
+
+    const [
+      settings,
+      categories,
+      heroBanners,
+      homeSections,
+      announcements,
+      socialLinks,
+      contactInfos,
+      pages,
+    ] = await Promise.all([
+      settingsService.getPublic(),
+      categoryService.list({ ...listBase, sortBy: 'sortOrder', sortOrder: 'asc' } as never),
+      heroService.list({ ...listBase, limit: 10, sortBy: 'priority', sortOrder: 'desc' } as never),
+      sectionService.list({
+        ...listBase,
+        limit: 50,
+        sortBy: 'sortOrder',
+        sortOrder: 'asc',
+      } as never),
+      announcementService.list({
+        ...listBase,
+        limit: 5,
+        sortBy: 'priority',
+        sortOrder: 'desc',
+      } as never),
+      socialService.list({
+        ...listBase,
+        limit: 20,
+        sortBy: 'sortOrder',
+        sortOrder: 'asc',
+      } as never),
+      contactService.list({
+        ...listBase,
+        limit: 20,
+        sortBy: 'sortOrder',
+        sortOrder: 'asc',
+      } as never),
+      pageService.list(pageBase as never),
+    ]);
+
+    const payload = {
+      settings,
+      categories: categories.data,
+      heroBanners: heroBanners.data,
+      homeSections: homeSections.data,
+      announcements: announcements.data,
+      socialLinks: socialLinks.data,
+      contactInfos: contactInfos.data,
+      pages: pages.data,
+    };
+
+    if (!skipCache) {
+      setCache(BOOTSTRAP_CACHE_KEY, payload);
+    }
+    setPublicCache(res);
+    ApiResponse.success(res, payload);
+  }),
+);
+
 storefrontRouter.get(
   '/products',
   asyncHandler(async (req, res) => {
     const { status: _status, visibility: _visibility, ...query } = req.query;
+    const cacheKey = `storefront:products:${JSON.stringify(query)}`;
+    const skipCache = process.env.NODE_ENV !== 'production';
+
+    if (!skipCache) {
+      const cached = getCached<{ data: unknown; meta: unknown }>(cacheKey);
+      if (cached) {
+        setPublicCache(res, 120);
+        return ApiResponse.success(res, cached.data, 'OK', 200, cached.meta as never);
+      }
+    }
+
     const result = await productService.list({
       ...query,
       includeDeleted: false,
@@ -59,6 +171,12 @@ storefrontRouter.get(
       ],
       excludeVisibility: [PRODUCT_VISIBILITY.HIDDEN],
     } as never);
+
+    if (!skipCache) {
+      setCache(cacheKey, { data: result.data, meta: result.meta }, 60_000);
+    }
+
+    setPublicCache(res, 120);
     ApiResponse.success(res, result.data, 'OK', 200, result.meta);
   }),
 );
@@ -138,3 +256,4 @@ publicList('/announcements', 'announcements', AnnouncementBarModel as Model<any>
 publicList('/home-sections', 'home-sections', HomeSectionModel as Model<any>);
 publicList('/social-links', 'social-links', SocialLinkModel as Model<any>);
 publicList('/contact-infos', 'contact-infos', ContactInfoModel as Model<any>);
+publicList('/pages', 'pages', CmsPageModel as Model<any>, 'published');

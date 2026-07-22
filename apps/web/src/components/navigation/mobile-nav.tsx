@@ -1,5 +1,6 @@
-import { Link } from '@tanstack/react-router';
+import { Link, useRouterState } from '@tanstack/react-router';
 import { Menu } from 'lucide-react';
+import { ROUTES } from '@/constants';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
@@ -15,6 +16,20 @@ export interface MobileNavProps {
 }
 
 export function MobileNav({ items, activeHref, transparent, open, onOpenChange }: MobileNavProps) {
+  const searchGender = useRouterState({
+    select: (state) => {
+      const search = state.location.search as Record<string, unknown>;
+      return typeof search.gender === 'string' ? search.gender : undefined;
+    },
+  });
+
+  const isItemActive = (item: NavItem) => {
+    if (item.gender) {
+      return activeHref === ROUTES.products && searchGender === item.gender;
+    }
+    return activeHref === item.href;
+  };
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetTrigger asChild>
@@ -37,9 +52,25 @@ export function MobileNav({ items, activeHref, transparent, open, onOpenChange }
         <Separator />
         <nav aria-label="Mobile" className="flex flex-col gap-1">
           {items.map((item) => {
-            const isActive = activeHref === item.href;
+            const isActive = isItemActive(item);
 
-            return (
+            return item.gender ? (
+              <Link
+                key={item.label}
+                to={ROUTES.products}
+                search={{ gender: item.gender }}
+                preload="intent"
+                aria-current={isActive ? 'page' : undefined}
+                onClick={() => onOpenChange?.(false)}
+                className={
+                  isActive
+                    ? 'bg-accent text-accent-foreground rounded-md px-3 py-2.5 text-sm font-medium'
+                    : 'text-foreground hover:bg-muted rounded-md px-3 py-2.5 text-sm font-medium transition-colors'
+                }
+              >
+                {item.label}
+              </Link>
+            ) : (
               <Link
                 key={item.label}
                 to={item.href}

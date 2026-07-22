@@ -111,4 +111,7 @@ export const QUERY_KEYS = {
   adminAudit: {
     list: (params?: unknown) => ['admin', 'audit', 'list', params] as const,
   },
+  storefront: {
+    bootstrap: () => ['storefront', 'bootstrap'] as const,
+  },
 } as const;

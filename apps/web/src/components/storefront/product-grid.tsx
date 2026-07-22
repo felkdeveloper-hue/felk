@@ -3,11 +3,11 @@ import { Link } from '@tanstack/react-router';
 import { ArrowRight } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { QUERY_KEYS, ROUTES } from '@/constants';
+import { useInView } from '@/hooks/use-in-view';
 import { Section } from '@/components/common/section';
 import { Button } from '@/components/ui/button';
 import { ProductGridSkeleton } from '@/components/feedback/skeletons';
 import { productsApi, type Product } from '@/services/sdk';
-import { AsyncSection } from './async-section';
 import { MotionItem, MotionReveal } from './motion-reveal';
 import { ProductCard } from './product-card';
 
@@ -25,18 +25,26 @@ function shuffleProducts(products: Product[]): Product[] {
   return next;
 }
 
-export function ProductGridSection() {
+export function ProductGridSection({
+  spacing = 'sm',
+}: {
+  spacing?: 'none' | 'sm' | 'default' | 'lg';
+}) {
+  const { ref, inView } = useInView({ rootMargin: '400px 0px' });
+
   const query = useQuery({
-    queryKey: QUERY_KEYS.products.list({ rail: 'home-grid', status: 'active', limit: 36 }),
+    queryKey: QUERY_KEYS.products.list({ rail: 'home-grid', status: 'active', limit: GRID_COUNT }),
     queryFn: () =>
       productsApi.list({
         status: 'active',
         sortBy: 'updatedAt',
         sortOrder: 'desc',
-        limit: 36,
+        limit: GRID_COUNT,
       }),
-    staleTime: 1000 * 60 * 2,
-    retry: 1,
+    staleTime: 1000 * 60 * 3,
+    retry: 3,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8_000),
+    enabled: inView,
   });
 
   const products = useMemo(() => {
@@ -44,42 +52,41 @@ export function ProductGridSection() {
     return shuffleProducts(query.data.data).slice(0, GRID_COUNT);
   }, [query.data]);
 
+  if (inView && query.isError && !query.isFetching && !products.length) return null;
+  if (inView && !query.isLoading && !query.isFetching && !products.length) return null;
+
   return (
-    <Section
-      spacing="default"
-      className="bg-background"
-      eyebrow="Shop the edit"
-      title="Featured products"
-      description="Four across, three rows — a curated mix from the collection."
-      action={
-        <Button variant="ghost" asChild className="hidden sm:inline-flex">
-          <Link to={ROUTES.products}>
-            View all
-            <ArrowRight />
-          </Link>
-        </Button>
-      }
-    >
-      <AsyncSection
-        isLoading={query.isLoading}
-        isError={query.isError}
-        error={query.error ?? undefined}
-        data={products}
-        isEmpty={(items) => !items.length}
-        onRetry={() => void query.refetch()}
-        skeleton={<ProductGridSkeleton count={GRID_COUNT} className={gridLayoutClass} />}
-        emptyTitle="Products coming soon"
+    <div ref={ref}>
+      <Section
+        spacing={spacing}
+        className="bg-background"
+        title="Featured products"
+        titleAlign="center"
+        action={
+          <Button variant="ghost" asChild className="hidden sm:inline-flex">
+            <Link to={ROUTES.products}>
+              View all
+              <ArrowRight />
+            </Link>
+          </Button>
+        }
       >
-        {(items) => (
+        {!inView || query.isLoading || (query.isFetching && !products.length) ? (
+          <ProductGridSkeleton count={GRID_COUNT} className={gridLayoutClass} />
+        ) : (
           <MotionReveal stagger className={gridLayoutClass}>
-            {items.map((product) => (
+            {products.map((product, index) => (
               <MotionItem key={product.id}>
-                <ProductCard product={product} />
+                <ProductCard
+                  product={product}
+                  priority={index < 4}
+                  sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                />
               </MotionItem>
             ))}
           </MotionReveal>
         )}
-      </AsyncSection>
-    </Section>
+      </Section>
+    </div>
   );
 }

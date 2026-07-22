@@ -1,14 +1,13 @@
 import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import ethnicWearImage from '@/assets/images/Crousel Image/EthenicWear.webp';
 import newInImage from '@/assets/images/Crousel Image/banner2.webp';
 import mensCarouselImage from '@/assets/images/Crousel Image/menscrousel.webp';
 import womenCarouselImage from '@/assets/images/Crousel Image/womenCrousel.webp';
-import { QUERY_KEYS } from '@/constants/query-keys';
+import { useCategoriesList } from '@/hooks/catalog/use-categories';
 import { Section } from '@/components/common/section';
 import { Image } from '@/components/media/image';
-import { categoriesApi, type Category } from '@/services/sdk';
+import type { Category } from '@/services/sdk';
 import type { HomeSection } from '@/services/sdk/cms';
 import { AsyncSection } from './async-section';
 import { HorizontalCarousel } from './horizontal-carousel';
@@ -73,27 +72,21 @@ export interface ShopYourMoodSectionProps {
 }
 
 export function ShopYourMoodSection({ section }: ShopYourMoodSectionProps) {
-  const query = useQuery({
-    queryKey: QUERY_KEYS.categories.list({ mood: true }),
-    queryFn: () =>
-      categoriesApi.list({ status: 'active', limit: 50, sortBy: 'sortOrder', sortOrder: 'asc' }),
-    staleTime: 1000 * 60 * 5,
-    retry: 1,
-  });
+  const query = useCategoriesList();
 
   const title = section?.title ?? 'Shop your mood';
   const tiles = useMemo(() => resolveMoodTiles(query.data?.data), [query.data?.data]);
 
   return (
     <Section spacing="default" className="bg-background" aria-label={title}>
-      <div className="mx-auto mb-8 max-w-[1600px] px-4 text-center sm:mb-10 sm:px-6 lg:px-10">
+      <div className="mx-auto mb-5 max-w-[1600px] px-4 text-center sm:mb-6 sm:px-6 lg:px-10">
         <h2 className="font-display text-foreground text-2xl font-bold uppercase tracking-[0.08em] sm:text-3xl lg:text-4xl">
           {title}
         </h2>
       </div>
 
       <AsyncSection
-        isLoading={query.isLoading && !query.data}
+        isLoading={false}
         isError={false}
         data={tiles}
         isEmpty={(items) => !items?.length}

@@ -7,15 +7,21 @@ import { QUERY_KEYS } from '@/constants';
 import { formatCurrency } from '@/lib/utils';
 import { AppError } from '@/lib/errors';
 import { nextLinkedSku } from '@/lib/sku';
-import { inventoryApi, mediaApi, productsApi, type AdminVariant } from '@/services/sdk/admin';
+import {
+  inventoryApi,
+  mediaApi,
+  productsApi,
+  cmsApi,
+  type AdminVariant,
+} from '@/services/sdk/admin';
 
 const fieldClass =
-  'w-full rounded-lg border border-[var(--admin-line)] bg-[var(--admin-panel-soft)] px-3 py-2 text-sm text-[var(--admin-ink)] outline-none focus:border-[var(--admin-accent)]/50';
+  'w-full rounded-none border border-[var(--admin-line)] bg-[var(--admin-panel-soft)] px-3 py-2 text-sm text-[var(--admin-ink)] outline-none focus:border-[var(--admin-accent)]/50';
 
 const btnPrimary =
-  'inline-flex h-9 items-center justify-center rounded-lg bg-[var(--admin-ink)] px-3 text-sm font-medium text-[var(--admin-surface)] transition hover:opacity-90 disabled:opacity-60';
+  'inline-flex h-9 items-center justify-center rounded-none bg-[var(--admin-ink)] px-3 text-sm font-medium text-[var(--admin-surface)] transition hover:opacity-90 disabled:opacity-60';
 const btnDanger =
-  'inline-flex h-8 items-center justify-center rounded-md px-2.5 text-xs font-medium text-red-700 transition hover:bg-red-50 disabled:opacity-60 dark:text-red-400 dark:hover:bg-red-500/10';
+  'inline-flex h-8 items-center justify-center rounded-none px-2.5 text-xs font-medium text-red-700 transition hover:bg-red-50 disabled:opacity-60 dark:text-red-400 dark:hover:bg-red-500/10';
 
 export type ProductSection = 'details' | 'images' | 'variants' | 'prices' | 'stock' | 'review';
 
@@ -65,10 +71,21 @@ export function ProductCommercePanels({
     queryKey: [...QUERY_KEYS.products.detail(productId), 'media'],
     queryFn: () => mediaApi.list(productId),
   });
+  const sizesQuery = useQuery({
+    queryKey: ['cms', 'sizes', 'variant-form'],
+    queryFn: () => cmsApi.sizes.list({ limit: 100, status: 'active' }),
+  });
+  const colorsQuery = useQuery({
+    queryKey: ['cms', 'colors', 'variant-form'],
+    queryFn: () => cmsApi.colors.list({ limit: 100, status: 'active' }),
+  });
 
   const [title, setTitle] = useState('');
+  const [selectedColorIds, setSelectedColorIds] = useState<string[]>([]);
+  const [selectedSizeIds, setSelectedSizeIds] = useState<string[]>([]);
   const [price, setPrice] = useState('0');
   const [salePrice, setSalePrice] = useState('');
+  const [photoColorId, setPhotoColorId] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [productPriceDraft, setProductPriceDraft] = useState({
     price: String(productPrice ?? 0),
@@ -188,16 +205,57 @@ export function ProductCommercePanels({
       setError(err instanceof AppError ? err.message : 'Unable to upload variant image.'),
   });
 
+  const toggleId = (list: string[], id: string) =>
+    list.includes(id) ? list.filter((item) => item !== id) : [...list, id];
+
   const createMutation = useMutation({
-    mutationFn: () =>
-      productsApi.createVariant(productId, {
-        title: title.trim() || undefined,
-        price: Number(price) || 0,
-        salePrice: salePrice === '' ? null : Number(salePrice),
-        currency: 'LKR',
-      }),
+    mutationFn: async () => {
+      const colorOptions = selectedColorIds.length ? selectedColorIds : [''];
+      const sizeOptions = selectedSizeIds.length ? selectedSizeIds : [''];
+      const pairs: { colorId: string; sizeId: string }[] = [];
+      for (const colorId of colorOptions) {
+        for (const sizeId of sizeOptions) {
+          pairs.push({ colorId, sizeId });
+        }
+      }
+
+      const existingKeys = new Set(
+        variants.map((variant) => `${variant.colorId ?? ''}:${variant.sizeId ?? ''}`),
+      );
+
+      const toCreate = pairs.filter((pair) => !existingKeys.has(`${pair.colorId}:${pair.sizeId}`));
+      if (!toCreate.length) {
+        throw new AppError(
+          selectedColorIds.length || selectedSizeIds.length
+            ? 'Those size x color combinations already exist.'
+            : 'Select at least one size or color, or add a single unlabeled variant.',
+        );
+      }
+
+      const basePrice = Number(price) || 0;
+      const baseSale = salePrice === '' ? null : Number(salePrice);
+
+      for (const pair of toCreate) {
+        const colorName = colorsQuery.data?.data.find((c) => c.id === pair.colorId)?.name;
+        const sizeName = sizesQuery.data?.data.find((s) => s.id === pair.sizeId)?.name;
+        const autoTitle =
+          title.trim() || [colorName, sizeName].filter(Boolean).join(' / ') || undefined;
+        await productsApi.createVariant(productId, {
+          title: autoTitle,
+          colorId: pair.colorId || null,
+          sizeId: pair.sizeId || null,
+          price: basePrice,
+          salePrice: baseSale,
+          currency: 'LKR',
+        });
+      }
+
+      return toCreate.length;
+    },
     onSuccess: async () => {
       setTitle('');
+      setSelectedColorIds([]);
+      setSelectedSizeIds([]);
       setPrice('0');
       setSalePrice('');
       setError(null);
@@ -304,7 +362,7 @@ export function ProductCommercePanels({
   return (
     <div className="space-y-6">
       {error ? (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
+        <div className="rounded-none border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
           {error}
         </div>
       ) : null}
@@ -312,7 +370,8 @@ export function ProductCommercePanels({
       <AdminPanel title="Product images">
         <div id="product-section-images" className={highlight('images')}>
           <p className="mb-3 text-xs text-neutral-500 dark:text-neutral-400">
-            The first image becomes the main listing photo. At least one image is required.
+            Upload photos here for the product gallery. The â˜… Main badge marks the listing photo
+            shoppers see first. At least one image is required.
           </p>
           <ImageUploader
             images={mainImages}
@@ -322,6 +381,7 @@ export function ProductCommercePanels({
             onUpload={(file) => uploadMainMutation.mutate(file)}
             onSetPrimary={(id) => setPrimaryMutation.mutate(id)}
             onRemove={(id) => removeMediaMutation.mutate(id)}
+            hint="Hover an image and click the star to change the main listing photo."
           />
         </div>
       </AdminPanel>
@@ -330,120 +390,305 @@ export function ProductCommercePanels({
         <div id="product-section-variants" className={highlight('variants')}>
           {canCreate ? (
             <form
-              className="mb-5 space-y-3 rounded-xl border border-[var(--admin-line)] bg-[var(--admin-surface)] p-4"
+              className="mb-6 space-y-5 border border-[var(--admin-line)] bg-[var(--admin-surface)] p-4"
               onSubmit={(event) => {
                 event.preventDefault();
                 createMutation.mutate();
               }}
             >
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
-                    Next variant SKU
-                  </p>
-                  <p className="mt-0.5 font-mono text-sm font-semibold tracking-wide text-[var(--admin-ink)]">
+              <div>
+                <p className="text-sm font-semibold text-[var(--admin-ink)]">
+                  Create size x color SKUs
+                </p>
+                <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+                  Next SKU:{' '}
+                  <span className="font-mono font-medium text-[var(--admin-ink)]">
                     {previewSku ?? 'Assigned on save'}
-                  </p>
-                </div>
-                {canPreviewSku && productSku ? (
-                  <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                    Linked to parent <span className="font-mono">{productSku}</span>
-                  </p>
-                ) : (
-                  <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                    Linked FE2026 sequence assigned automatically
-                  </p>
-                )}
+                  </span>
+                  {canPreviewSku && productSku ? (
+                    <span className="text-neutral-400"> · parent {productSku}</span>
+                  ) : null}
+                </p>
               </div>
-              <div className="grid gap-3 md:grid-cols-[1.2fr_1fr_auto]">
-                <input
-                  className={fieldClass}
-                  placeholder="Title (optional)"
-                  value={title}
-                  onChange={(event) => setTitle(event.target.value)}
-                />
-                <input
-                  className={fieldClass}
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="Price"
-                  value={price}
-                  onChange={(event) => setPrice(event.target.value)}
-                  required
-                />
-                <button type="submit" className={btnPrimary} disabled={createMutation.isPending}>
-                  {createMutation.isPending ? 'Adding…' : 'Add variant'}
-                </button>
+
+              <div className="grid gap-4 lg:grid-cols-2">
+                <div>
+                  <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.12em] text-neutral-500">
+                    1. Colors
+                  </p>
+                  <div className="flex max-h-36 flex-wrap gap-1.5 overflow-y-auto border border-[var(--admin-line)] p-2">
+                    {(colorsQuery.data?.data ?? []).length === 0 ? (
+                      <p className="text-xs text-neutral-500">
+                        Add colors under Catalog â†’ Colors.
+                      </p>
+                    ) : (
+                      (colorsQuery.data?.data ?? []).map((color) => {
+                        const checked = selectedColorIds.includes(color.id);
+                        return (
+                          <label
+                            key={color.id}
+                            className={`inline-flex cursor-pointer items-center border px-2.5 py-1.5 text-xs font-medium transition ${
+                              checked
+                                ? 'border-[var(--admin-ink)] bg-[var(--admin-ink)] text-[var(--admin-surface)]'
+                                : 'hover:border-[var(--admin-ink)]/50 border-[var(--admin-line)] text-[var(--admin-ink)]'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              className="sr-only"
+                              checked={checked}
+                              onChange={() =>
+                                setSelectedColorIds((current) => toggleId(current, color.id))
+                              }
+                            />
+                            {color.name}
+                          </label>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.12em] text-neutral-500">
+                    2. Sizes
+                  </p>
+                  <div className="flex max-h-36 flex-wrap gap-1.5 overflow-y-auto border border-[var(--admin-line)] p-2">
+                    {(sizesQuery.data?.data ?? []).length === 0 ? (
+                      <p className="text-xs text-neutral-500">Add sizes under Catalog â†’ Sizes.</p>
+                    ) : (
+                      (sizesQuery.data?.data ?? []).map((size) => {
+                        const checked = selectedSizeIds.includes(size.id);
+                        return (
+                          <label
+                            key={size.id}
+                            className={`inline-flex cursor-pointer items-center border px-2.5 py-1.5 text-xs font-medium transition ${
+                              checked
+                                ? 'border-[var(--admin-ink)] bg-[var(--admin-ink)] text-[var(--admin-surface)]'
+                                : 'hover:border-[var(--admin-ink)]/50 border-[var(--admin-line)] text-[var(--admin-ink)]'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              className="sr-only"
+                              checked={checked}
+                              onChange={() =>
+                                setSelectedSizeIds((current) => toggleId(current, size.id))
+                              }
+                            />
+                            {size.name}
+                          </label>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.12em] text-neutral-500">
+                  3. Price and create
+                </p>
+                <div className="grid gap-3 md:grid-cols-[1fr_140px_auto]">
+                  <input
+                    className={fieldClass}
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="Price for all selected combinations"
+                    value={price}
+                    onChange={(event) => setPrice(event.target.value)}
+                    required
+                  />
+                  <input
+                    className={fieldClass}
+                    placeholder="Label (optional)"
+                    value={title}
+                    onChange={(event) => setTitle(event.target.value)}
+                  />
+                  <button type="submit" className={btnPrimary} disabled={createMutation.isPending}>
+                    {createMutation.isPending
+                      ? 'Adding...'
+                      : (() => {
+                          const total =
+                            selectedColorIds.length || selectedSizeIds.length
+                              ? Math.max(selectedColorIds.length, 1) *
+                                Math.max(selectedSizeIds.length, 1)
+                              : 1;
+                          return total > 1 ? `Create ${total} SKUs` : 'Create SKU';
+                        })()}
+                  </button>
+                </div>
+                <p className="mt-2 text-xs text-neutral-500 dark:text-neutral-400">
+                  Example: Black + Red, and S / M / L â†’ creates 6 SKUs. Set stock and sale prices
+                  in the Stock / Prices tabs.
+                </p>
               </div>
             </form>
           ) : null}
 
           {variantsQuery.isLoading ? (
-            <p className="text-sm text-neutral-500 dark:text-neutral-400">Loading variants…</p>
+            <p className="text-sm text-neutral-500 dark:text-neutral-400">Loading variants...</p>
           ) : variants.length === 0 ? (
             <AdminEmptyState
-              title="No variants yet"
-              description="Optional — set a price on the main product, or add variants for sizes, colors, or other options."
+              title="No size / color SKUs yet"
+              description="Pick colors and sizes above, enter a price, then create."
             />
           ) : (
-            <ul className="divide-y divide-[var(--admin-line)]">
-              {variants.map((variant) => {
-                const variantImages = variantMediaMap.get(variant.id) ?? [];
-                return (
-                  <li
-                    key={variant.id}
-                    className="flex flex-wrap items-start justify-between gap-4 py-4"
-                  >
-                    <div className="flex items-start gap-3">
-                      <ImageUploader
-                        images={variantImages}
-                        required
-                        compact
-                        disabled={!canUpdate}
-                        uploading={
-                          uploadVariantImageMutation.isPending &&
-                          uploadVariantImageMutation.variables?.variantId === variant.id
-                        }
-                        onUpload={(file) =>
-                          uploadVariantImageMutation.mutate({ variantId: variant.id, file })
-                        }
-                        onRemove={(id) => removeMediaMutation.mutate(id)}
-                      />
-                      <div>
-                        <p className="font-medium text-[var(--admin-ink)]">
-                          {variant.title || variant.sku}
-                        </p>
-                        <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                          {variant.sku}
-                          {variant.isDefault ? ' · default' : ''} · stock{' '}
-                          {stockByVariant.get(variant.id) ?? 0}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium">
-                        {formatCurrency(variant.price, variant.currency)}
-                      </span>
-                      {canDelete ? (
-                        <button
-                          type="button"
-                          className={btnDanger}
-                          disabled={deleteMutation.isPending}
-                          onClick={() => {
-                            if (window.confirm(`Delete variant ${variant.sku}?`)) {
-                              deleteMutation.mutate(variant.id);
-                            }
-                          }}
-                        >
-                          Remove
-                        </button>
-                      ) : null}
-                    </div>
-                  </li>
+            <div className="space-y-6">
+              {(() => {
+                const colorNameById = new Map(
+                  (colorsQuery.data?.data ?? []).map((c) => [c.id, c.name] as const),
                 );
-              })}
-            </ul>
+                const sizeNameById = new Map(
+                  (sizesQuery.data?.data ?? []).map((s) => [s.id, s.name] as const),
+                );
+                const hasColored = variants.some((v) => v.colorId);
+                const displayVariants = hasColored
+                  ? variants.filter((v) => v.colorId || v.sizeId)
+                  : variants;
+                // Prefer real color/size rows; hide orphan default when colored SKUs exist
+                const rows = hasColored
+                  ? displayVariants.filter((v) => v.colorId || (v.sizeId && !v.isDefault))
+                  : displayVariants;
+
+                const colorOptions = [
+                  ...new Map(
+                    variants
+                      .filter((v) => v.colorId)
+                      .map(
+                        (v) =>
+                          [
+                            v.colorId!,
+                            colorNameById.get(v.colorId!) ??
+                              v.optionValues?.color ??
+                              v.title?.split(' / ')[0] ??
+                              'Color',
+                          ] as const,
+                      ),
+                  ).entries(),
+                ];
+
+                const activePhotoColor = photoColorId || colorOptions[0]?.[0] || '';
+                const photoTarget =
+                  variants.find((v) => v.colorId === activePhotoColor) ??
+                  variants.find((v) => v.colorId);
+                const photoImages = photoTarget ? (variantMediaMap.get(photoTarget.id) ?? []) : [];
+
+                return (
+                  <>
+                    <div className="overflow-x-auto border border-[var(--admin-line)]">
+                      <table className="w-full min-w-[32rem] text-left text-sm">
+                        <thead className="bg-[var(--admin-panel-soft)] text-[11px] font-bold uppercase tracking-[0.1em] text-neutral-500">
+                          <tr>
+                            <th className="px-3 py-2.5">Color</th>
+                            <th className="px-3 py-2.5">Size</th>
+                            <th className="px-3 py-2.5">SKU</th>
+                            <th className="px-3 py-2.5">Stock</th>
+                            <th className="px-3 py-2.5">Price</th>
+                            <th className="px-3 py-2.5 text-right"> </th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[var(--admin-line)]">
+                          {rows.map((variant) => {
+                            const colorLabel = variant.colorId
+                              ? (colorNameById.get(variant.colorId) ??
+                                variant.optionValues?.color ??
+                                '-')
+                              : '-';
+                            const sizeLabel = variant.sizeId
+                              ? (sizeNameById.get(variant.sizeId) ??
+                                variant.optionValues?.size ??
+                                '-')
+                              : '-';
+                            return (
+                              <tr key={variant.id} className="bg-[var(--admin-surface)]">
+                                <td className="px-3 py-2.5 font-medium text-[var(--admin-ink)]">
+                                  {colorLabel}
+                                </td>
+                                <td className="px-3 py-2.5 text-[var(--admin-ink)]">{sizeLabel}</td>
+                                <td className="px-3 py-2.5 font-mono text-xs text-neutral-500">
+                                  {variant.sku}
+                                </td>
+                                <td className="px-3 py-2.5 text-neutral-600 dark:text-neutral-400">
+                                  {stockByVariant.get(variant.id) ?? 0}
+                                </td>
+                                <td className="px-3 py-2.5 font-medium">
+                                  {formatCurrency(variant.price, variant.currency)}
+                                </td>
+                                <td className="px-3 py-2.5 text-right">
+                                  {canDelete ? (
+                                    <button
+                                      type="button"
+                                      className={btnDanger}
+                                      disabled={deleteMutation.isPending}
+                                      onClick={() => {
+                                        if (window.confirm(`Delete ${variant.sku}?`)) {
+                                          deleteMutation.mutate(variant.id);
+                                        }
+                                      }}
+                                    >
+                                      Remove
+                                    </button>
+                                  ) : null}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {colorOptions.length > 0 && photoTarget ? (
+                      <div className="border border-[var(--admin-line)] p-4">
+                        <p className="text-sm font-semibold text-[var(--admin-ink)]">
+                          Color photos (optional)
+                        </p>
+                        <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+                          Upload photos for one color at a time. These swap in the storefront
+                          gallery when the shopper picks that color. Main gallery photos stay in
+                          Product images above.
+                        </p>
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                          {colorOptions.map(([id, name]) => (
+                            <button
+                              key={id}
+                              type="button"
+                              onClick={() => setPhotoColorId(id)}
+                              className={`border px-2.5 py-1.5 text-xs font-medium transition ${
+                                activePhotoColor === id
+                                  ? 'border-[var(--admin-ink)] bg-[var(--admin-ink)] text-[var(--admin-surface)]'
+                                  : 'hover:border-[var(--admin-ink)]/50 border-[var(--admin-line)] text-[var(--admin-ink)]'
+                              }`}
+                            >
+                              {name}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="mt-3">
+                          <ImageUploader
+                            images={photoImages}
+                            compact
+                            disabled={!canUpdate}
+                            uploading={
+                              uploadVariantImageMutation.isPending &&
+                              uploadVariantImageMutation.variables?.variantId === photoTarget.id
+                            }
+                            onUpload={(file) =>
+                              uploadVariantImageMutation.mutate({
+                                variantId: photoTarget.id,
+                                file,
+                              })
+                            }
+                            onRemove={(id) => removeMediaMutation.mutate(id)}
+                          />
+                        </div>
+                      </div>
+                    ) : null}
+                  </>
+                );
+              })()}
+            </div>
           )}
         </div>
       </AdminPanel>
@@ -451,11 +696,11 @@ export function ProductCommercePanels({
       <AdminPanel title="Prices">
         <div id="product-section-prices" className={highlight('prices')}>
           {variants.length === 0 ? (
-            <div className="grid gap-3 rounded-xl border border-[var(--admin-line)] p-4 md:grid-cols-[1.2fr_1fr_1fr_auto]">
+            <div className="grid gap-3 rounded-none border border-[var(--admin-line)] p-4 md:grid-cols-[1.2fr_1fr_1fr_auto]">
               <div>
                 <p className="text-sm font-medium">Main product</p>
                 <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                  {productSku ?? 'No variants — price applies to the product itself'}
+                  {productSku ?? 'No variants - price applies to the product itself'}
                 </p>
               </div>
               <label className="block text-xs text-neutral-500 dark:text-neutral-400">
@@ -510,7 +755,7 @@ export function ProductCommercePanels({
               {variants.map((variant) => (
                 <div
                   key={variant.id}
-                  className="grid gap-3 rounded-xl border border-[var(--admin-line)] p-4 md:grid-cols-[1.2fr_1fr_1fr_auto]"
+                  className="grid gap-3 rounded-none border border-[var(--admin-line)] p-4 md:grid-cols-[1.2fr_1fr_1fr_auto]"
                 >
                   <div>
                     <p className="text-sm font-medium">{variant.title || variant.sku}</p>
@@ -588,7 +833,7 @@ export function ProductCommercePanels({
               {variants.map((variant) => (
                 <div
                   key={variant.id}
-                  className="grid gap-3 rounded-xl border border-[var(--admin-line)] p-4 md:grid-cols-[1.2fr_1fr_auto]"
+                  className="grid gap-3 rounded-none border border-[var(--admin-line)] p-4 md:grid-cols-[1.2fr_1fr_auto]"
                 >
                   <div>
                     <p className="text-sm font-medium">{variant.title || variant.sku}</p>
@@ -666,7 +911,7 @@ export function ProductCommercePanels({
                     : undefined
               }
             >
-              {isPublished ? 'Already live' : isPublishing ? 'Publishing…' : 'Publish product'}
+              {isPublished ? 'Already live' : isPublishing ? 'Publishing...' : 'Publish product'}
             </button>
           ) : null}
         </div>

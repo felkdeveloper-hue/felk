@@ -1,18 +1,22 @@
-import { useMemo } from 'react';
-import { Link } from '@tanstack/react-router';
-import { Info, ShoppingBag } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Link, useNavigate } from '@tanstack/react-router';
+import { Minus, Plus, RefreshCcw, ShieldCheck, ShoppingBag } from 'lucide-react';
+import { toast } from 'sonner';
 import { AddToCartButton } from '@/components/cart/add-to-cart-button';
 import { WishlistButton } from '@/components/wishlist/wishlist-button';
+import { useAddToCartMutation } from '@/hooks/cart';
 import { useCartStore } from '@/store/cart-store';
+import { resolveVariantId } from '@/utils/cart';
 import { formatCurrency } from '@/utils';
 import { ROUTES } from '@/constants';
-import type { Product, ProductMoney, ProductVariant } from '@/services/sdk';
+import type { Product, ProductMedia, ProductMoney, ProductVariant } from '@/services/sdk';
+import { AppError } from '@/lib/errors';
 import { cn } from '@/lib/utils';
 import { PriceDisplay } from './price-display';
-import { ProductRatingBadge } from './product-rating-badge';
-import { ProductSizeSelector } from './product-size-selector';
-import { ProductOffersSection } from './product-offers-section';
+import { ProductColorSelector } from './product-color-selector';
 import { ProductDeliveryCheck } from './product-delivery-check';
+import { ProductOffersSection } from './product-offers-section';
+import { ProductSizeSelector } from './product-size-selector';
 import { VariantSelector } from './variant-selector';
 
 function resolveDealPrice(product: Product): ProductMoney | undefined {
@@ -38,6 +42,7 @@ function findVariant(
 
 export interface ProductPurchasePanelProps {
   product: Product;
+  media?: ProductMedia[];
   selectedVariantId?: string;
   selectedColorId?: string;
   selectedSizeId?: string;
@@ -52,6 +57,7 @@ export interface ProductPurchasePanelProps {
 
 export function ProductPurchasePanel({
   product,
+  media = [],
   selectedVariantId,
   selectedColorId,
   selectedSizeId,
@@ -63,7 +69,10 @@ export function ProductPurchasePanel({
   materialLabel,
   badgeLabel,
 }: ProductPurchasePanelProps) {
+  const navigate = useNavigate();
   const cart = useCartStore((state) => state.cart);
+  const addMutation = useAddToCartMutation();
+  const [quantity, setQuantity] = useState(1);
   const variants = product.variants ?? [];
 
   const selectedVariant = useMemo(
@@ -84,6 +93,11 @@ export function ProductPurchasePanel({
 
   const colors = [...new Set(variants.map((v) => v.colorId).filter(Boolean))] as string[];
   const hasSeparateSizeSelector = variants.some((v) => v.sizeId);
+  const hasColorSelector = colors.length > 0;
+
+  const availabilityChips: { label: string }[] = [];
+  if (product.warrantyAvailable) availabilityChips.push({ label: 'Warranty available' });
+  if (product.returnsAvailable) availabilityChips.push({ label: 'Returns & refunds available' });
 
   const handleColorSelect = (colorId: string) => {
     onColorChange(colorId);
@@ -97,70 +111,103 @@ export function ProductPurchasePanel({
     if (match) onVariantChange(match.id);
   };
 
+  const handleBuyNow = () => {
+    const resolved = resolveVariantId(selectedVariantId, product);
+    if (!resolved) {
+      toast.error('Please select an available option');
+      return;
+    }
+    addMutation.mutate(
+      { variantId: resolved, quantity },
+      {
+        onSuccess: () => {
+          void navigate({ to: ROUTES.checkout });
+        },
+        onError: (error) => {
+          toast.error(AppError.isAppError(error) ? error.message : 'Unable to start checkout');
+        },
+      },
+    );
+  };
+
   return (
-    <div className="space-y-5">
-      {badgeLabel ? (
-        <span className="text-foreground inline-block rounded bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
-          {badgeLabel}
-        </span>
-      ) : null}
+    <div
+      className={cn(
+        'border-border bg-card text-card-foreground space-y-6 rounded-none border p-5 shadow-[0_1px_0_hsl(var(--foreground)/0.04),0_18px_40px_-28px_hsl(var(--foreground)/0.35)] sm:p-7',
+        'before:bg-foreground relative before:absolute before:inset-y-0 before:left-0 before:w-0.5',
+      )}
+    >
+      <div className="space-y-3">
+        {badgeLabel ? (
+          <span className="text-muted-foreground text-[11px] font-semibold uppercase tracking-[0.18em]">
+            {badgeLabel}
+          </span>
+        ) : null}
 
-      {product.brandName ? (
-        <p className="text-foreground text-xs font-bold uppercase tracking-wide">
-          {product.brandName}
-        </p>
-      ) : null}
+        {product.brandName ? (
+          <p className="text-muted-foreground text-xs font-semibold uppercase tracking-[0.16em]">
+            {product.brandName}
+          </p>
+        ) : null}
 
-      <div className="flex items-start justify-between gap-4">
-        <h1 className="text-muted-foreground text-lg font-normal leading-snug sm:text-xl">
-          {product.name}
-        </h1>
-        <ProductRatingBadge
-          averageRating={product.averageRating}
-          reviewCount={product.reviewCount}
-          className="shrink-0"
-        />
+        <div className="flex items-start justify-between gap-4">
+          <h1 className="font-display text-foreground text-xl font-bold uppercase leading-tight tracking-[0.04em] sm:text-2xl">
+            {product.name}
+          </h1>
+          <WishlistButton
+            product={product}
+            variantId={selectedVariantId}
+            iconOnly
+            variant="ghost"
+            size="icon"
+            className="text-muted-foreground hover:text-foreground -mr-1 mt-0.5 size-10 shrink-0"
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <PriceDisplay
+            premium
+            size="md"
+            price={selectedVariant?.price ?? product.price}
+            salePrice={selectedVariant?.salePrice ?? product.salePrice ?? product.effectivePrice}
+            compareAtPrice={compareAt}
+            discountPercent={product.discountPercent}
+          />
+          <p className="text-muted-foreground text-xs">Inclusive of all taxes</p>
+        </div>
+
+        {dealPrice ? (
+          <p className="text-muted-foreground text-sm">
+            Extra deals from {formatCurrency(dealPrice.amount, dealPrice.currency)}
+          </p>
+        ) : null}
+
+        {materialLabel ? (
+          <span className="bg-muted text-muted-foreground inline-block rounded-none px-2.5 py-1 text-xs font-medium uppercase tracking-wide">
+            {materialLabel}
+          </span>
+        ) : null}
       </div>
 
-      <div className="space-y-1">
-        <PriceDisplay
-          size="md"
-          price={selectedVariant?.price ?? product.price}
-          salePrice={selectedVariant?.salePrice ?? product.salePrice ?? product.effectivePrice}
-          compareAtPrice={compareAt}
-          discountPercent={product.discountPercent}
-        />
-        <p className="text-muted-foreground text-xs">Inclusive of all taxes</p>
-      </div>
-
-      {dealPrice ? (
-        <div className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-violet-300/60 bg-violet-50/50 px-3 py-1.5 text-sm text-violet-900">
-          <Info className="size-3.5 shrink-0" />
-          Get it for as low as {formatCurrency(dealPrice.amount, dealPrice.currency)}
+      {availabilityChips.length ? (
+        <div className="flex flex-wrap gap-2">
+          {availabilityChips.map((chip) => {
+            const isWarranty = /warranty/i.test(chip.label);
+            const Icon = isWarranty ? ShieldCheck : RefreshCcw;
+            return (
+              <span
+                key={chip.label}
+                className="inline-flex items-center gap-1.5 rounded-none border border-emerald-500/30 bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-900 dark:border-emerald-500/35 dark:bg-emerald-950/40 dark:text-emerald-100"
+              >
+                <Icon className="size-3.5 shrink-0" aria-hidden />
+                {chip.label}
+              </span>
+            );
+          })}
         </div>
       ) : null}
 
-      {materialLabel ? (
-        <span className="bg-muted text-muted-foreground inline-block rounded-md px-2.5 py-1 text-xs font-medium">
-          {materialLabel}
-        </span>
-      ) : null}
-
-      {colors.length > 1 ? (
-        <VariantSelector
-          variants={variants}
-          selectedId={selectedVariantId}
-          onSelect={(id) => {
-            const variant = variants.find((v) => v.id === id);
-            if (variant?.colorId) handleColorSelect(variant.colorId);
-            else onVariantChange(id);
-          }}
-          colorLabels={colorLabels}
-          showColors
-          showSizes={false}
-        />
-      ) : null}
-
+      {/* Size + color must sit above the cart CTAs */}
       {hasSeparateSizeSelector ? (
         <ProductSizeSelector
           variants={variants}
@@ -171,7 +218,18 @@ export function ProductPurchasePanel({
         />
       ) : null}
 
-      {!hasSeparateSizeSelector && colors.length <= 1 && variants.length ? (
+      {hasColorSelector ? (
+        <ProductColorSelector
+          variants={variants}
+          media={media}
+          selectedColorId={selectedColorId}
+          onColorSelect={handleColorSelect}
+          colorLabels={colorLabels}
+          productName={product.name}
+        />
+      ) : null}
+
+      {!hasSeparateSizeSelector && !hasColorSelector && variants.length > 1 ? (
         <VariantSelector
           variants={variants}
           selectedId={selectedVariantId}
@@ -181,38 +239,66 @@ export function ProductPurchasePanel({
         />
       ) : null}
 
-      <div className="flex gap-3 pt-1">
-        {isInCart ? (
-          <Link
-            to={ROUTES.cart}
-            className={cn(
-              'text-foreground inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-amber-400 px-6 text-sm font-bold uppercase tracking-wide transition-colors hover:bg-amber-400/90',
-            )}
-          >
-            <ShoppingBag className="size-4" />
-            Go to bag
-          </Link>
-        ) : (
-          <AddToCartButton
-            product={product}
-            variantId={selectedVariantId}
-            size="lg"
-            className="text-foreground min-h-12 flex-1 rounded-xl bg-amber-400 font-bold uppercase tracking-wide hover:bg-amber-400/90"
-            label="Add to bag"
-          />
-        )}
-        <WishlistButton
-          product={product}
-          variantId={selectedVariantId}
-          iconOnly
-          variant="outline"
-          size="lg"
-          className="min-h-12 min-w-12 rounded-xl"
-        />
+      <div className="space-y-3 pt-1">
+        <div className="flex flex-wrap items-stretch gap-3">
+          <div className="border-border inline-flex h-12 items-center rounded-none border">
+            <button
+              type="button"
+              aria-label="Decrease quantity"
+              className="text-foreground hover:bg-muted flex h-full w-11 items-center justify-center transition-colors disabled:opacity-40"
+              disabled={quantity <= 1}
+              onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+            >
+              <Minus className="size-3.5" />
+            </button>
+            <span className="min-w-10 text-center text-sm font-semibold tabular-nums">
+              {quantity}
+            </span>
+            <button
+              type="button"
+              aria-label="Increase quantity"
+              className="text-foreground hover:bg-muted flex h-full w-11 items-center justify-center transition-colors"
+              onClick={() => setQuantity((q) => Math.min(20, q + 1))}
+            >
+              <Plus className="size-3.5" />
+            </button>
+          </div>
+
+          {isInCart ? (
+            <Link
+              to={ROUTES.cart}
+              className={cn(
+                'border-foreground text-foreground hover:bg-foreground hover:text-background inline-flex h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-none border bg-transparent px-6 text-sm font-bold uppercase tracking-[0.12em] transition-colors',
+              )}
+            >
+              <ShoppingBag className="size-4" />
+              Go to bag
+            </Link>
+          ) : (
+            <AddToCartButton
+              product={product}
+              variantId={selectedVariantId}
+              quantity={quantity}
+              size="lg"
+              variant="outline"
+              className="border-foreground text-foreground hover:bg-foreground hover:text-background h-12 min-w-0 flex-1 rounded-none border bg-transparent font-bold uppercase tracking-[0.12em]"
+              label="Add to cart"
+            />
+          )}
+        </div>
+
+        <button
+          type="button"
+          onClick={handleBuyNow}
+          disabled={addMutation.isPending || product.status === 'out_of_stock'}
+          className="bg-foreground text-background hover:bg-foreground/90 inline-flex h-12 w-full items-center justify-center rounded-none text-sm font-bold uppercase tracking-[0.14em] transition-colors disabled:opacity-50"
+        >
+          {addMutation.isPending ? 'Please wait…' : 'Buy it now'}
+        </button>
       </div>
 
       <ProductOffersSection />
-      <ProductDeliveryCheck />
+      <ProductDeliveryCheck paymentOption={product.paymentOption} />
     </div>
   );
 }

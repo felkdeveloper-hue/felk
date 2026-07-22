@@ -18,7 +18,8 @@ export function RelatedProducts({ productId, title = 'You May Also Like' }: Rela
       ?.map((item) => item.relatedProduct)
       .filter((product): product is NonNullable<typeof product> => Boolean(product)) ?? [];
 
-  if (!query.isLoading && !products.length) return null;
+  // Hide quietly while loading fails or there is nothing to show — never flash a red error here.
+  if (query.isError || (!query.isLoading && !products.length)) return null;
 
   return (
     <Section spacing="default" title={title}>

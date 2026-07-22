@@ -12,6 +12,7 @@ export function ImageUploader({
   disabled = false,
   uploading = false,
   compact = false,
+  hint,
 }: {
   images: ProductMediaRow[];
   onUpload: (file: File) => void;
@@ -21,6 +22,7 @@ export function ImageUploader({
   disabled?: boolean;
   uploading?: boolean;
   compact?: boolean;
+  hint?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const missing = required && images.length === 0;
@@ -28,12 +30,12 @@ export function ImageUploader({
 
   return (
     <div>
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap gap-2">
         {images.map((image) => (
           <div
             key={image.id}
             className={cn(
-              'group relative overflow-hidden rounded-xl border border-[var(--admin-line)] bg-[var(--admin-panel-soft)]',
+              'group relative overflow-hidden rounded-none border border-[var(--admin-line)] bg-[var(--admin-panel-soft)]',
               size,
             )}
           >
@@ -43,16 +45,20 @@ export function ImageUploader({
               className="h-full w-full object-cover"
             />
             {image.isPrimary ? (
-              <span className="absolute left-1 top-1 rounded-full bg-[var(--admin-ink)] p-1 text-[var(--admin-surface)]">
+              <span
+                title="Main listing photo"
+                className="absolute left-0 top-0 inline-flex items-center gap-0.5 bg-[var(--admin-ink)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-[var(--admin-surface)]"
+              >
                 <Star className="size-2.5 fill-current" />
+                {!compact ? 'Main' : null}
               </span>
             ) : null}
             <div className="absolute inset-0 flex items-center justify-center gap-1 bg-black/50 opacity-0 transition group-hover:opacity-100">
               {onSetPrimary && !image.isPrimary ? (
                 <button
                   type="button"
-                  title="Set as primary"
-                  className="rounded-md bg-white/90 p-1.5 text-neutral-800 hover:bg-white"
+                  title="Set as main listing photo"
+                  className="rounded-none bg-white/90 p-1.5 text-neutral-800 hover:bg-white"
                   onClick={() => onSetPrimary(image.id)}
                 >
                   <Star className="size-3.5" />
@@ -62,7 +68,7 @@ export function ImageUploader({
                 <button
                   type="button"
                   title="Remove image"
-                  className="rounded-md bg-white/90 p-1.5 text-red-600 hover:bg-white"
+                  className="rounded-none bg-white/90 p-1.5 text-red-600 hover:bg-white"
                   onClick={() => onRemove(image.id)}
                 >
                   <Trash2 className="size-3.5" />
@@ -78,7 +84,7 @@ export function ImageUploader({
             onClick={() => inputRef.current?.click()}
             disabled={uploading}
             className={cn(
-              'flex flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed text-[10px] font-medium transition disabled:opacity-60',
+              'flex flex-col items-center justify-center gap-1 rounded-none border-2 border-dashed text-[10px] font-medium transition disabled:opacity-60',
               size,
               missing
                 ? 'border-red-300 text-red-600 hover:bg-red-50'
@@ -105,6 +111,8 @@ export function ImageUploader({
 
       {missing ? (
         <p className="mt-2 text-xs font-medium text-red-600">At least one image is required.</p>
+      ) : hint ? (
+        <p className="mt-2 text-xs text-neutral-500 dark:text-neutral-400">{hint}</p>
       ) : null}
     </div>
   );

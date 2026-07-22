@@ -1,4 +1,4 @@
-import { Bell, ChevronRight } from 'lucide-react';
+import { Bell, Ruler } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useUiStore } from '@/store/ui-store';
@@ -42,21 +42,30 @@ export function ProductSizeSelector({
 
   if (!sizes.length) return null;
 
+  const activeLabel = selectedSizeId
+    ? resolveSizeLabel(selectedSizeId, variants, sizeLabels)
+    : undefined;
+
   const handleNotify = () => {
     toast.success('We will notify you when this size is back in stock.');
   };
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-semibold">Select Size</span>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-baseline gap-2">
+          <span className="text-sm font-semibold uppercase tracking-[0.08em]">Size</span>
+          {activeLabel ? (
+            <span className="text-muted-foreground text-sm font-medium">: {activeLabel}</span>
+          ) : null}
+        </div>
         <button
           type="button"
           onClick={() => openModal('size-guide')}
-          className="inline-flex items-center gap-0.5 text-sm font-medium text-teal-600 hover:text-teal-700"
+          className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm font-medium transition-colors"
         >
-          Size guide
-          <ChevronRight className="size-3.5" />
+          <Ruler className="size-3.5" aria-hidden />
+          Sizing guide
         </button>
       </div>
 
@@ -74,18 +83,18 @@ export function ProductSizeSelector({
               aria-pressed={active}
               onClick={() => !oos && onSizeSelect(sizeId)}
               className={cn(
-                'relative min-w-[3rem] rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors',
+                'relative min-w-[3.25rem] rounded-none border px-3.5 py-2.5 text-sm font-semibold uppercase tracking-wide transition-colors',
                 oos
                   ? 'text-muted-foreground/50 border-border bg-muted/30 cursor-not-allowed'
                   : active
-                    ? 'border-foreground bg-foreground text-background'
-                    : 'border-border hover:border-foreground/40 hover:bg-muted/50',
+                    ? 'border-foreground text-foreground border-2'
+                    : 'border-border hover:border-foreground/50',
               )}
             >
               {label}
               {oos ? (
                 <span
-                  className="bg-muted-foreground/40 absolute inset-0 rounded-lg"
+                  className="absolute inset-0 rounded-none"
                   style={{
                     background:
                       'linear-gradient(to top left, transparent calc(50% - 0.5px), hsl(var(--muted-foreground) / 0.35) calc(50% - 0.5px), hsl(var(--muted-foreground) / 0.35) calc(50% + 0.5px), transparent calc(50% + 0.5px))',
@@ -101,9 +110,9 @@ export function ProductSizeSelector({
       <button
         type="button"
         onClick={handleNotify}
-        className="inline-flex items-center gap-1.5 text-sm text-teal-600 hover:text-teal-700"
+        className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm transition-colors"
       >
-        <span className="text-muted-foreground">Size not available?</span>
+        <span>Size not available?</span>
         <Bell className="size-3.5" />
         Notify me
       </button>

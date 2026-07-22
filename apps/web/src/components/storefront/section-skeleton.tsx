@@ -4,10 +4,10 @@ import { cn } from '@/lib/utils';
 
 export function SectionSkeleton({ className }: { className?: string }) {
   return (
-    <Container className={cn('py-14 sm:py-20', className)}>
-      <Skeleton className="mb-8 h-4 w-24" />
-      <Skeleton className="mb-3 h-10 w-64 max-w-full" />
-      <Skeleton className="mb-10 h-5 w-96 max-w-full" />
+    <Container className={cn('py-8 sm:py-10', className)}>
+      <Skeleton className="mb-5 h-4 w-24" />
+      <Skeleton className="mb-2 h-10 w-64 max-w-full" />
+      <Skeleton className="mb-6 h-5 w-96 max-w-full" />
       <div className="grid grid-cols-2 gap-6 lg:grid-cols-4">
         {Array.from({ length: 4 }, (_, i) => (
           <Skeleton key={i} className="aspect-[3/4] w-full rounded-xl" />

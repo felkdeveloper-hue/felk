@@ -8,6 +8,7 @@ export * from './price-display';
 export * from './product-breadcrumb';
 export * from './product-card';
 export * from './product-category-links';
+export * from './product-color-selector';
 export * from './product-delivery-check';
 export * from './product-gallery';
 export * from './product-grid';

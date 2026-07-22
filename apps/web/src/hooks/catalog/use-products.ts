@@ -82,5 +82,7 @@ export function useRelatedProducts(productId: string, type = 'related') {
     queryFn: () => productsApi.listRelationships(productId, type),
     enabled: Boolean(productId),
     staleTime: 1000 * 60 * 5,
+    retry: 2,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 6_000),
   });
 }

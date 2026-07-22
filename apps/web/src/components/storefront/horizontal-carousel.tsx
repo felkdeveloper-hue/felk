@@ -31,11 +31,14 @@ export function HorizontalCarousel({
   const [activeIndex, setActiveIndex] = useState(0);
   const [pageCount, setPageCount] = useState(1);
 
+  const getFirstCard = (node: HTMLDivElement) =>
+    node.querySelector<HTMLElement>('[data-carousel-item]');
+
   const measure = useCallback(() => {
     const node = scrollerRef.current;
     if (!node) return;
 
-    const first = node.firstElementChild as HTMLElement | null;
+    const first = getFirstCard(node);
     if (!first) {
       setPageCount(1);
       return;
@@ -60,7 +63,7 @@ export function HorizontalCarousel({
     measure();
 
     const onScroll = () => {
-      const first = node.firstElementChild as HTMLElement | null;
+      const first = getFirstCard(node);
       if (!first) return;
       const itemWidth = first.offsetWidth;
       const gap =
@@ -83,7 +86,7 @@ export function HorizontalCarousel({
     if (!node) return;
 
     if (scrollByItem) {
-      const first = node.firstElementChild as HTMLElement | null;
+      const first = getFirstCard(node);
       if (!first) return;
       const gap =
         Number.parseFloat(getComputedStyle(node).columnGap || getComputedStyle(node).gap) || 0;
@@ -99,7 +102,7 @@ export function HorizontalCarousel({
   const scrollToPage = (page: number) => {
     const node = scrollerRef.current;
     if (!node) return;
-    const first = node.firstElementChild as HTMLElement | null;
+    const first = getFirstCard(node);
     if (!first) return;
     const gap =
       Number.parseFloat(getComputedStyle(node).columnGap || getComputedStyle(node).gap) || 0;
@@ -111,19 +114,23 @@ export function HorizontalCarousel({
     <div className={cn('group/carousel relative', className)} aria-label={label}>
       <div
         ref={scrollerRef}
-        className="hide-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth px-4 pb-2 sm:gap-5 sm:px-6 md:px-8 lg:px-10 xl:px-14 2xl:px-20"
+        className="hide-scrollbar flex snap-x snap-mandatory scroll-pl-4 gap-3 overflow-x-auto scroll-smooth pb-2 sm:scroll-pl-5 sm:gap-4 lg:scroll-pl-6"
       >
+        {/* Edge spacers — more reliable than padding on overflow flex rows */}
+        <div className="w-4 shrink-0 sm:w-5 lg:w-6" aria-hidden />
         {items.map((child, index) => (
           <div
             key={index}
+            data-carousel-item
             className={cn(
               'shrink-0 snap-start',
-              itemClassName ?? 'w-[68%] sm:w-[40%] lg:w-[24%] xl:w-[20%] 2xl:w-[16%]',
+              itemClassName ?? 'w-[82%] sm:w-[48%] md:w-[40%] lg:w-[31%] xl:w-[24%]',
             )}
           >
             {child}
           </div>
         ))}
+        <div className="w-4 shrink-0 sm:w-5 lg:w-6" aria-hidden />
       </div>
 
       <div className="pointer-events-none absolute inset-y-0 left-2 right-2 flex items-center justify-between sm:left-3 sm:right-3 md:left-4 md:right-4 lg:left-6 lg:right-6">

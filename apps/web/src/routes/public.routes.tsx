@@ -43,6 +43,11 @@ export const categoriesRoute = createRoute({
 export const categoryDetailRoute = createRoute({
   getParentRoute: () => publicLayoutRoute,
   path: '/categories/$slug',
+  beforeLoad: ({ params }) => {
+    if (params.slug === 'men' || params.slug === 'women') {
+      throw redirect({ to: ROUTES.products, search: { gender: params.slug } });
+    }
+  },
   component: CategoryDetailPage,
 });
 

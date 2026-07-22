@@ -8,14 +8,10 @@ import { OrdersListPage } from '@/pages/admin/orders/orders-list-page';
 import { OrderDetailPage } from '@/pages/admin/orders/order-detail-page';
 import { ProductsListPage } from '@/pages/admin/products/products-list-page';
 import { ProductFormPage } from '@/pages/admin/products/product-form-page';
-import {
-  CategoriesPage,
-  CollectionsPage,
-  BrandsPage,
-  SizesPage,
-  OccasionsPage,
-} from '@/pages/admin/catalog/catalog-pages';
+import { CollectionsPage } from '@/pages/admin/catalog/catalog-pages';
 import { CategoryFormPage } from '@/pages/admin/catalog/category-form-page';
+import { FiltersPage } from '@/pages/admin/catalog/filters-page';
+import { BannersPage } from '@/pages/admin/cms/banners-page';
 import { InventoryPage } from '@/pages/admin/inventory/inventory-page';
 import { ForbiddenPage } from '@/pages/admin/auth/forbidden-page';
 import { rootRoute } from './root-route';
@@ -89,16 +85,42 @@ const adminProductDetailRoute = createRoute({
   },
 });
 
+const adminFiltersRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: 'filters',
+  component: () => (
+    <AdminPermissionRoute
+      permissions={[
+        PERMISSIONS.CATEGORIES_VIEW,
+        PERMISSIONS.CATEGORIES_MANAGE,
+        PERMISSIONS.BRANDS_VIEW,
+        PERMISSIONS.BRANDS_MANAGE,
+        PERMISSIONS.PRODUCTS_VIEW,
+      ]}
+    >
+      <FiltersPage />
+    </AdminPermissionRoute>
+  ),
+});
+
+const adminBannersRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: 'banners',
+  component: () => (
+    <AdminPermissionRoute
+      permissions={[PERMISSIONS.BANNERS_VIEW, PERMISSIONS.BANNERS_MANAGE, PERMISSIONS.CMS_MANAGE]}
+    >
+      <BannersPage />
+    </AdminPermissionRoute>
+  ),
+});
+
 const adminCategoriesRoute = createRoute({
   getParentRoute: () => adminLayoutRoute,
   path: 'categories',
-  component: () => (
-    <AdminPermissionRoute
-      permissions={[PERMISSIONS.CATEGORIES_VIEW, PERMISSIONS.CATEGORIES_MANAGE]}
-    >
-      <CategoriesPage />
-    </AdminPermissionRoute>
-  ),
+  beforeLoad: () => {
+    throw redirect({ to: ADMIN_ROUTES.filters, search: { tab: 'categories' } });
+  },
 });
 
 const adminCategoryDetailRoute = createRoute({
@@ -141,31 +163,25 @@ const adminCollectionsRoute = createRoute({
 const adminBrandsRoute = createRoute({
   getParentRoute: () => adminLayoutRoute,
   path: 'brands',
-  component: () => (
-    <AdminPermissionRoute permissions={[PERMISSIONS.BRANDS_VIEW, PERMISSIONS.BRANDS_MANAGE]}>
-      <BrandsPage />
-    </AdminPermissionRoute>
-  ),
+  beforeLoad: () => {
+    throw redirect({ to: ADMIN_ROUTES.filters, search: { tab: 'brands' } });
+  },
 });
 
 const adminSizesRoute = createRoute({
   getParentRoute: () => adminLayoutRoute,
   path: 'sizes',
-  component: () => (
-    <AdminPermissionRoute permissions={[PERMISSIONS.PRODUCTS_VIEW, PERMISSIONS.CATEGORIES_MANAGE]}>
-      <SizesPage />
-    </AdminPermissionRoute>
-  ),
+  beforeLoad: () => {
+    throw redirect({ to: ADMIN_ROUTES.filters, search: { tab: 'sizes' } });
+  },
 });
 
 const adminOccasionsRoute = createRoute({
   getParentRoute: () => adminLayoutRoute,
   path: 'occasions',
-  component: () => (
-    <AdminPermissionRoute permissions={[PERMISSIONS.PRODUCTS_VIEW, PERMISSIONS.CATEGORIES_MANAGE]}>
-      <OccasionsPage />
-    </AdminPermissionRoute>
-  ),
+  beforeLoad: () => {
+    throw redirect({ to: ADMIN_ROUTES.filters, search: { tab: 'occasions' } });
+  },
 });
 
 const adminOrdersRoute = createRoute({
@@ -291,6 +307,8 @@ export const adminRouteTree = adminLayoutRoute.addChildren([
   adminProductNewRoute,
   adminProductDetailRoute,
   adminProductsRoute,
+  adminFiltersRoute,
+  adminBannersRoute,
   adminCategoryDetailRoute,
   adminCategoriesRoute,
   adminCollectionsRoute,

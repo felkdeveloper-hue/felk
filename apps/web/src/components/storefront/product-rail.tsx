@@ -5,11 +5,11 @@ import {
   type ProductRailKind,
   type ProductRailScope,
 } from '@/hooks/storefront/use-product-rail';
+import { useInView } from '@/hooks/use-in-view';
 import { Section } from '@/components/common/section';
 import { Button } from '@/components/ui/button';
 import { ProductGridSkeleton } from '@/components/feedback/skeletons';
 import { ROUTES } from '@/constants';
-import { AsyncSection } from './async-section';
 import { HorizontalCarousel } from './horizontal-carousel';
 import { MotionReveal } from './motion-reveal';
 import { ProductCard } from './product-card';
@@ -45,72 +45,81 @@ export interface ProductRailSectionProps {
   scope?: ProductRailScope;
   /** Hide the whole section when the rail has no products. */
   hideWhenEmpty?: boolean;
+  /**
+   * When false (default for below-fold), wait until near viewport before fetching.
+   * Pass true for the first above-the-fold rail only.
+   */
+  eager?: boolean;
+  spacing?: 'none' | 'sm' | 'default' | 'lg';
+  titleAlign?: 'start' | 'center';
 }
 
 export function ProductRailSection({
   kind,
   title,
-  description,
-  eyebrow,
+  description: _description,
+  eyebrow: _eyebrow,
   scope,
-  hideWhenEmpty = false,
+  hideWhenEmpty = true,
+  eager = false,
+  spacing = 'sm',
+  titleAlign = 'start',
 }: ProductRailSectionProps) {
   const copy = railCopy[kind];
-  const query = useProductRail(kind, scope);
+  const { ref, inView } = useInView({ immediate: eager, rootMargin: '320px 0px' });
+  const query = useProductRail(kind, scope, { enabled: inView });
   const isEmpty = !query.isLoading && !query.isError && !query.data?.data?.length;
+  const hasProducts = Boolean(query.data?.data?.length);
 
-  if (hideWhenEmpty && isEmpty) return null;
+  // After retries fail, hide the whole rail (title included) — no red error blocks.
+  if (inView && query.isError && !query.isFetching && !hasProducts) return null;
+  if (hideWhenEmpty && inView && isEmpty) return null;
 
   return (
-    <Section
-      spacing="default"
-      className={
-        kind === 'trending'
-          ? 'from-muted/70 via-background to-background bg-gradient-to-b'
-          : kind === 'best-sellers'
-            ? 'bg-foreground/[0.025]'
-            : undefined
-      }
-      eyebrow={eyebrow ?? copy.eyebrow}
-      title={title ?? copy.title}
-      description={description ?? copy.description}
-      action={
-        <Button variant="ghost" asChild className="hidden sm:inline-flex">
-          <Link to={ROUTES.products}>
-            View all
-            <ArrowRight />
-          </Link>
-        </Button>
-      }
-    >
-      <AsyncSection
-        isLoading={query.isLoading}
-        isError={query.isError}
-        error={query.error ?? undefined}
-        data={query.data}
-        isEmpty={(result) => !result?.data?.length}
-        onRetry={() => void query.refetch()}
-        skeleton={
-          <div className="px-4 sm:px-6 lg:px-10">
+    <div ref={ref}>
+      <Section
+        spacing={spacing}
+        titleAlign={titleAlign}
+        className={
+          kind === 'trending'
+            ? 'from-muted/70 via-background to-background bg-gradient-to-b'
+            : kind === 'best-sellers'
+              ? 'bg-foreground/[0.025]'
+              : undefined
+        }
+        title={title ?? copy.title}
+        action={
+          <Button variant="ghost" asChild className="hidden sm:inline-flex">
+            <Link to={ROUTES.products}>
+              View all
+              <ArrowRight />
+            </Link>
+          </Button>
+        }
+      >
+        {!inView || query.isLoading || (query.isFetching && !hasProducts) ? (
+          <div className="px-3 sm:px-4 lg:px-6">
             <ProductGridSkeleton count={4} />
           </div>
-        }
-        emptyTitle={hideWhenEmpty ? '' : 'Products coming soon'}
-        emptyDescription={hideWhenEmpty ? '' : 'Our catalog is being curated. Check back shortly.'}
-      >
-        {(result) => (
+        ) : hasProducts ? (
           <MotionReveal>
             <HorizontalCarousel
               label={title ?? copy.title}
-              itemClassName="w-[72%] sm:w-[40%] lg:w-[26%] 2xl:w-[20%]"
+              itemClassName="w-[82%] sm:w-[48%] md:w-[40%] lg:w-[31%] xl:w-[24%]"
+              scrollByItem
             >
-              {result.data.map((product) => (
-                <ProductCard key={product.id} product={product} />
+              {query.data!.data.map((product, index) => (
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  priority={eager && index < 2}
+                  sizes="(max-width: 640px) 82vw, (max-width: 768px) 48vw, (max-width: 1024px) 40vw, (max-width: 1280px) 31vw, 24vw"
+                />
               ))}
             </HorizontalCarousel>
           </MotionReveal>
-        )}
-      </AsyncSection>
-    </Section>
+        ) : null}
+      </Section>
+    </div>
   );
 }

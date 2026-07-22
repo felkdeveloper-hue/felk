@@ -17,6 +17,9 @@ export interface ProductCardProps {
   product: Product;
   className?: string;
   layout?: 'grid' | 'list';
+  /** Eager-load primary image for LCP cards above the fold. */
+  priority?: boolean;
+  sizes?: string;
 }
 
 function readAverageRating(product: Product): number | undefined {
@@ -34,7 +37,13 @@ function resolveDealPrice(product: Product): ProductMoney | undefined {
   return undefined;
 }
 
-export function ProductCard({ product, className, layout = 'grid' }: ProductCardProps) {
+export function ProductCard({
+  product,
+  className,
+  layout = 'grid',
+  priority = false,
+  sizes = '(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw',
+}: ProductCardProps) {
   const candidates = [
     product.thumbnailUrl,
     product.media?.find((item) => item.isPrimary)?.url,
@@ -49,6 +58,8 @@ export function ProductCard({ product, className, layout = 'grid' }: ProductCard
   const isList = layout === 'list';
   const [quickOpen, setQuickOpen] = useState(false);
   const [hoverReady, setHoverReady] = useState(false);
+  /** Only mount hover image after first hover/focus — halves image requests on load. */
+  const [wantHover, setWantHover] = useState(false);
 
   const averageRating = readAverageRating(product);
   const title = product.brandName ?? product.name;
@@ -65,6 +76,8 @@ export function ProductCard({ product, className, layout = 'grid' }: ProductCard
         className={cn('group relative', isList && 'flex gap-4', className)}
         whileHover={{ y: isList ? 0 : -4 }}
         transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+        onMouseEnter={() => setWantHover(true)}
+        onFocusCapture={() => setWantHover(true)}
       >
         <div
           className={cn(
@@ -84,17 +97,22 @@ export function ProductCard({ product, className, layout = 'grid' }: ProductCard
               src={primaryImage}
               alt={product.media?.[0]?.alt ?? product.name}
               aspectRatio="3/4"
+              sizes={sizes}
+              loading={priority ? 'eager' : 'lazy'}
+              fetchPriority={priority ? 'high' : 'auto'}
               className={cn(
                 'transition-all duration-700 ease-out group-hover:scale-[1.06]',
                 hoverImage && hoverReady ? 'group-hover:opacity-0' : undefined,
               )}
               onError={() => setPrimaryBroken(true)}
             />
-            {hoverImage && hoverImage !== primaryImage ? (
+            {wantHover && hoverImage && hoverImage !== primaryImage ? (
               <Image
                 src={hoverImage}
                 alt=""
                 aspectRatio="3/4"
+                sizes={sizes}
+                loading="lazy"
                 containerClassName={cn(
                   'absolute inset-0 transition-opacity duration-700 ease-out',
                   hoverReady
@@ -136,7 +154,7 @@ export function ProductCard({ product, className, layout = 'grid' }: ProductCard
 
           {averageRating != null ? (
             <div
-              className="bg-card absolute bottom-2.5 left-2.5 flex items-center gap-1 rounded-md px-1.5 py-0.5 shadow-[var(--shadow-soft)]"
+              className="bg-card absolute bottom-2.5 left-2.5 flex items-center gap-1 rounded-md px-1.5 py-0.5 shadow-[var(--shadow-soft)] transition-opacity group-hover:opacity-0"
               aria-label={`Rated ${averageRating} out of 5`}
             >
               <Star className="size-3 fill-amber-400 text-amber-400" aria-hidden />
@@ -146,7 +164,16 @@ export function ProductCard({ product, className, layout = 'grid' }: ProductCard
             </div>
           ) : null}
 
-          {isList ? (
+          {/* Bonkers-style add to cart bar — grid cards */}
+          {!isList ? (
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[2] translate-y-full opacity-0 transition-all duration-300 ease-out group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100 max-sm:pointer-events-auto max-sm:translate-y-0 max-sm:opacity-100">
+              <AddToCartButton
+                product={product}
+                label="Add to cart"
+                className="h-11 w-full rounded-none border-0 bg-zinc-950 text-[11px] font-semibold uppercase tracking-[0.18em] text-white shadow-none hover:bg-zinc-900 hover:text-white"
+              />
+            </div>
+          ) : (
             <div className="pointer-events-none absolute inset-x-2 bottom-2 translate-y-1 opacity-0 transition-all duration-300 group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100 max-sm:pointer-events-auto max-sm:translate-y-0 max-sm:opacity-100">
               <AddToCartButton
                 product={product}
@@ -154,7 +181,7 @@ export function ProductCard({ product, className, layout = 'grid' }: ProductCard
                 className="w-full rounded-full shadow-[var(--shadow-elevated)]"
               />
             </div>
-          ) : null}
+          )}
         </div>
 
         <div

@@ -29,19 +29,9 @@ export function EditorialSection({ section }: EditorialSectionProps) {
         <MotionReveal>
           <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
             <div className="space-y-5">
-              {(config.eyebrow as string) ? (
-                <p className="text-primary text-xs font-medium uppercase tracking-[0.2em]">
-                  {config.eyebrow as string}
-                </p>
-              ) : null}
               <h2 className="font-display text-foreground text-4xl sm:text-5xl">
                 {resolvedSection.title}
               </h2>
-              {(config.description as string) || resolvedSection.subtitle ? (
-                <p className="text-muted-foreground max-w-lg">
-                  {(config.description as string) ?? resolvedSection.subtitle}
-                </p>
-              ) : null}
               <Button asChild variant="outline" className="rounded-full">
                 <CmsLink href={ctaUrl}>
                   {ctaLabel}

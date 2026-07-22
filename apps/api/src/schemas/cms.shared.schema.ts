@@ -36,6 +36,9 @@ export const slugSchema = z.string().trim().regex(REGEX.SLUG, 'Invalid slug');
 
 export const cmsListQuerySchema = paginationQuerySchema.extend({
   status: z.string().optional(),
+  placement: z.string().trim().optional(),
+  type: z.string().trim().optional(),
+  key: z.string().trim().optional(),
   isDeleted: z
     .enum(['true', 'false'])
     .optional()

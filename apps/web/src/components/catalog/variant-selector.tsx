@@ -41,7 +41,7 @@ export function VariantSelector({
                   aria-pressed={active}
                   onClick={() => variant && onSelect(variant.id)}
                   className={cn(
-                    'rounded-full border px-4 py-2 text-sm transition-colors',
+                    'rounded-none border px-4 py-2 text-sm transition-colors',
                     active
                       ? 'border-primary bg-primary/10 text-primary'
                       : 'border-border hover:bg-muted',
@@ -69,7 +69,7 @@ export function VariantSelector({
                   aria-pressed={active}
                   onClick={() => variant && onSelect(variant.id)}
                   className={cn(
-                    'min-w-12 rounded-xl border px-3 py-2.5 text-sm font-medium transition-colors',
+                    'min-w-12 rounded-none border px-3 py-2.5 text-sm font-medium transition-colors',
                     active
                       ? 'border-foreground bg-foreground text-background'
                       : 'border-border hover:bg-muted',

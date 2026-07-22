@@ -40,20 +40,35 @@ const HOME_CATEGORY_SLUGS = new Set([
   'shoes',
 ]);
 
+/** Gender is a product attribute — never expose these as active Category filters. */
+const GENDER_CATEGORY_SLUGS = [
+  ['Women', 'women', 'photo-1483985988355-763728e1935b'],
+  ['Men', 'men', 'photo-1617137968427-85924c800a22'],
+] as const;
+
+/**
+ * Full storefront category catalog (matches production / Vercel).
+ * Includes homepage tiles + product taxonomy used by mock products.
+ */
 const categories = [
-  ['Shirts', 'shirts', 'photo-1596755094514-f87e34085b2c'],
-  ['Shoes', 'shoes', 'photo-1542291026-7eec264c27ff'],
+  // Homepage tiles (also upserted by seed-home-categories with local images)
+  ['New Arrival', 'new-arrivals', 'photo-1483985988355-763728e1935b'],
   ['Jeans', 'jeans', 'photo-1542272454315-4c01d7abdf4a'],
+  ['Oversized', 'oversized', 'photo-1576566588028-4147f3842f27'],
+  ['Corset', 'corset', 'photo-1596783074918-c84cb06531ca'],
+  ['Hoodies', 'hoodies', 'photo-1556821840-3a63f95609a7'],
+  ['Jackets', 'jackets', 'photo-1551028719-00167b16eac5'],
+  ['Bags', 'bags', 'photo-1548036328-c9fa89d128fa'],
+  ['Shoes', 'shoes', 'photo-1542291026-7eec264c27ff'],
+  // Product taxonomy
+  ['Shirts', 'shirts', 'photo-1596755094514-f87e34085b2c'],
   ['Perfumes', 'perfumes', 'photo-1541643600914-78b084683601'],
   ['T-Shirts', 't-shirts', 'photo-1521572163474-6864f9cf17ab'],
   ['Skirts', 'skirts', 'photo-1583496661160-fb5886a0aaaa'],
   ['Heels & Boots', 'heels-boots', 'photo-1543163521-1bf539c55dd2'],
   ['Sunglasses', 'sunglasses', 'photo-1511499767150-a48a237f0083'],
-  ['Hoodies', 'hoodies', 'photo-1556821840-3a63f95609a7'],
   ['Oversized Tees', 'oversized-tees', 'photo-1576566588028-4147f3842f27'],
   ['Halloween Special', 'halloween-special', 'photo-1509551388413-e18d0ac5d495'],
-  ['Women', 'women', 'photo-1483985988355-763728e1935b'],
-  ['Men', 'men', 'photo-1617137968427-85924c800a22'],
   ['Accessories', 'accessories', 'photo-1523779917675-b6ed3a42a561'],
   ['Essentials', 'essentials', 'photo-1553062407-98eeb64c6a62'],
 ] as const;
@@ -232,6 +247,33 @@ async function upsertMasterData() {
             : { image: { url: image(imageId, 1000, 1000), alt: `${name} collection` } }),
           status: 'active',
           sortOrder: categoryDocs.size,
+          parentId: null,
+          path: `/${slug}`,
+          depth: 0,
+          isDeleted: false,
+          deletedAt: null,
+        },
+      },
+      { upsert: true, new: true },
+    );
+    categoryDocs.set(slug, doc);
+  }
+
+  // Keep Men/Women rows for legacy product links, but never as active Category filters.
+  for (const [name, slug, imageId] of GENDER_CATEGORY_SLUGS) {
+    const doc = await CategoryModel.findOneAndUpdate(
+      { slug },
+      {
+        $set: {
+          name,
+          slug,
+          description: `${name} products use the Gender filter — not Category.`,
+          image: { url: image(imageId, 1000, 1000), alt: name },
+          status: 'archived',
+          sortOrder: 999,
+          parentId: null,
+          path: `/${slug}`,
+          depth: 0,
           isDeleted: false,
           deletedAt: null,
         },
@@ -813,7 +855,10 @@ async function main() {
   await seedProducts(categoryDocs, brandDocs, collection, occasionDocs);
   await seedHomepage();
   await disconnectDatabase();
-  logger.info({ products: products.length }, 'Mock catalog and homepage seeded');
+  logger.info(
+    { products: products.length, categories: categoryDocs.size },
+    'Mock catalog and homepage seeded — run seed:home-categories next for local tile images',
+  );
 }
 
 main().catch(async (error) => {

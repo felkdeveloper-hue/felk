@@ -116,7 +116,7 @@ export function FeaturedCategoriesSection({ section }: FeaturedCategoriesSection
 
   return (
     <Section spacing="default" className="bg-background">
-      <div className="mx-auto mb-8 max-w-[1680px] px-4 text-center sm:mb-10 sm:px-6 lg:px-8 xl:px-10">
+      <div className="mx-auto mb-5 max-w-[1680px] px-4 text-center sm:mb-6 sm:px-6 lg:px-8 xl:px-10">
         <h2 className="font-display text-foreground text-2xl font-bold uppercase tracking-[0.08em] sm:text-3xl lg:text-4xl">
           {title}
         </h2>

@@ -166,12 +166,16 @@ export class ProductService {
         isDeleted: false,
         status: 'active',
       })
+        .select(
+          'productId isDefault displayOrder price salePrice compareAtPrice currency sku thumbnailUrl',
+        )
         .sort({ isDefault: -1, displayOrder: 1, createdAt: 1 })
         .lean(),
       ProductMediaModel.find({
         productId: { $in: productIds },
         isDeleted: false,
       })
+        .select('productId url thumbnailUrl isPrimary priority')
         .sort({ priority: 1 })
         .lean(),
       BrandModel.find({ _id: { $in: brandIds }, isDeleted: false })
@@ -189,28 +193,61 @@ export class ProductService {
 
     return {
       ...result,
-      data: result.data.map((product) => {
-        const id = product._id.toString();
-        const listingVariant = listingVariantByProduct.get(id);
-        const productMedia = mediaByProduct.get(id) ?? [];
-        const primary = productMedia.find((item) => item.isPrimary) ?? productMedia[0];
-        const hover = productMedia.find((item) => item._id.toString() !== primary?._id.toString());
-        const listingPricing = resolveListingPricing(
-          product as unknown as { pricing?: Record<string, unknown> | null },
-          listingVariant,
-        );
+      data: result.data.flatMap((product) => {
+        try {
+          const id = product._id.toString();
+          const listingVariant = listingVariantByProduct.get(id);
+          const productMedia = mediaByProduct.get(id) ?? [];
+          const primary = productMedia.find((item) => item.isPrimary) ?? productMedia[0];
+          const hover = primary
+            ? productMedia.find((item) => item._id.toString() !== primary._id.toString())
+            : productMedia[1];
+          const listingPricing = resolveListingPricing(
+            product as unknown as { pricing?: Record<string, unknown> | null },
+            listingVariant,
+          );
 
-        return {
-          ...withComputedPricing({
+          const computed = withComputedPricing({
             ...(product as unknown as Record<string, unknown>),
             pricing: listingPricing,
-          }),
-          brandName: product.brandId ? brandById.get(product.brandId.toString()) : undefined,
-          sku: product.sku ?? listingVariant?.sku,
-          thumbnailUrl: primary?.thumbnailUrl ?? primary?.url ?? listingVariant?.thumbnailUrl,
-          hoverImageUrl: hover?.url,
-          media: productMedia,
-        };
+          });
+
+          // Slim card DTO — omit description/seo/specifications/full media arrays.
+          return [
+            {
+              _id: product._id,
+              id,
+              name: product.name,
+              slug: product.slug,
+              shortDescription: product.shortDescription,
+              status: product.status,
+              visibility: product.visibility,
+              pricing: computed.pricing,
+              pricingInsights: computed.pricingInsights,
+              brandId: product.brandId,
+              brandName: product.brandId ? brandById.get(product.brandId.toString()) : undefined,
+              categoryId: product.categoryId,
+              gender: product.gender,
+              isFeatured: product.isFeatured,
+              isTrending: product.isTrending,
+              isNewArrival: product.isNewArrival,
+              isBestSeller: product.isBestSeller,
+              isClearance: product.isClearance,
+              averageRating: product.averageRating,
+              reviewCount: product.reviewCount,
+              defaultVariantId: product.defaultVariantId ?? listingVariant?._id,
+              variantCount: product.variantCount,
+              sku: product.sku ?? listingVariant?.sku,
+              thumbnailUrl: primary?.thumbnailUrl ?? primary?.url ?? listingVariant?.thumbnailUrl,
+              hoverImageUrl: hover?.url ?? hover?.thumbnailUrl,
+              createdAt: product.createdAt,
+              updatedAt: product.updatedAt,
+            },
+          ];
+        } catch {
+          // Skip malformed rows so one bad product cannot 500 the whole rail.
+          return [];
+        }
       }),
     };
   }
@@ -228,9 +265,17 @@ export class ProductService {
       productRepository.findById(id, includeDeleted),
     ]);
 
-    const plain = toPlain(refreshed ?? doc);
+    const plain = toPlain(refreshed ?? doc) as Record<string, unknown>;
+    const brandId = plain.brandId ? String(plain.brandId) : undefined;
+    let brandName: string | undefined;
+    if (brandId) {
+      const brand = await BrandModel.findById(brandId).select('name').lean();
+      brandName = brand?.name ? String(brand.name) : undefined;
+    }
+
     return {
       ...withComputedPricing(plain),
+      brandName,
       variants,
       media,
       relationships,
@@ -343,6 +388,12 @@ export class ProductService {
       ageGroup: payload.ageGroup ?? null,
       occasionIds: payload.occasionIds ?? [],
       tags: payload.tags ?? [],
+      paymentOption: (payload.paymentOption as string) ?? 'both',
+      returnsAvailable:
+        payload.returnsAvailable === undefined ? true : Boolean(payload.returnsAvailable),
+      returnsCriteria: (payload.returnsCriteria as string | null | undefined) ?? null,
+      warrantyAvailable: Boolean(payload.warrantyAvailable),
+      warrantyDetails: (payload.warrantyDetails as string | null | undefined) ?? null,
       isFeatured: Boolean(payload.isFeatured),
       isTrending: Boolean(payload.isTrending),
       isNewArrival: Boolean(payload.isNewArrival),

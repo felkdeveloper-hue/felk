@@ -1,7 +1,6 @@
 import { lazy, Suspense, type ReactNode } from 'react';
 import { HOME_SECTION_KEYS } from '@/constants/storefront';
 import type { HomeSection } from '@/services/sdk/cms';
-import { ProductRailSection } from './product-rail';
 import { SectionSkeleton } from './section-skeleton';
 
 const FeaturedCollectionsSection = lazy(() =>
@@ -46,15 +45,8 @@ export function HomeSectionRenderer({ section }: HomeSectionRendererProps) {
       // Rendered directly after the hero on the home page — skip CMS duplicate.
       return null;
     case HOME_SECTION_KEYS.trendingProducts:
-      return (
-        <LazySection>
-          <ProductRailSection
-            kind="trending"
-            title={section.title}
-            description={section.subtitle}
-          />
-        </LazySection>
-      );
+      // Removed from storefront ("Trending in Color" / trending rails).
+      return null;
     case HOME_SECTION_KEYS.bestSellers:
       // Rendered after the summer banner on the home page — skip CMS duplicate.
       return null;

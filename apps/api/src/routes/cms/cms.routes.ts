@@ -37,6 +37,7 @@ import { pageService } from '@/services/page.service';
 import { blogService } from '@/services/blog.service';
 import { settingsService } from '@/services/settings.service';
 import { actorFromRequest } from '@/services/cms-crud.service';
+import { uploadBannerDesktopImage } from '@/services/banner-image.service';
 import { authenticate, authorizeAny, validate } from '@/middlewares';
 import { asyncHandler } from '@/utils/async-handler';
 import { ApiResponse } from '@/utils/response/api-response';
@@ -47,6 +48,7 @@ import { objectIdSchema } from '@/schemas/common.schema';
 
 const P = PERMISSIONS;
 const categoryIdParams = z.object({ id: objectIdSchema });
+const bannerIdParams = z.object({ id: objectIdSchema });
 
 export const cmsRouter = Router();
 
@@ -235,6 +237,27 @@ cmsRouter.use(
 );
 
 /** CMS content */
+cmsRouter.post(
+  '/hero-banners/:id/image',
+  authenticate,
+  authorizeAny(P.BANNERS_MANAGE, P.CMS_MANAGE),
+  validate({ params: bannerIdParams }),
+  singleImageUpload('file'),
+  asyncHandler(async (req, res) => {
+    if (!req.file) {
+      return ApiResponse.error(res, 'File is required', 400, 'FILE_REQUIRED');
+    }
+    const banner = await uploadBannerDesktopImage(
+      HeroBannerModel as never,
+      String(req.params.id),
+      req.file,
+      'hero-banners',
+      typeof req.body.alt === 'string' ? req.body.alt : undefined,
+    );
+    ApiResponse.success(res, banner, 'Hero banner image updated');
+  }),
+);
+
 cmsRouter.use(
   '/hero-banners',
   createCrudRouter({
@@ -251,6 +274,27 @@ cmsRouter.use(
       update: [P.BANNERS_MANAGE, P.CMS_MANAGE],
       delete: [P.BANNERS_MANAGE, P.CMS_MANAGE],
     },
+  }),
+);
+
+cmsRouter.post(
+  '/promo-banners/:id/image',
+  authenticate,
+  authorizeAny(P.BANNERS_MANAGE, P.MARKETING_MANAGE, P.CMS_MANAGE),
+  validate({ params: bannerIdParams }),
+  singleImageUpload('file'),
+  asyncHandler(async (req, res) => {
+    if (!req.file) {
+      return ApiResponse.error(res, 'File is required', 400, 'FILE_REQUIRED');
+    }
+    const banner = await uploadBannerDesktopImage(
+      PromoBannerModel as never,
+      String(req.params.id),
+      req.file,
+      'promo-banners',
+      typeof req.body.alt === 'string' ? req.body.alt : undefined,
+    );
+    ApiResponse.success(res, banner, 'Promo banner image updated');
   }),
 );
 

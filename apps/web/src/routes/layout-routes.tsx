@@ -1,6 +1,7 @@
 import { createRoute } from '@tanstack/react-router';
 import { AuthLayout, CustomerLayout, PublicLayout } from '@/layouts';
 import { GuestRoute, ProtectedRoute } from '@/guards';
+import { prefetchStorefrontBootstrap } from '@/lib/prefetch-storefront-bootstrap';
 import { rootRoute } from './root-route';
 
 /**
@@ -12,6 +13,7 @@ export const publicLayoutRoute = createRoute({
   getParentRoute: () => rootRoute,
   id: 'public-layout',
   component: PublicLayout,
+  beforeLoad: ({ context }) => prefetchStorefrontBootstrap(context.queryClient),
 });
 
 export const authLayoutRoute = createRoute({

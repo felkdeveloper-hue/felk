@@ -6,6 +6,8 @@ export interface NavItem {
   label: string;
   href: string;
   megaMenu?: boolean;
+  /** When set, active state matches `/products?gender=<value>` instead of pathname equality. */
+  gender?: 'men' | 'women';
 }
 
 export interface MainNavProps {

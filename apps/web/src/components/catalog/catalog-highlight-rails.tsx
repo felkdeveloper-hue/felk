@@ -18,10 +18,12 @@ export function CatalogHighlightRails({
 
   return (
     <div className="border-border/50 border-b">
+      {/* Only the first rail fetches immediately — best sellers wait until near viewport. */}
       <ProductRailSection
         kind="new-arrivals"
         scope={scope}
         hideWhenEmpty
+        eager
         eyebrow="Just uploaded"
         title={label ? `${label} new arrivals` : 'New arrivals'}
         description="The latest pieces added to this collection."
@@ -30,6 +32,7 @@ export function CatalogHighlightRails({
         kind="best-sellers"
         scope={{ categoryId, gender }}
         hideWhenEmpty
+        eager={false}
         eyebrow="Most popular"
         title={label ? `${label} best sellers` : 'Best sellers'}
         description="Styles customers buy most in this collection."

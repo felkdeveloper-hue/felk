@@ -38,6 +38,8 @@ export interface Product {
   subcategoryId?: string;
   collectionIds?: string[];
   materialId?: string;
+  gender?: string;
+  ageGroup?: string;
   occasionIds?: string[];
   tags?: string[];
   isFeatured?: boolean;
@@ -45,6 +47,11 @@ export interface Product {
   isNewArrival?: boolean;
   isBestSeller?: boolean;
   isClearance?: boolean;
+  paymentOption?: 'cod' | 'prepaid' | 'both';
+  returnsAvailable?: boolean;
+  returnsCriteria?: string;
+  warrantyAvailable?: boolean;
+  warrantyDetails?: string;
   averageRating?: number;
   reviewCount?: number;
   defaultVariantId?: string;
@@ -90,6 +97,8 @@ export interface ProductMedia {
   isPrimary?: boolean;
   priority?: number;
   type?: string;
+  /** When set, this image belongs to a specific color/size SKU. */
+  variantId?: string;
   [key: string]: unknown;
 }
 

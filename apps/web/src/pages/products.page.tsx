@@ -32,8 +32,20 @@ export function ProductsPage() {
       <CatalogHighlightRails />
       <CatalogListShell
         eyebrow="Catalog"
-        title="All products"
-        description="Discover considered pieces designed for everyday elegance."
+        title={
+          state.gender === 'men'
+            ? "Shop men's collection"
+            : state.gender === 'women'
+              ? "Shop women's collection"
+              : 'All products'
+        }
+        description={
+          state.gender === 'men'
+            ? 'Shop the latest men edit.'
+            : state.gender === 'women'
+              ? 'Shop the latest women edit.'
+              : 'Discover considered pieces designed for everyday elegance.'
+        }
         state={state}
         products={products}
         total={total}
