@@ -87,6 +87,12 @@ const envSchema = z
     PAYHERE_MERCHANT_ID: z.string().default('dev-payhere-merchant-id'),
     PAYHERE_MERCHANT_SECRET: z.string().default('dev-payhere-merchant-secret'),
     PAYHERE_MODE: z.enum(['sandbox', 'live']).default('sandbox'),
+    /** OAuth App ID/Secret for Retrieval, Refund, Capture APIs. */
+    PAYHERE_APP_ID: z.string().optional(),
+    PAYHERE_APP_SECRET: z.string().optional(),
+    /** Public webhook URL PayHere can reach (not localhost). Falls back to constructed API URL. */
+    PAYHERE_NOTIFY_URL: z.string().optional(),
+    API_PUBLIC_URL: z.string().default('http://localhost:4000'),
 
     KOKO_MERCHANT_ID: z.string().default('dev-koko-merchant-id'),
     KOKO_SECRET_KEY: z.string().default('dev-koko-secret-key'),

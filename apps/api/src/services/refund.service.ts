@@ -1,18 +1,22 @@
-import { PaymentModel, RefundModel, type RefundDocument } from '@/models/payment.models';
+import {
+  PaymentModel,
+  RefundModel,
+  PaymentTransactionModel,
+  type RefundDocument,
+} from '@/models/payment.models';
 import { publishPaymentEvent } from '@/services/payment-event-publisher';
 import { writePaymentLog } from '@/services/payment-log.service';
 import { writeAuditLog } from '@/services/audit.service';
 import type { ActorMeta } from '@/services/cms-crud.service';
+import { getGateway, isKnownGateway } from '@/services/gateways/registry';
 import { ApiError } from '@/utils/errors/api-error';
 import { buildPaginationMeta, getPaginationSkip, parsePagination } from '@/utils/pagination';
 import { PAYMENT_STATUS } from '@/constants/payment-status';
 import { PAYMENT_AUDIT, PAYMENT_EVENT_TYPE, REFUND_STATUS, REFUND_TYPE } from '@/constants/payment';
 
 /**
- * Refund — structure only (Phase 10).
- * Requesting a refund is fully wired (status transitions, audit, event).
- * Actually settling money with the gateway is a future-phase integration;
- * `completeRefund` exists so that wiring has somewhere to land.
+ * Refund requests — creates a pending refund, then settles via the gateway
+ * when the adapter implements `refund()` (PayHere does).
  */
 export class RefundService {
   async request(
@@ -93,6 +97,67 @@ export class RefundService {
       { paymentId },
     );
 
+    // Settle with gateway when supported (PayHere Refund API needs payment_id).
+    if (isKnownGateway(payment.method)) {
+      const gateway = getGateway(payment.method);
+      if (typeof gateway.refund === 'function') {
+        const payherePaymentId =
+          typeof payment.metadata?.payherePaymentId === 'string'
+            ? payment.metadata.payherePaymentId
+            : undefined;
+        const txn = await PaymentTransactionModel.findOne({
+          paymentId: payment._id,
+          gateway: payment.method,
+          gatewayTransactionId: { $ne: null },
+        }).sort({ createdAt: -1 });
+
+        const gatewayPaymentId =
+          payherePaymentId ?? txn?.gatewayTransactionId ?? payment.gatewayPaymentId ?? undefined;
+
+        if (!gatewayPaymentId) {
+          await this.completeRefund(
+            refund._id.toString(),
+            { success: false, gatewayResponse: { reason: 'missing_gateway_payment_id' } },
+            actor,
+          );
+          throw ApiError.badRequest(
+            'Cannot refund: missing gateway payment id (complete a paid webhook first)',
+            undefined,
+            'GATEWAY_PAYMENT_ID_MISSING',
+          );
+        }
+
+        try {
+          const result = await gateway.refund({
+            gatewayPaymentId,
+            amount,
+            reason: payload.reason,
+          });
+          return this.completeRefund(
+            refund._id.toString(),
+            {
+              success: true,
+              gatewayRefundId: result.gatewayTxnId,
+              gatewayResponse: { status: result.status },
+            },
+            actor,
+          );
+        } catch (error) {
+          await this.completeRefund(
+            refund._id.toString(),
+            {
+              success: false,
+              gatewayResponse: {
+                message: error instanceof Error ? error.message : 'Gateway refund failed',
+              },
+            },
+            actor,
+          );
+          throw error;
+        }
+      }
+    }
+
     return this.toSummary(refund);
   }
 
@@ -154,6 +219,14 @@ export class RefundService {
         },
         { paymentId: payment._id.toString() },
       );
+    } else if (payment.status === PAYMENT_STATUS.REFUND_PENDING) {
+      const totalRefunded = await RefundModel.aggregate<{ total: number }>([
+        { $match: { paymentId: payment._id, status: REFUND_STATUS.COMPLETED } },
+        { $group: { _id: null, total: { $sum: '$amount' } } },
+      ]);
+      const refunded = totalRefunded[0]?.total ?? 0;
+      payment.status = refunded > 0 ? PAYMENT_STATUS.PARTIALLY_REFUNDED : PAYMENT_STATUS.PAID;
+      await payment.save();
     }
 
     return this.toSummary(refund);

@@ -83,7 +83,12 @@ export async function fetchWithRetry<T = unknown>(
         throw new HttpRetryError(`HTTP ${res.status}: ${body.slice(0, 200)}`, res.status, attempt);
       }
 
-      lastError = new HttpRetryError(`HTTP ${res.status}`, res.status, attempt);
+      const body = await res.text().catch(() => '');
+      lastError = new HttpRetryError(
+        `HTTP ${res.status}: ${body.slice(0, 200)}`,
+        res.status,
+        attempt,
+      );
     } catch (err) {
       if (err instanceof HttpRetryError && err.lastStatus && err.lastStatus < 500) {
         throw err;

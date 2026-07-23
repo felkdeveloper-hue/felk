@@ -129,11 +129,14 @@ export class PaymentService {
         if (payment.attemptCount === 0) {
           // Payment doc exists but its first attempt never completed (e.g. crash
           // between create() and createAttempt()) — finish creating it now.
-          return this.createAttempt(payment, customer.email, actor);
+          return this.createAttempt(payment, customer, actor);
         }
         // Idempotent — same in-flight payment. For COD, still ensure order exists.
         await fulfillCodPaymentIfNeeded(payment);
-        return this.toSummary(payment, { includeRedirect: true });
+        return {
+          ...this.toSummary(payment, { includeRedirect: true }),
+          redirectForm: payment.metadata?.redirectForm,
+        };
       }
       if (!RETRYABLE_STATUSES.includes(payment.status as never)) {
         throw ApiError.conflict(
@@ -194,7 +197,7 @@ export class PaymentService {
       { paymentId: payment._id.toString(), checkoutId: checkout._id.toString() },
     );
 
-    return this.createAttempt(payment, customer.email, actor);
+    return this.createAttempt(payment, customer, actor);
   }
 
   async retryPayment(
@@ -254,10 +257,20 @@ export class PaymentService {
       metadata: { attemptCount: payment.attemptCount + 1 },
     });
 
-    return this.createAttempt(payment, customer.email, actor);
+    return this.createAttempt(payment, customer, actor);
   }
 
-  private async createAttempt(payment: PaymentDocument, customerEmail: string, actor: ActorMeta) {
+  private async createAttempt(
+    payment: PaymentDocument,
+    customer: {
+      email: string;
+      firstName?: string;
+      lastName?: string;
+      phone?: string | null;
+      country?: string | null;
+    },
+    actor: ActorMeta,
+  ) {
     const gateway = getGateway(payment.method);
     const attemptNumber = payment.attemptCount + 1;
     const orderId = toAttemptOrderId(payment.referenceNumber, attemptNumber);
@@ -271,15 +284,29 @@ export class PaymentService {
     });
 
     try {
+      const checkout = await CheckoutSessionModel.findById(payment.checkoutId).lean();
+      const shipping = (checkout?.shippingAddress ?? {}) as Record<string, unknown>;
       const session = await gateway.createSession({
         orderId,
         amount: payment.amount,
         currency: payment.currency,
         method: payment.method as PaymentMethod,
-        customerEmail,
+        customerEmail: customer.email,
         returnUrl: payment.returnUrl,
         cancelUrl: payment.cancelUrl,
         idempotencyKey: `${payment.idempotencyKey}:${attemptNumber}`,
+        metadata: {
+          firstName: customer.firstName,
+          lastName: customer.lastName,
+          phone: customer.phone ?? undefined,
+          country: customer.country ?? undefined,
+          customerId: payment.customerId.toString(),
+          customerPhone: customer.phone ?? String(shipping.phone ?? ''),
+          ip: actor.ip ?? '',
+          deliveryStreet: String(shipping.line1 ?? shipping.address1 ?? ''),
+          deliveryRegion: String(shipping.city ?? shipping.state ?? ''),
+          deliveryPostcode: String(shipping.postalCode ?? shipping.postcode ?? ''),
+        },
       });
 
       attempt.status = PAYMENT_ATTEMPT_STATUS.PROCESSING;
@@ -293,6 +320,9 @@ export class PaymentService {
       payment.status = PAYMENT_STATUS.PROCESSING;
       payment.gatewayPaymentId = session.gatewayPaymentId;
       payment.redirectUrl = session.redirectUrl ?? null;
+      if (session.redirectForm) {
+        payment.metadata = { ...payment.metadata, redirectForm: session.redirectForm };
+      }
       await payment.save();
 
       await writePaymentLog({
@@ -302,7 +332,7 @@ export class PaymentService {
         metadata: { gatewayPaymentId: session.gatewayPaymentId },
       });
 
-      if (session.redirectUrl) {
+      if (session.redirectUrl || session.redirectForm) {
         await writeAuditLog({
           action: PAYMENT_AUDIT.GATEWAY_REDIRECT,
           resourceType: 'payments',
@@ -310,7 +340,11 @@ export class PaymentService {
           actorUserId: actor.userId,
           ip: actor.ip,
           requestId: actor.requestId,
-          metadata: { redirectUrl: session.redirectUrl, gateway: payment.method },
+          metadata: {
+            redirectUrl: session.redirectUrl,
+            redirectForm: session.redirectForm?.action,
+            gateway: payment.method,
+          },
         });
       }
 
@@ -639,6 +673,13 @@ export class PaymentService {
     ) {
       payment.failedAt = new Date();
       payment.failureReason = `Gateway reported status: ${newStatus}`;
+    }
+    if (verification.gatewayTxnId) {
+      payment.metadata = {
+        ...payment.metadata,
+        gatewayTxnId: verification.gatewayTxnId,
+        ...(gatewayKey === 'payhere' ? { payherePaymentId: verification.gatewayTxnId } : {}),
+      };
     }
     await payment.save();
 

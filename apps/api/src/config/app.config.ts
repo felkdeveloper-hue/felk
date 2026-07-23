@@ -95,6 +95,11 @@ export const appConfig = {
       merchantId: env.PAYHERE_MERCHANT_ID,
       merchantSecret: env.PAYHERE_MERCHANT_SECRET,
       mode: env.PAYHERE_MODE,
+      appId: env.PAYHERE_APP_ID ?? '',
+      appSecret: env.PAYHERE_APP_SECRET ?? '',
+      notifyUrl:
+        env.PAYHERE_NOTIFY_URL ??
+        `${env.API_PUBLIC_URL.replace(/\/$/, '')}${env.API_PREFIX}/payments/webhooks/payhere`,
     },
     koko: {
       merchantId: env.KOKO_MERCHANT_ID,
