@@ -70,31 +70,26 @@ export function PriceDisplay({
     );
   }
 
+  const priceSize = size === 'md' ? 'text-base' : 'text-sm';
+
   return (
     <div className={cn('flex flex-wrap items-baseline gap-x-2 gap-y-0.5', className)}>
+      {/* Original price (struck through) always first */}
+      {onSale ? (
+        <span className={cn('text-muted-foreground line-through', priceSize)}>
+          {formatCurrency(original!.amount, original!.currency)}
+        </span>
+      ) : null}
+      {/* Current / sale price — red when on sale */}
       <span
         className={cn(
-          'text-foreground font-bold tracking-tight',
-          size === 'md' ? 'text-xl' : 'text-[15px] sm:text-base',
+          'font-semibold tracking-tight',
+          onSale ? 'text-red-600 dark:text-red-500' : 'text-foreground',
+          priceSize,
         )}
       >
         {formatCurrency(display.amount, display.currency)}
       </span>
-      {onSale ? (
-        <span
-          className={cn(
-            'text-muted-foreground line-through',
-            size === 'md' ? 'text-sm' : 'text-xs',
-          )}
-        >
-          {formatCurrency(original!.amount, original!.currency)}
-        </span>
-      ) : null}
-      {offPercent && offPercent > 0 ? (
-        <span className={cn('text-success font-semibold', size === 'md' ? 'text-sm' : 'text-xs')}>
-          {Math.round(offPercent)}% OFF
-        </span>
-      ) : null}
     </div>
   );
 }
