@@ -172,8 +172,20 @@ const isTest = data.NODE_ENV === 'test';
 type StorageProvider = 'local' | 'r2' | 's3';
 
 function resolveStorageProvider(): StorageProvider {
-  if (data.STORAGE_PROVIDER) return data.STORAGE_PROVIDER;
-  if (data.R2_BUCKET_NAME && data.R2_ACCESS_KEY_ID && data.R2_SECRET_ACCESS_KEY) return 'r2';
+  // Prefer R2 whenever credentials exist — avoids accidental local-disk uploads
+  // when STORAGE_PROVIDER=local was left in an override .env.
+  if (
+    data.STORAGE_PROVIDER !== 's3' &&
+    data.R2_BUCKET_NAME &&
+    data.R2_ACCESS_KEY_ID &&
+    data.R2_SECRET_ACCESS_KEY
+  ) {
+    return 'r2';
+  }
+  if (data.STORAGE_PROVIDER === 's3') {
+    if (data.AWS_S3_BUCKET && data.AWS_ACCESS_KEY_ID && data.AWS_SECRET_ACCESS_KEY) return 's3';
+  }
+  if (data.STORAGE_PROVIDER === 'local') return 'local';
   if (data.AWS_S3_BUCKET && data.AWS_ACCESS_KEY_ID && data.AWS_SECRET_ACCESS_KEY) return 's3';
   return 'local';
 }

@@ -6,6 +6,7 @@ import type {
   ProductVariant,
 } from '@/services/sdk/products';
 import type { Category } from '@/services/sdk/categories';
+import { env } from '@/config/env';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -23,10 +24,23 @@ function toMoney(amount: unknown, currency: string): ProductMoney | undefined {
   return { amount: Number(amount), currency };
 }
 
+/**
+ * Absolute CDN/R2 URL for uploaded media (`/uploads/...`).
+ * Bundled storefront assets (`/catalog/...`) stay site-relative.
+ */
 function resolveMediaUrl(value: unknown): string | undefined {
-  if (typeof value === 'string') return value;
-  const record = asRecord(value);
-  return typeof record.url === 'string' ? record.url : undefined;
+  let url: string | undefined;
+  if (typeof value === 'string') url = value;
+  else {
+    const record = asRecord(value);
+    url = typeof record.url === 'string' ? record.url : undefined;
+  }
+  if (!url) return undefined;
+  if (/^(https?:|data:|blob:)/i.test(url)) return url;
+  if (url.startsWith('/uploads/') && env.cdnUrl) {
+    return `${env.cdnUrl.replace(/\/$/, '')}${url}`;
+  }
+  return url;
 }
 
 export function normalizeProductMedia(raw: unknown): ProductMedia {

@@ -12,6 +12,7 @@ import type {
   PublicSettings,
   SocialLink,
 } from '@/services/sdk/cms';
+import { env } from '@/config/env';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -33,10 +34,19 @@ function pickId(raw: UnknownRecord): string {
 }
 
 export function resolveMediaUrl(value: unknown): string | undefined {
-  if (typeof value === 'string') return value;
-  const record = asRecord(value);
-  if (typeof record.url === 'string') return record.url;
-  return undefined;
+  let url: string | undefined;
+  if (typeof value === 'string') url = value;
+  else {
+    const record = asRecord(value);
+    if (typeof record.url === 'string') url = record.url;
+  }
+  if (!url) return undefined;
+  if (/^(https?:|data:|blob:)/i.test(url)) return url;
+  // Uploaded objects may be stored under /uploads/; R2 public URLs are already absolute.
+  if (url.startsWith('/uploads/') && env.cdnUrl) {
+    return `${env.cdnUrl.replace(/\/$/, '')}${url}`;
+  }
+  return url;
 }
 
 export function resolveResponsiveImageUrl(images: unknown): string | undefined {

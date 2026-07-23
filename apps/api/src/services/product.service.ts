@@ -128,6 +128,7 @@ function resolveListingPricing(
 
 function pickListingVariant(
   variants: Array<{
+    _id?: { toString(): string };
     productId: { toString(): string };
     isDefault?: boolean;
     displayOrder?: number;
@@ -233,8 +234,8 @@ export class ProductService {
               isNewArrival: product.isNewArrival,
               isBestSeller: product.isBestSeller,
               isClearance: product.isClearance,
-              averageRating: product.averageRating,
-              reviewCount: product.reviewCount,
+              averageRating: product.averageRating ?? 0,
+              reviewCount: product.reviewCount ?? 0,
               defaultVariantId: product.defaultVariantId ?? listingVariant?._id,
               variantCount: product.variantCount,
               sku: product.sku ?? listingVariant?.sku,

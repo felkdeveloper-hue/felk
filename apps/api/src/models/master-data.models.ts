@@ -1,5 +1,5 @@
 import { Schema, model, type Document, type Model, type Types } from 'mongoose';
-import { mediaImageSchema, seoSchema } from '@/models/shared/seo.schema';
+import { mediaImageSchema, seoSchema, type MediaImage } from '@/models/shared/seo.schema';
 
 const softDelete = {
   isDeleted: { type: Boolean, default: false, index: true },
@@ -20,7 +20,7 @@ export interface CategoryDocument extends Document {
   path: string;
   depth: number;
   description?: string | null;
-  image?: unknown;
+  image?: MediaImage | null;
   sortOrder: number;
   seo?: unknown;
   status: string;

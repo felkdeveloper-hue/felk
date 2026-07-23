@@ -129,6 +129,9 @@ export interface ProductDocument extends Document {
   };
   defaultVariantId?: Types.ObjectId | null;
   variantCount: number;
+  /** Denormalized review stats (optional; may be absent on older docs). */
+  averageRating?: number;
+  reviewCount?: number;
   version: number;
   isDeleted: boolean;
   deletedAt?: Date | null;
@@ -209,6 +212,8 @@ const productSchema = new Schema<ProductDocument>(
     },
     defaultVariantId: { type: Schema.Types.ObjectId, ref: 'ProductVariant', default: null },
     variantCount: { type: Number, default: 0 },
+    averageRating: { type: Number, default: 0 },
+    reviewCount: { type: Number, default: 0 },
     version: { type: Number, default: 1 },
     ...softDelete,
   },

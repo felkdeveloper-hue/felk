@@ -46,8 +46,14 @@ export function useCmsPages(options?: CmsQueryOptions<{ data: CmsPage[] }>) {
   return useQuery({
     queryKey: QUERY_KEYS.cms.pages({ published: true }),
     queryFn: async () => {
-      const result = await cmsApi.listPages({ status: 'published', limit: 100 });
-      return { data: result.data };
+      try {
+        const result = await cmsApi.listPages({ status: 'published', limit: 100 });
+        return { data: result.data };
+      } catch (error) {
+        // Older API deploys may 404 this route — treat as empty, not a hard failure.
+        if (AppError.isAppError(error) && error.isNotFound) return { data: [] };
+        throw error;
+      }
     },
     staleTime: CMS_STALE,
     gcTime: CMS_GC,
