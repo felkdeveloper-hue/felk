@@ -1,19 +1,16 @@
 import type { ReactNode } from 'react';
 import { useEffect, useMemo, useRef } from 'react';
-import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { Container } from '@/components/layout/container';
-import { Button } from '@/components/ui/button';
-import { useDisclosure } from '@/hooks';
 import { useCatalogFilterFacets } from '@/hooks/catalog';
-import { cn } from '@/lib/utils';
 import { CATALOG_BATCH_SIZE, CATALOG_MAX_PRODUCTS, type CatalogSearchState } from '@/utils/catalog';
 import type { Product } from '@/services/sdk';
-import { CatalogFilterSheet, CatalogFilterSidebar } from './catalog-filter-sidebar';
+import { CatalogFilterAndSortSheet } from './catalog-filter-sidebar';
 import { AppliedFilterChips, type AppliedFilterChip } from './applied-filter-chips';
 import { ProductGrid, ProductGridError, ProductGridSkeletonWrapper } from './product-grid';
 
 export interface CatalogListShellProps {
-  title: string;
+  /** When omitted the shell renders no heading (hero-landing pages handle it externally). */
+  title?: string;
   description?: string;
   eyebrow?: string;
   banner?: ReactNode;
@@ -48,7 +45,6 @@ export function CatalogListShell({
   onClearFilters,
 }: CatalogListShellProps) {
   const facets = useCatalogFilterFacets();
-  const { isOpen: filtersOpen, open: openFilters, close: closeFilters } = useDisclosure(true);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
   const chips = useMemo(() => {
@@ -56,7 +52,7 @@ export function CatalogListShell({
     const add = (key: keyof CatalogSearchState, label: string) => list.push({ key, label });
 
     if (state.q) add('q', `Search: ${state.q}`);
-    if (state.gender) add('gender', `Gender: ${state.gender}`);
+    // Gender is implicit on category/gender pages — don't surface as a removable chip
     if (state.categoryId) {
       const name = facets.categories.data?.data.find((item) => item.id === state.categoryId)?.name;
       add('categoryId', name ? `Category: ${name}` : 'Category');
@@ -123,120 +119,81 @@ export function CatalogListShell({
     catalogTotal != null ? Math.min(catalogTotal, CATALOG_MAX_PRODUCTS) : CATALOG_MAX_PRODUCTS;
 
   return (
-    <div className="pb-10 sm:pb-14">
-      <div
-        className={cn(
-          filtersOpen
-            ? 'lg:grid lg:grid-cols-[18rem_minmax(0,1fr)] xl:grid-cols-[19rem_minmax(0,1fr)]'
-            : undefined,
-        )}
-      >
-        {filtersOpen ? (
-          <aside className="border-border/60 bg-background hidden self-stretch border-r lg:flex lg:flex-col">
-            <div className="sticky top-16 flex max-h-[calc(100vh-4rem)] flex-col lg:top-[4.75rem] lg:max-h-[calc(100vh-4.75rem)]">
-              <div className="border-border/60 flex shrink-0 items-center justify-between gap-2 border-b px-5 py-4 xl:px-6">
-                <p className="text-foreground text-sm font-bold">Refine By</p>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Hide filters"
-                  onClick={closeFilters}
-                >
-                  <PanelLeftClose className="size-4" />
-                </Button>
-              </div>
-              <div className="flex-1 overflow-y-auto px-5 py-5 xl:px-6">
-                <CatalogFilterSidebar
-                  state={state}
-                  onChange={onSearchChange}
-                  onClear={onClearFilters}
-                  hideHeading
-                />
-              </div>
-            </div>
-          </aside>
+    <div className="pb-12 sm:pb-16">
+      <Container className="space-y-5 pt-5 sm:pt-6">
+        {banner}
+
+        {/* Inline title — only rendered when explicitly passed (e.g. search page) */}
+        {title && !banner ? (
+          <header className="border-border/50 space-y-1 border-b pb-5">
+            {eyebrow ? (
+              <p className="text-muted-foreground text-[10px] font-semibold uppercase tracking-[0.22em]">
+                {eyebrow}
+              </p>
+            ) : null}
+            <h1 className="font-display text-foreground text-2xl font-bold uppercase tracking-tight">
+              {title}
+            </h1>
+            {description ? <p className="text-muted-foreground text-sm">{description}</p> : null}
+          </header>
         ) : null}
 
-        <div className="min-w-0">
-          <Container className="space-y-8 pt-8 sm:pt-10">
-            {banner}
-
-            <header className="space-y-3 text-center">
-              {eyebrow ? (
-                <p className="text-muted-foreground text-[11px] font-semibold uppercase tracking-[0.22em]">
-                  {eyebrow}
-                </p>
-              ) : null}
-              <h1 className="font-display text-foreground text-4xl font-bold uppercase tracking-tight sm:text-6xl">
-                {title}
-              </h1>
-              {description ? (
-                <p className="text-muted-foreground mx-auto max-w-2xl">{description}</p>
-              ) : null}
-            </header>
-
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="lg:hidden">
-                <CatalogFilterSheet
-                  state={state}
-                  onChange={onSearchChange}
-                  onClear={onClearFilters}
-                />
-              </div>
-              {!filtersOpen ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="hidden lg:inline-flex"
-                  aria-label="Show filters"
-                  onClick={openFilters}
-                >
-                  <PanelLeftOpen className="size-4" />
-                </Button>
-              ) : null}
+        {/* Toolbar — Filter+Sort sheet | product count */}
+        <div className="border-border/60 flex flex-wrap items-center justify-between gap-3 border-b pb-4">
+          <div className="flex items-center gap-4">
+            <CatalogFilterAndSortSheet
+              state={state}
+              onChange={onSearchChange}
+              onClear={onClearFilters}
+              total={catalogTotal}
+              onSortChange={(sortBy, sortOrder) => onSearchChange({ sortBy, sortOrder, page: 1 })}
+            />
+            {chips.length > 0 ? (
               <AppliedFilterChips
                 chips={chips}
                 onRemove={(key) => onSearchChange({ [key]: undefined, page: 1 })}
                 onClearAll={onClearFilters}
               />
-            </div>
+            ) : null}
+          </div>
 
-            {isLoading ? (
+          <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider">
+            {catalogTotal != null ? `${Math.min(catalogTotal, cappedTotal)} products` : null}
+          </p>
+        </div>
+
+        {/* Product grid */}
+        {isLoading ? (
+          <ProductGridSkeletonWrapper
+            view={state.view}
+            filtersOpen={false}
+            count={CATALOG_BATCH_SIZE}
+          />
+        ) : isError ? (
+          <ProductGridError onRetry={onRetry} />
+        ) : (
+          <>
+            <ProductGrid products={products} view={state.view} filtersOpen={false} />
+
+            {isFetchingNextPage ? (
               <ProductGridSkeletonWrapper
                 view={state.view}
-                filtersOpen={filtersOpen}
-                count={CATALOG_BATCH_SIZE}
+                filtersOpen={false}
+                count={Math.min(CATALOG_BATCH_SIZE, Math.max(cappedTotal - shown, 4))}
               />
-            ) : isError ? (
-              <ProductGridError onRetry={onRetry} />
-            ) : (
-              <>
-                <ProductGrid products={products} view={state.view} filtersOpen={filtersOpen} />
+            ) : null}
 
-                {isFetchingNextPage ? (
-                  <ProductGridSkeletonWrapper
-                    view={state.view}
-                    filtersOpen={filtersOpen}
-                    count={Math.min(CATALOG_BATCH_SIZE, Math.max(cappedTotal - shown, 4))}
-                  />
-                ) : null}
-
-                {hasNextPage ? (
-                  <div ref={loadMoreRef} className="h-8 w-full" aria-hidden />
-                ) : shown > 0 ? (
-                  <p className="text-muted-foreground pt-2 text-center text-sm">
-                    Showing {shown}
-                    {catalogTotal != null ? ` of ${Math.min(catalogTotal, cappedTotal)}` : ''}{' '}
-                    products
-                  </p>
-                ) : null}
-              </>
-            )}
-          </Container>
-        </div>
-      </div>
+            {hasNextPage ? (
+              <div ref={loadMoreRef} className="h-8 w-full" aria-hidden />
+            ) : shown > 0 ? (
+              <p className="text-muted-foreground pt-4 text-center text-xs uppercase tracking-widest">
+                Showing {shown}
+                {catalogTotal != null ? ` of ${Math.min(catalogTotal, cappedTotal)}` : ''} products
+              </p>
+            ) : null}
+          </>
+        )}
+      </Container>
     </div>
   );
 }

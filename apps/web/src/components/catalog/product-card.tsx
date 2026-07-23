@@ -7,7 +7,6 @@ import { Image } from '@/components/media/image';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { formatCurrency } from '@/utils';
 import { AddToCartButton } from '@/components/cart/add-to-cart-button';
 import { WishlistButton } from '@/components/wishlist/wishlist-button';
 import { PriceDisplay } from './price-display';
@@ -62,12 +61,16 @@ export function ProductCard({
   const [wantHover, setWantHover] = useState(false);
 
   const averageRating = readAverageRating(product);
-  const title = product.brandName ?? product.name;
-  const subtitle = product.brandName ? product.name : (product.shortDescription ?? undefined);
-  const dealPrice = resolveDealPrice(product);
-  const showPromo =
-    dealPrice != null || Boolean(product.isOnSale && (product.salePrice ?? product.effectivePrice));
-  const promoPrice = dealPrice ?? product.salePrice ?? product.effectivePrice ?? product.price;
+  const title = product.name;
+  // Compute discount % for image badge
+  const displayPrice = product.salePrice ?? product.effectivePrice ?? product.price;
+  const originalPrice = product.salePrice ? product.price : product.compareAtPrice;
+  const discountPct =
+    displayPrice && originalPrice && originalPrice.amount > displayPrice.amount
+      ? Math.round(((originalPrice.amount - displayPrice.amount) / originalPrice.amount) * 100)
+      : typeof product.discountPercent === 'number' && product.discountPercent > 0
+        ? Math.round(product.discountPercent)
+        : null;
 
   return (
     <>
@@ -81,8 +84,8 @@ export function ProductCard({
       >
         <div
           className={cn(
-            'bg-muted relative overflow-hidden rounded-t-2xl',
-            isList ? 'w-36 shrink-0 rounded-2xl sm:w-48' : 'w-full',
+            'bg-muted relative overflow-hidden',
+            isList ? 'w-36 shrink-0 rounded-xl sm:w-48' : 'w-full',
           )}
         >
           <Link
@@ -127,13 +130,13 @@ export function ProductCard({
           </Link>
 
           <div className="absolute left-2.5 top-2.5 flex flex-col gap-1.5">
-            {product.isNewArrival ? (
-              <Badge className="bg-foreground text-background rounded-md px-2 text-[10px]">
-                New
+            {discountPct ? (
+              <Badge className="rounded-none bg-red-600 px-2 text-[10px] font-bold uppercase tracking-wide text-white">
+                Save {discountPct}%
               </Badge>
             ) : null}
             {product.status === 'out_of_stock' ? (
-              <Badge variant="outline" className="bg-card/90 rounded-md text-[10px]">
+              <Badge variant="outline" className="bg-card/90 rounded-none text-[10px]">
                 Sold out
               </Badge>
             ) : null}
@@ -184,11 +187,9 @@ export function ProductCard({
           )}
         </div>
 
-        <div
-          className={cn('space-y-1.5 pt-2.5', isList && 'flex flex-1 flex-col justify-center py-1')}
-        >
-          <div className="flex items-start justify-between gap-2">
-            <h3 className="text-foreground line-clamp-1 text-sm font-bold leading-snug">
+        <div className={cn('pt-2', isList && 'flex flex-1 flex-col justify-center py-1')}>
+          <div className="flex items-start justify-between gap-1">
+            <h3 className="text-foreground line-clamp-1 text-sm font-medium leading-snug">
               <Link
                 to="/products/$slug"
                 params={{ slug: product.slug }}
@@ -201,15 +202,9 @@ export function ProductCard({
             <WishlistButton
               product={product}
               variant="ghost"
-              className="text-muted-foreground hover:text-foreground -mr-1.5 -mt-1 size-8 shrink-0 rounded-full"
+              className="text-muted-foreground hover:text-foreground -mr-1.5 -mt-0.5 size-7 shrink-0 rounded-full"
             />
           </div>
-
-          {subtitle ? (
-            <p className="text-muted-foreground line-clamp-1 text-xs leading-snug sm:text-[13px]">
-              {subtitle}
-            </p>
-          ) : null}
 
           <PriceDisplay
             price={product.price}
@@ -217,14 +212,6 @@ export function ProductCard({
             compareAtPrice={product.compareAtPrice}
             discountPercent={product.discountPercent}
           />
-
-          {showPromo && promoPrice ? (
-            <div className="border-primary/15 bg-primary/5 text-primary inline-flex max-w-full rounded-md border px-2 py-1 text-[11px] font-medium leading-tight">
-              <span className="truncate">
-                Get it for as low as {formatCurrency(promoPrice.amount, promoPrice.currency)}
-              </span>
-            </div>
-          ) : null}
         </div>
       </motion.article>
 

@@ -1,51 +1,56 @@
 import { useCallback, useMemo } from 'react';
 import { Seo } from '@/components/common/seo';
-import { CatalogHighlightRails, CatalogListShell } from '@/components/catalog';
+import { CatalogCategoryHero, CatalogListShell } from '@/components/catalog';
 import { buildAbsoluteUrl, siteConfig } from '@/config';
 import { useCatalogSearchParams, useInfiniteProducts } from '@/hooks/catalog';
-import { CATALOG_MAX_PRODUCTS } from '@/utils/catalog';
+
+const GENDER_META: Record<string, { title: string; description: string; scopeKey: string }> = {
+  women: {
+    title: 'Women',
+    description: 'Shop the latest women edit.',
+    scopeKey: 'women',
+  },
+  men: {
+    title: 'Men',
+    description: 'Shop the latest men edit.',
+    scopeKey: 'men',
+  },
+};
 
 export function ProductsPage() {
   const { state, setSearch, clearFilters } = useCatalogSearchParams();
   const query = useInfiniteProducts(state);
 
-  const products = useMemo(() => {
-    const flat = query.data?.pages.flatMap((page) => page.data) ?? [];
-    return flat.slice(0, CATALOG_MAX_PRODUCTS);
-  }, [query.data?.pages]);
+  const products = useMemo(
+    () => query.data?.pages.flatMap((page) => page.data) ?? [],
+    [query.data?.pages],
+  );
 
   const total = query.data?.pages[0]?.meta.total;
-  const hasNextPage = Boolean(query.hasNextPage) && products.length < CATALOG_MAX_PRODUCTS;
+  const hasNextPage = Boolean(query.hasNextPage);
 
   const onLoadMore = useCallback(() => {
     if (!query.hasNextPage || query.isFetchingNextPage) return;
     void query.fetchNextPage();
   }, [query]);
 
+  const gender = state.gender;
+  const meta = gender ? GENDER_META[gender] : undefined;
+
+  const heroTitle = meta?.title ?? 'All Products';
+  const heroScopeKey = meta?.scopeKey ?? 'women';
+
   return (
     <>
       <Seo
-        title="Shop"
-        description={`Browse the full ${siteConfig.name} collection.`}
+        title={meta?.title ?? 'Shop'}
+        description={meta?.description ?? `Browse the full ${siteConfig.name} collection.`}
         url={buildAbsoluteUrl('/products')}
       />
-      <CatalogHighlightRails />
+
+      <CatalogCategoryHero title={heroTitle} scopeKey={heroScopeKey} />
+
       <CatalogListShell
-        eyebrow="Catalog"
-        title={
-          state.gender === 'men'
-            ? "Shop men's collection"
-            : state.gender === 'women'
-              ? "Shop women's collection"
-              : 'All products'
-        }
-        description={
-          state.gender === 'men'
-            ? 'Shop the latest men edit.'
-            : state.gender === 'women'
-              ? 'Shop the latest women edit.'
-              : 'Discover considered pieces designed for everyday elegance.'
-        }
         state={state}
         products={products}
         total={total}

@@ -9,12 +9,15 @@ export interface ProductColorSelectorProps {
   onColorSelect: (colorId: string) => void;
   colorLabels?: Record<string, string>;
   productName?: string;
+  /** Used when a color has no dedicated thumbnail (e.g. options drawer). */
+  fallbackImageUrl?: string;
 }
 
 function resolveColorImage(
   colorId: string,
   variants: ProductVariant[],
   media: ProductMedia[],
+  fallbackImageUrl?: string,
 ): string | undefined {
   const colorVariants = variants.filter((v) => v.colorId === colorId);
   for (const variant of colorVariants) {
@@ -25,8 +28,15 @@ function resolveColorImage(
     (item) => item.variantId && variantIds.has(item.variantId) && item.url,
   );
   if (matched?.url) return matched.url;
-  // Do not fall back to shared product photos — those may be another color.
-  return undefined;
+
+  const hasAnyColorMedia = media.some((item) => item.variantId && item.url);
+  if (hasAnyColorMedia) return fallbackImageUrl;
+
+  return (
+    media.find((item) => !item.variantId && item.url)?.url ??
+    media.find((item) => item.url)?.url ??
+    fallbackImageUrl
+  );
 }
 
 export function ProductColorSelector({
@@ -36,6 +46,7 @@ export function ProductColorSelector({
   onColorSelect,
   colorLabels = {},
   productName = 'Product',
+  fallbackImageUrl,
 }: ProductColorSelectorProps) {
   const colors = [...new Set(variants.map((v) => v.colorId).filter(Boolean))] as string[];
   if (!colors.length) return null;
@@ -65,7 +76,7 @@ export function ProductColorSelector({
             colorLabels[colorId] ??
             variants.find((v) => v.colorId === colorId)?.optionValues?.color ??
             'Color';
-          const imageUrl = resolveColorImage(colorId, variants, media);
+          const imageUrl = resolveColorImage(colorId, variants, media, fallbackImageUrl);
 
           return (
             <button

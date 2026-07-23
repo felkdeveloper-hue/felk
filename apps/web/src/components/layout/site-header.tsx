@@ -7,9 +7,8 @@ import { MobileNav } from '@/components/navigation/mobile-nav';
 import { Container } from '@/components/layout/container';
 
 const DEFAULT_NAV_ITEMS: NavItem[] = [
-  { label: 'Shop', href: '/products' },
-  { label: 'Women', href: '/categories/women' },
-  { label: 'Men', href: '/categories/men' },
+  { label: 'Women', href: '/products?gender=women' },
+  { label: 'Accessories', href: '/categories/accessories' },
   { label: 'Browse', href: '/categories' },
   { label: 'Contact', href: '/contact' },
 ];

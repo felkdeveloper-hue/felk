@@ -17,7 +17,7 @@ export const SheetOverlay = React.forwardRef<
     ref={ref}
     data-slot="sheet-overlay"
     className={cn(
-      'bg-foreground/40 fixed inset-0 z-50 backdrop-blur-[2px]',
+      'bg-foreground/35 fixed inset-0 z-50',
       'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
       className,
     )}
@@ -50,14 +50,15 @@ export interface SheetContentProps
     React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>,
     VariantProps<typeof sheetVariants> {
   showClose?: boolean;
+  overlayClassName?: string;
 }
 
 export const SheetContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   SheetContentProps
->(({ side = 'right', className, children, showClose = true, ...props }, ref) => (
+>(({ side = 'right', className, children, showClose = true, overlayClassName, ...props }, ref) => (
   <SheetPortal>
-    <SheetOverlay />
+    <SheetOverlay className={overlayClassName} />
     <DialogPrimitive.Content
       ref={ref}
       data-slot="sheet-content"
@@ -66,8 +67,11 @@ export const SheetContent = React.forwardRef<
     >
       {children}
       {showClose ? (
-        <DialogPrimitive.Close className="text-muted-foreground hover:bg-accent hover:text-accent-foreground focus-visible:ring-ring/40 absolute right-4 top-4 rounded-md p-1 opacity-80 outline-none transition-opacity hover:opacity-100 focus-visible:ring-[3px] disabled:pointer-events-none">
-          <X className="size-4" />
+        <DialogPrimitive.Close
+          aria-label="Close"
+          className="border-border bg-background text-foreground hover:bg-muted focus-visible:ring-ring/40 absolute right-3 top-3 z-20 flex size-9 items-center justify-center border outline-none transition-colors focus-visible:ring-[3px] disabled:pointer-events-none"
+        >
+          <X className="size-5" strokeWidth={2.25} />
           <span className="sr-only">Close</span>
         </DialogPrimitive.Close>
       ) : null}

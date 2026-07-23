@@ -1,4 +1,5 @@
 export * from './applied-filter-chips';
+export * from './catalog-category-hero';
 export * from './back-to-top';
 export * from './catalog-filter-sidebar';
 export * from './catalog-highlight-rails';
@@ -24,6 +25,7 @@ export * from './product-trust-badges';
 export * from './quick-view-modal';
 export * from './recently-viewed-section';
 export * from './related-products';
+export * from './select-options-sheet';
 export * from './share-buttons';
 export * from './size-guide-modal';
 export * from './variant-selector';

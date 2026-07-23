@@ -192,6 +192,10 @@ export function normalizeProduct(raw: unknown): Product {
     reviewCount: typeof record.reviewCount === 'number' ? record.reviewCount : undefined,
     defaultVariantId: record.defaultVariantId ? String(record.defaultVariantId) : undefined,
     variantCount: typeof record.variantCount === 'number' ? record.variantCount : undefined,
+    requiresOptionSelection:
+      typeof record.requiresOptionSelection === 'boolean'
+        ? record.requiresOptionSelection
+        : undefined,
     thumbnailUrl,
     hoverImageUrl: media?.[1]?.url,
     media,

@@ -56,6 +56,8 @@ export interface Product {
   reviewCount?: number;
   defaultVariantId?: string;
   variantCount?: number;
+  /** When true, list/card add-to-cart should open the options drawer first. */
+  requiresOptionSelection?: boolean;
   thumbnailUrl?: string;
   hoverImageUrl?: string;
   media?: ProductMedia[];

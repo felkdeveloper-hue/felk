@@ -138,6 +138,8 @@ function pickListingVariant(
     currency?: string;
     sku?: string;
     thumbnailUrl?: string | null;
+    colorId?: { toString(): string } | string | null;
+    sizeId?: { toString(): string } | string | null;
   }>,
 ) {
   const byProduct = new Map<string, (typeof variants)[number]>();
@@ -149,6 +151,20 @@ function pickListingVariant(
     }
   }
   return byProduct;
+}
+
+function listingRequiresOptionSelection(
+  variants: Array<{
+    colorId?: { toString(): string } | string | null;
+    sizeId?: { toString(): string } | string | null;
+  }>,
+): boolean {
+  if (variants.length <= 1) return false;
+  const sizeIds = new Set(variants.map((v) => (v.sizeId ? String(v.sizeId) : '')).filter(Boolean));
+  const colorIds = new Set(
+    variants.map((v) => (v.colorId ? String(v.colorId) : '')).filter(Boolean),
+  );
+  return sizeIds.size > 1 || colorIds.size > 1 || variants.length > 1;
 }
 
 export class ProductService {
@@ -168,7 +184,7 @@ export class ProductService {
         status: 'active',
       })
         .select(
-          'productId isDefault displayOrder price salePrice compareAtPrice currency sku thumbnailUrl',
+          'productId isDefault displayOrder price salePrice compareAtPrice currency sku thumbnailUrl colorId sizeId',
         )
         .sort({ isDefault: -1, displayOrder: 1, createdAt: 1 })
         .lean(),
@@ -185,6 +201,11 @@ export class ProductService {
     ]);
 
     const listingVariantByProduct = pickListingVariant(variants);
+    const variantsByProduct = new Map<string, typeof variants>();
+    for (const variant of variants) {
+      const key = variant.productId.toString();
+      variantsByProduct.set(key, [...(variantsByProduct.get(key) ?? []), variant]);
+    }
     const mediaByProduct = new Map<string, typeof media>();
     for (const item of media) {
       const key = item.productId.toString();
@@ -198,6 +219,7 @@ export class ProductService {
         try {
           const id = product._id.toString();
           const listingVariant = listingVariantByProduct.get(id);
+          const productVariants = variantsByProduct.get(id) ?? [];
           const productMedia = mediaByProduct.get(id) ?? [];
           const primary = productMedia.find((item) => item.isPrimary) ?? productMedia[0];
           const hover = primary
@@ -237,7 +259,8 @@ export class ProductService {
               averageRating: product.averageRating ?? 0,
               reviewCount: product.reviewCount ?? 0,
               defaultVariantId: product.defaultVariantId ?? listingVariant?._id,
-              variantCount: product.variantCount,
+              variantCount: productVariants.length || product.variantCount || 0,
+              requiresOptionSelection: listingRequiresOptionSelection(productVariants),
               sku: product.sku ?? listingVariant?.sku,
               thumbnailUrl: primary?.thumbnailUrl ?? primary?.url ?? listingVariant?.thumbnailUrl,
               hoverImageUrl: hover?.url ?? hover?.thumbnailUrl,

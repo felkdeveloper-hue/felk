@@ -21,7 +21,7 @@ export interface MainNavProps {
 
 export function MainNav({ items, activeHref, transparent, className, renderItem }: MainNavProps) {
   return (
-    <nav aria-label="Main" className={cn('hidden items-center gap-7 lg:flex', className)}>
+    <nav aria-label="Main" className={cn('hidden items-center gap-6 lg:flex xl:gap-8', className)}>
       {items.map((item) => {
         const custom = renderItem?.(item);
         if (custom !== undefined) {

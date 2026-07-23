@@ -37,7 +37,7 @@ export const DEFAULT_CATALOG_SEARCH: CatalogSearchState = {
 /** Products fetched per scroll batch on shop pages. */
 export const CATALOG_BATCH_SIZE = 16;
 /** Soft cap for products shown via infinite scroll on a catalog page. */
-export const CATALOG_MAX_PRODUCTS = 50;
+export const CATALOG_MAX_PRODUCTS = 500;
 
 export function parseCatalogSearch(search: Record<string, unknown>): CatalogSearchState {
   const num = (value: unknown) => {
