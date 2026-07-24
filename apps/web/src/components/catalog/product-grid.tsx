@@ -39,7 +39,11 @@ export function ProductGrid({
   return (
     <div data-virtual-ready className={cn(gridClassName(view, filtersOpen), className)}>
       {products.map((product) => (
-        <ProductCard key={product.id} product={product} layout={view} />
+        <ProductCard
+          key={`${product.id}-${product.defaultVariantId ?? 'default'}`}
+          product={product}
+          layout={view}
+        />
       ))}
     </div>
   );

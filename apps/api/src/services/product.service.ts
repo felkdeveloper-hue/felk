@@ -184,7 +184,7 @@ export class ProductService {
         status: 'active',
       })
         .select(
-          'productId isDefault displayOrder price salePrice compareAtPrice currency sku thumbnailUrl colorId sizeId',
+          'productId isDefault listSeparately displayOrder price salePrice compareAtPrice currency sku thumbnailUrl colorId sizeId title',
         )
         .sort({ isDefault: -1, displayOrder: 1, createdAt: 1 })
         .lean(),
@@ -192,7 +192,7 @@ export class ProductService {
         productId: { $in: productIds },
         isDeleted: false,
       })
-        .select('productId url thumbnailUrl isPrimary priority')
+        .select('productId variantId url thumbnailUrl isPrimary priority')
         .sort({ priority: 1 })
         .lean(),
       BrandModel.find({ _id: { $in: brandIds }, isDeleted: false })
@@ -213,6 +213,33 @@ export class ProductService {
     }
     const brandById = new Map(brands.map((brand) => [brand._id.toString(), brand.name]));
 
+    const pickThumbnail = (
+      productMedia: typeof media,
+      listingVariant?: (typeof variants)[number],
+    ) => {
+      const listingId = listingVariant?._id?.toString();
+      const forVariant = listingId
+        ? productMedia.filter((item) => item.variantId?.toString() === listingId)
+        : [];
+      // Prefer images attached to the listing variant, then product-level (no variant), then any
+      const pool =
+        forVariant.length > 0
+          ? forVariant
+          : productMedia.filter((item) => !item.variantId).length > 0
+            ? productMedia.filter((item) => !item.variantId)
+            : productMedia;
+      const primary = pool.find((item) => item.isPrimary) ?? pool[0];
+      const hover = primary
+        ? (pool.find((item) => item._id.toString() !== primary._id.toString()) ??
+          productMedia.find((item) => item._id.toString() !== primary._id.toString()))
+        : undefined;
+      return {
+        thumbnailUrl:
+          primary?.thumbnailUrl ?? primary?.url ?? listingVariant?.thumbnailUrl ?? undefined,
+        hoverImageUrl: hover?.url ?? hover?.thumbnailUrl,
+      };
+    };
+
     return {
       ...result,
       data: result.data.flatMap((product) => {
@@ -221,23 +248,23 @@ export class ProductService {
           const listingVariant = listingVariantByProduct.get(id);
           const productVariants = variantsByProduct.get(id) ?? [];
           const productMedia = mediaByProduct.get(id) ?? [];
-          const primary = productMedia.find((item) => item.isPrimary) ?? productMedia[0];
-          const hover = primary
-            ? productMedia.find((item) => item._id.toString() !== primary._id.toString())
-            : productMedia[1];
           const listingPricing = resolveListingPricing(
             product as unknown as { pricing?: Record<string, unknown> | null },
             listingVariant,
           );
 
-          const computed = withComputedPricing({
-            ...(product as unknown as Record<string, unknown>),
-            pricing: listingPricing,
-          });
+          const thumbs = pickThumbnail(productMedia, listingVariant);
 
-          // Slim card DTO — omit description/seo/specifications/full media arrays.
-          return [
-            {
+          const buildCard = (
+            cardListingVariant: (typeof variants)[number] | undefined,
+            cardPricing: ReturnType<typeof resolveListingPricing>,
+            cardThumbs: { thumbnailUrl?: string; hoverImageUrl?: string | undefined },
+          ) => {
+            const cardComputed = withComputedPricing({
+              ...(product as unknown as Record<string, unknown>),
+              pricing: cardPricing,
+            });
+            return {
               _id: product._id,
               id,
               name: product.name,
@@ -245,8 +272,8 @@ export class ProductService {
               shortDescription: product.shortDescription,
               status: product.status,
               visibility: product.visibility,
-              pricing: computed.pricing,
-              pricingInsights: computed.pricingInsights,
+              pricing: cardComputed.pricing,
+              pricingInsights: cardComputed.pricingInsights,
               brandId: product.brandId,
               brandName: product.brandId ? brandById.get(product.brandId.toString()) : undefined,
               categoryId: product.categoryId,
@@ -258,16 +285,44 @@ export class ProductService {
               isClearance: product.isClearance,
               averageRating: product.averageRating ?? 0,
               reviewCount: product.reviewCount ?? 0,
-              defaultVariantId: product.defaultVariantId ?? listingVariant?._id,
+              defaultVariantId: cardListingVariant?._id ?? product.defaultVariantId,
               variantCount: productVariants.length || product.variantCount || 0,
               requiresOptionSelection: listingRequiresOptionSelection(productVariants),
-              sku: product.sku ?? listingVariant?.sku,
-              thumbnailUrl: primary?.thumbnailUrl ?? primary?.url ?? listingVariant?.thumbnailUrl,
-              hoverImageUrl: hover?.url ?? hover?.thumbnailUrl,
+              sku: product.sku ?? cardListingVariant?.sku,
+              thumbnailUrl: cardThumbs.thumbnailUrl,
+              hoverImageUrl: cardThumbs.hoverImageUrl,
               createdAt: product.createdAt,
               updatedAt: product.updatedAt,
-            },
-          ];
+            };
+          };
+
+          const cards = [buildCard(listingVariant, listingPricing, thumbs)];
+
+          // Extra catalog cards for colors marked "show as own listing"
+          const defaultColorKey = listingVariant?.colorId
+            ? String(listingVariant.colorId)
+            : '__none__';
+          const seenColors = new Set<string>([defaultColorKey]);
+          for (const variant of productVariants) {
+            if (!variant.listSeparately) continue;
+            const colorKey = variant.colorId ? String(variant.colorId) : `v:${variant._id}`;
+            if (seenColors.has(colorKey)) continue;
+            seenColors.add(colorKey);
+            // Prefer the first variant of this color (already sorted)
+            const colorRepresentative =
+              productVariants.find(
+                (v) =>
+                  (v.colorId ? String(v.colorId) : `v:${v._id}`) === colorKey && v.listSeparately,
+              ) ?? variant;
+            const extraPricing = resolveListingPricing(
+              product as unknown as { pricing?: Record<string, unknown> | null },
+              colorRepresentative,
+            );
+            const extraThumbs = pickThumbnail(productMedia, colorRepresentative);
+            cards.push(buildCard(colorRepresentative, extraPricing, extraThumbs));
+          }
+
+          return cards;
         } catch {
           // Skip malformed rows so one bad product cannot 500 the whole rail.
           return [];

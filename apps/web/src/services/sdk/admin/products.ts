@@ -65,6 +65,7 @@ export interface AdminVariant {
   currency?: string;
   status?: string;
   isDefault?: boolean;
+  listSeparately?: boolean;
 }
 
 export interface VariantInput {
@@ -78,6 +79,7 @@ export interface VariantInput {
   currency?: string;
   status?: string;
   isDefault?: boolean;
+  listSeparately?: boolean;
 }
 
 function readMoneyAmount(value: unknown): number | undefined {
@@ -197,6 +199,7 @@ function normalizeVariant(raw: unknown): AdminVariant {
     currency: typeof record.currency === 'string' ? record.currency : 'LKR',
     status: typeof record.status === 'string' ? record.status : undefined,
     isDefault: Boolean(record.isDefault),
+    listSeparately: Boolean(record.listSeparately),
   };
 }
 

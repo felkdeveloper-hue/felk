@@ -174,153 +174,313 @@ function PlacementToggle({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Images section (self-contained)
+// Per-color variant card (gallery + sizes table)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function ProductImagesSection({
-  productId,
-  canUpload,
+function ColorVariantCard({
+  colorLabel,
+  colorVariants,
+  colorImages,
+  firstVariant,
+  isDefault,
+  isOwnListing,
+  sizes,
+  stockByVariant,
+  canCreate,
+  canUpdate,
   canDelete,
+  editingVariantId,
+  editTitle,
+  setEditingVariantId,
+  setEditTitle,
+  onSetDefault,
+  onToggleOwnListing,
+  onUpload,
+  onRemoveImage,
+  onUpdateTitle,
+  onSetStock,
+  onUpdatePrice,
+  onDelete,
 }: {
-  productId: string;
-  canUpload: boolean;
+  colorLabel: string;
+  colorVariants: AdminVariant[];
+  colorImages: Array<{ id: string; url: string; thumbnailUrl?: string | null }>;
+  firstVariant?: AdminVariant;
+  isDefault: boolean;
+  isOwnListing: boolean;
+  sizes: Array<{ id: string; name: string }>;
+  stockByVariant: Map<string, number>;
+  canCreate: boolean;
+  canUpdate: boolean;
   canDelete: boolean;
+  editingVariantId: string | null;
+  editTitle: string;
+  setEditingVariantId: (id: string | null) => void;
+  setEditTitle: (v: string) => void;
+  onSetDefault: (id: string) => void;
+  onToggleOwnListing: (id: string, next: boolean) => void;
+  onUpload: (variantId: string, file: File) => void;
+  onRemoveImage: (mediaId: string) => void;
+  onUpdateTitle: (id: string, title: string) => void;
+  onSetStock: (variantId: string, quantity: number) => void;
+  onUpdatePrice: (id: string, price: number, salePrice: number | null) => void;
+  onDelete: (id: string) => void;
 }) {
-  const queryClient = useQueryClient();
-  const mediaQuery = useQuery({
-    queryKey: [...QUERY_KEYS.products.detail(productId), 'media'],
-    queryFn: () => mediaApi.list(productId),
-  });
-  const images = (mediaQuery.data ?? []).filter((m) => !m.variantId);
+  const [imgIdx, setImgIdx] = useState(0);
+  const currentImg = colorImages[imgIdx] ?? colorImages[0];
+  const hasMultiple = colorImages.length > 1;
 
-  const invalidate = () =>
-    queryClient.invalidateQueries({
-      queryKey: [...QUERY_KEYS.products.detail(productId), 'media'],
-    });
-
-  const uploadMut = useMutation({
-    mutationFn: (file: File) =>
-      mediaApi.upload(productId, file, { isPrimary: images.length === 0 }),
-    onSuccess: () => invalidate(),
-    onError: (err) => toast.error(err instanceof AppError ? err.message : 'Upload failed'),
-  });
-  const primaryMut = useMutation({
-    mutationFn: (id: string) => mediaApi.setPrimary(id),
-    onSuccess: () => invalidate(),
-  });
-  const removeMut = useMutation({
-    mutationFn: (id: string) => mediaApi.remove(id),
-    onSuccess: () => invalidate(),
-  });
-  const inputRef = useRef<HTMLInputElement>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const scroll = (dir: 'left' | 'right') => {
-    scrollRef.current?.scrollBy({ left: dir === 'left' ? -250 : 250, behavior: 'smooth' });
-  };
+  useEffect(() => {
+    if (imgIdx >= colorImages.length) setImgIdx(Math.max(0, colorImages.length - 1));
+  }, [colorImages.length, imgIdx]);
 
   return (
-    <div>
-      <div className="relative">
-        {images.length > 3 ? (
-          <>
+    <div
+      className={cn(
+        'overflow-hidden rounded-none border bg-[var(--admin-panel)]',
+        isDefault ? 'border-[var(--admin-accent)]' : 'border-[var(--admin-line)]',
+      )}
+    >
+      <div className="flex items-center justify-between gap-3 border-b border-[var(--admin-line)] px-4 py-3">
+        <div className="flex flex-wrap items-center gap-2">
+          {isDefault ? (
+            <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+              <Star className="size-2.5" /> Default
+            </span>
+          ) : null}
+          {isOwnListing ? (
+            <span className="flex items-center gap-1 rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-sky-800 dark:bg-sky-950/40 dark:text-sky-300">
+              <ExternalLink className="size-2.5" /> Own listing
+            </span>
+          ) : null}
+          <span className="text-sm font-bold text-[var(--admin-ink)]">{colorLabel}</span>
+          <span className="text-xs text-[var(--admin-ink-muted)]">
+            {colorVariants.length} size{colorVariants.length !== 1 ? 's' : ''}
+            {colorImages.length > 0
+              ? ` · ${colorImages.length} photo${colorImages.length !== 1 ? 's' : ''}`
+              : ''}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          {!isDefault && canUpdate && firstVariant ? (
             <button
               type="button"
-              onClick={() => scroll('left')}
-              className="absolute -left-3 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white p-1 shadow ring-1 ring-[var(--admin-line)] hover:bg-[var(--admin-panel-soft)]"
+              onClick={() => onSetDefault(firstVariant.id)}
+              className="text-xs text-[var(--admin-ink-muted)] underline hover:text-[var(--admin-ink)]"
             >
-              <ChevronLeft className="size-4 text-[var(--admin-ink)]" />
+              Set as default listing
             </button>
+          ) : null}
+          {canUpdate && firstVariant ? (
             <button
               type="button"
-              onClick={() => scroll('right')}
-              className="absolute -right-3 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white p-1 shadow ring-1 ring-[var(--admin-line)] hover:bg-[var(--admin-panel-soft)]"
+              onClick={() => onToggleOwnListing(firstVariant.id, !isOwnListing)}
+              className={cn(
+                'flex items-center gap-1.5 rounded-none border px-2.5 py-1 text-[10px] font-semibold transition',
+                isOwnListing
+                  ? 'border-sky-500 bg-sky-50 text-sky-800 dark:bg-sky-950/30 dark:text-sky-300'
+                  : 'border-[var(--admin-line)] text-[var(--admin-ink-muted)] hover:border-[var(--admin-accent)] hover:text-[var(--admin-accent)]',
+              )}
+              title="Show this color as its own product card on the storefront"
             >
-              <ChevronRight className="size-4 text-[var(--admin-ink)]" />
+              <ExternalLink className="size-3" />
+              {isOwnListing ? 'Own listing ON' : 'Show as own listing'}
             </button>
-          </>
-        ) : null}
-        <div
-          ref={scrollRef}
-          className="flex gap-3 overflow-x-auto pb-1"
-          style={{ scrollbarWidth: 'none' }}
-        >
-          {images.map((img) => (
-            <div
-              key={img.id}
-              className="group relative size-24 shrink-0 overflow-hidden rounded-none border border-[var(--admin-line)] bg-[var(--admin-panel-soft)]"
-            >
+          ) : null}
+        </div>
+      </div>
+
+      <div className="flex gap-4 p-4">
+        {/* Image gallery with arrows */}
+        <div className="w-24 shrink-0 space-y-1.5">
+          <div className="relative">
+            {currentImg ? (
               <img
-                src={img.thumbnailUrl || img.url}
-                alt={img.alt || ''}
-                className="size-full object-cover"
+                src={currentImg.thumbnailUrl || currentImg.url}
+                alt=""
+                className="aspect-[3/4] w-24 rounded-none object-cover ring-1 ring-[var(--admin-line)]"
               />
-              {img.isPrimary ? (
-                <span className="absolute left-0 top-0 bg-[var(--admin-ink)] px-1.5 py-0.5 text-[9px] font-bold uppercase text-[var(--admin-surface)]">
-                  Main
-                </span>
-              ) : null}
-              <div className="absolute inset-0 flex items-end justify-end gap-1 bg-black/40 p-1 opacity-0 transition-opacity group-hover:opacity-100">
-                {!img.isPrimary ? (
-                  <button
-                    type="button"
-                    onClick={() => primaryMut.mutate(img.id)}
-                    title="Set as catalog main"
-                    className="rounded-none bg-white/90 p-1 text-[var(--admin-ink)] hover:bg-white"
-                  >
-                    <Star className="size-3" />
-                  </button>
-                ) : null}
-                {canDelete ? (
-                  <button
-                    type="button"
-                    onClick={() => removeMut.mutate(img.id)}
-                    className="rounded-none bg-red-600 p-1 text-white hover:bg-red-700"
-                  >
-                    <Trash2 className="size-3" />
-                  </button>
-                ) : null}
+            ) : (
+              <div className="flex aspect-[3/4] w-24 items-center justify-center rounded-none bg-[var(--admin-panel-soft)] ring-1 ring-[var(--admin-line)]">
+                <ImageIcon className="size-6 text-[var(--admin-ink-muted)]" />
               </div>
-            </div>
-          ))}
-          {canUpload ? (
-            <>
+            )}
+            {hasMultiple ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setImgIdx((i) => (i - 1 + colorImages.length) % colorImages.length)
+                  }
+                  className="absolute left-0.5 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-0.5 shadow ring-1 ring-black/10"
+                >
+                  <ChevronLeft className="size-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setImgIdx((i) => (i + 1) % colorImages.length)}
+                  className="absolute right-0.5 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-0.5 shadow ring-1 ring-black/10"
+                >
+                  <ChevronRight className="size-3.5" />
+                </button>
+                <span className="absolute bottom-1 left-1/2 -translate-x-1/2 rounded bg-black/60 px-1.5 py-0.5 text-[9px] font-semibold text-white">
+                  {imgIdx + 1}/{colorImages.length}
+                </span>
+              </>
+            ) : null}
+            {currentImg && canDelete ? (
               <button
                 type="button"
-                onClick={() => inputRef.current?.click()}
-                disabled={uploadMut.isPending}
-                className="flex size-24 shrink-0 flex-col items-center justify-center gap-1 rounded-none border border-dashed border-[var(--admin-line)] text-[var(--admin-ink-muted)] transition hover:border-[var(--admin-accent)] hover:text-[var(--admin-accent)] disabled:opacity-50"
+                onClick={() => onRemoveImage(currentImg.id)}
+                className="absolute right-0.5 top-0.5 rounded-none bg-red-600 p-0.5 text-white hover:bg-red-700"
+                title="Delete this photo"
               >
-                {uploadMut.isPending ? (
-                  <Loader2 className="size-5 animate-spin" />
-                ) : (
-                  <Upload className="size-5" />
-                )}
-                <span className="text-[10px] font-semibold uppercase tracking-wide">
-                  {uploadMut.isPending ? 'Uploading…' : 'Add photo'}
-                </span>
+                <Trash2 className="size-3" />
               </button>
+            ) : null}
+          </div>
+          {canCreate && firstVariant ? (
+            <label className="flex cursor-pointer items-center justify-center gap-1 rounded-none border border-dashed border-[var(--admin-line)] py-1 text-[10px] text-[var(--admin-ink-muted)] hover:border-[var(--admin-accent)] hover:text-[var(--admin-accent)]">
+              <Upload className="size-3" />
+              Add photo
               <input
-                ref={inputRef}
                 type="file"
                 accept="image/*"
                 multiple
                 className="hidden"
                 onChange={(e) => {
                   const files = Array.from(e.target.files ?? []);
-                  files.forEach((file) => uploadMut.mutate(file));
+                  files.forEach((file) => onUpload(firstVariant.id, file));
                   e.target.value = '';
                 }}
               />
-            </>
+            </label>
           ) : null}
         </div>
+
+        {/* Sizes table */}
+        <div className="min-w-0 flex-1">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-[var(--admin-line)]">
+                <th className="pb-2 text-left font-semibold uppercase tracking-wider text-[var(--admin-ink-muted)]">
+                  Size
+                </th>
+                <th className="pb-2 text-left font-semibold uppercase tracking-wider text-[var(--admin-ink-muted)]">
+                  Name
+                </th>
+                <th className="pb-2 text-center font-semibold uppercase tracking-wider text-[var(--admin-ink-muted)]">
+                  Stock
+                </th>
+                <th className="pb-2 text-right font-semibold uppercase tracking-wider text-[var(--admin-ink-muted)]">
+                  Price
+                </th>
+                {canDelete ? <th /> : null}
+              </tr>
+            </thead>
+            <tbody>
+              {colorVariants.map((variant) => {
+                const sizeName = variant.sizeId
+                  ? (sizes.find((s) => s.id === variant.sizeId)?.name ?? variant.sizeId)
+                  : '—';
+                const stock = stockByVariant.get(variant.id) ?? 0;
+                const isEditing = editingVariantId === variant.id;
+                return (
+                  <tr
+                    key={variant.id}
+                    className="border-[var(--admin-line)]/50 border-b last:border-0"
+                  >
+                    <td className="py-2 pr-2 font-medium text-[var(--admin-ink)]">{sizeName}</td>
+                    <td className="py-2 pr-2">
+                      {isEditing ? (
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="text"
+                            value={editTitle}
+                            onChange={(e) => setEditTitle(e.target.value)}
+                            className="w-full rounded-none border border-[var(--admin-accent)] bg-white px-2 py-1 text-xs outline-none"
+                            autoFocus
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') onUpdateTitle(variant.id, editTitle);
+                              if (e.key === 'Escape') setEditingVariantId(null);
+                            }}
+                          />
+                          <button
+                            type="button"
+                            className="rounded-none bg-[var(--admin-accent)] px-2 py-1 text-[10px] font-bold text-white"
+                            onClick={() => onUpdateTitle(variant.id, editTitle)}
+                          >
+                            Save
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={!canUpdate}
+                          className="truncate text-left text-[var(--admin-ink-muted)] hover:underline"
+                          onClick={() => {
+                            setEditingVariantId(variant.id);
+                            setEditTitle(variant.title ?? '');
+                          }}
+                        >
+                          {variant.title || <span className="italic opacity-50">add label</span>}
+                        </button>
+                      )}
+                    </td>
+                    <td className="py-2 pr-2 text-center">
+                      <input
+                        key={`${variant.id}:stock:${stock}`}
+                        type="number"
+                        min={0}
+                        defaultValue={stock}
+                        disabled={!canUpdate}
+                        className="w-16 rounded-none border border-[var(--admin-line)] bg-white px-2 py-1 text-center text-xs outline-none focus:border-[var(--admin-accent)]"
+                        onBlur={(e) => {
+                          const qty = Number(e.target.value);
+                          if (Number.isFinite(qty) && qty !== stock) onSetStock(variant.id, qty);
+                        }}
+                      />
+                    </td>
+                    <td className="py-2 pr-2 text-right">
+                      <input
+                        key={`${variant.id}:price:${variant.price}:${variant.salePrice ?? ''}`}
+                        type="number"
+                        min={0}
+                        defaultValue={variant.salePrice ?? variant.price}
+                        disabled={!canUpdate}
+                        className="w-24 rounded-none border border-[var(--admin-line)] bg-white px-2 py-1 text-right text-xs outline-none focus:border-[var(--admin-accent)]"
+                        onBlur={(e) => {
+                          const next = Number(e.target.value);
+                          if (!Number.isFinite(next) || next < 0) return;
+                          const current = variant.salePrice ?? variant.price;
+                          if (next === current) return;
+                          // If product has a sale price set, update salePrice; else update base price
+                          if (variant.salePrice != null && variant.salePrice > 0) {
+                            onUpdatePrice(variant.id, variant.price || next, next);
+                          } else {
+                            onUpdatePrice(variant.id, next, null);
+                          }
+                        }}
+                      />
+                    </td>
+                    {canDelete ? (
+                      <td className="py-2 text-right">
+                        <button
+                          type="button"
+                          onClick={() => onDelete(variant.id)}
+                          className="rounded-none p-1 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                        >
+                          <Trash2 className="size-3.5" />
+                        </button>
+                      </td>
+                    ) : null}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
-      {images.length > 0 ? (
-        <p className="mt-2 text-[11px] text-[var(--admin-ink-muted)]">
-          Hover a photo → <Star className="inline size-3" /> to set as catalog main image.
-          {images.length > 3 ? ' Use the ‹ › arrows to scroll.' : ''}
-        </p>
-      ) : null}
     </div>
   );
 }
@@ -430,11 +590,16 @@ function VariantsSection({
 
   const createMutation = useMutation({
     mutationFn: async () => {
+      if (!newColorId) throw new AppError('Select a color first.');
+      const basePrice = Number(newPrice);
+      if (!Number.isFinite(basePrice) || basePrice <= 0) {
+        throw new AppError('Enter a price greater than 0 before adding the variant.');
+      }
       const sizeOptions = newSizeIds.length ? newSizeIds : [''];
-      const basePrice = Number(newPrice) || 0;
       const baseSale = newSalePrice === '' ? null : Number(newSalePrice);
       const existingKeys = new Set(variants.map((v) => `${v.colorId ?? ''}:${v.sizeId ?? ''}`));
       let created = 0;
+      const stockFailures: string[] = [];
       for (const sizeId of sizeOptions) {
         const key = `${newColorId}:${sizeId}`;
         if (existingKeys.has(key)) continue;
@@ -449,33 +614,26 @@ function VariantsSection({
           salePrice: baseSale,
           currency: 'LKR',
         });
-        // Set initial stock for this variant
         const stockQty = Number(newStockMap[sizeId] ?? newStockMap[''] ?? 0);
         if (stockQty > 0) {
           try {
             await inventoryApi.setStock({ variantId: variant.id, quantity: stockQty });
-          } catch {
-            // setStock endpoint may not exist; fall back to adjust
-            try {
-              await inventoryApi.adjust({
-                variantId: variant.id,
-                warehouseId: 'default',
-                quantity: stockQty,
-                direction: 'increase',
-                reason: 'initial_stock',
-              });
-            } catch {
-              /* stock will be 0 — can be set from the table */
-            }
+          } catch (err) {
+            stockFailures.push(
+              err instanceof AppError ? err.message : `Stock failed for ${sizeName ?? 'size'}`,
+            );
           }
         }
         created++;
       }
       if (!created) throw new AppError('These variants already exist.');
-      return created;
+      return { created, stockFailures };
     },
-    onSuccess: async (count) => {
-      toast.success(`${count} variant${count !== 1 ? 's' : ''} added`);
+    onSuccess: async ({ created, stockFailures }) => {
+      toast.success(`${created} variant${created !== 1 ? 's' : ''} added`);
+      if (stockFailures.length) {
+        toast.error(`Stock not saved: ${stockFailures[0]}`, { duration: 8000 });
+      }
       setAddingColor(false);
       setNewColorId('');
       setNewSizeIds([]);
@@ -483,7 +641,11 @@ function VariantsSection({
       setError(null);
       await invalidate();
     },
-    onError: (err) => setError(err instanceof AppError ? err.message : 'Unable to add variants.'),
+    onError: (err) => {
+      const msg = err instanceof AppError ? err.message : 'Unable to add variants.';
+      setError(msg);
+      toast.error(msg);
+    },
   });
 
   const updateTitleMutation = useMutation({
@@ -517,10 +679,56 @@ function VariantsSection({
   const setStockMutation = useMutation({
     mutationFn: ({ variantId, quantity }: { variantId: string; quantity: number }) =>
       inventoryApi.setStock({ variantId, quantity }),
-    onSuccess: () =>
-      queryClient.invalidateQueries({
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.inventory.items({ productId, limit: 200 }),
-      }),
+      });
+      toast.success('Stock updated');
+    },
+    onError: (err) =>
+      toast.error(
+        err instanceof AppError
+          ? err.message
+          : 'Unable to update stock. Check inventory permissions.',
+      ),
+  });
+
+  const updatePriceMutation = useMutation({
+    mutationFn: ({
+      id,
+      price,
+      salePrice,
+    }: {
+      id: string;
+      price: number;
+      salePrice: number | null;
+    }) => productsApi.updateVariant(id, { price, salePrice }),
+    onSuccess: async () => {
+      toast.success('Price updated');
+      await invalidate();
+    },
+    onError: (err) => toast.error(err instanceof AppError ? err.message : 'Unable to update price'),
+  });
+
+  const listSeparatelyMutation = useMutation({
+    mutationFn: ({ id, listSeparately }: { id: string; listSeparately: boolean }) =>
+      productsApi.updateVariant(id, { listSeparately }),
+    onSuccess: async (_, vars) => {
+      toast.success(
+        vars.listSeparately
+          ? 'This color will appear as its own catalog card'
+          : 'Removed from separate catalog listing',
+      );
+      await invalidate();
+    },
+    onError: (err) =>
+      toast.error(err instanceof AppError ? err.message : 'Unable to update listing'),
+  });
+
+  const removeMediaMutation = useMutation({
+    mutationFn: (mediaId: string) => mediaApi.remove(mediaId),
+    onSuccess: () => invalidate(),
+    onError: (err) => toast.error(err instanceof AppError ? err.message : 'Unable to delete image'),
   });
 
   const deleteMutation = useMutation({
@@ -534,7 +742,10 @@ function VariantsSection({
   const uploadVariantImageMutation = useMutation({
     mutationFn: ({ variantId, file }: { variantId: string; file: File }) =>
       mediaApi.upload(productId, file, { variantId }),
-    onSuccess: () => invalidate(),
+    onSuccess: () => {
+      toast.success('Photo added');
+      invalidate();
+    },
     onError: (err) => toast.error(err instanceof AppError ? err.message : 'Upload failed'),
   });
 
@@ -561,221 +772,43 @@ function VariantsSection({
             ? 'No color'
             : (colors.find((c) => c.id === colorKey)?.name ?? colorKey);
         const firstVariant = colorVariants[0] as AdminVariant | undefined;
-        const variantImages = variantMediaMap.get(firstVariant?.id ?? '') ?? [];
+        const colorImages = colorVariants.flatMap((v) => variantMediaMap.get(v.id) ?? []);
         const isDefault = colorVariants.some((v) => v.isDefault);
+        const isOwnListing = colorVariants.some((v) => v.listSeparately);
 
         return (
-          <div
+          <ColorVariantCard
             key={colorKey}
-            className={cn(
-              'overflow-hidden rounded-none border bg-[var(--admin-panel)]',
-              isDefault ? 'border-[var(--admin-accent)]' : 'border-[var(--admin-line)]',
-            )}
-          >
-            {/* Color header */}
-            <div className="flex items-center justify-between gap-3 border-b border-[var(--admin-line)] px-4 py-3">
-              <div className="flex items-center gap-2.5">
-                {isDefault ? (
-                  <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
-                    <Star className="size-2.5" /> Default
-                  </span>
-                ) : null}
-                <span className="text-sm font-bold text-[var(--admin-ink)]">{colorLabel}</span>
-                <span className="text-xs text-[var(--admin-ink-muted)]">
-                  {colorVariants.length} size{colorVariants.length !== 1 ? 's' : ''}
-                </span>
-              </div>
-              <div className="flex items-center gap-3">
-                {!isDefault && canUpdate && firstVariant ? (
-                  <button
-                    type="button"
-                    onClick={() => setDefaultMutation.mutate(firstVariant!.id)}
-                    className="text-xs text-[var(--admin-ink-muted)] underline hover:text-[var(--admin-ink)]"
-                    title="This color will show as the main catalog listing image"
-                  >
-                    Set as default listing
-                  </button>
-                ) : null}
-                {canUpdate && colorVariants.length > 0 ? (
-                  <div
-                    className="flex cursor-pointer items-center gap-1.5 rounded-none border border-[var(--admin-line)] px-2.5 py-1 text-[10px] font-semibold text-[var(--admin-ink-muted)] hover:border-[var(--admin-accent)] hover:text-[var(--admin-accent)]"
-                    title="Create a separate product listing for this color so it appears as its own card in the catalog"
-                    onClick={() => {
-                      const colorName = colorLabel;
-                      const firstId = colorVariants[0]?.id;
-                      if (!firstId) return;
-                      toast.info(
-                        `To show ${colorName} as a separate catalog card, duplicate this product and keep only the ${colorName} variant.`,
-                        { duration: 6000 },
-                      );
-                    }}
-                  >
-                    <ExternalLink className="size-3" />
-                    Show as own listing?
-                  </div>
-                ) : null}
-              </div>
-            </div>
-
-            <div className="flex gap-4 p-4">
-              {/* Variant photo */}
-              <div className="w-20 shrink-0 space-y-1.5">
-                {variantImages.length && variantImages[0] ? (
-                  <img
-                    src={variantImages[0].url}
-                    alt=""
-                    className="aspect-[3/4] w-20 rounded-none object-cover ring-1 ring-[var(--admin-line)]"
-                  />
-                ) : (
-                  <div className="flex aspect-[3/4] w-20 items-center justify-center rounded-none bg-[var(--admin-panel-soft)] ring-1 ring-[var(--admin-line)]">
-                    <ImageIcon className="size-6 text-[var(--admin-ink-muted)]" />
-                  </div>
-                )}
-                {canCreate && firstVariant ? (
-                  <label className="flex cursor-pointer items-center justify-center gap-1 rounded-none border border-dashed border-[var(--admin-line)] py-1 text-[10px] text-[var(--admin-ink-muted)] hover:border-[var(--admin-accent)] hover:text-[var(--admin-accent)]">
-                    <Upload className="size-3" />
-                    Photo
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file && firstVariant)
-                          uploadVariantImageMutation.mutate({ variantId: firstVariant.id, file });
-                      }}
-                    />
-                  </label>
-                ) : null}
-              </div>
-
-              {/* Sizes + stock table */}
-              <div className="min-w-0 flex-1">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="border-b border-[var(--admin-line)]">
-                      <th className="pb-2 text-left font-semibold uppercase tracking-wider text-[var(--admin-ink-muted)]">
-                        Size
-                      </th>
-                      <th className="pb-2 text-left font-semibold uppercase tracking-wider text-[var(--admin-ink-muted)]">
-                        Name / Label
-                      </th>
-                      <th className="pb-2 text-center font-semibold uppercase tracking-wider text-[var(--admin-ink-muted)]">
-                        Stock
-                      </th>
-                      <th className="pb-2 text-right font-semibold uppercase tracking-wider text-[var(--admin-ink-muted)]">
-                        Price
-                      </th>
-                      {canDelete ? <th /> : null}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {colorVariants.map((variant) => {
-                      const sizeName = variant.sizeId
-                        ? (sizes.find((s) => s.id === variant.sizeId)?.name ?? variant.sizeId)
-                        : '—';
-                      const stock = stockByVariant.get(variant.id) ?? 0;
-                      const isEditing = editingVariantId === variant.id;
-
-                      return (
-                        <tr
-                          key={variant.id}
-                          className="border-[var(--admin-line)]/50 border-b last:border-0"
-                        >
-                          <td className="py-2 pr-3 font-medium text-[var(--admin-ink)]">
-                            {sizeName}
-                          </td>
-                          <td className="py-2 pr-3">
-                            {isEditing ? (
-                              <div className="flex items-center gap-1">
-                                <input
-                                  type="text"
-                                  value={editTitle}
-                                  onChange={(e) => setEditTitle(e.target.value)}
-                                  className="w-full rounded-none border border-[var(--admin-accent)] bg-white px-2 py-1 text-xs outline-none"
-                                  autoFocus
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter')
-                                      updateTitleMutation.mutate({
-                                        id: variant.id,
-                                        title: editTitle,
-                                      });
-                                    if (e.key === 'Escape') setEditingVariantId(null);
-                                  }}
-                                />
-                                <button
-                                  type="button"
-                                  className="rounded-none bg-[var(--admin-accent)] px-2 py-1 text-[10px] font-bold text-white"
-                                  onClick={() =>
-                                    updateTitleMutation.mutate({ id: variant.id, title: editTitle })
-                                  }
-                                >
-                                  Save
-                                </button>
-                                <button
-                                  type="button"
-                                  className="rounded-none px-1 py-1 text-[var(--admin-ink-muted)] hover:text-[var(--admin-ink)]"
-                                  onClick={() => setEditingVariantId(null)}
-                                >
-                                  <X className="size-3" />
-                                </button>
-                              </div>
-                            ) : (
-                              <button
-                                type="button"
-                                className="truncate text-left text-[var(--admin-ink-muted)] hover:text-[var(--admin-ink)] hover:underline"
-                                onClick={() => {
-                                  setEditingVariantId(variant.id);
-                                  setEditTitle(variant.title ?? '');
-                                }}
-                                disabled={!canUpdate}
-                              >
-                                {variant.title || (
-                                  <span className="italic opacity-50">click to add label</span>
-                                )}
-                              </button>
-                            )}
-                          </td>
-                          <td className="py-2 pr-3 text-center">
-                            <input
-                              key={`${variant.id}:stock:${stock}`}
-                              type="number"
-                              min={0}
-                              defaultValue={stock}
-                              disabled={!canUpdate}
-                              className="w-16 rounded-none border border-[var(--admin-line)] bg-white px-2 py-1 text-center text-xs outline-none focus:border-[var(--admin-accent)] disabled:opacity-50"
-                              onBlur={(e) => {
-                                const qty = Number(e.target.value);
-                                if (qty !== stock)
-                                  setStockMutation.mutate({ variantId: variant.id, quantity: qty });
-                              }}
-                            />
-                          </td>
-                          <td className="py-2 pr-3 text-right font-medium text-[var(--admin-ink)]">
-                            LKR {(variant.salePrice ?? variant.price).toLocaleString()}
-                          </td>
-                          {canDelete ? (
-                            <td className="py-2 text-right">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (confirm('Remove this variant?'))
-                                    deleteMutation.mutate(variant.id);
-                                }}
-                                className="rounded-none p-1 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-                              >
-                                <Trash2 className="size-3.5" />
-                              </button>
-                            </td>
-                          ) : null}
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
+            colorLabel={colorLabel}
+            colorVariants={colorVariants}
+            colorImages={colorImages}
+            firstVariant={firstVariant}
+            isDefault={isDefault}
+            isOwnListing={isOwnListing}
+            sizes={sizes}
+            stockByVariant={stockByVariant}
+            canCreate={canCreate}
+            canUpdate={canUpdate}
+            canDelete={canDelete}
+            editingVariantId={editingVariantId}
+            editTitle={editTitle}
+            setEditingVariantId={setEditingVariantId}
+            setEditTitle={setEditTitle}
+            onSetDefault={(id) => setDefaultMutation.mutate(id)}
+            onToggleOwnListing={(id, next) =>
+              listSeparatelyMutation.mutate({ id, listSeparately: next })
+            }
+            onUpload={(variantId, file) => uploadVariantImageMutation.mutate({ variantId, file })}
+            onRemoveImage={(mediaId) => removeMediaMutation.mutate(mediaId)}
+            onUpdateTitle={(id, title) => updateTitleMutation.mutate({ id, title })}
+            onSetStock={(variantId, quantity) => setStockMutation.mutate({ variantId, quantity })}
+            onUpdatePrice={(id, price, salePrice) =>
+              updatePriceMutation.mutate({ id, price, salePrice })
+            }
+            onDelete={(id) => {
+              if (confirm('Remove this variant?')) deleteMutation.mutate(id);
+            }}
+          />
         );
       })}
 
@@ -900,7 +933,11 @@ function VariantsSection({
       {!addingColor && canCreate ? (
         <button
           type="button"
-          onClick={() => setAddingColor(true)}
+          onClick={() => {
+            setAddingColor(true);
+            setNewPrice(String(productPrice || ''));
+            setNewSalePrice(productSalePrice ? String(productSalePrice) : '');
+          }}
           className="inline-flex h-9 items-center gap-2 rounded-none border border-dashed border-[var(--admin-line)] px-4 text-sm text-[var(--admin-ink-muted)] transition hover:border-[var(--admin-accent)] hover:text-[var(--admin-accent)]"
         >
           <Plus className="size-4" /> Add color variant
@@ -1277,34 +1314,19 @@ export function ProductFormPage({ productId }: { productId?: string }) {
               </div>
             </div>
 
-            {/* Images — only in edit mode */}
-            {isEdit && productId ? (
-              <div className={cardCls}>
-                <p className={sectionTitleCls}>Photos</p>
-                <p className="-mt-2 mb-3 text-xs text-[var(--admin-ink-muted)]">
-                  First image is the main photo shown in the catalog. Click any image to set it as
-                  primary.
-                </p>
-                <ProductImagesSection
-                  productId={productId}
-                  canUpload={productPerms.create || productPerms.update}
-                  canDelete={productPerms.delete}
-                />
-              </div>
-            ) : null}
-
             {/* Variants — only in edit mode */}
             {isEdit && productId ? (
               <div className={cardCls}>
                 <div className="-mt-1 mb-1 flex items-center justify-between">
                   <p className={sectionTitleCls}>Color &amp; size variants</p>
                   <span className="text-xs text-[var(--admin-ink-muted)]">
-                    Each color can have multiple sizes with individual stock counts
+                    Photos · sizes · stock · price — all per color
                   </span>
                 </div>
                 <p className="mb-4 text-xs text-[var(--admin-ink-muted)]">
-                  The <strong>Default listing</strong> color is what appears first in the storefront
-                  catalog.
+                  <strong>Default listing</strong> color&apos;s first photo is what shoppers see on
+                  the catalog. Turn on <strong>Own listing</strong> for another color to show it as
+                  a separate product card too.
                 </p>
                 <VariantsSection
                   productId={productId}
@@ -1319,10 +1341,10 @@ export function ProductFormPage({ productId }: { productId?: string }) {
               <div className="rounded-none border border-dashed border-[var(--admin-line)] bg-[var(--admin-panel-soft)] p-6 text-center">
                 <ImageIcon className="mx-auto mb-2 size-7 text-[var(--admin-ink-muted)]" />
                 <p className="text-sm font-semibold text-[var(--admin-ink)]">
-                  Photos &amp; variants after saving
+                  Variants after saving
                 </p>
                 <p className="mt-1 text-xs text-[var(--admin-ink-muted)]">
-                  Create the product first, then add images, colors, and sizes.
+                  Create the product first, then add colors, photos, sizes, and stock.
                 </p>
               </div>
             ) : null}

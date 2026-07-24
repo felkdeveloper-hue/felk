@@ -150,6 +150,7 @@ export class ProductVariantService {
       thumbnailUrl: payload.thumbnailUrl ?? null,
       displayOrder: payload.displayOrder ?? 0,
       isDefault: Boolean(payload.isDefault),
+      listSeparately: Boolean(payload.listSeparately),
     });
 
     if (variant.isDefault) {
@@ -228,6 +229,18 @@ export class ProductVariantService {
       await ProductModel.updateOne(
         { _id: variant.productId },
         { $set: { defaultVariantId: variant._id } },
+      );
+    }
+
+    // Keep listSeparately in sync for every size of the same color
+    if (typeof payload.listSeparately === 'boolean' && variant.colorId) {
+      await ProductVariantModel.updateMany(
+        {
+          productId: variant.productId,
+          colorId: variant.colorId,
+          isDeleted: false,
+        },
+        { $set: { listSeparately: payload.listSeparately } },
       );
     }
 

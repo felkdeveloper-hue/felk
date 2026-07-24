@@ -204,6 +204,7 @@ export const variantCreateSchema = z.object({
   thumbnailUrl: z.string().url().nullable().optional().or(z.literal('')),
   displayOrder: z.number().int().min(0).optional(),
   isDefault: z.boolean().optional(),
+  listSeparately: z.boolean().optional(),
 });
 
 export const variantUpdateSchema = variantCreateSchema.partial();

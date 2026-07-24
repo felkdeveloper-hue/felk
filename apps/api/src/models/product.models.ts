@@ -260,6 +260,8 @@ export interface ProductVariantDocument extends Document {
   thumbnailUrl?: string | null;
   displayOrder: number;
   isDefault: boolean;
+  /** When true, this color appears as its own product card on the storefront. */
+  listSeparately: boolean;
   isDeleted: boolean;
   deletedAt?: Date | null;
   createdAt: Date;
@@ -306,6 +308,7 @@ const variantSchema = new Schema<ProductVariantDocument>(
     thumbnailUrl: { type: String, default: null },
     displayOrder: { type: Number, default: 0 },
     isDefault: { type: Boolean, default: false },
+    listSeparately: { type: Boolean, default: false, index: true },
     ...softDelete,
   },
   { timestamps: true, collection: 'product_variants' },
