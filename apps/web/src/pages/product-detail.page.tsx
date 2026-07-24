@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from '@tanstack/react-router';
+import { useNavigate, useParams, useSearch } from '@tanstack/react-router';
 import { motion } from 'framer-motion';
 import { Seo } from '@/components/common/seo';
 import { Container } from '@/components/layout/container';
@@ -100,6 +100,8 @@ function resolveCareLabel(specifications?: unknown[]): string | undefined {
 export function ProductDetailPage() {
   const { slug } = useParams({ strict: false }) as { slug: string };
   const navigate = useNavigate();
+  // variant param passed from product card so we pre-select the right color
+  const { variant: hintVariantId } = useSearch({ strict: false }) as { variant?: string };
   const query = useProductDetail(slug);
   const product = query.data;
   const { recentlyViewedIds } = useRecentlyViewed(product);
@@ -108,6 +110,7 @@ export function ProductDetailPage() {
 
   const [selectedVariantId, setSelectedVariantId] = useState<string | undefined>();
   const [selectedColorId, setSelectedColorId] = useState<string | undefined>();
+  // undefined = user has NOT explicitly chosen a size yet (gate before add/buy)
   const [selectedSizeId, setSelectedSizeId] = useState<string | undefined>();
 
   useEffect(() => {
@@ -119,13 +122,20 @@ export function ProductDetailPage() {
 
   useEffect(() => {
     if (!product?.variants?.length) return;
+    // Prefer the hinted variant (from product card link), then defaultVariantId, then first
+    const hinted = hintVariantId ? product.variants.find((v) => v.id === hintVariantId) : undefined;
     const defaultVariant =
-      product.variants.find((v) => v.id === product.defaultVariantId) ?? product.variants[0];
+      hinted ??
+      product.variants.find((v) => v.id === product.defaultVariantId) ??
+      product.variants[0];
     if (!defaultVariant) return;
     setSelectedVariantId(defaultVariant.id);
-    setSelectedColorId(defaultVariant.colorId);
-    setSelectedSizeId(defaultVariant.sizeId);
-  }, [product?.defaultVariantId, product?.variants]);
+    // Pre-select color so the correct swatch highlights immediately
+    const colorId = defaultVariant.colorId ?? product.variants.find((v) => v.colorId)?.colorId;
+    setSelectedColorId(colorId);
+    // Do NOT auto-select size — the user must pick one explicitly
+    setSelectedSizeId(undefined);
+  }, [product?.defaultVariantId, product?.variants, hintVariantId]);
 
   const sizeLabels = useMemo(() => {
     const map: Record<string, string> = {};

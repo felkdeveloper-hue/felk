@@ -73,6 +73,7 @@ export function ProductPurchasePanel({
   const cart = useCartStore((state) => state.cart);
   const addMutation = useAddToCartMutation();
   const [quantity, setQuantity] = useState(1);
+  const [sizeError, setSizeError] = useState(false);
   const variants = product.variants ?? [];
 
   const selectedVariant = useMemo(
@@ -107,11 +108,17 @@ export function ProductPurchasePanel({
 
   const handleSizeSelect = (sizeId: string) => {
     onSizeChange(sizeId);
+    setSizeError(false);
     const match = findVariant(variants, selectedColorId, sizeId);
     if (match) onVariantChange(match.id);
   };
 
   const handleBuyNow = () => {
+    if (hasSeparateSizeSelector && !selectedSizeId) {
+      setSizeError(true);
+      toast.error('Please select a size to continue');
+      return;
+    }
     const resolved = resolveVariantId(selectedVariantId, product);
     if (!resolved) {
       toast.error('Please select an available option');
@@ -209,13 +216,20 @@ export function ProductPurchasePanel({
 
       {/* Size + color must sit above the cart CTAs */}
       {hasSeparateSizeSelector ? (
-        <ProductSizeSelector
-          variants={variants}
-          selectedColorId={selectedColorId}
-          selectedSizeId={selectedSizeId}
-          onSizeSelect={handleSizeSelect}
-          sizeLabels={sizeLabels}
-        />
+        <div className={sizeError ? 'rounded-none p-3 ring-2 ring-red-500' : undefined}>
+          {sizeError ? (
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-red-600">
+              Please select a size
+            </p>
+          ) : null}
+          <ProductSizeSelector
+            variants={variants}
+            selectedColorId={selectedColorId}
+            selectedSizeId={selectedSizeId}
+            onSizeSelect={handleSizeSelect}
+            sizeLabels={sizeLabels}
+          />
+        </div>
       ) : null}
 
       {hasColorSelector ? (
@@ -274,6 +288,18 @@ export function ProductPurchasePanel({
               <ShoppingBag className="size-4" />
               Go to bag
             </Link>
+          ) : hasSeparateSizeSelector && !selectedSizeId ? (
+            // Size required but not yet selected — show the gate button
+            <button
+              type="button"
+              onClick={() => {
+                setSizeError(true);
+                toast.error('Please select a size to continue');
+              }}
+              className="border-foreground text-foreground hover:bg-foreground hover:text-background h-12 min-w-0 flex-1 rounded-none border bg-transparent text-sm font-bold uppercase tracking-[0.12em] transition-colors"
+            >
+              Add to cart
+            </button>
           ) : (
             <AddToCartButton
               product={product}
@@ -281,6 +307,7 @@ export function ProductPurchasePanel({
               quantity={quantity}
               size="lg"
               variant="outline"
+              skipOptionGate
               className="border-foreground text-foreground hover:bg-foreground hover:text-background h-12 min-w-0 flex-1 rounded-none border bg-transparent font-bold uppercase tracking-[0.12em]"
               label="Add to cart"
             />
