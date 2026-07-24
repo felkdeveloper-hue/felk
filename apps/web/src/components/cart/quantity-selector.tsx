@@ -1,4 +1,4 @@
-import { Minus, Plus } from 'lucide-react';
+import { Minus, Plus, Trash2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,6 +27,8 @@ export function QuantitySelector({
 }: QuantitySelectorProps) {
   const decrease = () => onChange(Math.max(min, value - 1));
   const increase = () => onChange(Math.min(max, value + 1));
+  // When min=0 and value=1, pressing − will go to 0 (remove action)
+  const atRemoveThreshold = min === 0 && value === 1;
 
   return (
     <div className={cn('flex items-center gap-1', className)}>
@@ -35,12 +37,12 @@ export function QuantitySelector({
         type="button"
         variant="outline"
         size="icon"
-        className="size-9"
+        className={cn('size-9', atRemoveThreshold && 'text-destructive hover:text-destructive')}
         onClick={decrease}
         disabled={disabled || loading || value <= min}
-        aria-label="Decrease quantity"
+        aria-label={atRemoveThreshold ? 'Remove item' : 'Decrease quantity'}
       >
-        <Minus className="size-4" />
+        {atRemoveThreshold ? <Trash2 className="size-4" /> : <Minus className="size-4" />}
       </Button>
       <motion.div
         key={value}

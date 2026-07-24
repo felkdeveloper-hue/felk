@@ -104,10 +104,15 @@ export function CartItemRow({ item, compact, validationMessage, className }: Car
         <div className="flex flex-wrap items-center justify-between gap-3">
           <QuantitySelector
             value={item.quantity}
-            onChange={(quantity) =>
-              updateMutation.mutate({ itemId: item.id, payload: { quantity } })
-            }
-            loading={updateMutation.isPending}
+            min={0}
+            onChange={(quantity) => {
+              if (quantity === 0) {
+                removeMutation.mutate(item.id);
+              } else {
+                updateMutation.mutate({ itemId: item.id, payload: { quantity } });
+              }
+            }}
+            loading={updateMutation.isPending || removeMutation.isPending}
             disabled={item.id.startsWith('optimistic-')}
           />
 

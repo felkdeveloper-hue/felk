@@ -130,9 +130,20 @@ export function ProductDetailPage() {
       product.variants[0];
     if (!defaultVariant) return;
     setSelectedVariantId(defaultVariant.id);
-    // Pre-select color so the correct swatch highlights immediately
-    const colorId = defaultVariant.colorId ?? product.variants.find((v) => v.colorId)?.colorId;
+    // Find the correct color: prefer the variant's own colorId, then the first color across all variants
+    const allColorIds = [
+      ...new Set(product.variants.map((v) => v.colorId).filter(Boolean)),
+    ] as string[];
+    const colorId =
+      defaultVariant.colorId && allColorIds.includes(defaultVariant.colorId)
+        ? defaultVariant.colorId
+        : allColorIds[0];
     setSelectedColorId(colorId);
+    // If the resolved default variant had no colorId but we chose one, sync the variant
+    if (colorId && !defaultVariant.colorId) {
+      const cv = product.variants.find((v) => v.colorId === colorId);
+      if (cv) setSelectedVariantId(cv.id);
+    }
     // Do NOT auto-select size — the user must pick one explicitly
     setSelectedSizeId(undefined);
   }, [product?.defaultVariantId, product?.variants, hintVariantId]);
