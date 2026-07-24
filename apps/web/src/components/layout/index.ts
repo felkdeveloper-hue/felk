@@ -2,7 +2,6 @@ export * from './container';
 export * from './floating-search';
 export * from './footer';
 export * from './header';
-export * from './mobile-bottom-nav';
 export * from './site-footer';
 export * from './site-header';
 export * from './storefront-footer';

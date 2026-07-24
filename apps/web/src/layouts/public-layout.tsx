@@ -4,7 +4,6 @@ import { OfflineBanner } from '@/components/feedback/offline-banner';
 import { AnnouncementBar } from '@/components/storefront/announcement-bar';
 import { StorefrontFooter, StorefrontHeader } from '@/components/layout';
 import { FloatingSearch } from '@/components/layout/floating-search';
-import { MobileBottomNav } from '@/components/layout/mobile-bottom-nav';
 import { SkipToContent } from '@/components/navigation/skip-to-content';
 import { CartBootstrap } from '@/components/cart';
 import { LiveRegion } from '@/components/commerce/live-region';
@@ -48,7 +47,6 @@ export function PublicLayout() {
       </main>
       <StorefrontFooter />
       <FloatingSearch />
-      <MobileBottomNav />
     </div>
   );
 }

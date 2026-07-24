@@ -2,9 +2,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useState } from 'react';
 import { Button } from '@fe-platform/ui';
+import { toast } from 'sonner';
 import { AdminErrorState, AdminPageHeader, AdminPanel, PageMotion } from '@/components/admin';
 import { ADMIN_ROUTES, QUERY_KEYS } from '@/constants';
+import { ORDER_STATUS_CONFIG, ORDER_STATUS_TRANSITIONS } from '@/constants/order.constants';
 import { useAdminPermissions } from '@/hooks/admin';
+import { AppError } from '@/lib/errors';
 import { cn, formatCurrency, formatDate } from '@/lib/utils';
 import { formatOrderAddress, ordersApi, type AdminOrderAddress } from '@/services/sdk/admin';
 
@@ -100,10 +103,19 @@ export function OrderDetailPage({ orderId }: { orderId: string }) {
   });
 
   const statusMutation = useMutation({
-    mutationFn: () => ordersApi.updateStatus(orderId, nextStatus),
-    onSuccess: () => {
+    mutationFn: (targetStatus: string) =>
+      targetStatus === 'cancelled'
+        ? ordersApi.cancel(orderId)
+        : ordersApi.updateStatus(orderId, targetStatus),
+    onSuccess: (_result, targetStatus) => {
+      toast.success(`Order marked as ${ORDER_STATUS_CONFIG[targetStatus]?.label ?? targetStatus}`);
       void queryClient.invalidateQueries({ queryKey: ['admin', 'orders'] });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminOrders.detail(orderId) });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminOrders.timeline(orderId) });
       void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.dashboard.stats() });
+    },
+    onError: (error) => {
+      toast.error(error instanceof AppError ? error.message : 'Unable to update order status');
     },
   });
 
@@ -135,6 +147,12 @@ export function OrderDetailPage({ orderId }: { orderId: string }) {
   const billingAddress = readAddress(order.billingAddress);
   const items = Array.isArray(order.items) ? order.items : [];
   const status = String(order.status ?? 'pending');
+  const allowedStatuses = (ORDER_STATUS_TRANSITIONS[status] ?? []).filter((candidate) =>
+    candidate === 'cancelled' ? orderPerms.cancel : orderPerms.update,
+  );
+  const selectedStatus = allowedStatuses.includes(nextStatus)
+    ? nextStatus
+    : (allowedStatuses[0] ?? '');
 
   return (
     <PageMotion>
@@ -356,26 +374,34 @@ export function OrderDetailPage({ orderId }: { orderId: string }) {
             ) : null}
           </AdminPanel>
 
-          {orderPerms.update ? (
+          {orderPerms.update || orderPerms.cancel ? (
             <AdminPanel title="Update status">
-              <select
-                value={nextStatus}
-                onChange={(event) => setNextStatus(event.target.value)}
-                className="mb-3 w-full rounded-lg border border-[var(--admin-line)] bg-[var(--admin-panel)] px-3 py-2 text-sm"
-              >
-                <option value="confirmed">Confirmed</option>
-                <option value="packed">Packed</option>
-                <option value="shipped">Shipped</option>
-                <option value="delivered">Delivered</option>
-                <option value="cancelled">Cancelled</option>
-              </select>
-              <Button
-                size="sm"
-                onClick={() => statusMutation.mutate()}
-                disabled={statusMutation.isPending}
-              >
-                Update status
-              </Button>
+              {allowedStatuses.length > 0 ? (
+                <>
+                  <select
+                    value={selectedStatus}
+                    onChange={(event) => setNextStatus(event.target.value)}
+                    className="mb-3 w-full rounded-lg border border-[var(--admin-line)] bg-[var(--admin-panel)] px-3 py-2 text-sm"
+                  >
+                    {allowedStatuses.map((candidate) => (
+                      <option key={candidate} value={candidate}>
+                        {ORDER_STATUS_CONFIG[candidate]?.label ?? candidate.replace(/_/g, ' ')}
+                      </option>
+                    ))}
+                  </select>
+                  <Button
+                    size="sm"
+                    onClick={() => statusMutation.mutate(selectedStatus)}
+                    disabled={!selectedStatus || statusMutation.isPending}
+                  >
+                    {statusMutation.isPending ? 'Updating…' : 'Update status'}
+                  </Button>
+                </>
+              ) : (
+                <p className="text-sm text-neutral-500 dark:text-neutral-400">
+                  No further status changes are available.
+                </p>
+              )}
             </AdminPanel>
           ) : null}
 

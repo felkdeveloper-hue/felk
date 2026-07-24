@@ -15,8 +15,10 @@ function resolveApiUrl(raw: string | undefined, fallback: string): string {
   }
 }
 
+const defaultApiUrl = import.meta.env.PROD ? 'https://felk-mq41.onrender.com/api/v1' : '/api/v1';
+
 export const env = {
-  apiUrl: resolveApiUrl(import.meta.env.VITE_API_URL, '/api/v1'),
+  apiUrl: resolveApiUrl(import.meta.env.VITE_API_URL, defaultApiUrl),
   appName: import.meta.env.VITE_APP_NAME || 'FE',
   cdnUrl: import.meta.env.VITE_CDN_URL ?? '',
   socketUrl: import.meta.env.VITE_SOCKET_URL ?? '',

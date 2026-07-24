@@ -38,7 +38,7 @@ export function MobileNav({ items, activeHref, transparent, open, onOpenChange }
           size="icon"
           aria-label="Open menu"
           className={cn(
-            'lg:hidden',
+            'size-10 shrink-0 sm:size-11 lg:hidden',
             transparent ? 'text-primary-foreground hover:bg-primary-foreground/10' : undefined,
           )}
         >

@@ -19,6 +19,21 @@ export const ORDER_STATUS_CONFIG: Record<string, OrderStatusConfig> = {
   refunded: { label: 'Refunded', badgeVariant: 'outline' },
 };
 
+/** Mirrors the API state machine so admin users can only choose valid next steps. */
+export const ORDER_STATUS_TRANSITIONS: Record<string, string[]> = {
+  pending: ['confirmed', 'cancelled'],
+  confirmed: ['packed', 'cancelled'],
+  packed: ['ready_for_shipment', 'cancelled'],
+  ready_for_shipment: ['shipped', 'cancelled'],
+  shipped: ['delivered'],
+  delivered: ['completed', 'returned'],
+  completed: ['returned'],
+  cancelled: [],
+  returned: ['refund_pending'],
+  refund_pending: ['refunded'],
+  refunded: [],
+};
+
 export const PAYMENT_STATUS_CONFIG: Record<string, OrderStatusConfig> = {
   paid: { label: 'Paid', badgeVariant: 'default' },
   refund_pending: { label: 'Refund pending', badgeVariant: 'secondary' },

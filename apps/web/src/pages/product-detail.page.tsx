@@ -20,8 +20,6 @@ import {
   RelatedProducts,
   SizeGuideModal,
 } from '@/components/catalog';
-import { AddToCartButton } from '@/components/cart/add-to-cart-button';
-import { PriceDisplay } from '@/components/catalog/price-display';
 import { buildAbsoluteUrl, siteConfig } from '@/config';
 import { ROUTES } from '@/constants';
 import {
@@ -229,7 +227,6 @@ export function ProductDetailPage() {
 
   const price =
     selectedVariant?.salePrice ?? selectedVariant?.price ?? product.salePrice ?? product.price;
-  const compareAt = selectedVariant?.compareAtPrice ?? product.compareAtPrice;
   const rawSpecs = Array.isArray(product.specifications) ? product.specifications : [];
   const materialLabel = resolveMaterialLabel(product.materialId, materialList, rawSpecs);
   const colorLabel =
@@ -352,28 +349,6 @@ export function ProductDetailPage() {
       <RelatedProducts productId={product.id} />
 
       <BackToTop />
-
-      <div className="border-border/70 bg-background/95 fixed inset-x-3 bottom-[5.25rem] z-40 rounded-none border p-3 shadow-[var(--shadow-elevated)] backdrop-blur-md sm:hidden">
-        <div className="flex items-center gap-3">
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold uppercase tracking-wide">{product.name}</p>
-            <PriceDisplay
-              premium
-              size="sm"
-              price={selectedVariant?.price ?? product.price}
-              salePrice={selectedVariant?.salePrice ?? product.salePrice ?? product.effectivePrice}
-              compareAtPrice={compareAt}
-            />
-          </div>
-          <AddToCartButton
-            product={product}
-            variantId={selectedVariantId}
-            size="sm"
-            label="Add"
-            className="bg-foreground text-background hover:bg-foreground/90 rounded-none"
-          />
-        </div>
-      </div>
     </>
   );
 }

@@ -21,7 +21,7 @@ export function BackToTop() {
       aria-label="Back to top"
       onClick={scrollToTop}
       className={cn(
-        'bg-muted-foreground/80 text-background fixed bottom-24 right-4 z-30 flex flex-col items-center gap-0.5 rounded-md px-2.5 py-2 text-[10px] font-bold uppercase shadow-md transition-all sm:bottom-8',
+        'bg-muted-foreground/80 text-background fixed bottom-4 right-4 z-30 flex flex-col items-center gap-0.5 rounded-md px-2.5 py-2 text-[10px] font-bold uppercase shadow-md transition-all sm:bottom-8',
         visible ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-4 opacity-0',
       )}
     >

@@ -64,6 +64,7 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
 
   const accountLabel = user?.firstName ?? user?.email?.split('@')[0] ?? 'Account';
   const iconBtn = cn(
+    'size-10 shrink-0 sm:size-11',
     iconStroke,
     lightChrome
       ? 'text-white hover:bg-white/10 hover:text-white'
@@ -89,14 +90,14 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
             : 'bg-background text-foreground border-border/70 border-b shadow-[0_8px_28px_-20px_rgba(0,0,0,0.28)]',
       )}
     >
-      <Container className="grid h-16 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 lg:h-[4.75rem] lg:gap-6">
-        <div className="flex min-w-0 items-center justify-start gap-2">
+      <Container className="flex h-16 items-center justify-between gap-2 lg:grid lg:h-[4.75rem] lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:justify-normal lg:gap-6">
+        <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
           <MobileNav items={navItems} activeHref={pathname} transparent={lightChrome} />
           <Link
             to={ROUTES.home}
             preload="intent"
             className={cn(
-              'font-display text-2xl font-bold uppercase tracking-[-0.04em] transition-colors lg:text-[1.85rem]',
+              'font-display flex items-center text-2xl font-bold uppercase leading-none tracking-[-0.04em] transition-colors lg:text-[1.85rem]',
               lightChrome ? 'text-white' : 'text-foreground',
             )}
           >
@@ -122,7 +123,7 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
           }}
         />
 
-        <div className="flex min-w-0 items-center justify-end gap-1.5 sm:gap-2">
+        <div className="flex min-w-0 items-center justify-end gap-0.5 sm:gap-1">
           <form
             role="search"
             onSubmit={submitSearch}
@@ -162,7 +163,7 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
               size="icon"
               aria-label={`Wishlist${wishlistCount ? `, ${wishlistCount} items` : ''}`}
               asChild
-              className={cn('relative hidden sm:inline-flex', iconBtn)}
+              className={cn('relative', iconBtn)}
             >
               <Link to={ROUTES.wishlist} preload="intent">
                 <Heart />
@@ -181,7 +182,7 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
                     variant="ghost"
                     size="icon"
                     aria-label={`Account, ${accountLabel}`}
-                    className={cn('hidden sm:inline-flex', iconBtn)}
+                    className={iconBtn}
                   >
                     <UserRound />
                   </Button>
@@ -212,13 +213,7 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label="Sign in"
-                asChild
-                className={cn('hidden sm:inline-flex', iconBtn)}
-              >
+              <Button variant="ghost" size="icon" aria-label="Sign in" asChild className={iconBtn}>
                 <Link to={ROUTES.authLogin} preload="intent">
                   <UserRound />
                 </Link>
@@ -245,12 +240,12 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
             <span
               aria-hidden
               className={cn(
-                'mx-0.5 hidden h-4 w-px sm:block',
+                'mx-0.5 hidden h-4 w-px lg:block',
                 lightChrome ? 'bg-white/25' : 'bg-border',
               )}
             />
 
-            <div className="hidden sm:block">
+            <div className="hidden lg:block">
               <ThemeToggle className={iconBtn} />
             </div>
           </div>
