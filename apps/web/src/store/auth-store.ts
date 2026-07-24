@@ -85,12 +85,17 @@ export const useAuthStore = create<AuthStore>()(
         accessToken: state.accessToken,
         refreshToken: state.refreshToken,
       }),
-      onRehydrateStorage: () => (state) => {
-        if (!state) return;
-        state.setHasHydrated(true);
-        if ((state.user?.permissions.length ?? 0) > 0) {
-          state.setPermissionsHydrated(true);
+      onRehydrateStorage: () => (state, _error) => {
+        // Always mark hydrated — even when storage is empty or corrupt —
+        // otherwise AuthProvider blocks the whole app on a white spinner forever.
+        if (state) {
+          state.setHasHydrated(true);
+          if ((state.user?.permissions.length ?? 0) > 0) {
+            state.setPermissionsHydrated(true);
+          }
+          return;
         }
+        useAuthStore.getState().setHasHydrated(true);
       },
     },
   ),

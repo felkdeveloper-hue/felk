@@ -19,6 +19,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const setUser = useAuthStore((state) => state.setUser);
   const clearSession = useAuthStore((state) => state.clearSession);
 
+  // Failsafe: never leave visitors on a blank loading shell if persist stalls.
+  useEffect(() => {
+    if (hasHydrated) return;
+    const timer = window.setTimeout(() => {
+      if (!useAuthStore.getState().hasHydrated) {
+        useAuthStore.getState().setHasHydrated(true);
+      }
+    }, 1200);
+    return () => window.clearTimeout(timer);
+  }, [hasHydrated]);
+
   useEffect(() => {
     if (!hasHydrated || !accessToken) return;
 

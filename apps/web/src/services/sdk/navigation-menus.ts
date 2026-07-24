@@ -51,7 +51,17 @@ export const navigationMenusApi = {
         featured: featured.length ? featured : fallback.featured,
       };
     } catch {
-      return structuredClone(DEFAULT_MEGA_MENUS[key]);
+      // Avoid structuredClone — Vite asset URL modules are plain strings, but
+      // a shallow copy is enough and safer across browsers.
+      return {
+        ...DEFAULT_MEGA_MENUS[key],
+        columns: DEFAULT_MEGA_MENUS[key].columns.map((column) => ({
+          ...column,
+          links: column.links.map((link) => ({ ...link })),
+        })),
+        specials: DEFAULT_MEGA_MENUS[key].specials.map((tile) => ({ ...tile })),
+        featured: DEFAULT_MEGA_MENUS[key].featured.map((tile) => ({ ...tile })),
+      };
     }
   },
 };
