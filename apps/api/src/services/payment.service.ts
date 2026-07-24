@@ -152,10 +152,9 @@ export class PaymentService {
         }
 
         // Stale PayHere form after PAYHERE_MODE switch (sandbox <-> live) must be rebuilt.
-        const storedAction =
-          typeof payment.metadata?.redirectForm?.action === 'string'
-            ? payment.metadata.redirectForm.action
-            : '';
+        const redirectForm = payment.metadata?.redirectForm as
+          { action?: unknown } | null | undefined;
+        const storedAction = typeof redirectForm?.action === 'string' ? redirectForm.action : '';
         const expectedHost =
           appConfig.payment.payhere.mode === 'live' ? 'www.payhere.lk' : 'sandbox.payhere.lk';
         if (

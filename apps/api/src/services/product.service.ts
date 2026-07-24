@@ -126,23 +126,10 @@ function resolveListingPricing(
   };
 }
 
-function pickListingVariant(
-  variants: Array<{
-    _id?: { toString(): string };
-    productId: { toString(): string };
-    isDefault?: boolean;
-    displayOrder?: number;
-    price?: number;
-    salePrice?: number | null;
-    compareAtPrice?: number | null;
-    currency?: string;
-    sku?: string;
-    thumbnailUrl?: string | null;
-    colorId?: { toString(): string } | string | null;
-    sizeId?: { toString(): string } | string | null;
-  }>,
-) {
-  const byProduct = new Map<string, (typeof variants)[number]>();
+function pickListingVariant<T extends { productId: { toString(): string }; isDefault?: boolean }>(
+  variants: T[],
+): Map<string, T> {
+  const byProduct = new Map<string, T>();
   for (const variant of variants) {
     const productId = variant.productId.toString();
     const existing = byProduct.get(productId);
@@ -236,7 +223,7 @@ export class ProductService {
       return {
         thumbnailUrl:
           primary?.thumbnailUrl ?? primary?.url ?? listingVariant?.thumbnailUrl ?? undefined,
-        hoverImageUrl: hover?.url ?? hover?.thumbnailUrl,
+        hoverImageUrl: hover?.url ?? hover?.thumbnailUrl ?? undefined,
       };
     };
 
