@@ -156,6 +156,24 @@ const envSchema = z
     }
   });
 
+/**
+ * Atlas SRV URIs without a path default to the `test` database and look like
+ * an empty catalog. Always pin a real DB name when one is missing.
+ */
+function ensureMongoDatabaseName(uri: string, fallbackDb = 'fe-platform'): string {
+  try {
+    const parsedUri = new URL(uri);
+    const path = parsedUri.pathname.replace(/^\//, '');
+    if (!path) {
+      parsedUri.pathname = `/${fallbackDb}`;
+      return parsedUri.toString();
+    }
+  } catch {
+    // Non-URL forms (e.g. legacy mongodb:// without authority) — leave as-is.
+  }
+  return uri;
+}
+
 const parsed = envSchema.safeParse(process.env);
 
 if (!parsed.success) {
@@ -163,7 +181,10 @@ if (!parsed.success) {
   process.exit(1);
 }
 
-const data = parsed.data;
+const data = {
+  ...parsed.data,
+  MONGODB_URI: ensureMongoDatabaseName(parsed.data.MONGODB_URI),
+};
 
 const isProd = data.NODE_ENV === 'production';
 const isDev = data.NODE_ENV === 'development';
