@@ -13,13 +13,27 @@ export interface InventoryItemRow {
   sku?: string;
 }
 
+/** Extract a string ID from either a raw ObjectId/string or a populated Mongoose sub-document. */
+function extractId(value: unknown): string {
+  if (!value) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'object') {
+    const obj = value as Record<string, unknown>;
+    // populated Mongoose document exposes _id or id
+    const raw = obj._id ?? obj.id;
+    if (raw) return String(raw);
+  }
+  return String(value);
+}
+
 function normalizeInventoryItem(raw: unknown): InventoryItemRow {
   const record = raw as Record<string, unknown>;
+  const variantId = extractId(record.variantId);
   return {
     id: normalizeId(record),
-    productId: String(record.productId ?? ''),
-    variantId: record.variantId ? String(record.variantId) : undefined,
-    warehouseId: String(record.warehouseId ?? ''),
+    productId: extractId(record.productId),
+    variantId: variantId || undefined,
+    warehouseId: extractId(record.warehouseId),
     quantityOnHand: Number(
       record.quantityOnHand ?? record.onHand ?? record.available ?? record.quantityAvailable ?? 0,
     ),

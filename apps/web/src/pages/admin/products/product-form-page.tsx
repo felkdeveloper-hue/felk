@@ -249,8 +249,8 @@ function ColorVariantCard({
             </span>
           ) : null}
           {isOwnListing ? (
-            <span className="flex items-center gap-1 rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-sky-800 dark:bg-sky-950/40 dark:text-sky-300">
-              <ExternalLink className="size-2.5" /> Own listing
+            <span className="flex items-center gap-1 rounded-none border border-sky-500 bg-sky-100 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-sky-700 dark:bg-sky-950/40 dark:text-sky-300">
+              <ExternalLink className="size-3" /> Own Listing Active
             </span>
           ) : null}
           <span className="text-sm font-bold text-[var(--admin-ink)]">{colorLabel}</span>
@@ -278,13 +278,13 @@ function ColorVariantCard({
               className={cn(
                 'flex items-center gap-1.5 rounded-none border px-2.5 py-1 text-[10px] font-semibold transition',
                 isOwnListing
-                  ? 'border-sky-500 bg-sky-50 text-sky-800 dark:bg-sky-950/30 dark:text-sky-300'
+                  ? 'border-sky-600 bg-sky-600 text-white hover:bg-sky-700'
                   : 'border-[var(--admin-line)] text-[var(--admin-ink-muted)] hover:border-[var(--admin-accent)] hover:text-[var(--admin-accent)]',
               )}
               title="Show this color as its own product card on the storefront"
             >
               <ExternalLink className="size-3" />
-              {isOwnListing ? 'Own listing ON' : 'Show as own listing'}
+              {isOwnListing ? '✓ Own listing ON' : 'Show as own listing'}
             </button>
           ) : null}
         </div>
