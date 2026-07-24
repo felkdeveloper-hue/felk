@@ -678,6 +678,13 @@ export const authService = {
       .then(() => true)
       .catch(() => false);
 
+    if (process.env.NODE_ENV !== 'production') {
+      logger.warn(
+        { email: user.email, code, sent },
+        'DEV: password reset OTP (check this if inbox is empty)',
+      );
+    }
+
     await writeAuditLog({
       action: AUDIT_ACTIONS.PASSWORD_RESET_REQUEST,
       resourceType: 'user',

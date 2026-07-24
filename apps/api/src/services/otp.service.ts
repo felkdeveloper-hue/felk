@@ -44,6 +44,12 @@ async function createAndSendOtp(email: string, userId?: string): Promise<void> {
     expiryMinutes: AUTH_LIMITS.OTP_EXPIRY_MINUTES,
   });
 
+  // Gmail SMTP "sent" ≠ recipient inbox. In local/dev, always print the OTP
+  // so testing is not blocked when the mail lands in Spam/Promotions.
+  if (process.env.NODE_ENV !== 'production') {
+    logger.warn({ email, otp }, 'DEV: verification OTP (check this if inbox is empty)');
+  }
+
   await writeAuditLog({
     action: AUDIT_ACTIONS.EMAIL_VERIFICATION_SENT,
     resourceType: 'user',

@@ -161,6 +161,14 @@ class DatabaseManager {
         'MongoDB connected',
       );
 
+      // A URI with no path segment silently resolves to the "test" database,
+      // which reads as an empty-but-healthy catalog rather than a failure.
+      if (connection.connection.name === 'test') {
+        logger.warn(
+          'MONGODB_URI has no database name — falling back to "test". Append /fe-platform to the URI.',
+        );
+      }
+
       await repairVariantBarcodeIndex().catch((error: unknown) => {
         logger.warn({ err: error }, 'Variant barcode index repair skipped');
       });

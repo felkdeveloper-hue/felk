@@ -87,10 +87,10 @@ export function VerifyEmailPanel({ email }: VerifyEmailPanelProps) {
         <Alert>
           <AlertDescription className="space-y-1 text-sm">
             <p>
-              The code was sent to <strong>{verifiedEmail}</strong> — open that inbox, not your SMTP
-              or admin Gmail account.
+              We sent a code to <strong>{verifiedEmail}</strong>. Check that inbox (and Spam /
+              Promotions).
             </p>
-            <p>Check spam/junk too. Sender may appear as Fashion Edge.</p>
+            <p>Sender may appear as Fashion Edge.</p>
           </AlertDescription>
         </Alert>
       ) : null}

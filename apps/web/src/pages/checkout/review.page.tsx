@@ -80,12 +80,10 @@ function ReviewSection({
   return (
     <section className={cn('border-border bg-card/60 rounded-2xl border p-5', className)}>
       <div className="mb-4 flex items-start justify-between gap-3">
-        <div className="flex items-center gap-2.5">
-          <span className="bg-muted text-foreground flex size-9 items-center justify-center rounded-full">
-            <Icon className="size-4" aria-hidden />
-          </span>
-          <h3 className="text-sm font-semibold uppercase tracking-wide">{title}</h3>
-        </div>
+        <h3 className="bg-primary text-primary-foreground inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-wide">
+          <Icon className="size-3.5" aria-hidden />
+          {title}
+        </h3>
         {editTo ? (
           <Button type="button" variant="ghost" size="sm" asChild className="h-8 px-2">
             <Link to={editTo}>
