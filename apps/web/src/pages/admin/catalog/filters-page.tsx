@@ -49,9 +49,9 @@ const FILTER_TABS = [
   },
   {
     id: 'materials',
-    label: 'Materials',
-    title: 'Materials',
-    description: 'Fabric and material options (Cotton, Linen, Denim, etc.).',
+    label: 'Fabric',
+    title: 'Fabric',
+    description: 'Fabric options customers filter by (Cotton, Denim, Linen, Silk, etc.).',
     resourceKey: 'materials',
     api: cmsApi.materials,
     canCreate: true,
@@ -92,7 +92,7 @@ export function FiltersPage() {
     <PageMotion>
       <AdminPageHeader
         title="Filters"
-        description="Manage all storefront filter options — categories, brands, colors, sizes, materials, and occasions."
+        description="Manage all storefront filter options — categories, brands, colors, sizes, fabric, and occasions."
       />
 
       <Tabs value={activeTab} onValueChange={onTabChange} className="mt-2">

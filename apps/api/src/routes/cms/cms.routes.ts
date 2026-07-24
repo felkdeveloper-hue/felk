@@ -20,6 +20,7 @@ import {
   FaqModel,
   HeroBannerModel,
   HomeSectionModel,
+  NavigationMenuModel,
   PromoBannerModel,
 } from '@/models/cms-content.models';
 import {
@@ -38,13 +39,16 @@ import { blogService } from '@/services/blog.service';
 import { settingsService } from '@/services/settings.service';
 import { actorFromRequest } from '@/services/cms-crud.service';
 import { uploadBannerDesktopImage } from '@/services/banner-image.service';
+import { storageService } from '@/services/storage.factory';
 import { authenticate, authorizeAny, validate } from '@/middlewares';
 import { asyncHandler } from '@/utils/async-handler';
 import { ApiResponse } from '@/utils/response/api-response';
 import { storeSettingUpsertSchema } from '@/schemas/cms.schema';
 import { singleImageUpload } from '@/utils/file-upload.helper';
+import { processImage } from '@/utils/image.helper';
 import { z } from 'zod';
 import { objectIdSchema } from '@/schemas/common.schema';
+import { randomUUID } from 'node:crypto';
 
 const P = PERMISSIONS;
 const categoryIdParams = z.object({ id: objectIdSchema });
@@ -333,6 +337,77 @@ cmsRouter.use(
       update: [P.MARKETING_MANAGE, P.CMS_MANAGE],
       delete: [P.MARKETING_MANAGE, P.CMS_MANAGE],
     },
+  }),
+);
+
+cmsRouter.post(
+  '/navigation-menus/media',
+  authenticate,
+  authorizeAny(P.BANNERS_MANAGE, P.CMS_MANAGE, P.MARKETING_MANAGE),
+  singleImageUpload('file'),
+  asyncHandler(async (req, res) => {
+    if (!req.file) {
+      return ApiResponse.error(res, 'File is required', 400, 'FILE_REQUIRED');
+    }
+    const webp = await processImage(req.file.buffer, {
+      width: 1200,
+      height: 1200,
+      quality: 85,
+      format: 'webp',
+    });
+    const key = `navigation-menus/${randomUUID()}.webp`;
+    const stored = await storageService.upload({
+      key,
+      body: webp,
+      contentType: 'image/webp',
+    });
+    ApiResponse.success(res, { url: stored.url, key: stored.key ?? key }, 'Image uploaded');
+  }),
+);
+
+cmsRouter.get(
+  '/navigation-menus/:key',
+  authenticate,
+  authorizeAny(P.BANNERS_VIEW, P.BANNERS_MANAGE, P.CMS_VIEW, P.CMS_MANAGE),
+  asyncHandler(async (req, res) => {
+    const key = String(req.params.key).trim().toLowerCase();
+    const doc = await NavigationMenuModel.findOne({ key, isDeleted: false }).lean();
+    if (!doc) {
+      return ApiResponse.error(res, 'Navigation menu not found', 404, 'NOT_FOUND');
+    }
+    ApiResponse.success(res, { ...doc, id: String(doc._id) });
+  }),
+);
+
+cmsRouter.put(
+  '/navigation-menus/:key',
+  authenticate,
+  authorizeAny(P.BANNERS_MANAGE, P.CMS_MANAGE, P.MARKETING_MANAGE),
+  validate({ body: schemas.navigationMenuUpsertSchema }),
+  asyncHandler(async (req, res) => {
+    const key = String(req.params.key).trim().toLowerCase();
+    if (key !== 'women' && key !== 'men' && key !== 'accessories') {
+      return ApiResponse.error(res, 'Key must be women, men, or accessories', 400, 'INVALID_KEY');
+    }
+    const body = req.body as z.infer<typeof schemas.navigationMenuUpsertSchema>;
+    const doc = await NavigationMenuModel.findOneAndUpdate(
+      { key },
+      {
+        $set: {
+          key,
+          label: body.label,
+          gender: body.gender,
+          columns: body.columns,
+          specials: body.specials,
+          featured: body.featured ?? [],
+          status: body.status ?? 'active',
+          isDeleted: false,
+          deletedAt: null,
+        },
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true },
+    ).lean();
+    ApiResponse.success(res, { ...doc, id: String(doc?._id) }, 'Navigation menu saved');
   }),
 );
 

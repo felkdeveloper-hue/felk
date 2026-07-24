@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { SlidersHorizontal } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { PriceRangeSlider } from '@/components/ui/price-range-slider';
@@ -22,6 +22,12 @@ import { useCatalogFilterFacets } from '@/hooks/catalog';
 import { cn } from '@/lib/utils';
 import type { CatalogSearchState } from '@/utils/catalog';
 import { CATALOG_SORT_OPTIONS } from '@/constants/catalog';
+import {
+  DEFAULT_CATALOG_FACET_KEYS,
+  resolveFacetDefinition,
+  type CatalogFacetKey,
+} from '@/constants/catalog-filter-facets';
+import type { Product } from '@/services/sdk';
 
 export interface CatalogFilterSidebarProps {
   state: CatalogSearchState;
@@ -31,6 +37,10 @@ export interface CatalogFilterSidebarProps {
   layout?: 'stack' | 'top';
   hideHeading?: boolean;
   priceBounds?: { min: number; max: number };
+  /** Ordered facet keys for this PLP (from category config). */
+  facetKeys?: string[];
+  /** Current product batch — used to build fashion-spec option lists. */
+  products?: Product[];
 }
 
 const DISCOUNT_OPTIONS = [
@@ -184,7 +194,7 @@ function InlineFilters({
 
       {materials.length ? (
         <section>
-          <h3 className="mb-3 text-xs font-bold uppercase tracking-widest">Material</h3>
+          <h3 className="mb-3 text-xs font-bold uppercase tracking-widest">Fabric</h3>
           <div className="space-y-0.5">
             {materials.map((m) => (
               <OptionRow
@@ -229,8 +239,23 @@ export interface CatalogFilterAndSortSheetProps extends CatalogFilterSidebarProp
   total?: number;
 }
 
-type SectionKey =
-  'availability' | 'price' | 'size' | 'category' | 'color' | 'brand' | 'material' | 'discount';
+type SectionKey = CatalogFacetKey;
+
+function collectSpecOptions(products: Product[], specName: string): string[] {
+  const values = new Set<string>();
+  for (const product of products) {
+    for (const spec of product.specifications ?? []) {
+      if (!spec || typeof spec !== 'object') continue;
+      const row = spec as Record<string, unknown>;
+      const name = String(row.name ?? row.label ?? row.key ?? '')
+        .trim()
+        .toLowerCase();
+      const value = String(row.value ?? '').trim();
+      if (name === specName.toLowerCase() && value) values.add(value);
+    }
+  }
+  return [...values].sort((a, b) => a.localeCompare(b));
+}
 
 export function CatalogFilterAndSortSheet({
   state,
@@ -239,6 +264,8 @@ export function CatalogFilterAndSortSheet({
   onSortChange,
   total,
   priceBounds,
+  facetKeys,
+  products = [],
 }: CatalogFilterAndSortSheetProps) {
   const facets = useCatalogFilterFacets();
   const bounds = priceBounds ?? { min: 0, max: 50_000 };
@@ -251,35 +278,74 @@ export function CatalogFilterAndSortSheet({
   const colors = facets.colors.data?.data ?? [];
   const materials = facets.materials.data?.data ?? [];
   const sizes = facets.sizes.data?.data ?? [];
+  const brands = facets.brands.data?.data ?? [];
+  const occasions = facets.occasions.data?.data ?? [];
 
-  const sections: { key: SectionKey; label: string; hide?: boolean }[] = [
-    { key: 'availability', label: 'Availability' },
-    { key: 'price', label: 'Price' },
-    { key: 'size', label: 'Size', hide: !sizes.length },
-    { key: 'category', label: 'Category', hide: !categories.length },
-    { key: 'color', label: 'Color', hide: !colors.length },
-    { key: 'material', label: 'Fabric', hide: !materials.length },
-    { key: 'discount', label: 'Discount' },
-  ].filter((s) => !s.hide);
+  const orderedKeys = (facetKeys?.length ? facetKeys : DEFAULT_CATALOG_FACET_KEYS).filter(
+    (key): key is CatalogFacetKey => Boolean(resolveFacetDefinition(key)),
+  );
+
+  const sections = useMemo(() => {
+    return orderedKeys
+      .map((key) => {
+        const def = resolveFacetDefinition(key)!;
+        let hide = false;
+        if (key === 'size') hide = !sizes.length;
+        if (key === 'category') hide = !categories.length;
+        if (key === 'color') hide = !colors.length;
+        if (key === 'material') hide = !materials.length;
+        if (key === 'brand') hide = !brands.length;
+        if (key === 'occasion') hide = !occasions.length;
+        if (def.kind === 'spec') {
+          hide = collectSpecOptions(products, def.specName ?? def.label).length === 0;
+        }
+        return { key, label: def.label, hide };
+      })
+      .filter((s) => !s.hide);
+  }, [
+    brands.length,
+    categories.length,
+    colors.length,
+    materials.length,
+    occasions.length,
+    orderedKeys,
+    products,
+    sizes.length,
+  ]);
 
   const [activeSection, setActiveSection] = useState<SectionKey>(
     sections[0]?.key ?? 'availability',
   );
+
+  useEffect(() => {
+    if (!sections.some((s) => s.key === activeSection) && sections[0]) {
+      setActiveSection(sections[0].key);
+    }
+  }, [activeSection, sections]);
 
   const activeCount = [
     state.categoryId,
     state.colorId,
     state.materialId,
     state.sizeId,
+    state.brandId,
+    state.occasionId,
     state.minPrice != null || state.maxPrice != null ? true : undefined,
     state.discountBand,
     state.inStock,
     state.onSale,
+    ...(state.specs ? Object.keys(state.specs) : []),
   ].filter(Boolean).length;
 
   const currentSort =
     CATALOG_SORT_OPTIONS.find((o) => o.sortBy === state.sortBy && o.sortOrder === state.sortOrder)
       ?.value ?? 'createdAt:desc';
+
+  const activeDef = resolveFacetDefinition(activeSection);
+  const specOptions =
+    activeDef?.kind === 'spec'
+      ? collectSpecOptions(products, activeDef.specName ?? activeDef.label)
+      : [];
 
   return (
     <Sheet>
@@ -303,7 +369,6 @@ export function CatalogFilterAndSortSheet({
         showClose={false}
         className="max-w-130 lg:top-19 top-16 flex h-[calc(100%-4rem)] w-full flex-col gap-0 rounded-none p-0 lg:h-[calc(100%-4.75rem)]"
       >
-        {/* ── Header ── */}
         <SheetHeader className="border-border flex-row items-baseline gap-3 border-b px-6 py-4">
           <SheetTitle className="text-xs font-bold uppercase tracking-[0.16em]">
             Filter and Sort
@@ -314,9 +379,7 @@ export function CatalogFilterAndSortSheet({
           <SheetDescription className="sr-only">Filter and sort products</SheetDescription>
         </SheetHeader>
 
-        {/* ── Two-column body ── */}
         <div className="flex min-h-0 flex-1">
-          {/* Left nav */}
           <nav className="border-border w-36 shrink-0 border-r">
             <ul className="py-2">
               {sections.map((s) => {
@@ -341,7 +404,6 @@ export function CatalogFilterAndSortSheet({
             </ul>
           </nav>
 
-          {/* Right options — changes apply immediately */}
           <div className="flex-1 overflow-y-auto px-6 py-4">
             {activeSection === 'availability' && (
               <div className="space-y-1">
@@ -424,6 +486,22 @@ export function CatalogFilterAndSortSheet({
               </div>
             )}
 
+            {activeSection === 'brand' && (
+              <div className="space-y-1">
+                {brands.map((b) => (
+                  <OptionRow
+                    key={b.id}
+                    id={`brand-${b.id}`}
+                    label={b.name}
+                    checked={state.brandId === b.id}
+                    onCheckedChange={(checked) =>
+                      onChange({ brandId: checked ? b.id : undefined, page: 1 })
+                    }
+                  />
+                ))}
+              </div>
+            )}
+
             {activeSection === 'material' && (
               <div className="space-y-1">
                 {materials.map((m) => (
@@ -434,6 +512,22 @@ export function CatalogFilterAndSortSheet({
                     checked={state.materialId === m.id}
                     onCheckedChange={(checked) =>
                       onChange({ materialId: checked ? m.id : undefined, page: 1 })
+                    }
+                  />
+                ))}
+              </div>
+            )}
+
+            {activeSection === 'occasion' && (
+              <div className="space-y-1">
+                {occasions.map((o) => (
+                  <OptionRow
+                    key={o.id}
+                    id={`occasion-${o.id}`}
+                    label={o.name}
+                    checked={state.occasionId === o.id}
+                    onCheckedChange={(checked) =>
+                      onChange({ occasionId: checked ? o.id : undefined, page: 1 })
                     }
                   />
                 ))}
@@ -459,10 +553,31 @@ export function CatalogFilterAndSortSheet({
                 ))}
               </div>
             )}
+
+            {activeDef?.kind === 'spec' ? (
+              <div className="space-y-1">
+                {specOptions.map((value) => (
+                  <OptionRow
+                    key={value}
+                    id={`spec-${activeSection}-${value}`}
+                    label={value}
+                    checked={state.specs?.[activeSection] === value}
+                    onCheckedChange={(checked) => {
+                      const nextSpecs = { ...(state.specs ?? {}) };
+                      if (checked) nextSpecs[activeSection] = value;
+                      else delete nextSpecs[activeSection];
+                      onChange({
+                        specs: Object.keys(nextSpecs).length ? nextSpecs : undefined,
+                        page: 1,
+                      });
+                    }}
+                  />
+                ))}
+              </div>
+            ) : null}
           </div>
         </div>
 
-        {/* ── Footer: Sort + Clear + Close ── */}
         <div className="border-border border-t px-6 py-4">
           <div className="mb-4 flex items-center justify-between gap-3">
             <span className="text-xs font-bold uppercase tracking-[0.12em]">Sort by</span>

@@ -25,6 +25,8 @@ export interface CatalogListShellProps {
   onRetry?: () => void;
   onSearchChange: (patch: Partial<CatalogSearchState>) => void;
   onClearFilters: () => void;
+  /** Per-category filter section keys (Bonkers-style). */
+  facetKeys?: string[];
 }
 
 export function CatalogListShell({
@@ -43,6 +45,7 @@ export function CatalogListShell({
   onRetry,
   onSearchChange,
   onClearFilters,
+  facetKeys,
 }: CatalogListShellProps) {
   const facets = useCatalogFilterFacets();
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
@@ -72,7 +75,7 @@ export function CatalogListShell({
     }
     if (state.materialId) {
       const name = facets.materials.data?.data.find((item) => item.id === state.materialId)?.name;
-      add('materialId', name ? `Material: ${name}` : 'Material');
+      add('materialId', name ? `Fabric: ${name}` : 'Fabric');
     }
     if (state.occasionId) {
       const name = facets.occasions.data?.data.find((item) => item.id === state.occasionId)?.name;
@@ -146,6 +149,8 @@ export function CatalogListShell({
               onChange={onSearchChange}
               onClear={onClearFilters}
               total={catalogTotal}
+              products={products}
+              facetKeys={facetKeys}
               onSortChange={(sortBy, sortOrder) => onSearchChange({ sortBy, sortOrder, page: 1 })}
             />
             {chips.length > 0 ? (

@@ -15,7 +15,14 @@ import {
   PageMotion,
 } from '@/components/admin';
 import { ADMIN_ROUTES, QUERY_KEYS } from '@/constants';
+import {
+  CATALOG_FACET_DEFINITIONS,
+  CATALOG_FACET_PRESETS,
+  DEFAULT_CATALOG_FACET_KEYS,
+  type CatalogFacetKey,
+} from '@/constants/catalog-filter-facets';
 import { AppError } from '@/lib/errors';
+import { cn } from '@/lib/utils';
 import { cmsApi } from '@/services/sdk/admin';
 
 const categorySchema = z.object({
@@ -34,6 +41,7 @@ export function CategoryFormPage({ categoryId }: { categoryId: string }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [facetKeys, setFacetKeys] = useState<CatalogFacetKey[]>([...DEFAULT_CATALOG_FACET_KEYS]);
 
   const query = useQuery({
     queryKey: QUERY_KEYS.adminCms.resource('categories', { id: categoryId }),
@@ -62,6 +70,12 @@ export function CategoryFormPage({ categoryId }: { categoryId: string }) {
       sortOrder: typeof query.data.sortOrder === 'number' ? query.data.sortOrder : 0,
     });
     setPreviewUrl(query.data.imageUrl ?? null);
+    const saved = Array.isArray(query.data.filterFacetKeys)
+      ? (query.data.filterFacetKeys as string[]).filter((key): key is CatalogFacetKey =>
+          CATALOG_FACET_DEFINITIONS.some((def) => def.key === key),
+        )
+      : [];
+    setFacetKeys(saved.length ? saved : [...DEFAULT_CATALOG_FACET_KEYS]);
   }, [query.data, form]);
 
   const saveMutation = useMutation({
@@ -72,6 +86,7 @@ export function CategoryFormPage({ categoryId }: { categoryId: string }) {
         description: values.description?.trim() || null,
         status: values.status,
         sortOrder: values.sortOrder ?? 0,
+        filterFacetKeys: facetKeys,
       }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['cms', 'categories'] });
@@ -97,6 +112,12 @@ export function CategoryFormPage({ categoryId }: { categoryId: string }) {
     }
   };
 
+  const toggleFacet = (key: CatalogFacetKey) => {
+    setFacetKeys((prev) =>
+      prev.includes(key) ? prev.filter((item) => item !== key) : [...prev, key],
+    );
+  };
+
   if (query.isError) {
     return (
       <PageMotion>
@@ -109,7 +130,7 @@ export function CategoryFormPage({ categoryId }: { categoryId: string }) {
     <PageMotion>
       <AdminPageHeader
         title={query.data?.name ? `Edit ${query.data.name}` : 'Edit category'}
-        description="Update the category name and homepage tile image."
+        description="Update category details, tile image, and which filters shoppers see on this category page."
         actions={
           <Link to={ADMIN_ROUTES.filters} search={{ tab: 'categories' }} className="admin-btn">
             Back to filters
@@ -194,6 +215,54 @@ export function CategoryFormPage({ categoryId }: { categoryId: string }) {
                 }}
               />
             </div>
+          </div>
+        </AdminPanel>
+
+        <AdminPanel title="PLP filters (Bonkers-style)">
+          <p className="mb-4 text-sm text-neutral-600 dark:text-neutral-400">
+            Choose which filter sections appear when shoppers open this category. Fashion options
+            like Fit / Rise / Neckline read from Product attributes on each product.
+          </p>
+          <div className="mb-4 flex flex-wrap gap-2">
+            {Object.entries(CATALOG_FACET_PRESETS).map(([id, preset]) => (
+              <button
+                key={id}
+                type="button"
+                className="admin-btn"
+                onClick={() => setFacetKeys([...preset.keys])}
+              >
+                Apply: {preset.label}
+              </button>
+            ))}
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {CATALOG_FACET_DEFINITIONS.map((facet) => {
+              const checked = facetKeys.includes(facet.key);
+              return (
+                <label
+                  key={facet.key}
+                  className={cn(
+                    'flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 text-sm',
+                    checked
+                      ? 'border-[var(--admin-accent)] bg-[var(--admin-panel-soft)]'
+                      : 'border-[var(--admin-line)]',
+                  )}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => toggleFacet(facet.key)}
+                    className="accent-[var(--admin-accent)]"
+                  />
+                  <span>
+                    {facet.label}
+                    <span className="ml-2 text-[10px] uppercase tracking-wider text-neutral-500">
+                      {facet.kind}
+                    </span>
+                  </span>
+                </label>
+              );
+            })}
           </div>
         </AdminPanel>
 

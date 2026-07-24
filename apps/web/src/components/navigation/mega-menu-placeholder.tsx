@@ -189,7 +189,7 @@ export function MegaMenuPlaceholder({ transparent }: MegaMenuPlaceholderProps) {
 
             <div
               ref={scrollRef}
-              className="min-h-0 flex-1 overflow-y-scroll overscroll-contain pr-1 [scrollbar-gutter:stable]"
+              className="premium-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain pr-2 [scrollbar-gutter:stable]"
             >
               <div className="grid grid-cols-2 gap-3 pb-2 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
                 {categories.map((category) => (

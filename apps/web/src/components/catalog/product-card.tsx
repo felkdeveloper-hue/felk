@@ -91,7 +91,7 @@ export function ProductCard({
           <Link
             to="/products/$slug"
             params={{ slug: product.slug }}
-            search={product.defaultVariantId ? { variant: product.defaultVariantId } : undefined}
+            search={{ variant: product.defaultVariantId }}
             preload="intent"
             aria-label={`View ${product.name}`}
             className="block"
@@ -194,9 +194,7 @@ export function ProductCard({
               <Link
                 to="/products/$slug"
                 params={{ slug: product.slug }}
-                search={
-                  product.defaultVariantId ? { variant: product.defaultVariantId } : undefined
-                }
+                search={{ variant: product.defaultVariantId }}
                 preload="intent"
                 className="hover:underline"
               >

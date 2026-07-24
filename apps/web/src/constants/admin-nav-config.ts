@@ -7,6 +7,7 @@ import {
   Image,
   LayoutDashboard,
   Package,
+  PanelTop,
   Settings,
   Shield,
   ShoppingCart,
@@ -60,6 +61,12 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     label: 'Banners',
     to: ADMIN_ROUTES.banners,
     icon: Image,
+    permissions: [PERMISSIONS.BANNERS_VIEW, PERMISSIONS.BANNERS_MANAGE, PERMISSIONS.CMS_MANAGE],
+  },
+  {
+    label: 'Mega menu',
+    to: ADMIN_ROUTES.megaMenu,
+    icon: PanelTop,
     permissions: [PERMISSIONS.BANNERS_VIEW, PERMISSIONS.BANNERS_MANAGE, PERMISSIONS.CMS_MANAGE],
   },
   {

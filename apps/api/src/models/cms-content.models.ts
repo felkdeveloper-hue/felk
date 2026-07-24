@@ -224,3 +224,53 @@ export const BlogPostModel = model(
 );
 BlogPostModel.schema.index({ slug: 1 }, { unique: true });
 BlogPostModel.schema.index({ status: 1, publishAt: -1 });
+
+const megaMenuLinkSchema = new Schema(
+  {
+    label: { type: String, required: true, trim: true },
+    slug: { type: String, required: true, trim: true },
+  },
+  { _id: false },
+);
+
+const megaMenuColumnSchema = new Schema(
+  {
+    title: { type: String, required: true, trim: true },
+    links: { type: [megaMenuLinkSchema], default: [] },
+  },
+  { _id: false },
+);
+
+const megaMenuTileSchema = new Schema(
+  {
+    label: { type: String, required: true, trim: true },
+    slug: { type: String, required: true, trim: true },
+    imageUrl: { type: String, default: '' },
+    imageClassName: { type: String, default: null },
+  },
+  { _id: false },
+);
+
+/** Editable Women/Men mega menus (columns + specials + shop-the-edit). */
+export const NavigationMenuModel = model(
+  'NavigationMenu',
+  new Schema(
+    {
+      key: { type: String, required: true, trim: true },
+      label: { type: String, required: true, trim: true },
+      gender: { type: String, enum: ['women', 'men', 'accessories'], required: true },
+      columns: { type: [megaMenuColumnSchema], default: [] },
+      specials: { type: [megaMenuTileSchema], default: [] },
+      featured: { type: [megaMenuTileSchema], default: [] },
+      status: {
+        type: String,
+        enum: ['draft', 'active', 'inactive', 'archived'],
+        default: 'active',
+        index: true,
+      },
+      ...softDelete,
+    },
+    { timestamps: true, collection: 'navigation_menus' },
+  ),
+);
+NavigationMenuModel.schema.index({ key: 1 }, { unique: true });

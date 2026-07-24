@@ -59,6 +59,7 @@ export function CategoryDetailPage() {
         onRetry={() => void query.refetch()}
         onSearchChange={setSearch}
         onClearFilters={clearFilters}
+        facetKeys={category?.filterFacetKeys}
       />
     </>
   );

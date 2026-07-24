@@ -370,6 +370,42 @@
     display: none;
   }
 
+  /* Slim, unobtrusive scrollbar — thumb only appears on hover for a premium feel. */
+  .premium-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+    transition: scrollbar-color 0.3s ease;
+  }
+
+  .premium-scroll:hover,
+  .premium-scroll:focus-within {
+    scrollbar-color: hsl(var(--foreground) / 0.28) transparent;
+  }
+
+  .premium-scroll::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .premium-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .premium-scroll::-webkit-scrollbar-thumb {
+    background-color: transparent;
+    border-radius: 9999px;
+    transition: background-color 0.3s ease;
+  }
+
+  .premium-scroll:hover::-webkit-scrollbar-thumb,
+  .premium-scroll:focus-within::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--foreground) / 0.28);
+  }
+
+  .premium-scroll::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--foreground) / 0.45);
+  }
+
   .safe-pb {
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }

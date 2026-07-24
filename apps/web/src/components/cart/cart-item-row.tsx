@@ -35,6 +35,7 @@ export function CartItemRow({ item, compact, validationMessage, className }: Car
       <Link
         to="/products/$slug"
         params={{ slug: String(item.productSlug ?? item.productId) }}
+        search={{ variant: undefined }}
         className="bg-muted block shrink-0 overflow-hidden rounded-lg"
         aria-label={`View ${item.name}`}
       >
@@ -53,6 +54,7 @@ export function CartItemRow({ item, compact, validationMessage, className }: Car
               <Link
                 to="/products/$slug"
                 params={{ slug: String(item.productSlug ?? item.productId) }}
+                search={{ variant: undefined }}
                 className="hover:underline"
               >
                 {item.name}

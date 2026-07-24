@@ -113,7 +113,16 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
           renderItem={(item) => {
             if (item.label === 'Women') {
               return (
-                <GenderMegaMenu gender="women" transparent={lightChrome} activeHref={pathname} />
+                <GenderMegaMenu menuKey="women" transparent={lightChrome} activeHref={pathname} />
+              );
+            }
+            if (item.label === 'Accessories') {
+              return (
+                <GenderMegaMenu
+                  menuKey="accessories"
+                  transparent={lightChrome}
+                  activeHref={pathname}
+                />
               );
             }
             if (item.label === 'Browse') {

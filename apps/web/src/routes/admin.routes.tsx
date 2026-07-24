@@ -12,6 +12,7 @@ import { CollectionsPage } from '@/pages/admin/catalog/catalog-pages';
 import { CategoryFormPage } from '@/pages/admin/catalog/category-form-page';
 import { FiltersPage } from '@/pages/admin/catalog/filters-page';
 import { BannersPage } from '@/pages/admin/cms/banners-page';
+import { MegaMenuPage } from '@/pages/admin/cms/mega-menu-page';
 import { InventoryPage } from '@/pages/admin/inventory/inventory-page';
 import { ForbiddenPage } from '@/pages/admin/auth/forbidden-page';
 import { rootRoute } from './root-route';
@@ -111,6 +112,18 @@ const adminBannersRoute = createRoute({
       permissions={[PERMISSIONS.BANNERS_VIEW, PERMISSIONS.BANNERS_MANAGE, PERMISSIONS.CMS_MANAGE]}
     >
       <BannersPage />
+    </AdminPermissionRoute>
+  ),
+});
+
+const adminMegaMenuRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: 'mega-menu',
+  component: () => (
+    <AdminPermissionRoute
+      permissions={[PERMISSIONS.BANNERS_VIEW, PERMISSIONS.BANNERS_MANAGE, PERMISSIONS.CMS_MANAGE]}
+    >
+      <MegaMenuPage />
     </AdminPermissionRoute>
   ),
 });
@@ -309,6 +322,7 @@ export const adminRouteTree = adminLayoutRoute.addChildren([
   adminProductsRoute,
   adminFiltersRoute,
   adminBannersRoute,
+  adminMegaMenuRoute,
   adminCategoryDetailRoute,
   adminCategoriesRoute,
   adminCollectionsRoute,

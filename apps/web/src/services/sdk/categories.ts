@@ -14,6 +14,8 @@ export interface Category {
   status?: string;
   depth?: number;
   path?: string;
+  /** Ordered filter section keys for this category’s PLP. */
+  filterFacetKeys?: string[];
   seo?: Record<string, unknown>;
   children?: Category[];
   [key: string]: unknown;

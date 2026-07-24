@@ -32,6 +32,7 @@ export function WishlistItemCard({ wishlistId, item }: WishlistItemCardProps) {
       <Link
         to="/products/$slug"
         params={{ slug: item.productSlug ?? item.productId }}
+        search={{ variant: undefined }}
         className="block"
       >
         <Image src={item.thumbnailUrl} alt={item.productName ?? 'Product'} aspectRatio="3/4" />
@@ -42,6 +43,7 @@ export function WishlistItemCard({ wishlistId, item }: WishlistItemCardProps) {
             <Link
               to="/products/$slug"
               params={{ slug: item.productSlug ?? item.productId }}
+              search={{ variant: undefined }}
               className="hover:underline"
             >
               {item.productName ?? 'Product'}

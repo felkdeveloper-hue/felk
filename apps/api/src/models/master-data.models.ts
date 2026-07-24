@@ -22,6 +22,8 @@ export interface CategoryDocument extends Document {
   description?: string | null;
   image?: MediaImage | null;
   sortOrder: number;
+  /** Ordered PLP filter sections (Bonkers-style per-category facets). */
+  filterFacetKeys: string[];
   seo?: unknown;
   status: string;
   isDeleted: boolean;
@@ -40,6 +42,7 @@ const categorySchema = new Schema<CategoryDocument>(
     description: { type: String, default: null },
     image: { type: mediaImageSchema, default: null },
     sortOrder: { type: Number, default: 0 },
+    filterFacetKeys: { type: [String], default: [] },
     seo: { type: seoSchema, default: () => ({}) },
     status: statusField,
     ...softDelete,

@@ -75,7 +75,11 @@ export function QuickViewModal({ product, open, onOpenChange }: QuickViewModalPr
               <div className="grid grid-cols-2 gap-3">
                 <WishlistButton product={product} iconOnly={false} variant="outline" size="lg" />
                 <Button asChild variant="outline" size="lg" onClick={() => onOpenChange(false)}>
-                  <Link to="/products/$slug" params={{ slug: product.slug }}>
+                  <Link
+                    to="/products/$slug"
+                    params={{ slug: product.slug }}
+                    search={{ variant: undefined }}
+                  >
                     Details
                     <ArrowRight />
                   </Link>

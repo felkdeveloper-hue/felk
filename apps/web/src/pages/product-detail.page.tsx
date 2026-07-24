@@ -114,7 +114,12 @@ export function ProductDetailPage() {
   useEffect(() => {
     if (!product?.slug || product.slug === slug) return;
     if (/^[a-f0-9]{24}$/i.test(slug)) {
-      navigate({ to: '/products/$slug', params: { slug: product.slug }, replace: true });
+      navigate({
+        to: '/products/$slug',
+        params: { slug: product.slug },
+        search: { variant: undefined },
+        replace: true,
+      });
     }
   }, [navigate, product?.slug, slug]);
 

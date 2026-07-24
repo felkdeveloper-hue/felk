@@ -12,6 +12,7 @@ import {
   HeroBannerModel,
   HomeSectionModel,
   MaterialModel,
+  NavigationMenuModel,
   OccasionModel,
   ProductMediaModel,
   ProductRelationshipModel,
@@ -257,3 +258,29 @@ publicList('/home-sections', 'home-sections', HomeSectionModel as Model<any>);
 publicList('/social-links', 'social-links', SocialLinkModel as Model<any>);
 publicList('/contact-infos', 'contact-infos', ContactInfoModel as Model<any>);
 publicList('/pages', 'pages', CmsPageModel as Model<any>, 'published');
+
+storefrontRouter.get(
+  '/navigation-menus/:key',
+  asyncHandler(async (req, res) => {
+    setPublicCache(res);
+    const key = String(req.params.key).trim().toLowerCase();
+    const doc = await NavigationMenuModel.findOne({
+      key,
+      status: 'active',
+      isDeleted: false,
+    }).lean();
+    if (!doc) {
+      throw ApiError.notFound('Navigation menu not found');
+    }
+    ApiResponse.success(res, {
+      id: String(doc._id),
+      key: doc.key,
+      label: doc.label,
+      gender: doc.gender,
+      columns: doc.columns ?? [],
+      specials: doc.specials ?? [],
+      featured: doc.featured ?? [],
+      status: doc.status,
+    });
+  }),
+);

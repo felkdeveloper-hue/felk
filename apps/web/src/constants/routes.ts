@@ -9,6 +9,7 @@ export const ADMIN_ROUTES = {
   productDetail: '/admin/products/$productId',
   filters: '/admin/filters',
   banners: '/admin/banners',
+  megaMenu: '/admin/mega-menu',
   categories: '/admin/categories',
   categoryDetail: '/admin/categories/$categoryId',
   collections: '/admin/collections',

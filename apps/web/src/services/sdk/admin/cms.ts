@@ -1,4 +1,5 @@
 import { http } from '@/lib/http-client';
+import { AppError } from '@/lib/errors';
 import { normalizeId, normalizeList } from '@/lib/utils';
 import type { ListQueryParams, PaginatedResult } from '@/types';
 
@@ -101,4 +102,22 @@ export const cmsApi = {
   materials: createCmsResourceApi('/cms/materials'),
   heroBanners: createBannerApi('/cms/hero-banners'),
   promoBanners: createBannerApi('/cms/promo-banners'),
+  navigationMenus: {
+    async getByKey(key: string): Promise<CmsResource | null> {
+      try {
+        return normalizeCmsResource(await http.get<unknown>(`/cms/navigation-menus/${key}`));
+      } catch (error) {
+        if (AppError.isAppError(error) && error.isNotFound) return null;
+        throw error;
+      }
+    },
+    async upsert(key: string, payload: Record<string, unknown>): Promise<CmsResource> {
+      return normalizeCmsResource(await http.put<unknown>(`/cms/navigation-menus/${key}`, payload));
+    },
+    async uploadMedia(file: File): Promise<{ url: string; key?: string }> {
+      const form = new FormData();
+      form.append('file', file);
+      return http.post<{ url: string; key?: string }>('/cms/navigation-menus/media', form);
+    },
+  },
 };

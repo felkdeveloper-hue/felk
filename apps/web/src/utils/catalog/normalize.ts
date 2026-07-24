@@ -211,6 +211,9 @@ export function normalizeProduct(raw: unknown): Product {
 
 export function normalizeCategory(raw: unknown): Category {
   const record = asRecord(raw);
+  const filterFacetKeys = Array.isArray(record.filterFacetKeys)
+    ? record.filterFacetKeys.map((key) => String(key)).filter(Boolean)
+    : undefined;
   return {
     id: pickId(record),
     name: String(record.name ?? ''),
@@ -222,6 +225,7 @@ export function normalizeCategory(raw: unknown): Category {
     status: typeof record.status === 'string' ? record.status : undefined,
     depth: typeof record.depth === 'number' ? record.depth : undefined,
     path: typeof record.path === 'string' ? record.path : undefined,
+    filterFacetKeys,
     seo: asRecord(record.seo),
   };
 }

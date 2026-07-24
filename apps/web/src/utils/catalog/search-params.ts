@@ -24,6 +24,8 @@ export interface CatalogSearchState {
   onSale?: boolean;
   rating?: string;
   isNewArrival?: boolean;
+  /** Fashion attribute filters, e.g. { fit: 'Oversized', rise: 'High Rise' }. */
+  specs?: Record<string, string>;
 }
 
 export const DEFAULT_CATALOG_SEARCH: CatalogSearchState = {
@@ -52,6 +54,14 @@ export function parseCatalogSearch(search: Record<string, unknown>): CatalogSear
     return undefined;
   };
 
+  const specs: Record<string, string> = {};
+  for (const [key, value] of Object.entries(search)) {
+    if (!key.startsWith('spec_')) continue;
+    if (typeof value === 'string' && value.trim()) {
+      specs[key.slice(5)] = value.trim();
+    }
+  }
+
   return {
     page: num(search.page) ?? DEFAULT_CATALOG_SEARCH.page,
     limit: num(search.limit) ?? DEFAULT_CATALOG_SEARCH.limit,
@@ -77,6 +87,7 @@ export function parseCatalogSearch(search: Record<string, unknown>): CatalogSear
     onSale: bool(search.onSale),
     rating: typeof search.rating === 'string' ? search.rating : undefined,
     isNewArrival: bool(search.isNewArrival),
+    specs: Object.keys(specs).length ? specs : undefined,
   };
 }
 
@@ -117,6 +128,7 @@ export function countActiveFilters(state: CatalogSearchState): number {
   if (state.onSale != null) count += 1;
   if (state.rating) count += 1;
   if (state.isNewArrival != null) count += 1;
+  if (state.specs) count += Object.keys(state.specs).length;
   return count;
 }
 
@@ -157,6 +169,11 @@ export function catalogSearchToUrlParams(state: CatalogSearchState): Record<stri
   assign('onSale', state.onSale === true ? 'true' : undefined);
   assign('rating', state.rating);
   assign('isNewArrival', state.isNewArrival ? 'true' : undefined);
+  if (state.specs) {
+    for (const [key, value] of Object.entries(state.specs)) {
+      assign(`spec_${key}`, value);
+    }
+  }
 
   return params;
 }
@@ -195,6 +212,32 @@ export function applyClientCatalogFilters(products: Product[], state: CatalogSea
       const hasSize = product.variants?.some((variant) => variant.sizeId === state.sizeId);
       if (product.variants?.length && !hasSize) return false;
     }
+    if (state.specs) {
+      for (const [facetKey, wanted] of Object.entries(state.specs)) {
+        const def = SPEC_FACET_NAMES[facetKey];
+        if (!def) continue;
+        const match = (product.specifications ?? []).some((spec) => {
+          if (!spec || typeof spec !== 'object') return false;
+          const row = spec as Record<string, unknown>;
+          const name = String(row.name ?? row.label ?? row.key ?? '')
+            .trim()
+            .toLowerCase();
+          const value = String(row.value ?? '').trim();
+          return name === def.toLowerCase() && value.toLowerCase() === wanted.toLowerCase();
+        });
+        if (!match) return false;
+      }
+    }
     return true;
   });
 }
+
+const SPEC_FACET_NAMES: Record<string, string> = {
+  fit: 'Fit',
+  neckline: 'Neckline',
+  pattern: 'Pattern',
+  'sleeve-length': 'Sleeve length',
+  length: 'Length',
+  rise: 'Rise',
+  closure: 'Closure',
+};

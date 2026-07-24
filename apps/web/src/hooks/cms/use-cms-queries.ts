@@ -14,7 +14,7 @@ import type {
   PublicSettings,
   SocialLink,
 } from '@/services/sdk/cms';
-import type { AppError } from '@/lib/errors';
+import { AppError } from '@/lib/errors';
 
 const CMS_STALE = 1000 * 60 * 5;
 const CMS_GC = 1000 * 60 * 30;

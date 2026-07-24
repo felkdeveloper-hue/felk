@@ -16,11 +16,38 @@ export const categoryCreateSchema = z.object({
   description: z.string().nullable().optional(),
   image: mediaImageZodSchema,
   sortOrder: z.number().int().optional(),
+  filterFacetKeys: z.array(z.string().trim().min(1).max(64)).max(24).optional(),
   seo: seoZodSchema,
   status: statusSchema.optional(),
 });
 
 export const categoryUpdateSchema = categoryCreateSchema.partial();
+
+const megaMenuLinkSchema = z.object({
+  label: z.string().trim().min(1).max(120),
+  slug: z.string().trim().min(1).max(120),
+});
+
+const megaMenuColumnSchema = z.object({
+  title: z.string().trim().min(1).max(120),
+  links: z.array(megaMenuLinkSchema).max(40),
+});
+
+const megaMenuTileSchema = z.object({
+  label: z.string().trim().min(1).max(120),
+  slug: z.string().trim().min(1).max(120),
+  imageUrl: z.string().trim().max(2000).optional().default(''),
+  imageClassName: z.string().trim().max(200).nullable().optional(),
+});
+
+export const navigationMenuUpsertSchema = z.object({
+  label: z.string().trim().min(1).max(120),
+  gender: z.enum(['women', 'men', 'accessories']),
+  columns: z.array(megaMenuColumnSchema).max(8),
+  specials: z.array(megaMenuTileSchema).max(24),
+  featured: z.array(megaMenuTileSchema).max(24).optional().default([]),
+  status: z.enum(['draft', 'active', 'inactive', 'archived']).optional(),
+});
 
 export const brandCreateSchema = z.object({
   name: z.string().trim().min(1),
