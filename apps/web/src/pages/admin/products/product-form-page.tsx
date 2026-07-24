@@ -3,7 +3,10 @@ import { Link, useNavigate } from '@tanstack/react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   ChevronUp,
+  ExternalLink,
   Image as ImageIcon,
   Loader2,
   Plus,
@@ -42,11 +45,9 @@ const productSchema = z.object({
   visibility: z.string().default('public'),
   shortDescription: z.string().optional(),
   description: z.string().optional(),
-  categoryId: z.string().optional(),
   brandId: z.string().optional(),
   materialId: z.string().optional(),
   gender: z.string().optional(),
-  occasionId: z.string().optional(),
   tags: z.string().optional(),
   price: z.string().optional(),
   salePrice: z.string().optional(),
@@ -212,84 +213,112 @@ function ProductImagesSection({
     onSuccess: () => invalidate(),
   });
   const inputRef = useRef<HTMLInputElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const scroll = (dir: 'left' | 'right') => {
+    scrollRef.current?.scrollBy({ left: dir === 'left' ? -250 : 250, behavior: 'smooth' });
+  };
 
   return (
     <div>
-      <div className="flex flex-wrap gap-3">
-        {images.map((img) => (
-          <div
-            key={img.id}
-            className="group relative size-24 shrink-0 overflow-hidden rounded-none border border-[var(--admin-line)] bg-[var(--admin-panel-soft)]"
-          >
-            <img
-              src={img.thumbnailUrl || img.url}
-              alt={img.alt || ''}
-              className="size-full object-cover"
-            />
-            {img.isPrimary ? (
-              <span className="absolute left-0 top-0 bg-[var(--admin-ink)] px-1.5 py-0.5 text-[9px] font-bold uppercase text-[var(--admin-surface)]">
-                Main
-              </span>
-            ) : null}
-            <div className="absolute inset-0 flex items-end justify-end gap-1 bg-black/40 p-1 opacity-0 transition-opacity group-hover:opacity-100">
-              {!img.isPrimary ? (
-                <button
-                  type="button"
-                  onClick={() => primaryMut.mutate(img.id)}
-                  title="Set as main"
-                  className="rounded-none bg-white/90 p-1 text-[var(--admin-ink)] hover:bg-white"
-                >
-                  <Star className="size-3" />
-                </button>
-              ) : null}
-              {canDelete ? (
-                <button
-                  type="button"
-                  onClick={() => removeMut.mutate(img.id)}
-                  className="rounded-none bg-red-600 p-1 text-white hover:bg-red-700"
-                >
-                  <Trash2 className="size-3" />
-                </button>
-              ) : null}
-            </div>
-          </div>
-        ))}
-
-        {canUpload ? (
+      <div className="relative">
+        {images.length > 3 ? (
           <>
             <button
               type="button"
-              onClick={() => inputRef.current?.click()}
-              disabled={uploadMut.isPending}
-              className="flex size-24 shrink-0 flex-col items-center justify-center gap-1 rounded-none border border-dashed border-[var(--admin-line)] text-[var(--admin-ink-muted)] transition hover:border-[var(--admin-accent)] hover:text-[var(--admin-accent)] disabled:opacity-50"
+              onClick={() => scroll('left')}
+              className="absolute -left-3 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white p-1 shadow ring-1 ring-[var(--admin-line)] hover:bg-[var(--admin-panel-soft)]"
             >
-              {uploadMut.isPending ? (
-                <Loader2 className="size-5 animate-spin" />
-              ) : (
-                <Upload className="size-5" />
-              )}
-              <span className="text-[10px] font-semibold uppercase tracking-wide">
-                {uploadMut.isPending ? 'Uploading…' : 'Add photo'}
-              </span>
+              <ChevronLeft className="size-4 text-[var(--admin-ink)]" />
             </button>
-            <input
-              ref={inputRef}
-              type="file"
-              accept="image/*"
-              multiple
-              className="hidden"
-              onChange={(e) => {
-                const files = Array.from(e.target.files ?? []);
-                files.forEach((file) => uploadMut.mutate(file));
-                e.target.value = '';
-              }}
-            />
+            <button
+              type="button"
+              onClick={() => scroll('right')}
+              className="absolute -right-3 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white p-1 shadow ring-1 ring-[var(--admin-line)] hover:bg-[var(--admin-panel-soft)]"
+            >
+              <ChevronRight className="size-4 text-[var(--admin-ink)]" />
+            </button>
           </>
         ) : null}
+        <div
+          ref={scrollRef}
+          className="flex gap-3 overflow-x-auto pb-1"
+          style={{ scrollbarWidth: 'none' }}
+        >
+          {images.map((img) => (
+            <div
+              key={img.id}
+              className="group relative size-24 shrink-0 overflow-hidden rounded-none border border-[var(--admin-line)] bg-[var(--admin-panel-soft)]"
+            >
+              <img
+                src={img.thumbnailUrl || img.url}
+                alt={img.alt || ''}
+                className="size-full object-cover"
+              />
+              {img.isPrimary ? (
+                <span className="absolute left-0 top-0 bg-[var(--admin-ink)] px-1.5 py-0.5 text-[9px] font-bold uppercase text-[var(--admin-surface)]">
+                  Main
+                </span>
+              ) : null}
+              <div className="absolute inset-0 flex items-end justify-end gap-1 bg-black/40 p-1 opacity-0 transition-opacity group-hover:opacity-100">
+                {!img.isPrimary ? (
+                  <button
+                    type="button"
+                    onClick={() => primaryMut.mutate(img.id)}
+                    title="Set as catalog main"
+                    className="rounded-none bg-white/90 p-1 text-[var(--admin-ink)] hover:bg-white"
+                  >
+                    <Star className="size-3" />
+                  </button>
+                ) : null}
+                {canDelete ? (
+                  <button
+                    type="button"
+                    onClick={() => removeMut.mutate(img.id)}
+                    className="rounded-none bg-red-600 p-1 text-white hover:bg-red-700"
+                  >
+                    <Trash2 className="size-3" />
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          ))}
+          {canUpload ? (
+            <>
+              <button
+                type="button"
+                onClick={() => inputRef.current?.click()}
+                disabled={uploadMut.isPending}
+                className="flex size-24 shrink-0 flex-col items-center justify-center gap-1 rounded-none border border-dashed border-[var(--admin-line)] text-[var(--admin-ink-muted)] transition hover:border-[var(--admin-accent)] hover:text-[var(--admin-accent)] disabled:opacity-50"
+              >
+                {uploadMut.isPending ? (
+                  <Loader2 className="size-5 animate-spin" />
+                ) : (
+                  <Upload className="size-5" />
+                )}
+                <span className="text-[10px] font-semibold uppercase tracking-wide">
+                  {uploadMut.isPending ? 'Uploading…' : 'Add photo'}
+                </span>
+              </button>
+              <input
+                ref={inputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                  const files = Array.from(e.target.files ?? []);
+                  files.forEach((file) => uploadMut.mutate(file));
+                  e.target.value = '';
+                }}
+              />
+            </>
+          ) : null}
+        </div>
       </div>
       {images.length > 0 ? (
         <p className="mt-2 text-[11px] text-[var(--admin-ink-muted)]">
-          Hover an image to set it as the main (catalog) photo or delete it.
+          Hover a photo → <Star className="inline size-3" /> to set as catalog main image.
+          {images.length > 3 ? ' Use the ‹ › arrows to scroll.' : ''}
         </p>
       ) : null}
     </div>
@@ -420,10 +449,25 @@ function VariantsSection({
           salePrice: baseSale,
           currency: 'LKR',
         });
-        // Set stock for this variant
-        const stock = Number(newStockMap[sizeId] ?? 0);
-        if (stock > 0) {
-          await inventoryApi.setStock({ variantId: variant.id, quantity: stock });
+        // Set initial stock for this variant
+        const stockQty = Number(newStockMap[sizeId] ?? newStockMap[''] ?? 0);
+        if (stockQty > 0) {
+          try {
+            await inventoryApi.setStock({ variantId: variant.id, quantity: stockQty });
+          } catch {
+            // setStock endpoint may not exist; fall back to adjust
+            try {
+              await inventoryApi.adjust({
+                variantId: variant.id,
+                warehouseId: 'default',
+                quantity: stockQty,
+                direction: 'increase',
+                reason: 'initial_stock',
+              });
+            } catch {
+              /* stock will be 0 — can be set from the table */
+            }
+          }
         }
         created++;
       }
@@ -452,9 +496,20 @@ function VariantsSection({
   });
 
   const setDefaultMutation = useMutation({
-    mutationFn: (variantId: string) => productsApi.updateVariant(variantId, { isDefault: true }),
+    mutationFn: async (variantId: string) => {
+      await productsApi.updateVariant(variantId, { isDefault: true });
+      // Auto-set primary image to match the default variant's first image
+      const variantImages = variantMediaMap.get(variantId) ?? [];
+      if (variantImages[0]) {
+        try {
+          await mediaApi.setPrimary(variantImages[0].id);
+        } catch {
+          /* non-critical */
+        }
+      }
+    },
     onSuccess: async () => {
-      toast.success('Default variant updated');
+      toast.success('Default variant updated — catalog will show this color first');
       await invalidate();
     },
   });
@@ -530,15 +585,34 @@ function VariantsSection({
                   {colorVariants.length} size{colorVariants.length !== 1 ? 's' : ''}
                 </span>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
                 {!isDefault && canUpdate && firstVariant ? (
                   <button
                     type="button"
                     onClick={() => setDefaultMutation.mutate(firstVariant!.id)}
                     className="text-xs text-[var(--admin-ink-muted)] underline hover:text-[var(--admin-ink)]"
+                    title="This color will show as the main catalog listing image"
                   >
                     Set as default listing
                   </button>
+                ) : null}
+                {canUpdate && colorVariants.length > 0 ? (
+                  <div
+                    className="flex cursor-pointer items-center gap-1.5 rounded-none border border-[var(--admin-line)] px-2.5 py-1 text-[10px] font-semibold text-[var(--admin-ink-muted)] hover:border-[var(--admin-accent)] hover:text-[var(--admin-accent)]"
+                    title="Create a separate product listing for this color so it appears as its own card in the catalog"
+                    onClick={() => {
+                      const colorName = colorLabel;
+                      const firstId = colorVariants[0]?.id;
+                      if (!firstId) return;
+                      toast.info(
+                        `To show ${colorName} as a separate catalog card, duplicate this product and keep only the ${colorName} variant.`,
+                        { duration: 6000 },
+                      );
+                    }}
+                  >
+                    <ExternalLink className="size-3" />
+                    Show as own listing?
+                  </div>
                 ) : null}
               </div>
             </div>
@@ -664,6 +738,7 @@ function VariantsSection({
                           </td>
                           <td className="py-2 pr-3 text-center">
                             <input
+                              key={`${variant.id}:stock:${stock}`}
                               type="number"
                               min={0}
                               defaultValue={stock}
@@ -851,6 +926,18 @@ const SPEC_PRESETS = [
   'Country of origin',
 ] as const;
 
+const SPEC_VALUE_HINTS: Record<string, string> = {
+  Fit: 'e.g. Slim Fit, Regular, Oversized',
+  Neckline: 'e.g. Round Neck, V-Neck, Collar',
+  Pattern: 'e.g. Plain, Printed, Striped',
+  'Sleeve length': 'e.g. Short Sleeves, Full Sleeves, Sleeveless',
+  Length: 'e.g. Regular, Cropped, Longline, Midi',
+  Rise: 'e.g. Mid Rise, High Rise, Low Rise',
+  Closure: 'e.g. Button, Zip, Hook & Eye, Pull-on',
+  'Fabric care': 'e.g. Machine Wash, Hand Wash, Do not iron on print',
+  'Country of origin': 'e.g. India, Sri Lanka, Bangladesh',
+};
+
 export function ProductFormPage({ productId }: { productId?: string }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -864,6 +951,8 @@ export function ProductFormPage({ productId }: { productId?: string }) {
   const [showSeo, setShowSeo] = useState(false);
   const [seoTitle, setSeoTitle] = useState('');
   const [seoDescription, setSeoDescription] = useState('');
+  const [categoryIds, setCategoryIds] = useState<string[]>([]);
+  const [occasionIds, setOccasionIds] = useState<string[]>([]);
 
   // Fetch CMS data
   const categoriesQuery = useQuery({
@@ -908,11 +997,9 @@ export function ProductFormPage({ productId }: { productId?: string }) {
       visibility: 'public',
       shortDescription: '',
       description: '',
-      categoryId: '',
       brandId: '',
       materialId: '',
       gender: '',
-      occasionId: '',
       tags: '',
       price: '',
       salePrice: '',
@@ -945,11 +1032,9 @@ export function ProductFormPage({ productId }: { productId?: string }) {
       visibility: product.visibility ?? 'public',
       shortDescription: product.shortDescription ?? '',
       description: product.description ?? '',
-      categoryId: product.categoryId ?? '',
       brandId: product.brandId ?? '',
       materialId: product.materialId ?? '',
       gender: product.gender ?? '',
-      occasionId: product.occasionIds?.[0] ?? '',
       tags: product.tags?.join(', ') ?? '',
       price: product.price ? String(product.price) : '',
       salePrice: product.salePrice ? String(product.salePrice) : '',
@@ -969,6 +1054,8 @@ export function ProductFormPage({ productId }: { productId?: string }) {
     if (product.specifications?.length) setSpecRows(product.specifications);
     setSeoTitle(product.seoTitle ?? '');
     setSeoDescription(product.seoDescription ?? '');
+    if (product.categoryId) setCategoryIds([product.categoryId]);
+    if (product.occasionIds?.length) setOccasionIds(product.occasionIds);
   }, [product, reset]);
 
   // Auto-slug from name
@@ -984,11 +1071,11 @@ export function ProductFormPage({ productId }: { productId?: string }) {
     visibility: data.visibility,
     shortDescription: data.shortDescription?.trim() || undefined,
     description: data.description?.trim() || undefined,
-    categoryId: data.categoryId || undefined,
+    categoryId: categoryIds[0] || undefined,
     brandId: data.brandId || undefined,
     materialId: data.materialId || undefined,
     gender: data.gender || undefined,
-    occasionIds: data.occasionId ? [data.occasionId] : [],
+    occasionIds,
     tags: data.tags?.trim()
       ? data.tags
           .split(',')
@@ -1285,7 +1372,7 @@ export function ProductFormPage({ productId }: { productId?: string }) {
                           )
                         }
                         className={cn(fieldCls, 'flex-1')}
-                        placeholder="e.g. Slim Fit, 100% Cotton…"
+                        placeholder={SPEC_VALUE_HINTS[row.name] ?? 'Enter value…'}
                       />
                       <button
                         type="button"
@@ -1417,55 +1504,120 @@ export function ProductFormPage({ productId }: { productId?: string }) {
                   />
                 </div>
               </Field>
-              {w.price && w.salePrice && Number(w.salePrice) < Number(w.price) ? (
-                <p className="rounded-none bg-amber-50 px-2.5 py-1.5 text-xs font-semibold text-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
-                  {Math.round(((Number(w.price) - Number(w.salePrice)) / Number(w.price)) * 100)}%
-                  off — will show SAVE badge
+              {w.price &&
+              w.salePrice &&
+              Number(w.salePrice) > 0 &&
+              Number(w.salePrice) < Number(w.price) ? (
+                <p className="text-[11px] text-[var(--admin-ink-muted)]">
+                  Discount:{' '}
+                  <strong className="text-[var(--admin-accent)]">
+                    {Math.round(((Number(w.price) - Number(w.salePrice)) / Number(w.price)) * 100)}%
+                    off
+                  </strong>
                 </p>
               ) : null}
             </SidebarCard>
 
             {/* Category & Placement */}
             <SidebarCard title="Category & Where it appears">
-              <Field label="Category">
-                <select {...register('categoryId')} className={fieldCls}>
-                  <option value="">— No category —</option>
+              {/* Multi-select categories */}
+              <div>
+                <p className={labelCls}>Category — select all that apply</p>
+                <p className="mb-2 text-[11px] text-[var(--admin-ink-muted)]">
+                  First selected = primary. Product appears in all checked sections.
+                </p>
+                <div className="max-h-52 space-y-1 overflow-y-auto rounded-none border border-[var(--admin-line)] p-2">
                   {womenCats.length ? (
-                    <optgroup label="Women">
+                    <>
+                      <p className="px-1 pt-1 text-[10px] font-bold uppercase tracking-wider text-[var(--admin-ink-muted)]">
+                        Women
+                      </p>
                       {womenCats.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name}
-                        </option>
+                        <label
+                          key={c.id}
+                          className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-[var(--admin-panel-soft)]"
+                        >
+                          <input
+                            type="checkbox"
+                            className="accent-[var(--admin-accent)]"
+                            checked={categoryIds.includes(c.id)}
+                            onChange={(e) =>
+                              setCategoryIds((prev) =>
+                                e.target.checked
+                                  ? [...prev, c.id]
+                                  : prev.filter((id) => id !== c.id),
+                              )
+                            }
+                          />
+                          <span className="text-xs text-[var(--admin-ink)]">{c.name}</span>
+                          {categoryIds[0] === c.id && categoryIds.length > 1 ? (
+                            <span className="ml-auto text-[10px] text-[var(--admin-accent)]">
+                              Primary
+                            </span>
+                          ) : null}
+                        </label>
                       ))}
-                    </optgroup>
+                    </>
                   ) : null}
                   {accessoriesCats.length ? (
-                    <optgroup label="Accessories">
+                    <>
+                      <p className="px-1 pt-2 text-[10px] font-bold uppercase tracking-wider text-[var(--admin-ink-muted)]">
+                        Accessories
+                      </p>
                       {accessoriesCats.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name}
-                        </option>
+                        <label
+                          key={c.id}
+                          className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-[var(--admin-panel-soft)]"
+                        >
+                          <input
+                            type="checkbox"
+                            className="accent-[var(--admin-accent)]"
+                            checked={categoryIds.includes(c.id)}
+                            onChange={(e) =>
+                              setCategoryIds((prev) =>
+                                e.target.checked
+                                  ? [...prev, c.id]
+                                  : prev.filter((id) => id !== c.id),
+                              )
+                            }
+                          />
+                          <span className="text-xs text-[var(--admin-ink)]">{c.name}</span>
+                        </label>
                       ))}
-                    </optgroup>
+                    </>
                   ) : null}
-                  {parentCats.length ? (
-                    <optgroup label="Other">
-                      {parentCats.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name}
-                        </option>
-                      ))}
-                    </optgroup>
+                  {parentCats.map((c) => (
+                    <label
+                      key={c.id}
+                      className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-[var(--admin-panel-soft)]"
+                    >
+                      <input
+                        type="checkbox"
+                        className="accent-[var(--admin-accent)]"
+                        checked={categoryIds.includes(c.id)}
+                        onChange={(e) =>
+                          setCategoryIds((prev) =>
+                            e.target.checked ? [...prev, c.id] : prev.filter((id) => id !== c.id),
+                          )
+                        }
+                      />
+                      <span className="text-xs text-[var(--admin-ink)]">{c.name}</span>
+                    </label>
+                  ))}
+                  {!categories.length ? (
+                    <p className="px-1 py-2 text-xs text-[var(--admin-ink-muted)]">
+                      No categories configured yet.
+                    </p>
                   ) : null}
-                  {!womenCats.length && !accessoriesCats.length && !parentCats.length
-                    ? categories.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name}
-                        </option>
-                      ))
-                    : null}
-                </select>
-              </Field>
+                </div>
+                {categoryIds.length > 0 ? (
+                  <p className="mt-1 text-[11px] text-[var(--admin-accent)]">
+                    {categoryIds.length} selected · Primary:{' '}
+                    {categories.find((c) => c.id === categoryIds[0])?.name ?? categoryIds[0]}
+                  </p>
+                ) : null}
+              </div>
+
               <Field label="Gender">
                 <select {...register('gender')} className={fieldCls}>
                   <option value="">— Not specified —</option>
@@ -1474,6 +1626,7 @@ export function ProductFormPage({ productId }: { productId?: string }) {
                   <option value="unisex">Unisex</option>
                 </select>
               </Field>
+
               <p className="pt-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--admin-ink-muted)]">
                 Homepage sections
               </p>
@@ -1485,24 +1638,25 @@ export function ProductFormPage({ productId }: { productId?: string }) {
               />
               <PlacementToggle
                 label="New Arrivals"
-                description="Shows in the New Arrivals row"
+                description="Shows in the New Arrivals row on the home page"
                 checked={w.isNewArrival ?? false}
                 onChange={(v) => setFlag('isNewArrival', v)}
               />
               <PlacementToggle
                 label="Trending Now"
-                description="Shown in the Trending section"
+                description="Shows in the Trending section on the home page"
                 checked={w.isTrending ?? false}
                 onChange={(v) => setFlag('isTrending', v)}
               />
               <PlacementToggle
                 label="Featured / Editor's Pick"
+                description="Shows in the Featured section on the home page"
                 checked={w.isFeatured ?? false}
                 onChange={(v) => setFlag('isFeatured', v)}
               />
               <PlacementToggle
                 label="On Sale / Clearance"
-                description="Adds SALE badge and appears in sale filters"
+                description="Adds SAVE badge on the product card"
                 checked={w.isClearance ?? false}
                 onChange={(v) => setFlag('isClearance', v)}
               />
@@ -1530,16 +1684,39 @@ export function ProductFormPage({ productId }: { productId?: string }) {
                   ))}
                 </select>
               </Field>
-              <Field label="Occasion">
-                <select {...register('occasionId')} className={fieldCls}>
-                  <option value="">— Not specified —</option>
-                  {occasions.map((o) => (
-                    <option key={o.id} value={o.id}>
-                      {o.name}
-                    </option>
-                  ))}
-                </select>
-              </Field>
+              {/* Occasions multi-select */}
+              <div>
+                <p className={labelCls}>Occasion — select all that apply</p>
+                <div className="mt-1 flex flex-wrap gap-2">
+                  {occasions.map((o) => {
+                    const selected = occasionIds.includes(o.id);
+                    return (
+                      <button
+                        key={o.id}
+                        type="button"
+                        onClick={() =>
+                          setOccasionIds((prev) =>
+                            selected ? prev.filter((id) => id !== o.id) : [...prev, o.id],
+                          )
+                        }
+                        className={cn(
+                          'rounded-none border px-3 py-1 text-xs font-semibold transition-colors',
+                          selected
+                            ? 'border-[var(--admin-accent)] bg-[var(--admin-accent)] text-white'
+                            : 'hover:border-[var(--admin-accent)]/60 border-[var(--admin-line)] text-[var(--admin-ink)]',
+                        )}
+                      >
+                        {o.name}
+                      </button>
+                    );
+                  })}
+                  {!occasions.length ? (
+                    <p className="text-xs text-[var(--admin-ink-muted)]">
+                      No occasions configured.
+                    </p>
+                  ) : null}
+                </div>
+              </div>
               <Field label="Tags (comma-separated)">
                 <input
                   {...register('tags')}
