@@ -1,11 +1,13 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { Link, useRouterState } from '@tanstack/react-router';
+import allBottomwearBanner from '@/assets/images/Categories/all-bottomwear.webp';
+import allTopwearBanner from '@/assets/images/Categories/all-topwear.webp';
 import bagsImage from '@/assets/images/Categories/Bags.png';
-import corsetImage from '@/assets/images/Categories/Corset.png';
+import corsetBanner from '@/assets/images/Categories/corset-banner.webp';
 import hoodieImage from '@/assets/images/Categories/Hoddiewomen.png';
-import jeansImage from '@/assets/images/Categories/Jeans.png';
+import jeansBanner from '@/assets/images/Categories/jeans-banner.webp';
 import newArrivalImage from '@/assets/images/Categories/New Arrival.png';
-import oversizedImage from '@/assets/images/Categories/Oversized.png';
+import oversizedBanner from '@/assets/images/Categories/oversized-banner.webp';
 import shoesImage from '@/assets/images/Categories/Shoes.png';
 import jacketImage from '@/assets/images/Categories/WomenJacket.png';
 import { ROUTES } from '@/constants';
@@ -30,11 +32,20 @@ type MegaMenuSpecial = {
   image: string;
 };
 
+/** Wide promo tiles under Women columns — baked-in campaign art. */
+type MegaMenuFeatured = {
+  label: string;
+  slug: string;
+  image: string;
+  imageClassName?: string;
+};
+
 type GenderMegaMenuConfig = {
   gender: MegaMenuGender;
   label: string;
   columns: MegaMenuColumn[];
   specials: MegaMenuSpecial[];
+  featured?: MegaMenuFeatured[];
 };
 
 const SHARED_TOPWEAR: MegaMenuLink[] = [
@@ -51,11 +62,44 @@ const SHARED_WINTERWEAR: MegaMenuLink[] = [
 
 const SHARED_SPECIALS: MegaMenuSpecial[] = [
   { label: 'New Arrival', slug: 'new-arrivals', image: newArrivalImage },
-  { label: 'Oversized', slug: 'oversized', image: oversizedImage },
-  { label: 'Jeans', slug: 'jeans', image: jeansImage },
+  { label: 'Oversized', slug: 'oversized', image: oversizedBanner },
+  { label: 'Jeans', slug: 'jeans', image: jeansBanner },
   { label: 'Hoodies', slug: 'hoodies', image: hoodieImage },
   { label: 'Shoes', slug: 'shoes', image: shoesImage },
   { label: 'Bags', slug: 'bags', image: bagsImage },
+];
+
+const WOMEN_FEATURED: MegaMenuFeatured[] = [
+  {
+    label: 'All Topwear',
+    slug: 'women',
+    image: allTopwearBanner,
+    imageClassName: 'object-[70%_center]',
+  },
+  {
+    label: 'All Bottomwear',
+    slug: 'women',
+    image: allBottomwearBanner,
+    imageClassName: 'object-[72%_center]',
+  },
+  {
+    label: 'Corset',
+    slug: 'corset',
+    image: corsetBanner,
+    imageClassName: 'object-[68%_center]',
+  },
+  {
+    label: 'Jeans',
+    slug: 'jeans',
+    image: jeansBanner,
+    imageClassName: 'object-[70%_center]',
+  },
+  {
+    label: 'Oversized',
+    slug: 'oversized',
+    image: oversizedBanner,
+    imageClassName: 'object-[75%_center]',
+  },
 ];
 
 const MEGA_MENUS: Record<MegaMenuGender, GenderMegaMenuConfig> = {
@@ -82,9 +126,10 @@ const MEGA_MENUS: Record<MegaMenuGender, GenderMegaMenuConfig> = {
     ],
     specials: [
       ...SHARED_SPECIALS.slice(0, 4),
-      { label: 'Corset', slug: 'corset', image: corsetImage },
+      { label: 'Corset', slug: 'corset', image: corsetBanner },
       { label: 'Jackets', slug: 'jackets', image: jacketImage },
     ],
+    featured: WOMEN_FEATURED,
   },
   men: {
     gender: 'men',
@@ -201,7 +246,7 @@ export function GenderMegaMenu({ gender, transparent, activeHref }: GenderMegaMe
         aria-label={`${config.label} categories`}
         aria-hidden={!open}
         className={cn(
-          'border-border/70 bg-background absolute left-1/2 top-full z-50 mt-3 w-[min(94vw,52rem)] -translate-x-1/2 overflow-hidden rounded-2xl border shadow-[var(--shadow-elevated)]',
+          'border-border/70 bg-background absolute left-1/2 top-full z-50 mt-3 w-[min(96vw,68rem)] -translate-x-1/2 overflow-hidden rounded-2xl border shadow-[var(--shadow-elevated)]',
           open
             ? 'pointer-events-auto visible opacity-100'
             : 'pointer-events-none invisible opacity-0',
@@ -268,7 +313,7 @@ export function GenderMegaMenu({ gender, transparent, activeHref }: GenderMegaMe
                       <Image
                         src={special.image}
                         alt=""
-                        className="size-full object-cover"
+                        className="size-full object-cover object-[center_20%]"
                         containerClassName="size-full rounded-none"
                       />
                     </span>
@@ -289,7 +334,7 @@ export function GenderMegaMenu({ gender, transparent, activeHref }: GenderMegaMe
                       <Image
                         src={special.image}
                         alt=""
-                        className="size-full object-cover"
+                        className="size-full object-cover object-[center_20%]"
                         containerClassName="size-full rounded-none"
                       />
                     </span>
@@ -302,6 +347,65 @@ export function GenderMegaMenu({ gender, transparent, activeHref }: GenderMegaMe
             </div>
           </div>
         </div>
+
+        {config.featured?.length ? (
+          <div className="border-border/50 border-t px-4 py-4 sm:px-5">
+            <p className="text-foreground mb-3 text-sm font-bold uppercase tracking-[0.12em]">
+              Shop the edit
+            </p>
+            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
+              {config.featured.map((item) => {
+                const target = megaMenuLinkTarget(item.slug, config.gender);
+                const cardClass =
+                  'group relative block aspect-[16/10] overflow-hidden rounded-xl ring-1 ring-black/5';
+                const media = (
+                  <>
+                    <Image
+                      src={item.image}
+                      alt={item.label}
+                      className={cn(
+                        'size-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.04]',
+                        item.imageClassName,
+                      )}
+                      containerClassName="absolute inset-0 size-full rounded-none"
+                    />
+                    <span
+                      aria-hidden
+                      className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent"
+                    />
+                    <span className="absolute inset-x-0 bottom-0 px-2.5 pb-2.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-white sm:text-xs">
+                      {item.label}
+                    </span>
+                  </>
+                );
+
+                return 'params' in target ? (
+                  <Link
+                    key={item.label}
+                    to={target.to}
+                    params={target.params}
+                    preload="intent"
+                    className={cardClass}
+                    onClick={() => setOpen(false)}
+                  >
+                    {media}
+                  </Link>
+                ) : (
+                  <Link
+                    key={item.label}
+                    to={target.to}
+                    search={target.search}
+                    preload="intent"
+                    className={cardClass}
+                    onClick={() => setOpen(false)}
+                  >
+                    {media}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );

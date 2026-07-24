@@ -1,20 +1,24 @@
-import promoImage from '@/assets/images/Crousel Image/womenCrousel.png';
+import newSeasonImage from '@/assets/images/Crousel Image/new-season.webp';
+import newSeasonImageMobile from '@/assets/images/Crousel Image/new-season-mobile.webp';
 import { usePromoBanners } from '@/hooks/cms';
 import type { PromoBanner } from '@/services/sdk/cms';
 import { FashionPromoBanner } from './fashion-promo-banner';
 
-const FALLBACK_EDITORIAL: PromoBanner = {
+type LocalPromoBanner = PromoBanner & { mobileImageUrl?: string };
+
+const FALLBACK_EDITORIAL: LocalPromoBanner = {
   id: 'local-editorial',
   title: 'New Season',
-  subtitle: 'The women’s edit',
-  imageUrl: promoImage,
+  subtitle: 'Effortless. Stylish. You.',
+  imageUrl: newSeasonImage,
+  mobileImageUrl: newSeasonImageMobile,
   linkUrl: '/products?gender=women',
   ctaLabel: 'Shop Now',
   placement: 'home_editorial',
   priority: 10,
 };
 
-function resolveEditorial(cmsBanners: PromoBanner[]): PromoBanner {
+function resolveEditorial(cmsBanners: PromoBanner[]): LocalPromoBanner {
   const cms = [...cmsBanners].sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0))[0];
   if (!cms) return FALLBACK_EDITORIAL;
   return {
@@ -25,11 +29,12 @@ function resolveEditorial(cmsBanners: PromoBanner[]): PromoBanner {
     linkUrl: cms.linkUrl || FALLBACK_EDITORIAL.linkUrl,
     ctaLabel: cms.ctaLabel || FALLBACK_EDITORIAL.ctaLabel,
     imageUrl: cms.imageUrl || FALLBACK_EDITORIAL.imageUrl,
+    mobileImageUrl: cms.imageUrl ? undefined : FALLBACK_EDITORIAL.mobileImageUrl,
   };
 }
 
 /**
- * Full-viewport editorial banner under the split row — women’s collection.
+ * Full-viewport editorial banner under the split row — women's collection.
  */
 export function HomeEditorialBannerSection() {
   const { data } = usePromoBanners('home_editorial');
@@ -43,7 +48,8 @@ export function HomeEditorialBannerSection() {
         title={banner.title}
         ctaLabel={banner.ctaLabel ?? 'Shop Now'}
         href={banner.linkUrl ?? '/products?gender=women'}
-        imageSrc={banner.imageUrl ?? promoImage}
+        imageSrc={banner.imageUrl ?? newSeasonImage}
+        mobileImageSrc={banner.mobileImageUrl}
         imageAlt={banner.title}
         imageClassName="object-[center_22%]"
       />

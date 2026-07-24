@@ -3,6 +3,11 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import mainBanner1 from '@/assets/images/Crousel Image/banner1.webp';
 import mainBanner2 from '@/assets/images/Crousel Image/banner2.webp';
 import mainBanner3 from '@/assets/images/Crousel Image/banner3.webp';
+// Portrait crops for small screens — filenames don't line up 1:1 with the
+// desktop numbering, so each is matched here by actual photo content.
+import mainBanner1Mobile from '@/assets/images/Crousel Image/mobile-banner3.webp';
+import mainBanner2Mobile from '@/assets/images/Crousel Image/mobile-banner1.webp';
+import mainBanner3Mobile from '@/assets/images/Crousel Image/mobile-banner2.webp';
 import { useHeroBanners } from '@/hooks/cms';
 import { ROUTES } from '@/constants';
 import { CmsLink } from '@/components/common/cms-link';
@@ -12,14 +17,18 @@ import { cn } from '@/lib/utils';
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 const AUTO_SLIDE_MS = 5000;
+const MOBILE_MEDIA_QUERY = '(max-width: 767px)';
 
-/** Always three slides — local hero art with optional CMS copy/CTA overlay. */
-const FALLBACK_HERO_BANNERS: HeroBanner[] = [
+type LocalHeroBanner = HeroBanner & { mobileImageUrl?: string };
+
+/** Local hero art with optional CMS copy/CTA overlay — mobile gets a dedicated portrait crop. */
+const FALLBACK_HERO_BANNERS: LocalHeroBanner[] = [
   {
     id: 'local-main-banner-1',
     title: 'Out of Office',
     subtitle: 'Essentials, upgraded',
     imageUrl: mainBanner1,
+    mobileImageUrl: mainBanner1Mobile,
     linkUrl: `${ROUTES.products}?gender=women`,
     ctaLabel: 'Shop Now',
   },
@@ -28,6 +37,7 @@ const FALLBACK_HERO_BANNERS: HeroBanner[] = [
     title: 'Essential Bottoms',
     subtitle: 'The women’s edit',
     imageUrl: mainBanner2,
+    mobileImageUrl: mainBanner2Mobile,
     linkUrl: `${ROUTES.products}?gender=women`,
     ctaLabel: 'Shop Now',
   },
@@ -36,6 +46,7 @@ const FALLBACK_HERO_BANNERS: HeroBanner[] = [
     title: 'Everyday Style',
     subtitle: 'Made to wear on repeat',
     imageUrl: mainBanner3,
+    mobileImageUrl: mainBanner3Mobile,
     linkUrl: `${ROUTES.products}?gender=women`,
     ctaLabel: 'Shop Now',
   },
@@ -61,7 +72,7 @@ const DOT_STROKE = 1.5;
 const DOT_RADIUS = (DOT_SIZE - DOT_STROKE) / 2;
 const DOT_CIRCUMFERENCE = 2 * Math.PI * DOT_RADIUS;
 
-function resolveHeroBanners(cmsBanners: HeroBanner[]): HeroBanner[] {
+function resolveHeroBanners(cmsBanners: HeroBanner[]): LocalHeroBanner[] {
   return FALLBACK_HERO_BANNERS.map((fallback, index) => {
     const cms = cmsBanners[index];
     if (!cms) return fallback;
@@ -72,24 +83,30 @@ function resolveHeroBanners(cmsBanners: HeroBanner[]): HeroBanner[] {
       subtitle: cms.subtitle || fallback.subtitle,
       linkUrl: cms.linkUrl || fallback.linkUrl,
       ctaLabel: cms.ctaLabel || fallback.ctaLabel,
-      // Keep local carousel images so all 3 slides always show.
+      // Keep local carousel images so all slides always show.
       imageUrl: fallback.imageUrl,
+      mobileImageUrl: fallback.mobileImageUrl,
     };
   });
 }
 
-function HeroSlide({ banner }: { banner: HeroBanner }) {
+function HeroSlide({ banner, eager }: { banner: LocalHeroBanner; eager: boolean }) {
   return (
     <div className="relative min-h-[100svh] overflow-hidden bg-zinc-950">
       {banner.imageUrl ? (
         <div className="absolute inset-0">
           <Image
             src={banner.imageUrl}
+            sources={
+              banner.mobileImageUrl
+                ? [{ media: MOBILE_MEDIA_QUERY, srcSet: banner.mobileImageUrl }]
+                : undefined
+            }
             alt={banner.title}
             className="absolute inset-0 h-full w-full object-cover"
             containerClassName="absolute inset-0"
-            loading="eager"
-            fetchPriority="high"
+            loading={eager ? 'eager' : 'lazy'}
+            fetchPriority={eager ? 'high' : 'auto'}
           />
         </div>
       ) : (
@@ -211,7 +228,7 @@ function HeroDot({
   );
 }
 
-function HeroCarousel({ banners }: { banners: HeroBanner[] }) {
+function HeroCarousel({ banners }: { banners: LocalHeroBanner[] }) {
   const [index, setIndex] = useState(0);
   const [direction, setDirection] = useState(-1);
   const reduceMotion = useReducedMotion();
@@ -247,7 +264,7 @@ function HeroCarousel({ banners }: { banners: HeroBanner[] }) {
             transition={{ duration: 0.9, ease: EASE }}
             className="absolute inset-0 w-full"
           >
-            <HeroSlide banner={active} />
+            <HeroSlide banner={active} eager={index === 0} />
           </motion.div>
         </AnimatePresence>
       </div>

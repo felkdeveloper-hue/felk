@@ -126,11 +126,50 @@ export class PaymentService {
         NON_TERMINAL_STATUSES.includes(payment.status as never) &&
         payment.expiresAt > new Date()
       ) {
+        const methodChanged = payment.method !== payload.method;
+
+        if (methodChanged) {
+          // Customer switched gateway on the checkout UI — do not reuse the old redirect.
+          payment.method = payload.method;
+          if (payload.returnUrl) payment.returnUrl = payload.returnUrl;
+          if (payload.cancelUrl) payment.cancelUrl = payload.cancelUrl;
+          payment.redirectUrl = null;
+          if (payment.metadata?.redirectForm) {
+            const { redirectForm: _removed, ...rest } = payment.metadata;
+            payment.metadata = rest;
+          }
+          await payment.save();
+          return this.createAttempt(payment, customer, actor);
+        }
+
         if (payment.attemptCount === 0) {
           // Payment doc exists but its first attempt never completed (e.g. crash
           // between create() and createAttempt()) — finish creating it now.
+          if (payload.returnUrl) payment.returnUrl = payload.returnUrl;
+          if (payload.cancelUrl) payment.cancelUrl = payload.cancelUrl;
+          await payment.save();
           return this.createAttempt(payment, customer, actor);
         }
+
+        // Stale PayHere form after PAYHERE_MODE switch (sandbox <-> live) must be rebuilt.
+        const storedAction =
+          typeof payment.metadata?.redirectForm?.action === 'string'
+            ? payment.metadata.redirectForm.action
+            : '';
+        const expectedHost =
+          appConfig.payment.payhere.mode === 'live' ? 'www.payhere.lk' : 'sandbox.payhere.lk';
+        if (
+          payment.method === PAYMENT_METHOD.PAYHERE &&
+          storedAction &&
+          !storedAction.includes(expectedHost)
+        ) {
+          payment.redirectUrl = null;
+          const { redirectForm: _removed, ...rest } = payment.metadata ?? {};
+          payment.metadata = rest;
+          await payment.save();
+          return this.createAttempt(payment, customer, actor);
+        }
+
         // Idempotent — same in-flight payment. For COD, still ensure order exists.
         await fulfillCodPaymentIfNeeded(payment);
         return {

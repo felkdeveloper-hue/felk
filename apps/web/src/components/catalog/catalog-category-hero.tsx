@@ -1,23 +1,74 @@
 import { useEffect, useRef, useState } from 'react';
+import allBottomwearBanner from '@/assets/images/Categories/all-bottomwear.webp';
+import allBottomwearBannerMobile from '@/assets/images/Categories/all-bottomwear-mobile.webp';
+import allTopwearBanner from '@/assets/images/Categories/all-topwear.webp';
+import corsetBanner from '@/assets/images/Categories/corset-banner.webp';
+import corsetBannerMobile from '@/assets/images/Categories/corset-banner-mobile.webp';
+import jeansBanner from '@/assets/images/Categories/jeans-banner.webp';
+import jeansBannerMobile from '@/assets/images/Categories/jeans-banner-mobile.webp';
+import oversizedBanner from '@/assets/images/Categories/oversized-banner.webp';
 import { cn } from '@/lib/utils';
 
-/** Curated fallback images keyed by gender or category slug. */
-const HERO_FALLBACKS: Record<string, string> = {
-  women: '/catalog/women/women-08.jpg',
-  men: '/catalog/women/women-14.jpg',
-  accessories: '/catalog/categories/bags.png',
-  bags: '/catalog/categories/bags.png',
-  'bags-wallets': '/catalog/categories/bags.png',
-  hoodies: '/catalog/categories/hoodies.png',
-  jackets: '/catalog/categories/jackets.png',
-  jeans: '/catalog/categories/jeans.png',
-  'new-arrivals': '/catalog/categories/new-arrivals.png',
-  oversized: '/catalog/categories/oversized.png',
-  shoes: '/catalog/categories/shoes.png',
-  corset: '/catalog/categories/corset.png',
+type HeroArt = {
+  desktop: string;
+  mobile?: string;
+  /** Campaign art already has title/tagline baked in — skip HTML copy. */
+  bakedCopy?: boolean;
+  objectClass?: string;
 };
 
-/** One sentence taglines per scope. */
+/** Curated campaign art keyed by gender or category slug. */
+const HERO_FALLBACKS: Record<string, HeroArt> = {
+  women: {
+    desktop: allTopwearBanner,
+    bakedCopy: true,
+    objectClass: 'object-[70%_center]',
+  },
+  men: { desktop: '/catalog/women/women-14.jpg' },
+  accessories: { desktop: '/catalog/categories/bags.png' },
+  bags: { desktop: '/catalog/categories/bags.png' },
+  'bags-wallets': { desktop: '/catalog/categories/bags.png' },
+  hoodies: { desktop: '/catalog/categories/hoodies.png' },
+  jackets: { desktop: '/catalog/categories/jackets.png' },
+  jeans: {
+    desktop: jeansBanner,
+    mobile: jeansBannerMobile,
+    bakedCopy: true,
+    objectClass: 'object-[70%_center] md:object-[68%_center]',
+  },
+  'new-arrivals': { desktop: '/catalog/categories/new-arrivals.png' },
+  oversized: {
+    desktop: oversizedBanner,
+    bakedCopy: true,
+    objectClass: 'object-[75%_center]',
+  },
+  shoes: { desktop: '/catalog/categories/shoes.png' },
+  corset: {
+    desktop: corsetBanner,
+    mobile: corsetBannerMobile,
+    bakedCopy: true,
+    objectClass: 'object-[68%_center]',
+  },
+  'all-topwear': {
+    desktop: allTopwearBanner,
+    bakedCopy: true,
+    objectClass: 'object-[70%_center]',
+  },
+  'all-bottomwear': {
+    desktop: allBottomwearBanner,
+    mobile: allBottomwearBannerMobile,
+    bakedCopy: true,
+    objectClass: 'object-[72%_center]',
+  },
+};
+
+const DEFAULT_HERO: HeroArt = {
+  desktop: allTopwearBanner,
+  bakedCopy: true,
+  objectClass: 'object-[70%_center]',
+};
+
+/** One sentence taglines per scope (only used when art has no baked copy). */
 const TAGLINES: Record<string, string> = {
   women: 'Essential layering · Minimal silhouettes that still make an entrance.',
   men: 'Clean cuts · Considered materials for the modern wardrobe.',
@@ -28,17 +79,27 @@ const TAGLINES: Record<string, string> = {
   jeans: 'The right fit for every occasion.',
   shoes: 'Step out with intention.',
   oversized: 'Comfort without compromise.',
+  corset: 'Shape. Style. Confidence.',
 };
+
+const MOBILE_MEDIA = '(max-width: 767px)';
 
 export interface CatalogCategoryHeroProps {
   title: string;
   /** Slug or gender key used to pick the curated fallback. */
   scopeKey?: string;
-  /** CMS-supplied image URL — takes priority over fallback. */
+  /** CMS-supplied image URL — only used when no curated campaign art exists. */
   imageUrl?: string | null;
   /** Short tagline. Auto-resolved from scopeKey when omitted. */
   tagline?: string;
   className?: string;
+}
+
+function resolveHeroArt(scopeKey?: string, imageUrl?: string | null): HeroArt {
+  const curated = scopeKey ? HERO_FALLBACKS[scopeKey] : undefined;
+  if (curated) return curated;
+  if (imageUrl) return { desktop: imageUrl };
+  return DEFAULT_HERO;
 }
 
 export function CatalogCategoryHero({
@@ -48,10 +109,9 @@ export function CatalogCategoryHero({
   tagline,
   className,
 }: CatalogCategoryHeroProps) {
-  const src =
-    imageUrl ??
-    (scopeKey ? (HERO_FALLBACKS[scopeKey] ?? HERO_FALLBACKS['women']) : HERO_FALLBACKS['women']);
-  const resolvedTagline = tagline ?? (scopeKey ? TAGLINES[scopeKey] : undefined);
+  const art = resolveHeroArt(scopeKey, imageUrl);
+  const showCopy = !art.bakedCopy;
+  const resolvedTagline = tagline ?? (scopeKey && showCopy ? TAGLINES[scopeKey] : undefined);
 
   const [loaded, setLoaded] = useState(false);
   const [visible, setVisible] = useState(false);
@@ -63,48 +123,69 @@ export function CatalogCategoryHero({
     return () => clearTimeout(t);
   }, []);
 
+  useEffect(() => {
+    setLoaded(false);
+  }, [art.desktop, art.mobile]);
+
   return (
     <section
       ref={ref}
       aria-label={`${title} banner`}
-      className={cn('relative h-[38vw] max-h-96 min-h-52 w-full overflow-hidden', className)}
+      className={cn(
+        'relative h-[min(58vw,22rem)] w-full overflow-hidden sm:h-[38vw] sm:max-h-96 sm:min-h-52',
+        className,
+      )}
     >
-      {/* Background image */}
-      <img
-        src={src}
-        alt=""
-        aria-hidden
-        loading="eager"
-        decoding="async"
-        onLoad={() => setLoaded(true)}
+      <picture>
+        {art.mobile ? <source media={MOBILE_MEDIA} srcSet={art.mobile} /> : null}
+        <img
+          src={art.desktop}
+          alt=""
+          aria-hidden
+          loading="eager"
+          decoding="async"
+          fetchPriority="high"
+          onLoad={() => setLoaded(true)}
+          className={cn(
+            'duration-1200 absolute inset-0 h-full w-full object-cover transition-[opacity,transform] ease-out',
+            art.objectClass,
+            loaded ? 'scale-100 opacity-100' : 'scale-[1.03] opacity-0',
+          )}
+        />
+      </picture>
+
+      {/* Light readability veil — campaign art already carries its own type */}
+      <div
         className={cn(
-          'duration-1200 absolute inset-0 h-full w-full object-cover transition-[opacity,transform] ease-out',
-          loaded ? 'scale-100 opacity-100' : 'scale-[1.03] opacity-0',
+          'absolute inset-0',
+          showCopy
+            ? 'bg-linear-to-b from-black/50 via-black/30 to-black/70'
+            : 'bg-linear-to-t from-black/25 via-transparent to-black/10',
         )}
       />
 
-      {/* Gradient overlay — bottom-heavy so products below still read clean */}
-      <div className="bg-linear-to-b absolute inset-0 from-black/50 via-black/30 to-black/70" />
-
-      {/* Text block — centred, minimal */}
-      <div
-        className={cn(
-          'absolute inset-0 flex flex-col items-center justify-end pb-10 text-white transition-[opacity,transform] duration-700 ease-out sm:pb-14',
-          visible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0',
-        )}
-      >
-        <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.28em] text-white/65">
-          FE Collection
-        </p>
-        <h1 className="font-display text-5xl font-bold uppercase leading-none tracking-[-0.03em] sm:text-7xl">
-          {title}
-        </h1>
-        {resolvedTagline ? (
-          <p className="mt-4 max-w-md px-6 text-center text-xs tracking-wider text-white/60 sm:text-sm">
-            {resolvedTagline}
+      {showCopy ? (
+        <div
+          className={cn(
+            'absolute inset-0 flex flex-col items-center justify-end pb-10 text-white transition-[opacity,transform] duration-700 ease-out sm:pb-14',
+            visible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0',
+          )}
+        >
+          <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.28em] text-white/65">
+            FE Collection
           </p>
-        ) : null}
-      </div>
+          <h1 className="font-display text-5xl font-bold uppercase leading-none tracking-[-0.03em] sm:text-7xl">
+            {title}
+          </h1>
+          {resolvedTagline ? (
+            <p className="mt-4 max-w-md px-6 text-center text-xs tracking-wider text-white/60 sm:text-sm">
+              {resolvedTagline}
+            </p>
+          ) : null}
+        </div>
+      ) : (
+        <h1 className="sr-only">{title}</h1>
+      )}
     </section>
   );
 }

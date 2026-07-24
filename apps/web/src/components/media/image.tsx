@@ -3,9 +3,21 @@ import { ImageOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 
+export interface ImageSource {
+  srcSet: string;
+  media?: string;
+  type?: string;
+}
+
 export interface ImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {
   containerClassName?: string;
   aspectRatio?: string;
+  /**
+   * Extra `<source>` candidates rendered inside a `<picture>` wrapper, e.g. a
+   * portrait crop for mobile via `{ media: '(max-width: 767px)', srcSet: mobileSrc }`.
+   * The browser downloads only the matching source — never both.
+   */
+  sources?: ImageSource[];
 }
 
 function markIfComplete(
@@ -25,6 +37,7 @@ export const Image = React.forwardRef<HTMLImageElement, ImageProps>(
       className,
       containerClassName,
       aspectRatio,
+      sources,
       loading = 'lazy',
       decoding = 'async',
       onLoad,
@@ -66,27 +79,47 @@ export const Image = React.forwardRef<HTMLImageElement, ImageProps>(
             <ImageOff className="size-6" />
           </div>
         ) : (
-          <img
-            ref={setRefs}
-            src={src}
-            alt={alt}
-            loading={loading}
-            decoding={decoding}
-            className={cn(
-              'size-full object-cover transition-opacity duration-300',
-              status === 'loaded' ? 'opacity-100' : 'opacity-0',
-              className,
-            )}
-            onLoad={(event) => {
-              setStatus('loaded');
-              onLoad?.(event);
-            }}
-            onError={(event) => {
-              setStatus('error');
-              onError?.(event);
-            }}
-            {...props}
-          />
+          (() => {
+            const img = (
+              <img
+                ref={setRefs}
+                src={src}
+                alt={alt}
+                loading={loading}
+                decoding={decoding}
+                className={cn(
+                  'size-full object-cover transition-opacity duration-300',
+                  status === 'loaded' ? 'opacity-100' : 'opacity-0',
+                  className,
+                )}
+                onLoad={(event) => {
+                  setStatus('loaded');
+                  onLoad?.(event);
+                }}
+                onError={(event) => {
+                  setStatus('error');
+                  onError?.(event);
+                }}
+                {...props}
+              />
+            );
+
+            if (!sources?.length) return img;
+
+            return (
+              <picture>
+                {sources.map((source) => (
+                  <source
+                    key={source.srcSet}
+                    srcSet={source.srcSet}
+                    media={source.media}
+                    type={source.type}
+                  />
+                ))}
+                {img}
+              </picture>
+            );
+          })()
         )}
       </div>
     );

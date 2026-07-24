@@ -1,14 +1,19 @@
-import bottomsImage from '@/assets/images/Categories/Jeans.png';
-import topsImage from '@/assets/images/Categories/Corset.png';
+import bottomsImage from '@/assets/images/Crousel Image/bottoms.webp';
+import bottomsImageMobile from '@/assets/images/Crousel Image/bottoms-mobile.webp';
+import topsImage from '@/assets/images/Crousel Image/tops.webp';
+import topsImageMobile from '@/assets/images/Crousel Image/tops-mobile.webp';
 import { usePromoBanners } from '@/hooks/cms';
 import type { PromoBanner } from '@/services/sdk/cms';
 import { FashionPromoBanner } from './fashion-promo-banner';
 
-const FALLBACK_SPLIT: PromoBanner[] = [
+type LocalPromoBanner = PromoBanner & { mobileImageUrl?: string };
+
+const FALLBACK_SPLIT: LocalPromoBanner[] = [
   {
     id: 'local-split-bottoms',
     title: 'Bottoms',
     imageUrl: bottomsImage,
+    mobileImageUrl: bottomsImageMobile,
     linkUrl: '/products?gender=women',
     ctaLabel: 'Shop Now',
     placement: 'home_split',
@@ -18,6 +23,7 @@ const FALLBACK_SPLIT: PromoBanner[] = [
     id: 'local-split-tops',
     title: 'Tops',
     imageUrl: topsImage,
+    mobileImageUrl: topsImageMobile,
     linkUrl: '/products?gender=women',
     ctaLabel: 'Shop Now',
     placement: 'home_split',
@@ -25,7 +31,7 @@ const FALLBACK_SPLIT: PromoBanner[] = [
   },
 ];
 
-function resolveSplitBanners(cmsBanners: PromoBanner[]): PromoBanner[] {
+function resolveSplitBanners(cmsBanners: PromoBanner[]): LocalPromoBanner[] {
   const sorted = [...cmsBanners].sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
   return FALLBACK_SPLIT.map((fallback, index) => {
     const cms = sorted[index];
@@ -38,6 +44,7 @@ function resolveSplitBanners(cmsBanners: PromoBanner[]): PromoBanner[] {
       linkUrl: cms.linkUrl || fallback.linkUrl,
       ctaLabel: cms.ctaLabel || fallback.ctaLabel,
       imageUrl: cms.imageUrl || fallback.imageUrl,
+      mobileImageUrl: cms.imageUrl ? undefined : fallback.mobileImageUrl,
       priority: cms.priority ?? fallback.priority,
     };
   });
@@ -61,8 +68,9 @@ export function HomeSplitBannersSection() {
           ctaLabel={banner.ctaLabel ?? 'Shop Now'}
           href={banner.linkUrl ?? '/products?gender=women'}
           imageSrc={banner.imageUrl ?? (index === 0 ? bottomsImage : topsImage)}
+          mobileImageSrc={banner.mobileImageUrl}
           imageAlt={banner.title}
-          imageClassName={index === 0 ? 'object-[center_28%]' : 'object-[center_18%]'}
+          imageClassName={index === 0 ? 'object-[62%_35%]' : 'object-[68%_30%]'}
         />
       ))}
     </section>

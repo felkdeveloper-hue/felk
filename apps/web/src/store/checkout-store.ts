@@ -11,7 +11,6 @@ interface CheckoutState {
   selectedBillingAddressId: string | null;
   selectedShippingMethod: ShippingMethod;
   selectedPaymentMethod: PaymentMethod | null;
-  termsAccepted: boolean;
   isRedirectingToGateway: boolean;
 }
 
@@ -22,7 +21,6 @@ interface CheckoutActions {
   setSelectedBillingAddressId: (id: string | null) => void;
   setSelectedShippingMethod: (method: ShippingMethod) => void;
   setSelectedPaymentMethod: (method: PaymentMethod | null) => void;
-  setTermsAccepted: (value: boolean) => void;
   setRedirectingToGateway: (value: boolean) => void;
   resetCheckoutUi: () => void;
 }
@@ -36,7 +34,6 @@ const initialState: CheckoutState = {
   selectedBillingAddressId: null,
   selectedShippingMethod: 'standard',
   selectedPaymentMethod: null,
-  termsAccepted: false,
   isRedirectingToGateway: false,
 };
 
@@ -57,8 +54,6 @@ export const useCheckoutStore = create<CheckoutStore>()(
       setSelectedShippingMethod: (selectedShippingMethod) => set({ selectedShippingMethod }),
 
       setSelectedPaymentMethod: (selectedPaymentMethod) => set({ selectedPaymentMethod }),
-
-      setTermsAccepted: (termsAccepted) => set({ termsAccepted }),
 
       setRedirectingToGateway: (isRedirectingToGateway) => set({ isRedirectingToGateway }),
 

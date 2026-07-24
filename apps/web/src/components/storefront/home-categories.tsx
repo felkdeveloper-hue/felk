@@ -2,28 +2,34 @@ import { useMemo } from 'react';
 import { Link } from '@tanstack/react-router';
 import { motion, useReducedMotion } from 'framer-motion';
 import bagsImage from '@/assets/images/Categories/Bags.png';
-import corsetImage from '@/assets/images/Categories/Corset.png';
+import corsetImage from '@/assets/images/Categories/corset-banner-mobile.webp';
 import hoodieImage from '@/assets/images/Categories/Hoddiewomen.png';
-import jeansImage from '@/assets/images/Categories/Jeans.png';
+import jeansImage from '@/assets/images/Categories/jeans-banner-mobile.webp';
 import newArrivalImage from '@/assets/images/Categories/New Arrival.png';
-import oversizedImage from '@/assets/images/Categories/Oversized.png';
+import oversizedImage from '@/assets/images/Categories/oversized-banner.webp';
 import shoesImage from '@/assets/images/Categories/Shoes.png';
 import jacketImage from '@/assets/images/Categories/WomenJacket.png';
 import { Section } from '@/components/common/section';
 import { Image } from '@/components/media/image';
 import { useCategoriesList } from '@/hooks/catalog/use-categories';
+import { cn } from '@/lib/utils';
 import type { Category } from '@/services/sdk';
 import { MotionItem, MotionReveal } from './motion-reveal';
 
 const FALLBACK_TILES = [
-  { slug: 'new-arrivals', name: 'New Arrival', image: newArrivalImage },
-  { slug: 'jeans', name: 'Jeans', image: jeansImage },
-  { slug: 'oversized', name: 'Oversized', image: oversizedImage },
-  { slug: 'corset', name: 'Corset', image: corsetImage },
-  { slug: 'hoodies', name: 'Hoodies', image: hoodieImage },
-  { slug: 'jackets', name: 'Jackets', image: jacketImage },
-  { slug: 'bags', name: 'Bags', image: bagsImage },
-  { slug: 'shoes', name: 'Shoes', image: shoesImage },
+  { slug: 'new-arrivals', name: 'New Arrival', image: newArrivalImage, objectClass: undefined },
+  { slug: 'jeans', name: 'Jeans', image: jeansImage, objectClass: 'object-[center_18%]' },
+  {
+    slug: 'oversized',
+    name: 'Oversized',
+    image: oversizedImage,
+    objectClass: 'object-[78%_center]',
+  },
+  { slug: 'corset', name: 'Corset', image: corsetImage, objectClass: 'object-[center_22%]' },
+  { slug: 'hoodies', name: 'Hoodies', image: hoodieImage, objectClass: undefined },
+  { slug: 'jackets', name: 'Jackets', image: jacketImage, objectClass: undefined },
+  { slug: 'bags', name: 'Bags', image: bagsImage, objectClass: undefined },
+  { slug: 'shoes', name: 'Shoes', image: shoesImage, objectClass: undefined },
 ] as const;
 
 type HomeCategoryTile = {
@@ -31,6 +37,7 @@ type HomeCategoryTile = {
   slug: string;
   name: string;
   imageUrl: string;
+  objectClass?: string;
 };
 
 function resolveHomeTiles(apiCategories: Category[] | undefined): HomeCategoryTile[] {
@@ -49,6 +56,7 @@ function resolveHomeTiles(apiCategories: Category[] | undefined): HomeCategoryTi
       slug: matched?.slug ?? tile.slug,
       name: matched?.name ?? tile.name,
       imageUrl: tile.image,
+      objectClass: tile.objectClass,
     };
   });
 }
@@ -93,7 +101,10 @@ export function HomeCategoriesSection() {
                     src={category.imageUrl}
                     alt={category.name}
                     aspectRatio="3/4"
-                    className="transition-transform duration-700 ease-out group-hover:scale-[1.06]"
+                    className={cn(
+                      'transition-transform duration-700 ease-out group-hover:scale-[1.06]',
+                      category.objectClass,
+                    )}
                   />
                 ) : (
                   <div className="bg-muted aspect-[3/4] w-full" />

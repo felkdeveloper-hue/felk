@@ -8,6 +8,8 @@ export interface FashionPromoBannerProps {
   ctaLabel?: string;
   href: string;
   imageSrc: string;
+  /** Portrait crop shown on screens below `md` (767px), if provided. */
+  mobileImageSrc?: string;
   imageAlt: string;
   /** Full viewport height (matches hero / editorial) */
   size?: 'full' | 'half';
@@ -25,6 +27,7 @@ export function FashionPromoBanner({
   ctaLabel = 'Shop Now',
   href,
   imageSrc,
+  mobileImageSrc,
   imageAlt,
   size = 'half',
   className,
@@ -41,6 +44,9 @@ export function FashionPromoBanner({
     >
       <Image
         src={imageSrc}
+        sources={
+          mobileImageSrc ? [{ media: '(max-width: 767px)', srcSet: mobileImageSrc }] : undefined
+        }
         alt={imageAlt}
         className={cn('absolute inset-0 h-full w-full object-cover', imageClassName)}
         containerClassName="absolute inset-0"

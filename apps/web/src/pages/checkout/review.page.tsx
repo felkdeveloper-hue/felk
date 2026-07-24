@@ -11,8 +11,6 @@ import {
 import { AuthErrorAlert } from '@/components/auth/auth-error-alert';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PAYMENT_METHOD_OPTIONS, SHIPPING_METHOD_OPTIONS } from '@/constants/checkout.constants';
 import { ROUTES } from '@/constants';
@@ -136,8 +134,6 @@ export function CheckoutReviewPage() {
   const navigate = useNavigate();
   const checkoutToken = useCheckoutStore((state) => state.checkoutToken);
   const paymentMethod = useCheckoutStore((state) => state.selectedPaymentMethod);
-  const terms = useCheckoutStore((state) => state.termsAccepted);
-  const setTermsAccepted = useCheckoutStore((state) => state.setTermsAccepted);
 
   const sessionQuery = useCheckoutSessionQuery();
   const validateCheckout = useValidateCheckoutMutation();
@@ -162,7 +158,7 @@ export function CheckoutReviewPage() {
   }, [session?.checkoutToken]);
 
   const handlePlaceOrder = () => {
-    if (!session?.checkoutToken || !paymentMethod || !terms) return;
+    if (!session?.checkoutToken || !paymentMethod) return;
 
     placeOrder.mutate(
       { checkoutToken: session.checkoutToken, method: paymentMethod },
@@ -209,8 +205,7 @@ export function CheckoutReviewPage() {
   const placeOrderError = placeOrder.error;
   const validationIssues = validateCheckout.data?.issues ?? session?.validationIssues;
   const hasBlockingIssues = validationIssues?.some((issue) => issue.severity !== 'warning');
-  const canPlaceOrder =
-    Boolean(terms && paymentMethod && session?.readyForPayment) && !hasBlockingIssues;
+  const canPlaceOrder = Boolean(paymentMethod && session?.readyForPayment) && !hasBlockingIssues;
 
   if (sessionQuery.isLoading) {
     return (
@@ -281,57 +276,61 @@ export function CheckoutReviewPage() {
               ) : null}
             </div>
 
-            <ReviewSection
-              icon={Truck}
-              title="Delivery"
-              editTo={ROUTES.checkoutShipping}
-              editLabel="Change"
-            >
-              <p className="font-medium capitalize">{shippingLabel(session.shippingMethod)}</p>
-              {shippingDescription(session.shippingMethod) ? (
-                <p className="text-muted-foreground mt-1 text-sm">
-                  {shippingDescription(session.shippingMethod)}
-                </p>
-              ) : null}
-              <p className="text-muted-foreground mt-2 text-sm">
-                Shipping:{' '}
-                <span className="text-foreground font-medium">
-                  {formatCurrency(session.totals.shipping, session.currency)}
-                </span>
-              </p>
-            </ReviewSection>
-
-            <ReviewSection
-              icon={ShieldCheck}
-              title="Payment"
-              editTo={ROUTES.checkoutPayment}
-              editLabel="Change"
-            >
-              <div className="flex flex-wrap items-center gap-4">
-                {selectedPayment ? (
-                  <div className="bg-background border-border/70 flex h-12 w-[148px] items-center justify-center rounded-xl border px-2">
-                    <img
-                      src={selectedPayment.logoSrc}
-                      alt=""
-                      width={140}
-                      height={36}
-                      className="h-9 w-auto max-w-full object-contain"
-                    />
-                  </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <ReviewSection
+                icon={Truck}
+                title="Delivery"
+                editTo={ROUTES.checkoutShipping}
+                editLabel="Change"
+              >
+                <p className="font-medium capitalize">{shippingLabel(session.shippingMethod)}</p>
+                {shippingDescription(session.shippingMethod) ? (
+                  <p className="text-muted-foreground mt-1 text-sm">
+                    {shippingDescription(session.shippingMethod)}
+                  </p>
                 ) : null}
-                <div className="min-w-0">
-                  <p className="font-medium">
-                    {selectedPayment?.label ?? paymentMethod?.replace(/_/g, ' ') ?? 'Not selected'}
-                  </p>
-                  <p className="text-muted-foreground mt-0.5 text-sm">
-                    {isCod
-                      ? 'Pay in cash when your order is delivered.'
-                      : (selectedPayment?.description ??
-                        'You will complete payment on the next screen.')}
-                  </p>
+                <p className="text-muted-foreground mt-2 text-sm">
+                  Shipping:{' '}
+                  <span className="text-foreground font-medium">
+                    {formatCurrency(session.totals.shipping, session.currency)}
+                  </span>
+                </p>
+              </ReviewSection>
+
+              <ReviewSection
+                icon={ShieldCheck}
+                title="Payment"
+                editTo={ROUTES.checkoutPayment}
+                editLabel="Change"
+              >
+                <div className="flex flex-wrap items-center gap-4">
+                  {selectedPayment ? (
+                    <div className="bg-background border-border/70 flex h-12 w-[148px] items-center justify-center rounded-xl border px-2">
+                      <img
+                        src={selectedPayment.logoSrc}
+                        alt=""
+                        width={140}
+                        height={36}
+                        className="h-9 w-auto max-w-full object-contain"
+                      />
+                    </div>
+                  ) : null}
+                  <div className="min-w-0">
+                    <p className="font-medium">
+                      {selectedPayment?.label ??
+                        paymentMethod?.replace(/_/g, ' ') ??
+                        'Not selected'}
+                    </p>
+                    <p className="text-muted-foreground mt-0.5 text-sm">
+                      {isCod
+                        ? 'Pay in cash when your order is delivered.'
+                        : (selectedPayment?.description ??
+                          'You will complete payment on the next screen.')}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            </ReviewSection>
+              </ReviewSection>
+            </div>
 
             <div className="border-border from-muted/40 to-card rounded-2xl border bg-gradient-to-br p-5">
               <div className="flex flex-wrap items-end justify-between gap-3">
@@ -349,39 +348,6 @@ export function CheckoutReviewPage() {
                     : 'After you place the order, you will be redirected to a secure payment page.'}
                 </p>
               </div>
-            </div>
-
-            <div className="border-border rounded-2xl border p-4">
-              <div className="flex items-start gap-3">
-                <Checkbox
-                  id="terms-accepted"
-                  checked={terms}
-                  onCheckedChange={(checked) => setTermsAccepted(checked === true)}
-                  className="mt-0.5"
-                />
-                <Label htmlFor="terms-accepted" className="text-sm font-normal leading-relaxed">
-                  I agree to the{' '}
-                  <Link
-                    to={ROUTES.terms}
-                    className="text-foreground font-medium underline-offset-4 hover:underline"
-                  >
-                    terms and conditions
-                  </Link>{' '}
-                  and{' '}
-                  <Link
-                    to={ROUTES.privacy}
-                    className="text-foreground font-medium underline-offset-4 hover:underline"
-                  >
-                    privacy policy
-                  </Link>
-                  .
-                </Label>
-              </div>
-              {!terms ? (
-                <p className="text-muted-foreground mt-3 pl-7 text-xs">
-                  Accept the terms to enable Place order.
-                </p>
-              ) : null}
             </div>
 
             {placeOrderError ? (
