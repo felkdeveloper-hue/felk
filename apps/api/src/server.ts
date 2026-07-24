@@ -9,6 +9,7 @@ import {
   catchUpOrphanCodPayments,
 } from '@/services/order-payment-consumer.service';
 import { startCronJobs } from '@/cron';
+import { verifyEmailTransporter } from '@/services/email/transporter';
 
 async function bootstrap(): Promise<void> {
   const app = createApp();
@@ -16,6 +17,8 @@ async function bootstrap(): Promise<void> {
 
   try {
     await connectDatabase();
+
+    void verifyEmailTransporter();
 
     // Order Management subscribes to PaymentSucceeded in-process, then
     // catches up on anything published while no one was listening (e.g. a

@@ -1,4 +1,4 @@
-import { Link } from '@tanstack/react-router';
+import { Link, useNavigate } from '@tanstack/react-router';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ROUTES } from '@/constants';
@@ -14,11 +14,11 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/forms/form-field';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
 export function ForgotPasswordForm() {
+  const navigate = useNavigate();
   const forgotMutation = useForgotPasswordMutation();
 
   const form = useForm<ForgotPasswordFormValues>({
@@ -27,41 +27,21 @@ export function ForgotPasswordForm() {
   });
 
   const onSubmit = (values: ForgotPasswordFormValues) => {
-    forgotMutation.mutate(values.email);
+    forgotMutation.mutate(values.email, {
+      onSuccess: (result) => {
+        navigate({
+          to: ROUTES.authResetPassword,
+          search: { email: values.email, devResetCode: result.devResetCode },
+        });
+      },
+    });
   };
-
-  if (forgotMutation.isSuccess) {
-    return (
-      <div>
-        <AuthFormHeader
-          title="Check your email"
-          description="If an account exists for that address, we sent password reset instructions."
-        />
-        <Alert variant="success">
-          <AlertDescription>
-            Didn&apos;t receive it? Check spam or{' '}
-            <button
-              type="button"
-              className="text-foreground font-medium underline-offset-4 hover:underline"
-              onClick={() => forgotMutation.reset()}
-            >
-              try again
-            </button>
-            .
-          </AlertDescription>
-        </Alert>
-        <Button asChild variant="outline" size="lg" className="mt-6 w-full">
-          <Link to={ROUTES.authLogin}>Back to sign in</Link>
-        </Button>
-      </div>
-    );
-  }
 
   return (
     <div>
       <AuthFormHeader
         title="Forgot password"
-        description="Enter your email and we'll send a link to reset your password."
+        description="Enter your email and we'll send you a 6-digit code to reset your password."
       />
 
       {forgotMutation.error ? (
@@ -93,7 +73,7 @@ export function ForgotPasswordForm() {
           />
 
           <Button type="submit" size="lg" className="w-full" loading={forgotMutation.isPending}>
-            Send reset link
+            Send reset code
           </Button>
         </form>
       </Form>

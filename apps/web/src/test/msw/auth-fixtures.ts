@@ -114,37 +114,67 @@ export const authHandlers = [
   ),
 
   http.post(`${API}/auth/reset-password`, async ({ request }) => {
-    const body = (await request.json()) as { token: string; password: string };
-    if (body.token === 'expired') {
+    const body = (await request.json()) as { email: string; code: string; password: string };
+    if (body.code === '000000') {
       return HttpResponse.json(
-        { success: false, error: { message: 'Token expired', code: 'TOKEN_EXPIRED' } },
-        { status: 400 },
-      );
-    }
-    if (body.token === 'invalid') {
-      return HttpResponse.json(
-        { success: false, error: { message: 'Invalid token', code: 'INVALID_TOKEN' } },
+        {
+          success: false,
+          error: { message: 'Invalid or expired reset code', code: 'INVALID_RESET_CODE' },
+        },
         { status: 400 },
       );
     }
     return HttpResponse.json({ success: true, data: { message: 'Password reset successful' } });
   }),
 
+  http.post(`${API}/auth/verify-otp`, async ({ request }) => {
+    const body = (await request.json()) as { email: string; otp: string };
+    if (body.otp === '000000') {
+      return HttpResponse.json(
+        {
+          success: false,
+          error: { message: 'Invalid or expired verification code', code: 'INVALID_VERIFY_CODE' },
+        },
+        { status: 400 },
+      );
+    }
+    return HttpResponse.json({
+      success: true,
+      data: {
+        accessToken: 'mock-access-token',
+        refreshToken: 'mock-refresh-token',
+        expiresIn: 900,
+        tokenType: 'Bearer',
+        user: mockAuthUser,
+      },
+    });
+  }),
+
+  http.post(`${API}/auth/resend-otp`, () =>
+    HttpResponse.json({ success: true, data: { message: 'Verification email sent' } }),
+  ),
+
   http.post(`${API}/auth/verify-email`, async ({ request }) => {
-    const body = (await request.json()) as { token: string };
-    if (body.token === 'expired') {
+    const body = (await request.json()) as { email: string; code: string };
+    if (body.code === '000000') {
       return HttpResponse.json(
-        { success: false, error: { message: 'Token expired', code: 'TOKEN_EXPIRED' } },
+        {
+          success: false,
+          error: { message: 'Invalid or expired verification code', code: 'INVALID_VERIFY_CODE' },
+        },
         { status: 400 },
       );
     }
-    if (body.token === 'invalid') {
-      return HttpResponse.json(
-        { success: false, error: { message: 'Invalid token', code: 'INVALID_TOKEN' } },
-        { status: 400 },
-      );
-    }
-    return HttpResponse.json({ success: true, data: { message: 'Email verified' } });
+    return HttpResponse.json({
+      success: true,
+      data: {
+        accessToken: 'mock-access-token',
+        refreshToken: 'mock-refresh-token',
+        expiresIn: 900,
+        tokenType: 'Bearer',
+        user: mockAuthUser,
+      },
+    });
   }),
 
   http.post(`${API}/auth/resend-verification`, () =>

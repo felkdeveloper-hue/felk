@@ -63,7 +63,7 @@ const userSchema = new Schema<UserDocument>(
   { timestamps: true, collection: 'users' },
 );
 
-userSchema.index({ email: 1 }, { unique: true });
+userSchema.index({ email: 1 }, { unique: true, partialFilterExpression: { isDeleted: false } });
 userSchema.index({ googleId: 1 }, { unique: true, sparse: true });
 userSchema.index({ status: 1, isDeleted: 1 });
 

@@ -50,8 +50,7 @@ fe-platform/
 # 1. Install
 pnpm install
 
-# 2. Environment
-cp .env.example .env
+# 2. Environment (per-app only — no root .env)
 cp apps/api/.env.example apps/api/.env
 cp apps/web/.env.example apps/web/.env
 cp apps/admin/.env.example apps/admin/.env

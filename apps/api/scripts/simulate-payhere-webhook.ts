@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 function loadEnv() {
-  for (const file of [resolve(process.cwd(), '.env'), resolve(process.cwd(), '../../.env')]) {
+  for (const file of [resolve(process.cwd(), '.env'), resolve(process.cwd(), '../.env')]) {
     try {
       const raw = readFileSync(file, 'utf8');
       const env: Record<string, string> = {};

@@ -35,6 +35,12 @@ export function assertPasswordStrength(password: string): void {
   }
 }
 
+export function assertRegisterPassword(password: string): void {
+  if (password.length < AUTH_LIMITS.PASSWORD_MIN_LENGTH) {
+    throw ApiError.badRequest('Password must be at least 8 characters', undefined, 'WEAK_PASSWORD');
+  }
+}
+
 export function isPasswordStrong(password: string): boolean {
   return PASSWORD_RULES.every((rule) => rule.test(password));
 }

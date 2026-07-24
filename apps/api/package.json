@@ -33,6 +33,7 @@
     "@fe-platform/types": "workspace:*",
     "@fe-platform/utils": "workspace:*",
     "argon2": "^0.44.0",
+    "bcrypt": "^6.0.0",
     "compression": "^1.7.5",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
@@ -56,6 +57,7 @@
   "devDependencies": {
     "@fe-platform/eslint-config": "workspace:*",
     "@fe-platform/tsconfig": "workspace:*",
+    "@types/bcrypt": "^6.0.0",
     "@types/compression": "^1.7.5",
     "@types/cookie-parser": "^1.4.8",
     "@types/cors": "^2.8.17",

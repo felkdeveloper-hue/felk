@@ -51,5 +51,6 @@ export interface ListQueryParams {
 
 export interface MessageResult {
   message: string;
-  devVerificationUrl?: string;
+  devVerificationCode?: string;
+  devResetCode?: string;
 }

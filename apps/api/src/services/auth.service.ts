@@ -1,7 +1,7 @@
 import type { CookieOptions, Response } from 'express';
-import { Types } from 'mongoose';
 import { randomUUID } from 'node:crypto';
 import { appConfig } from '@/config/app.config';
+import { logger } from '@/config/logger';
 import {
   AUTH_COOKIES,
   AUTH_LIMITS,
@@ -13,23 +13,16 @@ import {
 } from '@/constants/auth';
 import { ERROR_MESSAGES } from '@/constants/error-messages';
 import { ROLES, type RoleKey } from '@/constants/roles';
-import { attachDevVerificationUrl } from '@/utils/dev-verification.helper';
-import {
-  forgotPasswordEmail,
-  loginAlertEmail,
-  passwordChangedEmail,
-  verifyEmailTemplate,
-  welcomeEmail,
-} from '@/emails';
+import { attachDevResetCode } from '@/utils/dev-verification.helper';
+import { loginAlertEmail, passwordChangedEmail } from '@/emails';
 import {
   PasswordResetTokenModel,
   RefreshTokenModel,
   UserModel,
   UserSessionModel,
-  VerificationTokenModel,
   type UserDocument,
 } from '@/models';
-import { emailService } from '@/services/email.service';
+import { emailService, trySendEmail } from '@/services/email/email.service';
 import { writeActivityLog, writeAuditLog } from '@/services/audit.service';
 import { findRoleByKey, getPermissionsForRole } from '@/services/rbac.service';
 import {
@@ -44,8 +37,10 @@ import type { AuthenticatedUser } from '@/types';
 import { addMinutes } from '@/utils/date.helper';
 import { normalizeEmail } from '@/utils/email.helper';
 import { ApiError } from '@/utils/errors/api-error';
+import { generateNumericOtp, hashOtp, verifyOtp } from '@/utils/otp.helper';
 import {
   assertPasswordStrength,
+  assertRegisterPassword,
   comparePassword,
   hashPassword,
   pushPasswordHistory,
@@ -181,26 +176,51 @@ async function createSessionAndTokens(
   };
 }
 
-async function issueVerificationToken(userId: Types.ObjectId): Promise<string> {
-  const token = generateSecureToken(32);
-  await VerificationTokenModel.updateMany(
-    { userId, consumedAt: null },
-    { $set: { consumedAt: new Date() } },
+function isDuplicateKeyError(err: unknown): boolean {
+  return (
+    typeof err === 'object' &&
+    err !== null &&
+    'code' in err &&
+    (err as { code?: number }).code === 11000
   );
-  await VerificationTokenModel.create({
-    userId,
-    tokenHash: hashToken(token),
-    purpose: 'email_verification',
-    expiresAt: addMinutes(new Date(), AUTH_LIMITS.VERIFICATION_TOKEN_HOURS * 60),
-  });
-  return token;
 }
 
-function appBaseUrl(): string {
-  return appConfig.cors.origins[0] ?? 'http://localhost:5173';
+function applyRegistrationFields(
+  user: UserDocument,
+  input: {
+    firstName: string;
+    lastName: string;
+    phone?: string;
+  },
+  passwordHash: string,
+  role: { _id: UserDocument['roleId'] },
+): void {
+  user.passwordHash = passwordHash;
+  user.passwordHistory = [];
+  user.firstName = input.firstName.trim();
+  user.lastName = input.lastName.trim();
+  user.phone = input.phone ?? null;
+  user.roleId = role._id;
+  user.roleKey = ROLES.CUSTOMER;
+  user.status = USER_STATUS.PENDING_VERIFICATION;
+  user.emailVerifiedAt = null;
+  user.failedLoginAttempts = 0;
+  user.lockedUntil = null;
 }
 
 export const authService = {
+  async issueAuthSession(
+    userId: string,
+    meta: AuthRequestMeta,
+    rememberMe = false,
+  ): Promise<AuthTokensResult> {
+    const user = await UserModel.findOne({ _id: userId, isDeleted: false });
+    if (!user) {
+      throw ApiError.unauthorized('User not found', 'USER_NOT_FOUND');
+    }
+    return createSessionAndTokens(user, meta, rememberMe);
+  },
+
   async register(
     input: {
       email: string;
@@ -211,12 +231,16 @@ export const authService = {
     },
     meta: AuthRequestMeta,
   ) {
-    assertPasswordStrength(input.password);
+    assertRegisterPassword(input.password);
 
     const email = normalizeEmail(input.email);
-    const existing = await UserModel.findOne({ email, isDeleted: false });
-    if (existing) {
-      throw ApiError.conflict('Email already registered', undefined, 'EMAIL_EXISTS');
+    const activeUser = await UserModel.findOne({ email, isDeleted: false });
+    if (activeUser?.emailVerifiedAt) {
+      throw ApiError.conflict(
+        'This email is already registered. Sign in instead.',
+        undefined,
+        'EMAIL_EXISTS',
+      );
     }
 
     const role = await findRoleByKey(ROLES.CUSTOMER);
@@ -226,17 +250,54 @@ export const authService = {
 
     const passwordHash = await hashPassword(input.password);
 
-    const user = await UserModel.create({
-      email,
-      passwordHash,
-      passwordHistory: [],
-      firstName: input.firstName.trim(),
-      lastName: input.lastName.trim(),
-      phone: input.phone ?? null,
-      roleId: role._id,
-      roleKey: ROLES.CUSTOMER,
-      status: USER_STATUS.PENDING_VERIFICATION,
-    });
+    let user: UserDocument;
+
+    if (activeUser) {
+      applyRegistrationFields(activeUser, input, passwordHash, role);
+      await activeUser.save();
+      user = activeUser;
+    } else {
+      const deletedUser = await UserModel.findOne({ email, isDeleted: true });
+
+      if (deletedUser) {
+        applyRegistrationFields(deletedUser, input, passwordHash, role);
+        deletedUser.isDeleted = false;
+        deletedUser.deletedAt = null;
+        await deletedUser.save();
+        user = deletedUser;
+      } else {
+        try {
+          user = await UserModel.create({
+            email,
+            passwordHash,
+            passwordHistory: [],
+            firstName: input.firstName.trim(),
+            lastName: input.lastName.trim(),
+            phone: input.phone ?? null,
+            roleId: role._id,
+            roleKey: ROLES.CUSTOMER,
+            status: USER_STATUS.PENDING_VERIFICATION,
+          });
+        } catch (err) {
+          if (isDuplicateKeyError(err)) {
+            const existing = await UserModel.findOne({ email, isDeleted: false });
+            if (existing && !existing.emailVerifiedAt) {
+              applyRegistrationFields(existing, input, passwordHash, role);
+              await existing.save();
+              user = existing;
+            } else {
+              throw ApiError.conflict(
+                'This email is already registered. Sign in instead.',
+                undefined,
+                'EMAIL_EXISTS',
+              );
+            }
+          } else {
+            throw err;
+          }
+        }
+      }
+    }
 
     const { customerService } = await import('@/services/customer.service');
     await customerService.ensureForUser(
@@ -255,24 +316,13 @@ export const authService = {
       },
     );
 
-    const verifyToken = await issueVerificationToken(user._id);
-    const verifyUrl = `${appBaseUrl()}/verify-email?token=${verifyToken}`;
-
-    const welcome = welcomeEmail(user.firstName);
-    const verify = verifyEmailTemplate(user.firstName, verifyUrl);
-
-    await emailService.send({
-      to: user.email,
-      subject: welcome.subject,
-      html: welcome.html,
-      text: welcome.text,
-    });
-    await emailService.send({
-      to: user.email,
-      subject: verify.subject,
-      html: verify.html,
-      text: verify.text,
-    });
+    try {
+      const { otpService } = await import('@/services/otp.service');
+      await otpService.issueOtpForUser(user._id.toString(), user.email);
+    } catch (err) {
+      logger.error({ err, email: user.email }, 'Register: verification email failed');
+      throw ApiError.internal('Unable to send verification email', 'EMAIL_SEND_FAILED');
+    }
 
     // Track registration analytics (fire-and-forget)
     void import('@/services/analytics/analytics.service')
@@ -304,22 +354,10 @@ export const authService = {
       ip: meta.ip,
     });
 
-    await writeAuditLog({
-      action: AUDIT_ACTIONS.EMAIL_VERIFICATION_SENT,
-      resourceType: 'user',
-      resourceId: user._id.toString(),
-      actorUserId: user._id.toString(),
-      ip: meta.ip,
-      requestId: meta.requestId,
-    });
-
-    return attachDevVerificationUrl(
-      {
-        user: sanitizeUser(user),
-        message: 'Registration successful. Please verify your email.',
-      },
-      verifyUrl,
-    );
+    return {
+      user: sanitizeUser(user),
+      message: 'Registration successful. Please verify your email.',
+    };
   },
 
   async login(
@@ -616,29 +654,29 @@ export const authService = {
 
     // Always succeed to avoid account enumeration
     if (!user) {
-      return { message: 'If the email exists, a reset link has been sent.' };
+      return { message: 'If the email exists, a reset code has been sent.' };
     }
 
-    const token = generateSecureToken(32);
+    const code = generateNumericOtp(AUTH_LIMITS.OTP_LENGTH);
     await PasswordResetTokenModel.updateMany(
       { userId: user._id, consumedAt: null },
       { $set: { consumedAt: new Date() } },
     );
     await PasswordResetTokenModel.create({
       userId: user._id,
-      tokenHash: hashToken(token),
+      codeHash: hashOtp(code),
+      attempts: 0,
       expiresAt: addMinutes(new Date(), AUTH_LIMITS.RESET_TOKEN_MINUTES),
       requestedIp: meta.ip ?? null,
     });
 
-    const resetUrl = `${appBaseUrl()}/reset-password?token=${token}`;
-    const tpl = forgotPasswordEmail(user.firstName, resetUrl);
-    await emailService.send({
-      to: user.email,
-      subject: tpl.subject,
-      html: tpl.html,
-      text: tpl.text,
-    });
+    const sent = await emailService
+      .sendPasswordReset(user.email, code, {
+        name: user.firstName,
+        expiryMinutes: AUTH_LIMITS.RESET_TOKEN_MINUTES,
+      })
+      .then(() => true)
+      .catch(() => false);
 
     await writeAuditLog({
       action: AUDIT_ACTIONS.PASSWORD_RESET_REQUEST,
@@ -649,22 +687,50 @@ export const authService = {
       requestId: meta.requestId,
     });
 
-    return { message: 'If the email exists, a reset link has been sent.' };
+    return attachDevResetCode(
+      { message: 'If the email exists, a reset code has been sent.' },
+      code,
+      sent,
+    );
   },
 
-  async resetPassword(token: string, newPassword: string, meta: AuthRequestMeta) {
+  async resetPassword(emailRaw: string, code: string, newPassword: string, meta: AuthRequestMeta) {
     assertPasswordStrength(newPassword);
 
-    const tokenHash = hashToken(token);
-    const stored = await PasswordResetTokenModel.findOne({ tokenHash });
+    const email = normalizeEmail(emailRaw);
+    const invalidCodeError = () =>
+      ApiError.badRequest('Invalid or expired reset code', undefined, 'INVALID_RESET_CODE');
 
-    if (!stored || stored.consumedAt || stored.expiresAt.getTime() <= Date.now()) {
-      throw ApiError.badRequest('Invalid or expired reset token', undefined, 'INVALID_RESET_TOKEN');
+    const user = await UserModel.findOne({ email, isDeleted: false }).select(
+      '+passwordHash +passwordHistory',
+    );
+    if (!user) {
+      throw invalidCodeError();
     }
 
-    const user = await UserModel.findById(stored.userId).select('+passwordHash +passwordHistory');
-    if (!user || user.isDeleted) {
-      throw ApiError.badRequest('Invalid or expired reset token', undefined, 'INVALID_RESET_TOKEN');
+    const stored = await PasswordResetTokenModel.findOne({
+      userId: user._id,
+      consumedAt: null,
+    }).sort({ createdAt: -1 });
+
+    if (!stored || stored.expiresAt.getTime() <= Date.now()) {
+      throw invalidCodeError();
+    }
+
+    if (stored.attempts >= AUTH_LIMITS.OTP_MAX_ATTEMPTS) {
+      stored.consumedAt = new Date();
+      await stored.save();
+      throw ApiError.badRequest(
+        'Too many incorrect attempts. Request a new code.',
+        undefined,
+        'OTP_MAX_ATTEMPTS',
+      );
+    }
+
+    if (!verifyOtp(code, stored.codeHash)) {
+      stored.attempts += 1;
+      await stored.save();
+      throw invalidCodeError();
     }
 
     if (await wasPasswordUsedRecently(newPassword, [user.passwordHash, ...user.passwordHistory])) {
@@ -695,7 +761,7 @@ export const authService = {
     );
 
     const tpl = passwordChangedEmail(user.firstName);
-    await emailService.send({
+    void trySendEmail({
       to: user.email,
       subject: tpl.subject,
       html: tpl.html,
@@ -743,7 +809,7 @@ export const authService = {
     await user.save();
 
     const tpl = passwordChangedEmail(user.firstName);
-    await emailService.send({
+    void trySendEmail({
       to: user.email,
       subject: tpl.subject,
       html: tpl.html,
@@ -762,77 +828,21 @@ export const authService = {
     return { message: 'Password changed successfully' };
   },
 
-  async verifyEmail(token: string, meta: AuthRequestMeta) {
-    const tokenHash = hashToken(token);
-    const stored = await VerificationTokenModel.findOne({ tokenHash });
-
-    if (!stored || stored.consumedAt || stored.expiresAt.getTime() <= Date.now()) {
-      throw ApiError.badRequest(
-        'Invalid or expired verification token',
-        undefined,
-        'INVALID_VERIFY_TOKEN',
-      );
-    }
-
-    const user = await UserModel.findById(stored.userId);
-    if (!user || user.isDeleted) {
-      throw ApiError.badRequest(
-        'Invalid or expired verification token',
-        undefined,
-        'INVALID_VERIFY_TOKEN',
-      );
-    }
-
-    user.emailVerifiedAt = new Date();
-    user.status = USER_STATUS.ACTIVE;
-    await user.save();
-
-    stored.consumedAt = new Date();
-    await stored.save();
-
-    await writeAuditLog({
-      action: AUDIT_ACTIONS.EMAIL_VERIFIED,
-      resourceType: 'user',
-      resourceId: user._id.toString(),
-      actorUserId: user._id.toString(),
-      ip: meta.ip,
-      requestId: meta.requestId,
-    });
-
-    return { message: 'Email verified successfully', user: sanitizeUser(user) };
+  async verifyEmail(emailRaw: string, code: string, meta: AuthRequestMeta) {
+    const { otpService } = await import('@/services/otp.service');
+    const result = await otpService.verifyOtp(emailRaw, code, meta);
+    return {
+      message: result.message,
+      user: result.user,
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+      expiresIn: result.expiresIn,
+    };
   },
 
   async resendVerification(emailRaw: string, meta: AuthRequestMeta) {
-    const email = normalizeEmail(emailRaw);
-    const user = await UserModel.findOne({ email, isDeleted: false });
-
-    if (!user || user.emailVerifiedAt) {
-      return { message: 'If verification is required, a new email has been sent.' };
-    }
-
-    const token = await issueVerificationToken(user._id);
-    const verifyUrl = `${appBaseUrl()}/verify-email?token=${token}`;
-    const tpl = verifyEmailTemplate(user.firstName, verifyUrl);
-    await emailService.send({
-      to: user.email,
-      subject: tpl.subject,
-      html: tpl.html,
-      text: tpl.text,
-    });
-
-    await writeAuditLog({
-      action: AUDIT_ACTIONS.EMAIL_VERIFICATION_SENT,
-      resourceType: 'user',
-      resourceId: user._id.toString(),
-      actorUserId: user._id.toString(),
-      ip: meta.ip,
-      requestId: meta.requestId,
-    });
-
-    return attachDevVerificationUrl(
-      { message: 'If verification is required, a new email has been sent.' },
-      verifyUrl,
-    );
+    const { otpService } = await import('@/services/otp.service');
+    return otpService.resendOtp(emailRaw, meta);
   },
 
   async getMe(userId: string): Promise<AuthenticatedUser> {

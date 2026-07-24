@@ -12,11 +12,7 @@ const API = process.env.API_URL ?? 'http://localhost:4000/api/v1';
 const PASSWORD = 'TestPass1!';
 
 function loadEnv() {
-  const candidates = [
-    resolve(process.cwd(), '.env'),
-    resolve(process.cwd(), '../../.env'),
-    resolve(process.cwd(), '../..', '.env'),
-  ];
+  const candidates = [resolve(process.cwd(), '.env'), resolve(process.cwd(), '../.env')];
   for (const file of candidates) {
     try {
       const raw = readFileSync(file, 'utf8');

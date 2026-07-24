@@ -1,6 +1,12 @@
 import { Router } from 'express';
 import { authController } from '@/controllers/auth.controller';
-import { authenticate, authRateLimiter, optionalAuthenticate, validate } from '@/middlewares';
+import {
+  authenticate,
+  authRateLimiter,
+  optionalAuthenticate,
+  otpRateLimiter,
+  validate,
+} from '@/middlewares';
 import {
   changePasswordSchema,
   forgotPasswordSchema,
@@ -12,9 +18,13 @@ import {
   verifyEmailSchema,
 } from '@/schemas/auth.schema';
 
+import { otpRouter } from '@/routes/otp.routes';
+
 export const authRouter = Router();
 
 authRouter.use(authRateLimiter);
+
+authRouter.use(otpRouter);
 
 authRouter.post('/register', validate({ body: registerSchema }), authController.register);
 
@@ -49,6 +59,7 @@ authRouter.post('/verify-email', validate({ body: verifyEmailSchema }), authCont
 
 authRouter.post(
   '/resend-verification',
+  otpRateLimiter,
   validate({ body: resendVerificationSchema }),
   authController.resendVerification,
 );

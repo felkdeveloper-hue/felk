@@ -4,11 +4,10 @@ import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 
 const configDir = dirname(fileURLToPath(import.meta.url));
-const repoRoot = join(configDir, '../../../..');
+const apiRoot = join(configDir, '../..');
 
-// Root .env first, then app-specific overrides.
-loadDotenv({ path: join(repoRoot, '.env') });
-loadDotenv({ path: join(repoRoot, 'apps/api/.env'), override: true });
+// Single source: apps/api/.env (frontend vars live in apps/web/.env).
+loadDotenv({ path: join(apiRoot, '.env') });
 
 const DEV_SECRETS = [
   'dev-access-secret-change-me!!',
@@ -54,15 +53,14 @@ const envSchema = z
     MORGAN_FORMAT: z.string().default('dev'),
     UPLOAD_MAX_SIZE_MB: z.coerce.number().positive().default(10),
     UPLOAD_ALLOWED_MIME: z.string().default('image/jpeg,image/png,image/webp,image/avif'),
-    SMTP_HOST: z.string().optional(),
-    SMTP_PORT: z.coerce.number().optional(),
+    SMTP_HOST: z.string().default('smtp.gmail.com'),
+    SMTP_PORT: z.coerce.number().default(587),
     SMTP_SECURE: z
       .enum(['true', 'false'])
-      .optional()
+      .default('false')
       .transform((v) => v === 'true'),
-    SMTP_USER: z.string().optional(),
-    SMTP_PASS: z.string().optional(),
-    EMAIL_FROM: z.string().default('FE Platform <noreply@feplatform.com>'),
+    EMAIL_FROM: z.string().optional(),
+    EMAIL_PASSWORD: z.string().optional(),
     AWS_REGION: z.string().optional(),
     AWS_ACCESS_KEY_ID: z.string().optional(),
     AWS_SECRET_ACCESS_KEY: z.string().optional(),
@@ -113,12 +111,8 @@ const envSchema = z
     TIKTOK_PIXEL_ID: z.string().optional(),
     TIKTOK_ACCESS_TOKEN: z.string().optional(),
 
-    SMTP_ENABLED: z
-      .enum(['true', 'false'])
-      .optional()
-      .transform((v) => (v === undefined ? undefined : v === 'true')),
-    FROM_EMAIL: z.string().optional(),
     FROM_NAME: z.string().optional(),
+    SHOP_URL: z.string().url().optional(),
   })
   .superRefine((data, ctx) => {
     const strictProduction =
@@ -238,10 +232,7 @@ export const env = {
   metricsEnabled: data.METRICS_ENABLED === undefined ? true : data.METRICS_ENABLED === 'true',
   csrfEnabled: data.CSRF_ENABLED === 'true',
   logLevel: isProd && data.LOG_LEVEL === 'debug' ? 'info' : data.LOG_LEVEL,
-  smtpEnabled:
-    data.SMTP_ENABLED !== undefined
-      ? data.SMTP_ENABLED
-      : Boolean(data.SMTP_HOST && data.SMTP_USER && data.SMTP_PASS),
+  smtpEnabled: Boolean(data.SMTP_HOST && data.EMAIL_FROM && data.EMAIL_PASSWORD),
   isDev,
   isProd,
   isTest,

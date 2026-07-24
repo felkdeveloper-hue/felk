@@ -8,6 +8,7 @@ import { OrdersListPage } from '@/pages/admin/orders/orders-list-page';
 import { OrderDetailPage } from '@/pages/admin/orders/order-detail-page';
 import { ProductsListPage } from '@/pages/admin/products/products-list-page';
 import { ProductFormPage } from '@/pages/admin/products/product-form-page';
+import { UsersListPage } from '@/pages/admin/users/users-list-page';
 import { CollectionsPage } from '@/pages/admin/catalog/catalog-pages';
 import { CategoryFormPage } from '@/pages/admin/catalog/category-form-page';
 import { FiltersPage } from '@/pages/admin/catalog/filters-page';
@@ -265,7 +266,7 @@ const adminUsersRoute = createRoute({
   path: 'users',
   component: () => (
     <AdminPermissionRoute permissions={[PERMISSIONS.USERS_READ, PERMISSIONS.USERS_MANAGE]}>
-      <PlaceholderModulePage title="Users" description="Staff user management coming soon." />
+      <UsersListPage />
     </AdminPermissionRoute>
   ),
 });

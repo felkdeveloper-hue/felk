@@ -1,4 +1,4 @@
-import { emailLayout, ctaButton } from '@/emails/layout';
+import { ctaButton, emailGreeting, emailHeading, emailLayout } from '@/emails/layout';
 import type { EmailTemplate } from './auth.templates';
 
 export function newsletterEmail(data: {
@@ -9,13 +9,10 @@ export function newsletterEmail(data: {
   ctaLabel?: string;
   ctaUrl?: string;
 }): EmailTemplate {
-  const greeting = data.name ? `<p>Hi ${data.name},</p>` : '';
-  const cta =
-    data.ctaLabel && data.ctaUrl
-      ? `<p style="margin:24px 0;">${ctaButton(data.ctaUrl, data.ctaLabel)}</p>`
-      : '';
+  const greeting = data.name ? emailGreeting(data.name) : '';
+  const cta = data.ctaLabel && data.ctaUrl ? ctaButton(data.ctaUrl, data.ctaLabel) : '';
   const html = emailLayout(
-    `<h2 style="margin:0 0 16px;font-size:20px;color:#1a1a2e;">${data.headline}</h2>
+    `${emailHeading(data.headline)}
      ${greeting}
      ${data.bodyHtml}
      ${cta}`,

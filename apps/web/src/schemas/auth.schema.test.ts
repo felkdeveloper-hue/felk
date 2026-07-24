@@ -16,30 +16,22 @@ describe('auth schemas', () => {
     expect(result.success).toBe(true);
   });
 
-  it('requires matching passwords and terms acceptance for register', () => {
+  it('requires full name and a valid password for register', () => {
     const result = registerSchema.safeParse({
-      firstName: 'Jane',
-      lastName: 'Doe',
+      fullName: '',
       email: 'jane@example.com',
       phone: '',
-      password: 'Password1!',
-      confirmPassword: 'Password1!',
-      acceptTerms: false,
-      newsletterOptIn: false,
+      password: 'short',
     });
     expect(result.success).toBe(false);
   });
 
   it('accepts valid register payload', () => {
     const result = registerSchema.safeParse({
-      firstName: 'Jane',
-      lastName: 'Doe',
+      fullName: 'Jane Doe',
       email: 'jane@example.com',
       phone: '+15550100',
-      password: 'Password1!',
-      confirmPassword: 'Password1!',
-      acceptTerms: true,
-      newsletterOptIn: true,
+      password: 'password123',
     });
     expect(result.success).toBe(true);
   });

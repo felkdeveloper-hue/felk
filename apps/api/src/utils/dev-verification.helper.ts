@@ -2,22 +2,46 @@ import { appConfig } from '@/config/app.config';
 import { logger } from '@/config/logger';
 
 export function isEmailDeliveryConfigured(): boolean {
-  const { enabled, host, user, pass } = appConfig.email;
-  return Boolean(enabled && host && user && pass);
+  const { enabled, host, from, password } = appConfig.email;
+  return Boolean(enabled && host && from && password);
 }
 
-export function attachDevVerificationUrl<T extends { message: string }>(
+/**
+ * In dev, surface the raw code in the API response whenever the user can't
+ * be expected to receive a real email — either SMTP isn't configured at all,
+ * or the send attempt itself failed (wrong credentials, unreachable host,
+ * etc). `delivered` should be the actual result of the send attempt.
+ */
+export function attachDevVerificationCode<T extends { message: string }>(
   payload: T,
-  verifyUrl: string,
-): T & { devVerificationUrl?: string } {
-  if (!appConfig.app.isDev || isEmailDeliveryConfigured()) {
+  code: string,
+  delivered: boolean,
+): T & { devVerificationCode?: string } {
+  if (!appConfig.app.isDev || delivered) {
     return payload;
   }
 
   logger.warn(
-    { verifyUrl },
-    'Auth: SMTP is not configured — verification email was not sent (devVerificationUrl returned)',
+    { code },
+    'Auth: verification email was not delivered — devVerificationCode returned instead',
   );
 
-  return { ...payload, devVerificationUrl: verifyUrl };
+  return { ...payload, devVerificationCode: code };
+}
+
+export function attachDevResetCode<T extends { message: string }>(
+  payload: T,
+  code: string,
+  delivered: boolean,
+): T & { devResetCode?: string } {
+  if (!appConfig.app.isDev || delivered) {
+    return payload;
+  }
+
+  logger.warn(
+    { code },
+    'Auth: password reset email was not delivered — devResetCode returned instead',
+  );
+
+  return { ...payload, devResetCode: code };
 }

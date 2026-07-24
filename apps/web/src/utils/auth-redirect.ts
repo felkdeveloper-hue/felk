@@ -45,17 +45,13 @@ export function parseLoginSearch(search: Record<string, unknown>) {
 }
 
 export type VerifyEmailSearch = {
-  token?: string;
   email?: string;
   pending?: boolean;
-  devVerificationUrl?: string;
 };
 
 export function buildVerifyEmailSearch(search: Partial<VerifyEmailSearch> = {}): VerifyEmailSearch {
   return {
-    token: search.token,
     email: search.email,
     pending: search.pending,
-    devVerificationUrl: search.devVerificationUrl,
   };
 }

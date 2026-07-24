@@ -175,7 +175,7 @@ export const openApiSpec = {
     '/auth/reset-password': {
       post: {
         tags: ['Auth'],
-        summary: 'Reset password with token',
+        summary: 'Reset password with a one-time code',
         responses: { 200: { description: 'Password reset' } },
       },
     },
@@ -187,17 +187,38 @@ export const openApiSpec = {
         responses: { 200: { description: 'Changed' } },
       },
     },
+    '/auth/send-otp': {
+      post: {
+        tags: ['Auth'],
+        summary: 'Send email verification OTP',
+        responses: { 200: { description: 'Accepted' }, 429: { description: 'Rate limited' } },
+      },
+    },
+    '/auth/verify-otp': {
+      post: {
+        tags: ['Auth'],
+        summary: 'Verify email OTP and create session',
+        responses: { 200: { description: 'Verified with JWT' } },
+      },
+    },
+    '/auth/resend-otp': {
+      post: {
+        tags: ['Auth'],
+        summary: 'Resend email verification OTP',
+        responses: { 200: { description: 'Accepted' }, 429: { description: 'Rate limited' } },
+      },
+    },
     '/auth/verify-email': {
       post: {
         tags: ['Auth'],
-        summary: 'Verify email with token',
+        summary: 'Verify email with a one-time code',
         responses: { 200: { description: 'Verified' } },
       },
     },
     '/auth/resend-verification': {
       post: {
         tags: ['Auth'],
-        summary: 'Resend verification email',
+        summary: 'Resend verification code',
         responses: { 200: { description: 'Accepted' } },
       },
     },

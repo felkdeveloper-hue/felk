@@ -10,7 +10,6 @@ import { fileURLToPath } from 'node:url';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 const pairs = [
-  ['.env.example', '.env'],
   ['apps/api/.env.example', 'apps/api/.env'],
   ['apps/web/.env.example', 'apps/web/.env'],
   ['apps/admin/.env.example', 'apps/admin/.env'],

@@ -10,12 +10,14 @@ const passwordSchema = z
   .regex(/\d/, 'Password must include a number')
   .regex(/[^A-Za-z0-9]/, 'Password must include a special character');
 
+const registerPasswordSchema = z.string().min(8, 'Password must be at least 8 characters');
+
 export const registerSchema = z.object({
   email: z
     .string()
     .email()
     .transform((v) => v.trim().toLowerCase()),
-  password: passwordSchema,
+  password: registerPasswordSchema,
   firstName: z.string().trim().min(1).max(100),
   lastName: z.string().trim().min(1).max(100),
   phone: z.string().regex(REGEX.E164_PHONE).optional(),
@@ -46,7 +48,11 @@ export const forgotPasswordSchema = z.object({
 });
 
 export const resetPasswordSchema = z.object({
-  token: z.string().min(1),
+  email: z
+    .string()
+    .email()
+    .transform((v) => v.trim().toLowerCase()),
+  code: z.string().regex(REGEX.OTP, 'Enter the 6-digit code'),
   password: passwordSchema,
 });
 
@@ -56,7 +62,11 @@ export const changePasswordSchema = z.object({
 });
 
 export const verifyEmailSchema = z.object({
-  token: z.string().min(1),
+  email: z
+    .string()
+    .email()
+    .transform((v) => v.trim().toLowerCase()),
+  code: z.string().regex(REGEX.OTP, 'Enter the 6-digit code'),
 });
 
 export const resendVerificationSchema = z.object({

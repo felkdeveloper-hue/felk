@@ -23,6 +23,7 @@ export * from './payment.models';
 export * from './order.models';
 export * from './review.model';
 export { EmailLogModel, type EmailLogStatus } from './email-log.model';
+export { EmailOtpModel, type EmailOtpDocument } from './email-otp.model';
 export {
   AnalyticsEventLogModel,
   type AnalyticsProvider,

@@ -1,4 +1,15 @@
-import { emailLayout, ctaButton } from '@/emails/layout';
+import {
+  ctaButton,
+  emailEyebrow,
+  emailGreeting,
+  emailHeading,
+  emailLayout,
+  emailMuted,
+  emailParagraph,
+  infoTable,
+  orderReference,
+  totalRow,
+} from '@/emails/layout';
 import type { EmailTemplate } from './auth.templates';
 
 export interface OrderLine {
@@ -22,38 +33,39 @@ export interface OrderEmailData {
 function orderLinesTable(lines: OrderLine[], currency = 'LKR'): string {
   const rows = lines
     .map(
-      (l) => `<tr>
-      <td style="padding:8px;border-bottom:1px solid #eeeeee;">${l.name}</td>
-      <td style="padding:8px;border-bottom:1px solid #eeeeee;text-align:center;">${l.quantity}</td>
-      <td style="padding:8px;border-bottom:1px solid #eeeeee;text-align:right;">${currency} ${l.price.toFixed(2)}</td>
+      (line) => `<tr>
+      <td style="padding:12px 14px;border-bottom:1px solid #e5e7eb;font-size:14px;color:#1f2937;">${line.name}</td>
+      <td style="padding:12px 14px;border-bottom:1px solid #e5e7eb;text-align:center;font-size:14px;color:#1f2937;">${line.quantity}</td>
+      <td style="padding:12px 14px;border-bottom:1px solid #e5e7eb;text-align:right;font-size:14px;color:#1f2937;">${currency} ${line.price.toFixed(2)}</td>
     </tr>`,
     )
     .join('');
-  return `<table style="width:100%;border-collapse:collapse;margin:16px 0;font-size:14px;">
-    <thead><tr style="background:#f8f8f8;">
-      <th style="padding:8px;text-align:left;border-bottom:2px solid #eeeeee;">Item</th>
-      <th style="padding:8px;text-align:center;border-bottom:2px solid #eeeeee;">Qty</th>
-      <th style="padding:8px;text-align:right;border-bottom:2px solid #eeeeee;">Price</th>
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0;border:1px solid #e5e7eb;">
+    <thead><tr style="background:#fafafa;">
+      <th style="padding:12px 14px;text-align:left;font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#6b7280;border-bottom:1px solid #e5e7eb;">Item</th>
+      <th style="padding:12px 14px;text-align:center;font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#6b7280;border-bottom:1px solid #e5e7eb;">Qty</th>
+      <th style="padding:12px 14px;text-align:right;font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#6b7280;border-bottom:1px solid #e5e7eb;">Price</th>
     </tr></thead>
     <tbody>${rows}</tbody>
   </table>`;
 }
 
 export function orderConfirmationEmail(data: OrderEmailData): EmailTemplate {
+  const currency = data.currency ?? 'LKR';
   const subject = `Order Confirmed — #${data.orderNumber}`;
-  const text = `Hi ${data.name}, your Fashion Edge order #${data.orderNumber} has been confirmed. Total: ${data.currency ?? 'LKR'} ${(data.total ?? 0).toFixed(2)}.`;
-  const linesHtml = data.lines ? orderLinesTable(data.lines, data.currency) : '';
+  const text = `Hi ${data.name}, your Fashion Edge order #${data.orderNumber} has been confirmed. Total: ${currency} ${(data.total ?? 0).toFixed(2)}.`;
+  const linesHtml = data.lines ? orderLinesTable(data.lines, currency) : '';
   const html = emailLayout(
-    `<h2 style="margin:0 0 4px;font-size:20px;color:#1a1a2e;">Order Confirmed!</h2>
-     <p style="color:#e94560;font-weight:600;margin:0 0 16px;">Order #${data.orderNumber}</p>
-     <p>Hi ${data.name},</p>
-     <p>Thank you for your purchase! We've received your order and we'll begin processing it shortly.</p>
-     ${data.orderDate ? `<p style="font-size:13px;color:#777777;">Placed on: ${data.orderDate}</p>` : ''}
+    `${orderReference('Order', `#${data.orderNumber}`)}
+     ${emailHeading('Your order is confirmed')}
+     ${emailGreeting(data.name)}
+     ${emailParagraph(`Thank you for your purchase. We're preparing your items and will notify you when they ship.`)}
+     ${data.orderDate ? emailEyebrow(`Placed on ${data.orderDate}`) : ''}
      ${linesHtml}
-     ${data.total !== undefined ? `<p style="text-align:right;font-weight:700;font-size:16px;">Total: ${data.currency ?? 'LKR'} ${data.total.toFixed(2)}</p>` : ''}
-     ${data.shippingAddress ? `<p style="font-size:13px;"><strong>Shipping to:</strong><br/>${data.shippingAddress}</p>` : ''}
-     ${data.orderUrl ? `<p style="margin:24px 0;">${ctaButton(data.orderUrl, 'View Order')}</p>` : ''}
-     <p>We'll send you an update when your order ships. Questions? Reply to this email.</p>`,
+     ${data.total !== undefined ? totalRow(currency, data.total) : ''}
+     ${data.shippingAddress ? emailParagraph(`<strong>Shipping to:</strong><br/>${data.shippingAddress}`) : ''}
+     ${data.orderUrl ? ctaButton(data.orderUrl, 'View order') : ''}
+     ${emailMuted(`We'll send you an update when your order ships.`)}`,
     { title: 'Order Confirmed', preheader: `Order #${data.orderNumber} confirmed. Thank you!` },
   );
   return { subject, html, text };
@@ -68,13 +80,13 @@ export function orderCancelledEmail(data: {
   const subject = `Order Cancelled — #${data.orderNumber}`;
   const text = `Hi ${data.name}, your order #${data.orderNumber} has been cancelled.${data.reason ? ` Reason: ${data.reason}` : ''}`;
   const html = emailLayout(
-    `<h2 style="margin:0 0 16px;font-size:20px;">Order Cancelled</h2>
-     <p>Hi ${data.name},</p>
-     <p>Your order <strong>#${data.orderNumber}</strong> has been cancelled.</p>
-     ${data.reason ? `<p><strong>Reason:</strong> ${data.reason}</p>` : ''}
-     <p>If any payment was taken it will be refunded within 5–7 business days.</p>
-     ${data.orderUrl ? `<p style="margin:24px 0;">${ctaButton(data.orderUrl, 'View Order Details')}</p>` : ''}
-     <p>If you have questions, please contact our support team.</p>`,
+    `${orderReference('Order', `#${data.orderNumber}`)}
+     ${emailHeading('Order cancelled')}
+     ${emailGreeting(data.name)}
+     ${emailParagraph(`Your order <strong>#${data.orderNumber}</strong> has been cancelled.`)}
+     ${data.reason ? emailParagraph(`<strong>Reason:</strong> ${data.reason}`) : ''}
+     ${emailMuted('If any payment was taken it will be refunded within 5–7 business days.')}
+     ${data.orderUrl ? ctaButton(data.orderUrl, 'View order') : ''}`,
     { title: 'Order Cancelled', preheader: `Your order #${data.orderNumber} has been cancelled.` },
   );
   return { subject, html, text };
@@ -83,16 +95,19 @@ export function orderCancelledEmail(data: {
 export function returnRequestedEmail(data: {
   name: string;
   orderNumber: string;
-  returnId?: string;
+  returnNumber?: string;
+  orderUrl?: string;
 }): EmailTemplate {
-  const subject = `Return Requested — Order #${data.orderNumber}`;
-  const text = `Hi ${data.name}, your return request for order #${data.orderNumber} has been received.`;
+  const subject = `Return Request Received — Order #${data.orderNumber}`;
+  const text = `Hi ${data.name}, we've received your return request for order #${data.orderNumber}.`;
   const html = emailLayout(
-    `<h2 style="margin:0 0 16px;font-size:20px;">Return Request Received</h2>
-     <p>Hi ${data.name},</p>
-     <p>We've received your return request for order <strong>#${data.orderNumber}</strong>${data.returnId ? ` (Return ID: ${data.returnId})` : ''}.</p>
-     <p>Our team will review it within 1–2 business days and send you further instructions.</p>`,
-    { title: 'Return Requested', preheader: 'Your return request is being processed.' },
+    `${orderReference('Order', `#${data.orderNumber}`)}
+     ${emailHeading('Return request received')}
+     ${emailGreeting(data.name)}
+     ${emailParagraph(`We've received your return request${data.returnNumber ? ` (<strong>${data.returnNumber}</strong>)` : ''} and will review it shortly.`)}
+     ${emailMuted('Our team will email you once your return has been approved with next steps.')}
+     ${data.orderUrl ? ctaButton(data.orderUrl, 'View return') : ''}`,
+    { title: 'Return Requested', preheader: `Return request for order #${data.orderNumber}.` },
   );
   return { subject, html, text };
 }
@@ -100,19 +115,20 @@ export function returnRequestedEmail(data: {
 export function returnApprovedEmail(data: {
   name: string;
   orderNumber: string;
+  returnNumber?: string;
   instructions?: string;
+  orderUrl?: string;
 }): EmailTemplate {
   const subject = `Return Approved — Order #${data.orderNumber}`;
   const text = `Hi ${data.name}, your return for order #${data.orderNumber} has been approved.`;
   const html = emailLayout(
-    `<h2 style="margin:0 0 16px;font-size:20px;">Return Approved</h2>
-     <p>Hi ${data.name},</p>
-     <p>Great news — your return for order <strong>#${data.orderNumber}</strong> has been approved.</p>
-     ${data.instructions ? `<p><strong>Next steps:</strong><br/>${data.instructions}</p>` : '<p>Please ship the item(s) back using the prepaid label that will be emailed separately.</p>'}`,
-    {
-      title: 'Return Approved',
-      preheader: `Your return for order #${data.orderNumber} is approved.`,
-    },
+    `${orderReference('Order', `#${data.orderNumber}`)}
+     ${emailHeading('Return approved')}
+     ${emailGreeting(data.name)}
+     ${emailParagraph(`Your return request has been approved.`)}
+     ${data.instructions ? emailParagraph(data.instructions) : emailParagraph('Please follow the return instructions provided by our team.')}
+     ${data.orderUrl ? ctaButton(data.orderUrl, 'View return') : ''}`,
+    { title: 'Return Approved', preheader: `Return approved for order #${data.orderNumber}.` },
   );
   return { subject, html, text };
 }
@@ -122,19 +138,19 @@ export function refundProcessedEmail(data: {
   orderNumber: string;
   amount: number;
   currency?: string;
+  orderUrl?: string;
 }): EmailTemplate {
+  const currency = data.currency ?? 'LKR';
   const subject = `Refund Processed — Order #${data.orderNumber}`;
-  const text = `Hi ${data.name}, your refund of ${data.currency ?? 'LKR'} ${data.amount.toFixed(2)} for order #${data.orderNumber} has been processed.`;
+  const text = `Hi ${data.name}, a refund of ${currency} ${data.amount.toFixed(2)} for order #${data.orderNumber} has been processed.`;
   const html = emailLayout(
-    `<h2 style="margin:0 0 16px;font-size:20px;">Refund Processed</h2>
-     <p>Hi ${data.name},</p>
-     <p>Your refund for order <strong>#${data.orderNumber}</strong> has been processed.</p>
-     <p style="font-size:18px;font-weight:700;color:#e94560;">Refund: ${data.currency ?? 'LKR'} ${data.amount.toFixed(2)}</p>
-     <p>Please allow 5–7 business days for the amount to appear on your original payment method.</p>`,
-    {
-      title: 'Refund Processed',
-      preheader: `Refund of ${data.currency ?? 'LKR'} ${data.amount.toFixed(2)} is on its way.`,
-    },
+    `${orderReference('Order', `#${data.orderNumber}`)}
+     ${emailHeading('Refund processed')}
+     ${emailGreeting(data.name)}
+     ${emailParagraph(`We've processed a refund of <strong>${currency} ${data.amount.toFixed(2)}</strong> for your order.`)}
+     ${emailMuted('Funds may take 5–7 business days to appear on your statement.')}
+     ${data.orderUrl ? ctaButton(data.orderUrl, 'View order') : ''}`,
+    { title: 'Refund Processed', preheader: `Refund for order #${data.orderNumber}.` },
   );
   return { subject, html, text };
 }

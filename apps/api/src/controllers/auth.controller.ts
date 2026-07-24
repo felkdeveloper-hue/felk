@@ -96,7 +96,12 @@ export const authController = {
   }),
 
   resetPassword: asyncHandler(async (req, res) => {
-    const result = await authService.resetPassword(req.body.token, req.body.password, meta(req));
+    const result = await authService.resetPassword(
+      req.body.email,
+      req.body.code,
+      req.body.password,
+      meta(req),
+    );
     ApiResponse.success(res, result, result.message);
   }),
 
@@ -111,8 +116,23 @@ export const authController = {
   }),
 
   verifyEmail: asyncHandler(async (req, res) => {
-    const result = await authService.verifyEmail(req.body.token, meta(req));
-    ApiResponse.success(res, result, result.message);
+    const result = await authService.verifyEmail(req.body.email, req.body.code, meta(req));
+    setAuthCookies(res, {
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+      rememberMe: false,
+    });
+    ApiResponse.success(
+      res,
+      {
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+        expiresIn: result.expiresIn,
+        tokenType: 'Bearer',
+        user: result.user,
+      },
+      result.message,
+    );
   }),
 
   resendVerification: asyncHandler(async (req, res) => {

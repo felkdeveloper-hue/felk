@@ -16,14 +16,10 @@ import type {
  */
 export const authApi = {
   async register(payload: RegisterPayload): Promise<RegisterResult> {
-    const raw = await http.post<{ user: unknown; message: string; devVerificationUrl?: string }>(
-      '/auth/register',
-      payload,
-    );
+    const raw = await http.post<{ user: unknown; message: string }>('/auth/register', payload);
     return {
       user: normalizeAuthUser(raw.user),
       message: raw.message,
-      devVerificationUrl: raw.devVerificationUrl,
     };
   },
 
@@ -49,20 +45,32 @@ export const authApi = {
     return http.post<MessageResult>('/auth/forgot-password', { email });
   },
 
-  resetPassword(token: string, password: string): Promise<MessageResult> {
-    return http.post<MessageResult>('/auth/reset-password', { token, password });
+  resetPassword(email: string, code: string, password: string): Promise<MessageResult> {
+    return http.post<MessageResult>('/auth/reset-password', { email, code, password });
   },
 
   changePassword(payload: ChangePasswordPayload): Promise<MessageResult> {
     return http.post<MessageResult>('/auth/change-password', payload);
   },
 
-  verifyEmail(token: string): Promise<MessageResult> {
-    return http.post<MessageResult>('/auth/verify-email', { token });
+  verifyEmail(email: string, code: string): Promise<AuthSession> {
+    return http.post<unknown>('/auth/verify-otp', { email, otp: code }).then(normalizeAuthSession);
   },
 
   resendVerification(email: string): Promise<MessageResult> {
-    return http.post<MessageResult>('/auth/resend-verification', { email });
+    return http.post<MessageResult>('/auth/resend-otp', { email });
+  },
+
+  sendOtp(email: string): Promise<MessageResult> {
+    return http.post<MessageResult>('/auth/send-otp', { email });
+  },
+
+  verifyOtp(email: string, otp: string): Promise<AuthSession> {
+    return http.post<unknown>('/auth/verify-otp', { email, otp }).then(normalizeAuthSession);
+  },
+
+  resendOtp(email: string): Promise<MessageResult> {
+    return http.post<MessageResult>('/auth/resend-otp', { email });
   },
 
   async me(): Promise<AuthUser> {

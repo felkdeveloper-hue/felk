@@ -1,6 +1,6 @@
 import { http } from '@/lib/http-client';
 import { normalizeId, normalizeList } from '@/lib/utils';
-import type { ListQueryParams, PaginatedResult } from '@/types';
+import type { ListQueryParams, MessageResult, PaginatedResult } from '@/types';
 
 export interface AdminUserRow {
   id: string;
@@ -50,9 +50,27 @@ export interface UserListParams extends ListQueryParams {
   status?: string;
 }
 
+export interface AdminUpdateUserPayload {
+  status?: string;
+  roleKey?: string;
+}
+
 export const usersApi = {
   async list(params?: UserListParams): Promise<PaginatedResult<AdminUserRow>> {
     const result = await http.getPaginated<unknown>('/users', { params });
     return { ...result, data: normalizeList(result.data, normalizeUser) };
+  },
+
+  async update(userId: string, payload: AdminUpdateUserPayload): Promise<AdminUserRow> {
+    const raw = await http.patch<unknown>(`/users/${userId}`, payload);
+    return normalizeUser(raw);
+  },
+
+  setPassword(userId: string, password: string): Promise<MessageResult> {
+    return http.post<MessageResult>(`/users/${userId}/set-password`, { password });
+  },
+
+  remove(userId: string): Promise<MessageResult> {
+    return http.delete<MessageResult>(`/users/${userId}`);
   },
 };

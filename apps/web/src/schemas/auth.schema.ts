@@ -14,23 +14,21 @@ export const loginSchema = z.object({
   rememberMe: z.boolean().default(false),
 });
 
-export const registerSchema = z
-  .object({
-    firstName: z.string().min(1, 'First name is required'),
-    lastName: z.string().min(1, 'Last name is required'),
-    email: z.string().email('Enter a valid email address'),
-    phone: z.string().optional(),
-    password: passwordSchema,
-    confirmPassword: z.string(),
-    acceptTerms: z
-      .boolean()
-      .refine((value) => value === true, { message: 'You must accept the terms to continue' }),
-    newsletterOptIn: z.boolean().default(false),
-  })
-  .refine((values) => values.password === values.confirmPassword, {
-    message: 'Passwords do not match',
-    path: ['confirmPassword'],
-  });
+export const registerPasswordSchema = z.string().min(8, 'Password must be at least 8 characters');
+
+const E164_PHONE = /^\+[1-9]\d{7,14}$/;
+
+export const registerSchema = z.object({
+  fullName: z.string().trim().min(1, 'Full name is required'),
+  email: z.string().email('Enter a valid email address'),
+  phone: z
+    .string()
+    .optional()
+    .refine((value) => !value || E164_PHONE.test(value), {
+      message: 'Include your country code, e.g. +14155552671',
+    }),
+  password: registerPasswordSchema,
+});
 
 export const forgotPasswordSchema = z.object({
   email: z.string().email('Enter a valid email address'),

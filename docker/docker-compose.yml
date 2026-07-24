@@ -41,7 +41,7 @@ services:
     ports:
       - '4000:4000'
     env_file:
-      - ../.env
+      - ../apps/api/.env
     environment:
       MONGODB_URI: mongodb://mongodb:27017/fe-platform
       REDIS_URL: redis://redis:6379

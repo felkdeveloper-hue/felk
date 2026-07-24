@@ -55,7 +55,7 @@ export class IntegrationsStatusService {
         .sort({ sentAt: -1 })
         .select('provider eventName sentAt')
         .lean(),
-      appConfig.email.enabled
+      appConfig.email.configured
         ? emailService.verifyConnection().catch(() => false)
         : Promise.resolve(false),
     ]);
@@ -88,13 +88,13 @@ export class IntegrationsStatusService {
       },
       smtp: {
         name: 'SMTP / Email',
-        configured: Boolean(appConfig.email.host && appConfig.email.user),
+        configured: appConfig.email.configured,
         enabled: appConfig.email.enabled ?? false,
         verified: smtpVerified,
         extra: {
           host: appConfig.email.host,
           port: appConfig.email.port,
-          from: appConfig.email.fromEmail,
+          from: appConfig.email.from,
         },
       },
       analytics: {

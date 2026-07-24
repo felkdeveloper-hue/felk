@@ -2,15 +2,14 @@ import { Link, useNavigate } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { CheckCircle2, Mail, XCircle } from 'lucide-react';
+import { CheckCircle2, Mail } from 'lucide-react';
 import { ROUTES } from '@/constants';
 import { useResendVerificationMutation, useVerifyEmailMutation } from '@/hooks/auth';
-import { buildVerifyEmailSearch } from '@/utils/auth-redirect';
-import { AppError } from '@/lib/errors';
+import { getPostLoginDestination, buildVerifyEmailSearch } from '@/utils/auth-redirect';
 import { resendVerificationSchema } from '@/schemas';
-import { DevVerificationLink } from '@/components/auth/dev-verification-link';
 import { AuthErrorAlert } from '@/components/auth/auth-error-alert';
 import { AuthFormHeader } from '@/components/auth/auth-form-header';
+import { OtpInput } from '@/components/forms/otp-input';
 import {
   Form,
   FormControl,
@@ -22,27 +21,18 @@ import {
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Skeleton } from '@/components/ui/skeleton';
 
 export interface VerifyEmailPanelProps {
-  token?: string;
   email?: string;
   pending?: boolean;
-  devVerificationUrl?: string;
 }
 
-export function VerifyEmailPanel({
-  token,
-  email,
-  pending,
-  devVerificationUrl,
-}: VerifyEmailPanelProps) {
+export function VerifyEmailPanel({ email }: VerifyEmailPanelProps) {
   const navigate = useNavigate();
   const verifyMutation = useVerifyEmailMutation();
   const resendMutation = useResendVerificationMutation();
-  const [verificationState, setVerificationState] = useState<
-    'idle' | 'loading' | 'success' | 'expired' | 'invalid'
-  >('idle');
+  const [code, setCode] = useState('');
+  const [verifiedEmail, setVerifiedEmail] = useState(email ?? '');
 
   const resendForm = useForm<{ email: string }>({
     resolver: zodResolver(resendVerificationSchema),
@@ -50,90 +40,31 @@ export function VerifyEmailPanel({
   });
 
   useEffect(() => {
-    if (!token) {
-      setVerificationState(pending ? 'idle' : 'idle');
-      return;
+    if (email) {
+      setVerifiedEmail(email);
+      resendForm.setValue('email', email);
     }
-
-    setVerificationState('loading');
-    verifyMutation.mutate(token, {
-      onSuccess: () => setVerificationState('success'),
-      onError: (error) => {
-        if (AppError.isAppError(error)) {
-          if (error.code === 'TOKEN_EXPIRED') {
-            setVerificationState('expired');
-            return;
-          }
-          if (error.code === 'INVALID_TOKEN' || error.status === 404) {
-            setVerificationState('invalid');
-            return;
-          }
-        }
-        setVerificationState('invalid');
-      },
-    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, [email]);
 
-  if (token && verificationState === 'loading') {
-    return (
-      <div className="space-y-4" aria-busy="true" aria-live="polite">
-        <AuthFormHeader
-          title="Verifying email"
-          description="Please wait while we confirm your address."
-        />
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-10 w-full" />
-      </div>
-    );
-  }
+  const handleVerify = (submittedCode: string) => {
+    if (!verifiedEmail || submittedCode.length !== 6) return;
+    verifyMutation.mutate({ email: verifiedEmail, code: submittedCode });
+  };
 
-  if (verificationState === 'success') {
+  if (verifyMutation.isSuccess && verifyMutation.data) {
     return (
       <div className="space-y-4 text-center">
         <CheckCircle2 className="text-success mx-auto size-12" aria-hidden />
         <AuthFormHeader
           title="Email verified"
-          description="Your email has been confirmed. You can now sign in to your account."
+          description="Your email has been confirmed. Redirecting you now…"
         />
         <Button asChild className="w-full">
-          <Link to={ROUTES.authLogin}>Continue to sign in</Link>
+          <Link to={getPostLoginDestination(verifyMutation.data.user)}>
+            Continue to your account
+          </Link>
         </Button>
-      </div>
-    );
-  }
-
-  if (verificationState === 'expired') {
-    return (
-      <div className="space-y-4">
-        <AuthFormHeader
-          title="Link expired"
-          description="This verification link has expired. Request a new one below."
-        />
-        <ResendForm
-          form={resendForm}
-          mutation={resendMutation}
-          defaultEmail={email}
-          onSuccess={() =>
-            navigate({
-              to: ROUTES.authVerifyEmail,
-              search: buildVerifyEmailSearch({ email, pending: true }),
-            })
-          }
-        />
-      </div>
-    );
-  }
-
-  if (verificationState === 'invalid') {
-    return (
-      <div className="space-y-4 text-center">
-        <XCircle className="text-destructive mx-auto size-12" aria-hidden />
-        <AuthFormHeader
-          title="Invalid link"
-          description="This verification link is invalid or has already been used."
-        />
-        <ResendForm form={resendForm} mutation={resendMutation} defaultEmail={email} />
       </div>
     );
   }
@@ -146,27 +77,112 @@ export function VerifyEmailPanel({
       <AuthFormHeader
         title="Verify your email"
         description={
-          email
-            ? `We sent a verification link to ${email}. Open it to activate your account.`
-            : 'Check your inbox for a verification link to activate your account.'
+          verifiedEmail
+            ? `Enter the 6-digit code we sent to ${verifiedEmail}.`
+            : 'Enter the 6-digit code we sent to your email to activate your account.'
         }
       />
 
-      <Alert>
-        <AlertDescription>
-          Didn&apos;t get the email? Check spam or resend the verification message below.
-        </AlertDescription>
-      </Alert>
+      {verifiedEmail ? (
+        <Alert>
+          <AlertDescription className="space-y-1 text-sm">
+            <p>
+              The code was sent to <strong>{verifiedEmail}</strong> — open that inbox, not your SMTP
+              or admin Gmail account.
+            </p>
+            <p>Check spam/junk too. Sender may appear as Fashion Edge.</p>
+          </AlertDescription>
+        </Alert>
+      ) : null}
 
-      {devVerificationUrl ? <DevVerificationLink url={devVerificationUrl} /> : null}
+      {!verifiedEmail ? (
+        <EmailPrompt onSubmit={(value) => setVerifiedEmail(value)} />
+      ) : (
+        <>
+          {verifyMutation.error ? (
+            <AuthErrorAlert error={verifyMutation.error} onRetry={() => verifyMutation.reset()} />
+          ) : null}
 
-      <ResendForm
-        form={resendForm}
-        mutation={resendMutation}
-        defaultEmail={email}
-        devVerificationUrl={devVerificationUrl}
-      />
+          <div className="flex flex-col items-center gap-4">
+            <OtpInput
+              length={6}
+              value={code}
+              onChange={setCode}
+              onComplete={handleVerify}
+              disabled={verifyMutation.isPending}
+              autoFocus
+            />
+            <Button
+              type="button"
+              className="w-full"
+              loading={verifyMutation.isPending}
+              disabled={code.length !== 6}
+              onClick={() => handleVerify(code)}
+            >
+              Verify email
+            </Button>
+          </div>
+
+          <Alert>
+            <AlertDescription>
+              Didn&apos;t get the code? Check spam or resend it below.
+            </AlertDescription>
+          </Alert>
+
+          <ResendForm
+            form={resendForm}
+            mutation={resendMutation}
+            defaultEmail={verifiedEmail}
+            onSuccess={(sentTo) => {
+              setVerifiedEmail(sentTo);
+              setCode('');
+              verifyMutation.reset();
+              navigate({
+                to: ROUTES.authVerifyEmail,
+                search: buildVerifyEmailSearch({
+                  email: sentTo,
+                  pending: true,
+                }),
+              });
+            }}
+          />
+        </>
+      )}
     </div>
+  );
+}
+
+function EmailPrompt({ onSubmit }: { onSubmit: (email: string) => void }) {
+  const form = useForm<{ email: string }>({
+    resolver: zodResolver(resendVerificationSchema),
+    defaultValues: { email: '' },
+  });
+
+  return (
+    <Form {...form}>
+      <form
+        onSubmit={form.handleSubmit((values) => onSubmit(values.email))}
+        className="space-y-4"
+        noValidate
+      >
+        <FormField
+          control={form.control}
+          name="email"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Email</FormLabel>
+              <FormControl>
+                <Input type="email" autoComplete="email" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <Button type="submit" className="w-full">
+          Continue
+        </Button>
+      </form>
+    </Form>
   );
 }
 
@@ -174,17 +190,10 @@ interface ResendFormProps {
   form: ReturnType<typeof useForm<{ email: string }>>;
   mutation: ReturnType<typeof useResendVerificationMutation>;
   defaultEmail?: string;
-  devVerificationUrl?: string;
-  onSuccess?: () => void;
+  onSuccess?: (email: string) => void;
 }
 
-function ResendForm({
-  form,
-  mutation,
-  defaultEmail,
-  devVerificationUrl,
-  onSuccess,
-}: ResendFormProps) {
+function ResendForm({ form, mutation, defaultEmail, onSuccess }: ResendFormProps) {
   useEffect(() => {
     if (defaultEmail) {
       form.setValue('email', defaultEmail);
@@ -192,18 +201,10 @@ function ResendForm({
   }, [defaultEmail, form]);
 
   if (mutation.isSuccess) {
-    const verificationUrl = mutation.data?.devVerificationUrl ?? devVerificationUrl;
     return (
-      <div className="space-y-4">
-        <Alert variant="success">
-          <AlertDescription>
-            {verificationUrl
-              ? 'Verification link generated for local development.'
-              : 'Verification email sent. Please check your inbox.'}
-          </AlertDescription>
-        </Alert>
-        {verificationUrl ? <DevVerificationLink url={verificationUrl} /> : null}
-      </div>
+      <Alert variant="success">
+        <AlertDescription>A new verification code was sent to your email.</AlertDescription>
+      </Alert>
     );
   }
 
@@ -217,7 +218,11 @@ function ResendForm({
 
       <Form {...form}>
         <form
-          onSubmit={form.handleSubmit((values) => mutation.mutate(values.email, { onSuccess }))}
+          onSubmit={form.handleSubmit((values) =>
+            mutation.mutate(values.email, {
+              onSuccess: () => onSuccess?.(values.email),
+            }),
+          )}
           className="space-y-4"
           noValidate
         >
@@ -234,8 +239,8 @@ function ResendForm({
               </FormItem>
             )}
           />
-          <Button type="submit" className="w-full" loading={mutation.isPending}>
-            Resend verification email
+          <Button type="submit" className="w-full" variant="outline" loading={mutation.isPending}>
+            Resend verification code
           </Button>
         </form>
       </Form>

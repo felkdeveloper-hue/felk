@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -6,7 +7,6 @@ import { useRegisterMutation } from '@/hooks/auth';
 import { registerSchema, type RegisterFormValues } from '@/schemas';
 import { AuthErrorAlert } from '@/components/auth/auth-error-alert';
 import { AuthFormHeader } from '@/components/auth/auth-form-header';
-import { PasswordStrengthMeter } from '@/components/auth/password-strength-meter';
 import {
   Form,
   FormControl,
@@ -18,39 +18,82 @@ import {
 import { PasswordField } from '@/components/forms/password-field';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 
 export interface RegisterFormProps {
   redirect?: string;
 }
 
+function splitFullName(fullName: string): { firstName: string; lastName: string } {
+  const trimmed = fullName.trim();
+  const spaceIndex = trimmed.indexOf(' ');
+
+  if (spaceIndex === -1) {
+    return { firstName: trimmed, lastName: trimmed };
+  }
+
+  return {
+    firstName: trimmed.slice(0, spaceIndex),
+    lastName: trimmed.slice(spaceIndex + 1).trim() || trimmed.slice(0, spaceIndex),
+  };
+}
+
 export function RegisterForm({ redirect }: RegisterFormProps) {
   const registerMutation = useRegisterMutation();
+  const [termsOpen, setTermsOpen] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [pendingValues, setPendingValues] = useState<RegisterFormValues | null>(null);
 
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
-      firstName: '',
-      lastName: '',
+      fullName: '',
       email: '',
       phone: '',
       password: '',
-      confirmPassword: '',
-      acceptTerms: false,
-      newsletterOptIn: false,
     },
   });
 
-  const password = form.watch('password');
+  const submitRegistration = (values: RegisterFormValues) => {
+    const { firstName, lastName } = splitFullName(values.fullName);
 
-  const onSubmit = (values: RegisterFormValues) => {
     registerMutation.mutate({
       email: values.email,
       password: values.password,
-      firstName: values.firstName,
-      lastName: values.lastName,
+      firstName,
+      lastName,
       phone: values.phone || undefined,
     });
+  };
+
+  const handleCreateAccountClick = async () => {
+    const valid = await form.trigger();
+    if (!valid) return;
+
+    setPendingValues(form.getValues());
+    setTermsAccepted(false);
+    setTermsOpen(true);
+  };
+
+  const handleTermsConfirm = () => {
+    if (!termsAccepted || !pendingValues) return;
+    submitRegistration(pendingValues);
+  };
+
+  const handleTermsOpenChange = (open: boolean) => {
+    setTermsOpen(open);
+    if (!open) {
+      setTermsAccepted(false);
+      setPendingValues(null);
+    }
   };
 
   return (
@@ -67,43 +110,25 @@ export function RegisterForm({ redirect }: RegisterFormProps) {
       ) : null}
 
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5" noValidate>
-          <div className="grid gap-5 sm:grid-cols-2">
-            <FormField
-              control={form.control}
-              name="firstName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>First name</FormLabel>
-                  <FormControl>
-                    <Input
-                      autoComplete="given-name"
-                      className="h-11 rounded-sm bg-transparent"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="lastName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Last name</FormLabel>
-                  <FormControl>
-                    <Input
-                      autoComplete="family-name"
-                      className="h-11 rounded-sm bg-transparent"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
+        <form className="space-y-5" noValidate onSubmit={(event) => event.preventDefault()}>
+          <FormField
+            control={form.control}
+            name="fullName"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Full name</FormLabel>
+                <FormControl>
+                  <Input
+                    autoComplete="name"
+                    placeholder="Jane Doe"
+                    className="h-11 rounded-sm bg-transparent"
+                    {...field}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
           <FormField
             control={form.control}
@@ -158,86 +183,97 @@ export function RegisterForm({ redirect }: RegisterFormProps) {
                     {...field}
                   />
                 </FormControl>
-                <PasswordStrengthMeter password={password} />
                 <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="confirmPassword"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Confirm password</FormLabel>
-                <FormControl>
-                  <PasswordField
-                    autoComplete="new-password"
-                    className="h-11 rounded-sm bg-transparent"
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="acceptTerms"
-            render={({ field }) => (
-              <FormItem className="flex items-start gap-2.5 space-y-0">
-                <FormControl>
-                  <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-                </FormControl>
-                <div className="space-y-1 leading-none">
-                  <FormLabel className="text-muted-foreground font-normal">
-                    I agree to the{' '}
-                    <Link
-                      to={ROUTES.terms}
-                      className="text-foreground font-medium underline-offset-4 hover:underline"
-                    >
-                      Terms of Service
-                    </Link>{' '}
-                    and{' '}
-                    <Link
-                      to={ROUTES.privacy}
-                      className="text-foreground font-medium underline-offset-4 hover:underline"
-                    >
-                      Privacy Policy
-                    </Link>
-                  </FormLabel>
-                  <FormMessage />
-                </div>
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="newsletterOptIn"
-            render={({ field }) => (
-              <FormItem className="flex items-center gap-2.5 space-y-0">
-                <FormControl>
-                  <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-                </FormControl>
-                <FormLabel className="text-muted-foreground font-normal">
-                  Email me new arrivals and offers
-                </FormLabel>
               </FormItem>
             )}
           />
 
           <Button
-            type="submit"
+            type="button"
             size="lg"
             className="mt-1 w-full"
             loading={registerMutation.isPending}
+            onClick={handleCreateAccountClick}
           >
             Create account
           </Button>
         </form>
       </Form>
+
+      <Dialog open={termsOpen} onOpenChange={handleTermsOpenChange}>
+        <DialogContent className="max-h-[90vh] gap-4 sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Terms & Conditions</DialogTitle>
+            <DialogDescription>
+              Please review and accept our terms before creating your account.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="border-border text-muted-foreground max-h-48 overflow-y-auto rounded-md border p-4 text-sm leading-relaxed">
+            <p>
+              By creating an account with Fashion Edge, you agree to use our services responsibly,
+              provide accurate account information, and comply with applicable laws when placing
+              orders.
+            </p>
+            <p className="mt-3">
+              We process your personal data to manage your account, fulfil orders, and improve your
+              shopping experience. You can read the full details in our policies below.
+            </p>
+            <p className="mt-3">
+              <Link
+                to={ROUTES.terms}
+                className="text-foreground font-medium underline-offset-4 hover:underline"
+              >
+                Terms of Service
+              </Link>
+              {' · '}
+              <Link
+                to={ROUTES.privacy}
+                className="text-foreground font-medium underline-offset-4 hover:underline"
+              >
+                Privacy Policy
+              </Link>
+            </p>
+          </div>
+
+          <label className="flex items-start gap-2.5">
+            <Checkbox
+              checked={termsAccepted}
+              onCheckedChange={(checked) => setTermsAccepted(checked === true)}
+            />
+            <span className="text-muted-foreground text-sm leading-snug">
+              I agree to the{' '}
+              <Link
+                to={ROUTES.terms}
+                className="text-foreground font-medium underline-offset-4 hover:underline"
+              >
+                Terms of Service
+              </Link>{' '}
+              and{' '}
+              <Link
+                to={ROUTES.privacy}
+                className="text-foreground font-medium underline-offset-4 hover:underline"
+              >
+                Privacy Policy
+              </Link>
+            </span>
+          </label>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="outline" onClick={() => handleTermsOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              loading={registerMutation.isPending}
+              disabled={!termsAccepted}
+              onClick={handleTermsConfirm}
+            >
+              Create account
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <p className="text-muted-foreground border-border mt-8 border-t pt-6 text-center text-sm">
         Already a member?{' '}

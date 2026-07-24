@@ -36,7 +36,6 @@ export function useRegisterMutation() {
         search: buildVerifyEmailSearch({
           email: result.user.email,
           pending: true,
-          devVerificationUrl: result.devVerificationUrl,
         }),
       });
     },
@@ -53,8 +52,8 @@ export function useResetPasswordMutation() {
   const navigate = useNavigate();
 
   return useMutation({
-    mutationFn: ({ token, password }: { token: string; password: string }) =>
-      authApi.resetPassword(token, password),
+    mutationFn: ({ email, code, password }: { email: string; code: string; password: string }) =>
+      authApi.resetPassword(email, code, password),
     onSuccess: () => {
       navigate({ to: ROUTES.authLogin, search: { reset: true } });
     },
@@ -62,8 +61,16 @@ export function useResetPasswordMutation() {
 }
 
 export function useVerifyEmailMutation() {
+  const navigate = useNavigate();
+  const setSession = useAuthStore((state) => state.setSession);
+
   return useMutation({
-    mutationFn: (token: string) => authApi.verifyEmail(token),
+    mutationFn: ({ email, code }: { email: string; code: string }) =>
+      authApi.verifyEmail(email, code),
+    onSuccess: (session) => {
+      setSession(session);
+      navigate({ to: getPostLoginDestination(session.user) });
+    },
   });
 }
 

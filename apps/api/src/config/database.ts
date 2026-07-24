@@ -41,6 +41,71 @@ async function repairVariantBarcodeIndex() {
   await ProductVariantModel.syncIndexes();
 }
 
+/**
+ * Drop legacy unique `tokenHash` indexes on the OTP-based verification /
+ * password-reset collections. These fields were replaced by `codeHash`
+ * (which is not unique — short numeric codes can collide across users), but
+ * MongoDB keeps the old unique index until it's explicitly dropped, which
+ * rejects every second document with `tokenHash: null`.
+ */
+async function repairOtpTokenIndexes() {
+  const db = mongoose.connection.db;
+  if (!db) return;
+
+  for (const collectionName of ['verification_tokens', 'password_reset_tokens']) {
+    const collection = db.collection(collectionName);
+    const indexes = await collection.indexes().catch(() => []);
+    const staleIndexes = indexes.filter(
+      (index) => index.unique && (index.key as { tokenHash?: number }).tokenHash === 1,
+    );
+
+    for (const index of staleIndexes) {
+      if (!index.name) continue;
+      await collection.dropIndex(index.name);
+      logger.info(
+        { collection: collectionName, index: index.name },
+        'Dropped legacy tokenHash index',
+      );
+    }
+  }
+
+  const { VerificationTokenModel, PasswordResetTokenModel } = await import('@/models');
+  await VerificationTokenModel.syncIndexes();
+  await PasswordResetTokenModel.syncIndexes();
+}
+
+/** Replace global unique email index with partial index (allows re-register after soft delete). */
+async function repairUserEmailIndex() {
+  const db = mongoose.connection.db;
+  if (!db) return;
+
+  const collection = db.collection('users');
+  const indexes = await collection.indexes().catch(() => []);
+  const emailIndexes = indexes.filter(
+    (index) => index.key && (index.key as { email?: number }).email === 1,
+  );
+
+  for (const index of emailIndexes) {
+    if (!index.name || index.name === '_id_') continue;
+    const isPartialActiveUnique =
+      Boolean(index.unique) &&
+      Boolean(index.partialFilterExpression) &&
+      JSON.stringify(index.partialFilterExpression).includes('isDeleted');
+    if (isPartialActiveUnique) continue;
+    await collection.dropIndex(index.name);
+    logger.info({ index: index.name }, 'Dropped legacy users email index');
+  }
+
+  await collection.createIndex(
+    { email: 1 },
+    {
+      unique: true,
+      partialFilterExpression: { isDeleted: false },
+      name: 'email_1',
+    },
+  );
+}
+
 class DatabaseManager {
   private status: DatabaseStatus = 'disconnected';
   private lastError: Error | null = null;
@@ -98,6 +163,14 @@ class DatabaseManager {
 
       await repairVariantBarcodeIndex().catch((error: unknown) => {
         logger.warn({ err: error }, 'Variant barcode index repair skipped');
+      });
+
+      await repairOtpTokenIndexes().catch((error: unknown) => {
+        logger.warn({ err: error }, 'OTP token index repair skipped');
+      });
+
+      await repairUserEmailIndex().catch((error: unknown) => {
+        logger.warn({ err: error }, 'User email index repair skipped');
       });
 
       return connection;

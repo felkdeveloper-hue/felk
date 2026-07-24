@@ -42,7 +42,6 @@ export interface RegisterPayload {
 export interface RegisterResult {
   user: AuthUser;
   message: string;
-  devVerificationUrl?: string;
 }
 
 export interface ChangePasswordPayload {
@@ -51,6 +50,7 @@ export interface ChangePasswordPayload {
 }
 
 export interface ResetPasswordPayload {
-  token: string;
+  email: string;
+  code: string;
   password: string;
 }
