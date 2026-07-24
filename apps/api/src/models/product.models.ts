@@ -226,6 +226,11 @@ productSchema.index(
   { unique: true, partialFilterExpression: { sku: { $type: 'string' } } },
 );
 productSchema.index({ status: 1, isDeleted: 1, publishAt: -1 });
+// Storefront listing: filter by isDeleted + status (+ gender) and sort by createdAt.
+productSchema.index({ isDeleted: 1, status: 1, createdAt: -1 });
+productSchema.index({ gender: 1, isDeleted: 1, status: 1, createdAt: -1 });
+// Home-page rails filter on a boolean flag + status and sort by newest.
+productSchema.index({ isFeatured: 1, isDeleted: 1, status: 1, createdAt: -1 });
 productSchema.index({
   name: 'text',
   shortDescription: 'text',
@@ -322,6 +327,8 @@ variantSchema.index(
 );
 variantSchema.index({ productId: 1, colorId: 1, sizeId: 1 });
 variantSchema.index({ productId: 1, isDeleted: 1, displayOrder: 1 });
+// Listing enrichment fetches active, non-deleted variants for a batch of products.
+variantSchema.index({ productId: 1, isDeleted: 1, status: 1 });
 
 export const ProductVariantModel: Model<ProductVariantDocument> = model(
   'ProductVariant',
@@ -356,6 +363,8 @@ export const ProductMediaModel = model(
     { timestamps: true, collection: 'product_media' },
   ),
 );
+// Listing/detail enrichment fetches non-deleted media per product ordered by priority.
+ProductMediaModel.schema.index({ productId: 1, isDeleted: 1, priority: 1 });
 
 export const ProductRelationshipModel = model(
   'ProductRelationship',

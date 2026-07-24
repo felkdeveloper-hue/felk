@@ -95,12 +95,17 @@ export const ordersApi = {
     return http.get<unknown>(`/orders/${id}`);
   },
 
-  async updateStatus(id: string, status: string, note?: string): Promise<unknown> {
-    return http.patch<unknown>(`/orders/${id}/status`, { status, note });
+  async updateStatus(
+    id: string,
+    status: string,
+    note?: string,
+    updateMessage?: string,
+  ): Promise<unknown> {
+    return http.patch<unknown>(`/orders/${id}/status`, { status, note, updateMessage });
   },
 
-  async cancel(id: string, reason?: string): Promise<unknown> {
-    return http.post<unknown>(`/orders/${id}/cancel`, { reason });
+  async cancel(id: string, reason?: string, updateMessage?: string): Promise<unknown> {
+    return http.post<unknown>(`/orders/${id}/cancel`, { reason, updateMessage });
   },
 
   async getTimeline(id: string): Promise<unknown[]> {

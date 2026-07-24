@@ -3,7 +3,8 @@ import { checkoutRef, normalizeCheckoutSession } from '@/utils/checkout';
 import type { MessageResult } from '@/types';
 
 export type ShippingMethod = 'standard' | 'express' | 'pickup' | 'free' | string;
-export type CheckoutStatus = 'open' | 'reserved' | 'ready' | 'expired' | 'cancelled' | string;
+export type CheckoutStatus =
+  'open' | 'reserved' | 'ready' | 'completed' | 'expired' | 'cancelled' | string;
 
 export interface CheckoutAddressSnapshot {
   addressId: string;

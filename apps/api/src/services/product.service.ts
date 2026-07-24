@@ -322,22 +322,30 @@ export class ProductService {
     const doc = await productRepository.findById(id, includeDeleted);
     if (!doc) throw ApiError.notFound('Product not found');
 
-    await this.ensureDefaultVariant(id);
+    // Reuse the already-loaded product doc so ensureDefaultVariant doesn't re-query it.
+    const defaultVariant = await this.ensureDefaultVariant(id, {}, doc as never);
 
-    const [variants, media, relationships, refreshed] = await Promise.all([
-      ProductVariantModel.find({ productId: id, isDeleted: false }).sort({ displayOrder: 1 }),
-      ProductMediaModel.find({ productId: id, isDeleted: false }).sort({ priority: 1 }),
-      ProductRelationshipModel.find({ productId: id, isDeleted: false }).sort({ sortOrder: 1 }),
-      productRepository.findById(id, includeDeleted),
+    const plain = toPlain(doc) as Record<string, unknown>;
+    const brandId = plain.brandId ? String(plain.brandId) : undefined;
+
+    // Fetch variants/media/relationships/brand in one parallel batch; lean() skips
+    // Mongoose document hydration since these are read-only for the response.
+    const [variants, media, relationships, brand] = await Promise.all([
+      ProductVariantModel.find({ productId: id, isDeleted: false })
+        .sort({ displayOrder: 1 })
+        .lean(),
+      ProductMediaModel.find({ productId: id, isDeleted: false }).sort({ priority: 1 }).lean(),
+      ProductRelationshipModel.find({ productId: id, isDeleted: false })
+        .sort({ sortOrder: 1 })
+        .lean(),
+      brandId ? BrandModel.findById(brandId).select('name').lean() : Promise.resolve(null),
     ]);
 
-    const plain = toPlain(refreshed ?? doc) as Record<string, unknown>;
-    const brandId = plain.brandId ? String(plain.brandId) : undefined;
-    let brandName: string | undefined;
-    if (brandId) {
-      const brand = await BrandModel.findById(brandId).select('name').lean();
-      brandName = brand?.name ? String(brand.name) : undefined;
+    // ensureDefaultVariant may have created/linked a default variant after `doc` was read.
+    if (defaultVariant && !plain.defaultVariantId) {
+      plain.defaultVariantId = (defaultVariant as { _id?: unknown })._id;
     }
+    const brandName = brand?.name ? String(brand.name) : undefined;
 
     return {
       ...withComputedPricing(plain),
@@ -352,8 +360,21 @@ export class ProductService {
    * Simple products (price only, no size/color options) still need a default variant
    * for cart/checkout. Create one automatically when missing.
    */
-  async ensureDefaultVariant(productId: string, actor: ActorMeta = {}) {
-    const product = await productRepository.findById(productId);
+  async ensureDefaultVariant(
+    productId: string,
+    actor: ActorMeta = {},
+    preloadedProduct?: {
+      defaultVariantId?: unknown;
+      pricing?: {
+        price?: number;
+        salePrice?: number | null;
+        compareAtPrice?: number | null;
+        currency?: string;
+      } | null;
+      name?: string;
+    } | null,
+  ) {
+    const product = preloadedProduct ?? (await productRepository.findById(productId));
     if (!product) return null;
 
     const existing = await ProductVariantModel.findOne({

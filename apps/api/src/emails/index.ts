@@ -13,8 +13,11 @@ export {
   returnRequestedEmail,
   returnApprovedEmail,
   refundProcessedEmail,
+  orderStatusUpdateEmail,
   type OrderEmailData,
   type OrderLine,
+  type OrderStatusUpdateEmailData,
+  type NotifiableOrderStatus,
 } from './templates/order.templates';
 
 export { paymentSuccessfulEmail, paymentFailedEmail } from './templates/payment.templates';

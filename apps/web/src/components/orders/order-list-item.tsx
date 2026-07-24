@@ -11,7 +11,6 @@ export interface OrderListItemProps {
 }
 
 export function OrderListItem({ order, index = 0 }: OrderListItemProps) {
-  const preview = order.items[0];
   const itemCount =
     order.totals.totalQuantity ?? order.items.reduce((sum, item) => sum + item.quantity, 0);
 
@@ -24,18 +23,9 @@ export function OrderListItem({ order, index = 0 }: OrderListItemProps) {
       <Link
         to="/account/orders/$orderId"
         params={{ orderId: order.id }}
-        className="border-border bg-card hover:border-primary/40 flex flex-col gap-4 rounded-xl border p-4 transition-colors sm:flex-row sm:items-center"
+        className="border-border bg-card hover:border-primary/40 block rounded-xl border p-4 transition-colors"
       >
-        <div className="flex min-w-0 flex-1 items-center gap-4">
-          {preview?.thumbnailUrl ? (
-            <img
-              src={preview.thumbnailUrl}
-              alt=""
-              className="border-border size-16 rounded-lg border object-cover"
-            />
-          ) : (
-            <div className="border-border bg-muted size-16 rounded-lg border" aria-hidden />
-          )}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <p className="font-medium">{order.orderNumber}</p>
@@ -48,21 +38,46 @@ export function OrderListItem({ order, index = 0 }: OrderListItemProps) {
                 : '—'}{' '}
               · {itemCount} {itemCount === 1 ? 'item' : 'items'}
             </p>
-            {preview ? (
-              <p className="text-muted-foreground mt-1 truncate text-sm">
-                {preview.name}
-                {order.items.length > 1 ? ` + ${order.items.length - 1} more` : ''}
-              </p>
-            ) : null}
+          </div>
+
+          <div className="flex items-center justify-between gap-3 sm:flex-col sm:items-end">
+            <p className="text-lg font-semibold">
+              {formatCurrency(order.totals.grandTotal, order.currency)}
+            </p>
+            <ChevronRight className="text-muted-foreground size-5" aria-hidden />
           </div>
         </div>
 
-        <div className="flex items-center justify-between gap-3 sm:flex-col sm:items-end">
-          <p className="text-lg font-semibold">
-            {formatCurrency(order.totals.grandTotal, order.currency)}
-          </p>
-          <ChevronRight className="text-muted-foreground size-5" aria-hidden />
-        </div>
+        <ul className="border-border mt-4 space-y-3 border-t pt-4">
+          {order.items.map((item) => (
+            <li key={item.id} className="flex items-center gap-3">
+              {item.thumbnailUrl ? (
+                <img
+                  src={item.thumbnailUrl}
+                  alt=""
+                  className="border-border size-14 shrink-0 rounded-lg border object-cover"
+                />
+              ) : (
+                <div
+                  className="border-border bg-muted size-14 shrink-0 rounded-lg border"
+                  aria-hidden
+                />
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium">{item.name}</p>
+                {item.variantTitle ? (
+                  <p className="text-muted-foreground truncate text-xs">{item.variantTitle}</p>
+                ) : null}
+                <p className="text-muted-foreground mt-0.5 text-xs">
+                  {item.sku ? `SKU ${item.sku} · ` : ''}Qty {item.quantity}
+                </p>
+              </div>
+              <p className="shrink-0 text-sm font-medium">
+                {formatCurrency(item.lineTotal, order.currency)}
+              </p>
+            </li>
+          ))}
+        </ul>
       </Link>
     </motion.li>
   );

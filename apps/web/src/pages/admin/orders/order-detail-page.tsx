@@ -5,7 +5,11 @@ import { Button } from '@fe-platform/ui';
 import { toast } from 'sonner';
 import { AdminErrorState, AdminPageHeader, AdminPanel, PageMotion } from '@/components/admin';
 import { ADMIN_ROUTES, QUERY_KEYS } from '@/constants';
-import { ORDER_STATUS_CONFIG, ORDER_STATUS_TRANSITIONS } from '@/constants/order.constants';
+import {
+  ORDER_STATUS_CONFIG,
+  ORDER_STATUS_EMAIL_PREVIEW,
+  ORDER_STATUS_TRANSITIONS,
+} from '@/constants/order.constants';
 import { useAdminPermissions } from '@/hooks/admin';
 import { AppError } from '@/lib/errors';
 import { cn, formatCurrency, formatDate } from '@/lib/utils';
@@ -108,7 +112,9 @@ export function OrderDetailPage({ orderId }: { orderId: string }) {
         ? ordersApi.cancel(orderId)
         : ordersApi.updateStatus(orderId, targetStatus),
     onSuccess: (_result, targetStatus) => {
-      toast.success(`Order marked as ${ORDER_STATUS_CONFIG[targetStatus]?.label ?? targetStatus}`);
+      toast.success(
+        `Order marked as ${ORDER_STATUS_CONFIG[targetStatus]?.label ?? targetStatus}. Customer notified by email.`,
+      );
       void queryClient.invalidateQueries({ queryKey: ['admin', 'orders'] });
       void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminOrders.detail(orderId) });
       void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminOrders.timeline(orderId) });
@@ -377,26 +383,49 @@ export function OrderDetailPage({ orderId }: { orderId: string }) {
           {orderPerms.update || orderPerms.cancel ? (
             <AdminPanel title="Update status">
               {allowedStatuses.length > 0 ? (
-                <>
-                  <select
-                    value={selectedStatus}
-                    onChange={(event) => setNextStatus(event.target.value)}
-                    className="mb-3 w-full rounded-lg border border-[var(--admin-line)] bg-[var(--admin-panel)] px-3 py-2 text-sm"
-                  >
-                    {allowedStatuses.map((candidate) => (
-                      <option key={candidate} value={candidate}>
-                        {ORDER_STATUS_CONFIG[candidate]?.label ?? candidate.replace(/_/g, ' ')}
-                      </option>
-                    ))}
-                  </select>
+                <div className="space-y-3">
+                  <div>
+                    <label
+                      htmlFor={`order-next-status-${orderId}`}
+                      className="mb-1.5 block text-xs font-medium text-neutral-500 dark:text-neutral-400"
+                    >
+                      New status
+                    </label>
+                    <select
+                      id={`order-next-status-${orderId}`}
+                      value={selectedStatus}
+                      onChange={(event) => setNextStatus(event.target.value)}
+                      className="w-full rounded-lg border border-[var(--admin-line)] bg-[var(--admin-panel)] px-3 py-2 text-sm"
+                    >
+                      {allowedStatuses.map((candidate) => (
+                        <option key={candidate} value={candidate}>
+                          {ORDER_STATUS_CONFIG[candidate]?.label ?? candidate.replace(/_/g, ' ')}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {selectedStatus && ORDER_STATUS_EMAIL_PREVIEW[selectedStatus] ? (
+                    <div className="rounded-lg border border-[var(--admin-line)] bg-neutral-50 p-3 dark:bg-white/5">
+                      <p className="mb-1 text-xs font-medium text-neutral-500 dark:text-neutral-400">
+                        Automated email to customer
+                      </p>
+                      <p className="text-sm text-[var(--admin-ink)]">
+                        Hi {shippingAddress?.fullName?.split(' ')[0] || 'there'},{' '}
+                        {ORDER_STATUS_EMAIL_PREVIEW[selectedStatus]}
+                      </p>
+                      <p className="mt-2 text-xs text-neutral-400">
+                        Sent automatically when you update the status — no message needed.
+                      </p>
+                    </div>
+                  ) : null}
                   <Button
                     size="sm"
                     onClick={() => statusMutation.mutate(selectedStatus)}
                     disabled={!selectedStatus || statusMutation.isPending}
                   >
-                    {statusMutation.isPending ? 'Updating…' : 'Update status'}
+                    {statusMutation.isPending ? 'Updating…' : 'Update status & notify customer'}
                   </Button>
-                </>
+                </div>
               ) : (
                 <p className="text-sm text-neutral-500 dark:text-neutral-400">
                   No further status changes are available.

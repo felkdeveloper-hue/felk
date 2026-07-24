@@ -23,10 +23,14 @@ export const orderListQuerySchema = z.object({
 export const orderStatusUpdateSchema = z.object({
   status: statusEnum,
   note: z.string().trim().max(500).optional(),
+  /** Optional customer-facing update message shown in the notification email. */
+  updateMessage: z.string().trim().max(500).optional(),
 });
 
 export const orderCancelSchema = z.object({
   reason: z.string().trim().max(500).optional(),
+  /** Optional customer-facing update message shown in the cancellation email. */
+  updateMessage: z.string().trim().max(500).optional(),
 });
 
 export const orderNoteSchema = z.object({

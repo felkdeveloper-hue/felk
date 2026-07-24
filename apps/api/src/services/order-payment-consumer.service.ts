@@ -15,6 +15,7 @@ import type { ActorMeta } from '@/services/cms-crud.service';
 import { logger } from '@/config/logger';
 import { ORDER_STATUS } from '@/constants/order-status';
 import { ORDER_AUDIT, ORDER_EVENT_TYPE, CONSUMED_PAYMENT_EVENT_TYPES } from '@/constants/order';
+import { CHECKOUT_AUDIT, CHECKOUT_STATUS } from '@/constants/checkout';
 import { PAYMENT_METHOD } from '@/constants/payment-status';
 import { PAYMENT_EVENT_TYPE } from '@/constants/payment';
 import { publishPaymentEvent } from '@/services/payment-event-publisher';
@@ -43,23 +44,34 @@ function isDuplicateKeyError(error: unknown): boolean {
 
 async function buildOrderItems(checkout: CheckoutSessionDocument): Promise<OrderItemSubdocument[]> {
   const variantIds = [...new Set(checkout.lines.map((l) => l.variantId.toString()))];
-  const [variants, products] = await Promise.all([
+  const productIds = [...new Set(checkout.lines.map((l) => l.productId.toString()))];
+  const [variants, products, productMedia] = await Promise.all([
     ProductVariantModel.find({ _id: { $in: variantIds } }),
-    ProductModel.find({
-      _id: { $in: [...new Set(checkout.lines.map((l) => l.productId.toString()))] },
+    ProductModel.find({ _id: { $in: productIds } }),
+    ProductMediaModel.find({ productId: { $in: productIds }, isDeleted: false }).sort({
+      priority: 1,
     }),
   ]);
 
   const variantMap = new Map(variants.map((v) => [v._id.toString(), v]));
   const productMap = new Map(products.map((p) => [p._id.toString(), p]));
+  const mediaByProductId = new Map<string, string[]>();
+  for (const media of productMedia) {
+    const key = media.productId.toString();
+    const urls = mediaByProductId.get(key) ?? [];
+    if (media.url) urls.push(String(media.url));
+    mediaByProductId.set(key, urls);
+  }
 
   const primaryImageIds = variants
     .map((v) => v.primaryImageId)
     .filter((id): id is Types.ObjectId => Boolean(id));
-  const media = primaryImageIds.length
+  const primaryMedia = primaryImageIds.length
     ? await ProductMediaModel.find({ _id: { $in: primaryImageIds } })
     : [];
-  const mediaMap = new Map(media.map((m) => [m._id.toString(), m as unknown as { url: string }]));
+  const mediaMap = new Map(
+    primaryMedia.map((m) => [m._id.toString(), m as unknown as { url: string }]),
+  );
 
   const subtotal = checkout.totals.subtotal || 1;
 
@@ -69,8 +81,9 @@ async function buildOrderItems(checkout: CheckoutSessionDocument): Promise<Order
     const primaryImage = variant?.primaryImageId
       ? mediaMap.get(variant.primaryImageId.toString())?.url
       : undefined;
-    const images = [primaryImage, variant?.thumbnailUrl ?? undefined].filter((u): u is string =>
-      Boolean(u),
+    const productImages = mediaByProductId.get(line.productId.toString()) ?? [];
+    const images = [primaryImage, variant?.thumbnailUrl ?? undefined, ...productImages].filter(
+      (u): u is string => Boolean(u),
     );
 
     const weight = checkout.totals.subtotal ? line.lineSubtotal / subtotal : 0;
@@ -214,6 +227,23 @@ export async function handlePaymentSucceededEvent(payload: Record<string, unknow
       status: ORDER_STATUS.PENDING,
       note: 'Order created from a verified payment',
     });
+
+    try {
+      checkout.status = CHECKOUT_STATUS.COMPLETED;
+      checkout.reservationExpiresAt = null;
+      await checkout.save();
+      await writeAuditLog({
+        action: CHECKOUT_AUDIT.COMPLETED,
+        resourceType: 'checkout_sessions',
+        resourceId: checkout._id.toString(),
+        metadata: { orderId: order._id.toString(), paymentId },
+      });
+    } catch (error) {
+      logger.warn(
+        { err: error, checkoutId: checkout._id.toString(), orderId: order._id.toString() },
+        'Failed to mark checkout completed after order creation — continuing',
+      );
+    }
 
     try {
       await cartService.clear({ customerId: checkout.customerId.toString() }, SYSTEM_ACTOR);

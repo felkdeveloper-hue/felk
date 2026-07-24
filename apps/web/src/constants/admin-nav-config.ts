@@ -1,8 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
 import {
-  BarChart3,
-  Boxes,
-  CreditCard,
   Filter,
   Image,
   LayoutDashboard,
@@ -32,6 +29,18 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     to: ADMIN_ROUTES.dashboard,
     icon: LayoutDashboard,
     permissions: [PERMISSIONS.REPORTS_VIEW, PERMISSIONS.ANALYTICS_VIEW, PERMISSIONS.ORDERS_VIEW],
+  },
+  {
+    label: 'Users',
+    to: ADMIN_ROUTES.users,
+    icon: Users,
+    permissions: [PERMISSIONS.USERS_READ, PERMISSIONS.USERS_MANAGE],
+  },
+  {
+    label: 'Orders',
+    to: ADMIN_ROUTES.orders,
+    icon: ShoppingCart,
+    permissions: [PERMISSIONS.ORDERS_VIEW, PERMISSIONS.ORDERS_READ],
   },
   {
     label: 'Products',
@@ -76,36 +85,6 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     permissions: [PERMISSIONS.INVENTORY_VIEW, PERMISSIONS.WAREHOUSE_MANAGE],
   },
   {
-    label: 'Orders',
-    to: ADMIN_ROUTES.orders,
-    icon: ShoppingCart,
-    permissions: [PERMISSIONS.ORDERS_VIEW, PERMISSIONS.ORDERS_READ],
-  },
-  {
-    label: 'Customers',
-    to: ADMIN_ROUTES.customers,
-    icon: Users,
-    permissions: [PERMISSIONS.CUSTOMERS_VIEW],
-  },
-  {
-    label: 'Finance',
-    to: ADMIN_ROUTES.finance,
-    icon: CreditCard,
-    permissions: [PERMISSIONS.PAYMENTS_VIEW, PERMISSIONS.PAYMENTS_RECONCILE],
-  },
-  {
-    label: 'Reports',
-    to: ADMIN_ROUTES.reports,
-    icon: BarChart3,
-    permissions: [PERMISSIONS.REPORTS_VIEW, PERMISSIONS.REPORTS_EXPORT],
-  },
-  {
-    label: 'Users',
-    to: ADMIN_ROUTES.users,
-    icon: Users,
-    permissions: [PERMISSIONS.USERS_READ, PERMISSIONS.USERS_MANAGE],
-  },
-  {
     label: 'Roles',
     to: ADMIN_ROUTES.roles,
     icon: Shield,
@@ -116,12 +95,6 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     to: ADMIN_ROUTES.settings,
     icon: Settings,
     permissions: [PERMISSIONS.SETTINGS_VIEW, PERMISSIONS.SETTINGS_MANAGE],
-  },
-  {
-    label: 'Audit',
-    to: ADMIN_ROUTES.audit,
-    icon: Boxes,
-    permissions: [PERMISSIONS.AUDIT_READ, PERMISSIONS.ACTIVITY_READ],
   },
 ];
 

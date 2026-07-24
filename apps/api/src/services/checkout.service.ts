@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { Types } from 'mongoose';
 import { CheckoutSessionModel, type CheckoutSessionDocument } from '@/models/checkout.models';
+import { OrderModel } from '@/models/order.models';
 import { InventoryItemModel, WarehouseModel } from '@/models/inventory.models';
 import { CustomerAddressModel } from '@/models/customer.models';
 import { cartService } from '@/services/cart.service';
@@ -33,38 +34,66 @@ function newCheckoutToken() {
   return `chk_${randomBytes(24).toString('hex')}`;
 }
 
-async function pickWarehouseForVariant(variantId: string, quantity: number) {
-  const items = await InventoryItemModel.find({
-    variantId,
-    isDeleted: false,
-    available: { $gte: quantity },
-  })
-    .sort({ available: -1 })
-    .limit(5);
-
-  if (!items.length) {
-    // prefer any warehouse with some stock for clearer error later
-    const any = await InventoryItemModel.find({
-      variantId,
-      isDeleted: false,
-    })
-      .sort({ available: -1 })
-      .limit(1);
-    return any[0] ?? null;
-  }
-
-  // Prefer default warehouse when available and sufficient
+async function getDefaultWarehouseId(): Promise<string | null> {
   const defaultWh = await WarehouseModel.findOne({
     isDefault: true,
     isDeleted: false,
     status: 'active',
-  });
-  if (defaultWh) {
-    const atDefault = items.find((i) => i.warehouseId.toString() === defaultWh._id.toString());
-    if (atDefault) return atDefault;
+  })
+    .select('_id')
+    .lean();
+  return defaultWh?._id.toString() ?? null;
+}
+
+function pickInventoryForVariant(
+  items: Array<{ warehouseId: Types.ObjectId; available: number }>,
+  quantity: number,
+  defaultWarehouseId: string | null,
+) {
+  const sufficient = items.filter((i) => i.available >= quantity);
+  const pool = sufficient.length ? sufficient : items;
+  if (!pool.length) return null;
+
+  if (defaultWarehouseId) {
+    const atDefault = pool.find((i) => i.warehouseId.toString() === defaultWarehouseId);
+    if (atDefault && atDefault.available >= quantity) return atDefault;
   }
 
-  return items[0]!;
+  return pool[0] ?? null;
+}
+
+async function loadInventoryByVariant(
+  variantIds: string[],
+): Promise<
+  Map<string, Array<{ warehouseId: Types.ObjectId; available: number; _id: Types.ObjectId }>>
+> {
+  if (!variantIds.length) return new Map();
+
+  const rows = await InventoryItemModel.find({
+    variantId: { $in: variantIds },
+    isDeleted: false,
+  })
+    .select('variantId warehouseId available')
+    .sort({ available: -1 })
+    .lean();
+
+  const byVariant = new Map<
+    string,
+    Array<{ warehouseId: Types.ObjectId; available: number; _id: Types.ObjectId }>
+  >();
+
+  for (const row of rows) {
+    const key = String(row.variantId);
+    const list = byVariant.get(key) ?? [];
+    list.push({
+      _id: row._id as Types.ObjectId,
+      warehouseId: row.warehouseId as Types.ObjectId,
+      available: row.available,
+    });
+    byVariant.set(key, list);
+  }
+
+  return byVariant;
 }
 
 export class CheckoutService {
@@ -124,29 +153,58 @@ export class CheckoutService {
       throw ApiError.badRequest('Cart is empty', undefined, 'CART_EMPTY');
     }
 
-    const cartValidation = await cartService.validateCart(String(view.cart._id));
-    const issues = cartValidation.issues;
+    // getCart already refreshed pricing; avoid a second full validateCart pass.
+    // Stock is resolved from a single batched inventory query below.
+    const issues: Array<{
+      code: string;
+      message: string;
+      variantId?: string;
+      severity: 'error' | 'warning';
+    }> = [];
 
-    const lines = [];
-    for (const raw of view.items) {
-      const item = raw as {
-        _id: Types.ObjectId;
-        productId: Types.ObjectId;
-        variantId: Types.ObjectId;
-        sku: string;
-        title: string;
-        quantity: number;
-        currentPrice: number;
-        salePrice?: number | null;
-        compareAtPrice?: number | null;
-        lineSubtotal: number;
-        weightGrams: number;
-        priceChanged?: boolean;
-      };
+    const typedItems = view.items as Array<{
+      _id: Types.ObjectId;
+      productId: Types.ObjectId;
+      variantId: Types.ObjectId;
+      sku: string;
+      title: string;
+      quantity: number;
+      currentPrice: number;
+      salePrice?: number | null;
+      compareAtPrice?: number | null;
+      lineSubtotal: number;
+      weightGrams: number;
+      priceChanged?: boolean;
+    }>;
 
-      const inv = await pickWarehouseForVariant(item.variantId.toString(), item.quantity);
+    const [defaultWarehouseId, inventoryByVariant] = await Promise.all([
+      getDefaultWarehouseId(),
+      loadInventoryByVariant(typedItems.map((item) => item.variantId.toString())),
+    ]);
 
-      lines.push({
+    const lines = typedItems.map((item) => {
+      const invRows = inventoryByVariant.get(item.variantId.toString()) ?? [];
+      const inv = pickInventoryForVariant(invRows, item.quantity, defaultWarehouseId);
+
+      if (!inv || inv.available < item.quantity) {
+        issues.push({
+          code: 'OUT_OF_STOCK',
+          message: `Insufficient stock for ${item.sku}`,
+          variantId: item.variantId.toString(),
+          severity: 'error',
+        });
+      }
+
+      if (item.priceChanged) {
+        issues.push({
+          code: 'PRICE_CHANGED',
+          message: `Price changed for ${item.sku}`,
+          variantId: item.variantId.toString(),
+          severity: 'warning',
+        });
+      }
+
+      return {
         cartItemId: item._id,
         productId: item.productId,
         variantId: item.variantId,
@@ -159,19 +217,10 @@ export class CheckoutService {
         lineSubtotal: item.lineSubtotal,
         weightGrams: item.weightGrams ?? 0,
         taxClass: null,
-        warehouseId: inv?.warehouseId ?? null,
+        warehouseId: inv && inv.available >= item.quantity ? inv.warehouseId : null,
         reservationId: null,
-      });
-
-      if (item.priceChanged) {
-        issues.push({
-          code: 'PRICE_CHANGED',
-          message: `Price changed for ${item.sku}`,
-          variantId: item.variantId.toString(),
-          severity: 'warning' as const,
-        });
-      }
-    }
+      };
+    });
 
     return {
       cartId: String(view.cart._id),
@@ -271,8 +320,13 @@ export class CheckoutService {
     });
 
     if (existing) {
-      // Reject duplicate unless expired
-      if (existing.reservationExpiresAt && existing.reservationExpiresAt <= new Date()) {
+      // Reject duplicate unless expired, or already fulfilled into an order.
+      const alreadyOrdered = await OrderModel.exists({ checkoutId: existing._id });
+      if (alreadyOrdered) {
+        existing.status = CHECKOUT_STATUS.COMPLETED;
+        existing.reservationExpiresAt = null;
+        await existing.save();
+      } else if (existing.reservationExpiresAt && existing.reservationExpiresAt <= new Date()) {
         await this.expireSession(existing, actor);
       } else {
         throw ApiError.conflict(
@@ -294,23 +348,18 @@ export class CheckoutService {
     }
 
     const shippingAddressId =
-      payload.shippingAddressId ??
-      (await customerService.getById(customer._id.toString())).defaultShippingAddressId?.toString();
+      payload.shippingAddressId ?? customer.defaultShippingAddressId?.toString();
     const billingAddressId =
-      payload.billingAddressId ??
-      (
-        await customerService.getById(customer._id.toString())
-      ).defaultBillingAddressId?.toString() ??
-      shippingAddressId;
+      payload.billingAddressId ?? customer.defaultBillingAddressId?.toString() ?? shippingAddressId;
 
     const shippingAddress = await this.loadAddressSnapshot(
       customer._id.toString(),
       shippingAddressId,
     );
-    const billingAddress = await this.loadAddressSnapshot(
-      customer._id.toString(),
-      billingAddressId,
-    );
+    const billingAddress =
+      billingAddressId === shippingAddressId
+        ? shippingAddress
+        : await this.loadAddressSnapshot(customer._id.toString(), billingAddressId);
 
     const timeout = CHECKOUT_RESERVATION_TTL_MINUTES;
     const expiresAt = new Date(Date.now() + timeout * 60_000);
@@ -352,7 +401,8 @@ export class CheckoutService {
     });
 
     if (payload.autoReserve !== false) {
-      return this.reserve(session._id.toString(), user, actor);
+      // Lines were just built — skip a second cart rebuild inside reserve.
+      return this.reserve(session._id.toString(), user, actor, { skipRebuild: true });
     }
 
     return this.toSummary(session);
@@ -361,14 +411,22 @@ export class CheckoutService {
   async get(idOrToken: string, user: AuthenticatedUser) {
     const session = await this.getByIdOrToken(idOrToken);
     await this.assertOwner(session, user);
-    await this.ensureNotExpired(session, { userId: user.id });
+    // Allow reading closed sessions so the client can clear stale tokens and start fresh.
+    // Only auto-expire live reserved/ready sessions past their TTL.
+    if (
+      ![CHECKOUT_STATUS.COMPLETED, CHECKOUT_STATUS.CANCELLED, CHECKOUT_STATUS.EXPIRED].includes(
+        session.status as never,
+      )
+    ) {
+      await this.ensureReservationNotExpired(session, { userId: user.id });
+    }
     return this.toSummary(session);
   }
 
   async validate(idOrToken: string, user: AuthenticatedUser, actor: ActorMeta) {
     const session = await this.getByIdOrToken(idOrToken);
     await this.assertOwner(session, user);
-    await this.ensureNotExpired(session, actor);
+    await this.assertMutable(session, actor);
 
     const rebuilt = await this.buildLinesFromCart(session.customerId.toString());
     session.lines = rebuilt.lines as never;
@@ -390,11 +448,20 @@ export class CheckoutService {
     return { ...this.toSummary(session), valid, issues: rebuilt.issues };
   }
 
-  async reserve(idOrToken: string, user: AuthenticatedUser, actor: ActorMeta) {
-    let session = await this.getByIdOrToken(idOrToken);
+  async reserve(
+    idOrToken: string,
+    user: AuthenticatedUser,
+    actor: ActorMeta,
+    opts?: { skipRebuild?: boolean },
+  ) {
+    const session = await this.getByIdOrToken(idOrToken);
     await this.assertOwner(session, user);
 
-    if ([CHECKOUT_STATUS.CANCELLED, CHECKOUT_STATUS.EXPIRED].includes(session.status as never)) {
+    if (
+      [CHECKOUT_STATUS.CANCELLED, CHECKOUT_STATUS.EXPIRED, CHECKOUT_STATUS.COMPLETED].includes(
+        session.status as never,
+      )
+    ) {
       throw ApiError.badRequest(`Cannot reserve checkout in status ${session.status}`);
     }
 
@@ -403,20 +470,22 @@ export class CheckoutService {
       await this.releaseReservations(session, actor, 'Re-reserve checkout');
     }
 
-    // Re-validate lines
-    const rebuilt = await this.buildLinesFromCart(session.customerId.toString());
-    const hardErrors = rebuilt.issues.filter((i) => i.severity === 'error');
-    if (hardErrors.length) {
-      session.validationIssues = rebuilt.issues as unknown[];
-      await session.save();
-      throw ApiError.unprocessable(
-        'Cannot reserve — cart validation failed',
-        { issues: hardErrors },
-        'CHECKOUT_INVALID',
-      );
+    // Re-validate lines unless caller just built them (e.g. start → autoReserve).
+    if (!opts?.skipRebuild) {
+      const rebuilt = await this.buildLinesFromCart(session.customerId.toString());
+      const hardErrors = rebuilt.issues.filter((i) => i.severity === 'error');
+      if (hardErrors.length) {
+        session.validationIssues = rebuilt.issues as unknown[];
+        await session.save();
+        throw ApiError.unprocessable(
+          'Cannot reserve — cart validation failed',
+          { issues: hardErrors },
+          'CHECKOUT_INVALID',
+        );
+      }
+      session.lines = rebuilt.lines as never;
     }
 
-    session.lines = rebuilt.lines as never;
     const timeout = session.reservationTimeoutMinutes || CHECKOUT_RESERVATION_TTL_MINUTES;
     const expiresAt = new Date(Date.now() + timeout * 60_000);
     const reservationIds: Types.ObjectId[] = [];
@@ -506,9 +575,9 @@ export class CheckoutService {
     },
     actor: ActorMeta,
   ) {
-    let session = await this.getByIdOrToken(idOrToken);
+    const session = await this.getByIdOrToken(idOrToken);
     await this.assertOwner(session, user);
-    await this.ensureNotExpired(session, actor);
+    await this.assertMutable(session, actor);
 
     if (payload.shippingAddressId) {
       session.shippingAddress = await this.loadAddressSnapshot(
@@ -622,7 +691,23 @@ export class CheckoutService {
     });
   }
 
-  private async ensureNotExpired(session: CheckoutSessionDocument, actor: ActorMeta) {
+  private async assertMutable(session: CheckoutSessionDocument, actor: ActorMeta) {
+    if (
+      [CHECKOUT_STATUS.COMPLETED, CHECKOUT_STATUS.CANCELLED, CHECKOUT_STATUS.EXPIRED].includes(
+        session.status as never,
+      )
+    ) {
+      throw ApiError.badRequest(
+        `Checkout is ${session.status} and can no longer be modified`,
+        { checkoutId: session._id.toString(), status: session.status },
+        'CHECKOUT_CLOSED',
+      );
+    }
+
+    await this.ensureReservationNotExpired(session, actor);
+  }
+
+  private async ensureReservationNotExpired(session: CheckoutSessionDocument, actor: ActorMeta) {
     if (
       session.reservationExpiresAt &&
       session.reservationExpiresAt <= new Date() &&

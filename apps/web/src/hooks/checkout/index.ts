@@ -1,4 +1,6 @@
 export {
+  isCheckoutClosedError,
+  isClosedCheckoutSession,
   useCancelCheckoutMutation,
   useCheckoutSessionQuery,
   useRefreshCheckoutMutation,

@@ -19,6 +19,25 @@ export const ORDER_STATUS_CONFIG: Record<string, OrderStatusConfig> = {
   refunded: { label: 'Refunded', badgeVariant: 'outline' },
 };
 
+/** Preview of the automated customer email for each status (mirrors API templates). */
+export const ORDER_STATUS_EMAIL_PREVIEW: Record<string, string> = {
+  confirmed:
+    'Congratulations — your order is confirmed! We’ve confirmed your order and our team is getting your items ready.',
+  packed: 'Great news — your order has been carefully packed and is waiting for carrier pickup.',
+  ready_for_shipment: 'Your order is ready for shipment and will leave our warehouse shortly.',
+  shipped:
+    'Congratulations — your order has been shipped out for delivery and is heading to your address.',
+  delivered: 'Congratulations — your order has been delivered. We hope you love your new pieces!',
+  completed: 'Thank you again for shopping with Fashion Edge. Your order is now complete.',
+  cancelled:
+    'Your order has been cancelled. If this was unexpected, please contact our support team.',
+  returned:
+    'We’ve started the return process for your order. Our team will be in touch with next steps.',
+  refund_pending:
+    'Good news — your refund is now being processed. We’re working to get it back to you soon.',
+  refunded: 'We’ve issued a refund for your order. The amount should appear in your account soon.',
+};
+
 /** Mirrors the API state machine so admin users can only choose valid next steps. */
 export const ORDER_STATUS_TRANSITIONS: Record<string, string[]> = {
   pending: ['confirmed', 'cancelled'],

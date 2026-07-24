@@ -7,7 +7,7 @@ import {
   type CartDocument,
   type CartItemDocument,
 } from '@/models/cart.models';
-import { ProductModel, ProductVariantModel } from '@/models/product.models';
+import { ProductModel, ProductVariantModel, ProductMediaModel } from '@/models/product.models';
 import { InventoryItemModel } from '@/models/inventory.models';
 import { ColorModel, SizeModel } from '@/models/master-data.models';
 import { customerService } from '@/services/customer.service';
@@ -320,12 +320,40 @@ export class CartService {
     };
   }
 
+  private async resolveVariantThumbnail(
+    variant: { thumbnailUrl?: string | null; primaryImageId?: Types.ObjectId | null },
+    productId: Types.ObjectId | string,
+  ): Promise<string | null> {
+    if (variant.thumbnailUrl) return variant.thumbnailUrl;
+
+    if (variant.primaryImageId) {
+      const primary = await ProductMediaModel.findById(variant.primaryImageId).select('url').lean();
+      if (primary?.url) return String(primary.url);
+    }
+
+    const fallback = await ProductMediaModel.findOne({
+      productId,
+      isDeleted: false,
+    })
+      .sort({ priority: 1 })
+      .select('url')
+      .lean();
+
+    return fallback?.url ? String(fallback.url) : null;
+  }
+
   private async refreshItemPricing(item: CartItemDocument) {
-    const { pricing, variant } = await this.loadVariantContext(item.variantId.toString());
+    const { pricing, variant, product, color, size } = await this.loadVariantContext(
+      item.variantId.toString(),
+    );
     const currentPrice = pricing.effectivePrice;
     const priceDifference = Number((currentPrice - item.priceAtAdd).toFixed(2));
     const priceChanged = Math.abs(priceDifference) > 0.001;
 
+    item.title = product.name || variant.title || item.title;
+    item.colorName = color?.name ?? item.colorName ?? null;
+    item.sizeName = size?.name ?? item.sizeName ?? null;
+    item.thumbnailUrl = await this.resolveVariantThumbnail(variant, item.productId);
     item.currentPrice = currentPrice;
     item.salePrice = pricing.salePrice;
     item.compareAtPrice = pricing.compareAtPrice ?? variant.compareAtPrice ?? null;
@@ -363,15 +391,16 @@ export class CartService {
       isDeleted: false,
     }).sort({ updatedAt: -1 });
 
-    for (const item of allItems) {
-      if (item.location === CART_ITEM_LOCATION.CART) {
+    await Promise.all(
+      allItems.map(async (item) => {
+        if (item.location !== CART_ITEM_LOCATION.CART) return;
         try {
           await this.refreshItemPricing(item);
         } catch {
           // keep snapshot if catalog vanished; validation will flag
         }
-      }
-    }
+      }),
+    );
 
     const fresh = await CartItemModel.find({
       cartId: cart._id,
@@ -478,7 +507,7 @@ export class CartService {
         productId: product._id,
         variantId: variant._id,
         sku: variant.sku,
-        title: variant.title || product.name,
+        title: product.name || variant.title,
         colorId: variant.colorId,
         sizeId: variant.sizeId,
         colorName: color?.name ?? null,
@@ -494,7 +523,7 @@ export class CartService {
         priceChanged: false,
         priceDifference: 0,
         lineSubtotal: Number((pricing.effectivePrice * quantity).toFixed(2)),
-        thumbnailUrl: variant.thumbnailUrl ?? null,
+        thumbnailUrl: await this.resolveVariantThumbnail(variant, product._id),
       });
 
       await writeAuditLog({
@@ -816,38 +845,42 @@ export class CartService {
       isDeleted: false,
     });
 
-    const issues: ValidationIssue[] = [];
-    for (const item of items) {
-      try {
-        const { issues: lineIssues } = await this.validateLineQuantity(
-          item.variantId.toString(),
-          item.quantity,
-          { cartId, excludeItemId: item._id.toString() },
-        );
-        for (const issue of lineIssues) {
-          issues.push({ ...issue, itemId: item._id.toString() });
-        }
+    const perItemIssues = await Promise.all(
+      items.map(async (item) => {
+        const issues: ValidationIssue[] = [];
+        try {
+          const { issues: lineIssues } = await this.validateLineQuantity(
+            item.variantId.toString(),
+            item.quantity,
+            { cartId, excludeItemId: item._id.toString() },
+          );
+          for (const issue of lineIssues) {
+            issues.push({ ...issue, itemId: item._id.toString() });
+          }
 
-        const refreshed = await this.refreshItemPricing(item);
-        if (refreshed.priceChanged) {
+          const refreshed = await this.refreshItemPricing(item);
+          if (refreshed.priceChanged) {
+            issues.push({
+              code: 'PRICE_CHANGED',
+              message: `Price changed by ${refreshed.priceDifference}`,
+              itemId: item._id.toString(),
+              variantId: item.variantId.toString(),
+              severity: 'warning',
+            });
+          }
+        } catch (error) {
           issues.push({
-            code: 'PRICE_CHANGED',
-            message: `Price changed by ${refreshed.priceDifference}`,
+            code: 'VARIANT_INVALID',
+            message: error instanceof Error ? error.message : 'Invalid cart line',
             itemId: item._id.toString(),
-            variantId: item.variantId.toString(),
-            severity: 'warning',
+            severity: 'error',
           });
         }
-      } catch (error) {
-        issues.push({
-          code: 'VARIANT_INVALID',
-          message: error instanceof Error ? error.message : 'Invalid cart line',
-          itemId: item._id.toString(),
-          severity: 'error',
-        });
-      }
-    }
+        return issues;
+      }),
+    );
 
+    const issues = perItemIssues.flat();
     return {
       valid: !issues.some((i) => i.severity === 'error'),
       issues,

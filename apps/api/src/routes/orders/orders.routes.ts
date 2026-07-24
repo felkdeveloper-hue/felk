@@ -91,7 +91,7 @@ ordersRouter.patch(
   validate({ params: S.orderIdParamsSchema, body: S.orderStatusUpdateSchema }),
   asyncHandler(async (req, res) => {
     if (!req.user) throw ApiError.unauthorized();
-    const body = req.body as { status: OrderStatus; note?: string };
+    const body = req.body as { status: OrderStatus; note?: string; updateMessage?: string };
     const order = await orderService.updateStatus(
       String(req.params.id),
       body,
@@ -111,7 +111,7 @@ ordersRouter.post(
     if (!req.user) throw ApiError.unauthorized();
     const order = await orderService.cancel(
       String(req.params.id),
-      req.body as { reason?: string },
+      req.body as { reason?: string; updateMessage?: string },
       req.user,
       actorFromRequest(req),
     );

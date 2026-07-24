@@ -11,6 +11,7 @@ import { recordOrderTimeline } from '@/services/order-timeline.service';
 import { publishOrderEvent } from '@/services/order-event-publisher';
 import { writeAuditLog } from '@/services/audit.service';
 import { inventoryService } from '@/services/inventory.service';
+import { notifyOrderStatusChange } from '@/services/order-notification.service';
 import type { ActorMeta } from '@/services/cms-crud.service';
 import { ApiError } from '@/utils/errors/api-error';
 import { buildPaginationMeta, getPaginationSkip, parsePagination } from '@/utils/pagination';
@@ -130,7 +131,7 @@ export class OrderService {
 
   async updateStatus(
     id: string,
-    payload: { status: OrderStatus; note?: string },
+    payload: { status: OrderStatus; note?: string; updateMessage?: string },
     user: AuthenticatedUser,
     actor: ActorMeta,
   ) {
@@ -138,15 +139,20 @@ export class OrderService {
     await this.assertAccess(order, user, ['orders.update']);
 
     if (payload.status === ORDER_STATUS.CANCELLED) {
-      return this.cancel(id, { reason: payload.note }, user, actor);
+      return this.cancel(
+        id,
+        { reason: payload.note, updateMessage: payload.updateMessage },
+        user,
+        actor,
+      );
     }
 
-    return this.transitionTo(order, payload.status, payload.note, actor);
+    return this.transitionTo(order, payload.status, payload.note, actor, payload.updateMessage);
   }
 
   async cancel(
     id: string,
-    payload: { reason?: string },
+    payload: { reason?: string; updateMessage?: string },
     user: AuthenticatedUser,
     actor: ActorMeta,
   ) {
@@ -187,7 +193,13 @@ export class OrderService {
     }
 
     order.cancelReason = payload.reason ?? null;
-    return this.transitionTo(order, ORDER_STATUS.CANCELLED, payload.reason, actor);
+    return this.transitionTo(
+      order,
+      ORDER_STATUS.CANCELLED,
+      payload.reason,
+      actor,
+      payload.updateMessage,
+    );
   }
 
   private async transitionTo(
@@ -195,6 +207,7 @@ export class OrderService {
     status: OrderStatus,
     note: string | undefined,
     actor: ActorMeta,
+    updateMessage?: string,
   ) {
     const allowed = ORDER_STATUS_TRANSITIONS[order.status as OrderStatus] ?? [];
     if (!allowed.includes(status)) {
@@ -270,6 +283,15 @@ export class OrderService {
         { orderId: order._id.toString(), paymentId: order.paymentId.toString() },
       );
     }
+
+    // Fire-and-forget customer notification — failure must not roll back the status change.
+    void notifyOrderStatusChange({
+      orderId: order._id.toString(),
+      orderNumber: order.orderNumber,
+      customerId: order.customerId.toString(),
+      status,
+      updateMessage,
+    });
 
     return this.toSummary(order);
   }

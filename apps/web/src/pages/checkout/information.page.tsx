@@ -17,17 +17,19 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ROUTES } from '@/constants';
 import { useAddressesQuery } from '@/hooks/account';
-import { useValidateCartMutation } from '@/hooks/cart/use-cart-queries';
 import {
+  isCheckoutClosedError,
   useCheckoutSessionQuery,
   useRefreshCheckoutMutation,
   useStartCheckoutMutation,
 } from '@/hooks/checkout';
-import { useCheckoutStore } from '@/store';
+import { useCartStore, useCheckoutStore } from '@/store';
 
 export function CheckoutInformationPage() {
   const navigate = useNavigate();
   const startedRef = useRef(false);
+  const recoveringClosedRef = useRef(false);
+  const [recoveringClosed, setRecoveringClosed] = useState(false);
   const [offline, setOffline] = useState(() =>
     typeof navigator !== 'undefined' ? !navigator.onLine : false,
   );
@@ -35,14 +37,15 @@ export function CheckoutInformationPage() {
   const billingSameAsShipping = useCheckoutStore((state) => state.billingSameAsShipping);
   const shippingAddressId = useCheckoutStore((state) => state.selectedShippingAddressId);
   const billingAddressId = useCheckoutStore((state) => state.selectedBillingAddressId);
+  const checkoutToken = useCheckoutStore((state) => state.checkoutToken);
   const setBillingSameAsShipping = useCheckoutStore((state) => state.setBillingSameAsShipping);
   const setShippingAddressId = useCheckoutStore((state) => state.setSelectedShippingAddressId);
   const setBillingAddressId = useCheckoutStore((state) => state.setSelectedBillingAddressId);
 
-  const validateCart = useValidateCartMutation();
   const startCheckout = useStartCheckoutMutation();
   const refreshCheckout = useRefreshCheckoutMutation();
-  const { data: addresses } = useAddressesQuery();
+  const addressesQuery = useAddressesQuery();
+  const { data: addresses } = addressesQuery;
   const sessionQuery = useCheckoutSessionQuery();
   const session = sessionQuery.data;
 
@@ -57,31 +60,66 @@ export function CheckoutInformationPage() {
     };
   }, []);
 
+  const beginCheckout = async () => {
+    const storeCart = useCartStore.getState().cart;
+    if (storeCart && storeCart.items.length === 0) {
+      void navigate({ to: ROUTES.cart });
+      return;
+    }
+
+    const defaultShipping = addresses?.find((address) => address.isDefaultShipping);
+    await startCheckout.mutateAsync({
+      shippingAddressId: defaultShipping?.id,
+      autoReserve: true,
+    });
+  };
+
+  // Start checkout in the background. Do not wait on a separate cart validate —
+  // start already rebuilds/validates the cart. Wait for addresses to settle so
+  // the default shipping id can be sent on the first request.
   useEffect(() => {
     if (startedRef.current) return;
+    if (useCheckoutStore.getState().checkoutToken) {
+      startedRef.current = true;
+      return;
+    }
+    if (addressesQuery.isPending) return;
+
     startedRef.current = true;
 
     void (async () => {
       try {
-        const cart = await validateCart.mutateAsync();
-        if (!cart.items.length) {
-          void navigate({ to: ROUTES.cart });
-          return;
-        }
-
-        if (!useCheckoutStore.getState().checkoutToken) {
-          const latestAddresses = addresses;
-          const defaultShipping = latestAddresses?.find((address) => address.isDefaultShipping);
-          await startCheckout.mutateAsync({
-            shippingAddressId: defaultShipping?.id,
-            autoReserve: true,
-          });
-        }
+        await beginCheckout();
       } catch {
         /* surfaced via mutation state */
       }
     })();
-  }, [addresses, navigate, startCheckout, validateCart]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- bootstrap once per mount/token clear
+  }, [addresses, addressesQuery.isPending, navigate, startCheckout]);
+
+  // Stale completed/cancelled tokens: clear and start a fresh session automatically.
+  useEffect(() => {
+    const closedError =
+      isCheckoutClosedError(sessionQuery.error) || isCheckoutClosedError(startCheckout.error);
+    if (!closedError || recoveringClosedRef.current || addressesQuery.isPending) return;
+
+    recoveringClosedRef.current = true;
+    setRecoveringClosed(true);
+    useCheckoutStore.getState().resetCheckoutUi();
+    startedRef.current = true;
+
+    void (async () => {
+      try {
+        await beginCheckout();
+      } catch {
+        /* surfaced via mutation state */
+      } finally {
+        recoveringClosedRef.current = false;
+        setRecoveringClosed(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- recover once per closed error
+  }, [sessionQuery.error, startCheckout.error, addressesQuery.isPending]);
 
   useEffect(() => {
     if (!addresses?.length) return;
@@ -97,10 +135,27 @@ export function CheckoutInformationPage() {
     setBillingAddressId(shippingAddressId);
   }, [billingSameAsShipping, shippingAddressId, setBillingAddressId]);
 
-  // Session already loaded (e.g. resumed token) — show the form even if validate/start is still running.
-  const bootstrapPending =
-    !session && (validateCart.isPending || startCheckout.isPending || sessionQuery.isLoading);
-  const bootstrapError = validateCart.error ?? startCheckout.error ?? sessionQuery.error;
+  const recovering =
+    recoveringClosed || (isCheckoutClosedError(sessionQuery.error) && startCheckout.isPending);
+
+  // Hide CHECKOUT_CLOSED while recovering into a new session.
+  const bootstrapError = recovering
+    ? null
+    : isCheckoutClosedError(sessionQuery.error)
+      ? startCheckout.error && !isCheckoutClosedError(startCheckout.error)
+        ? startCheckout.error
+        : null
+      : (startCheckout.error ?? sessionQuery.error);
+
+  const sessionPending =
+    recovering ||
+    (!session &&
+      !bootstrapError &&
+      (addressesQuery.isPending ||
+        startCheckout.isPending ||
+        sessionQuery.isLoading ||
+        !checkoutToken));
+  const sessionReady = Boolean(session?.checkoutToken);
 
   const handleContinue = () => {
     if (!session?.checkoutToken || !shippingAddressId) return;
@@ -157,6 +212,7 @@ export function CheckoutInformationPage() {
         <AuthErrorAlert
           error={bootstrapError}
           onRetry={() => {
+            useCheckoutStore.getState().resetCheckoutUi();
             startedRef.current = false;
             void navigate({ to: ROUTES.checkout, replace: true });
             window.location.reload();
@@ -173,20 +229,23 @@ export function CheckoutInformationPage() {
             Choose shipping and billing addresses from your saved profile.
           </p>
 
-          {bootstrapPending ? (
-            <div className="mt-6 space-y-4" aria-busy="true">
-              <Skeleton className="h-32 w-full" />
-              <Skeleton className="h-32 w-full" />
-            </div>
-          ) : session ? (
+          {!bootstrapError || session ? (
             <div className="mt-6 space-y-8">
-              <CheckoutExpiryBanner
-                session={session}
-                onExtend={handleExtend}
-                onRestart={handleRestart}
-                isExtending={refreshCheckout.isPending}
-              />
-              <CheckoutValidationAlert issues={session.validationIssues} />
+              {session ? (
+                <>
+                  <CheckoutExpiryBanner
+                    session={session}
+                    onExtend={handleExtend}
+                    onRestart={handleRestart}
+                    isExtending={refreshCheckout.isPending}
+                  />
+                  <CheckoutValidationAlert issues={session.validationIssues} />
+                </>
+              ) : sessionPending ? (
+                <p className="text-muted-foreground text-sm" aria-live="polite">
+                  Preparing checkout…
+                </p>
+              ) : null}
 
               <AddressPicker
                 label="Shipping address"
@@ -216,14 +275,15 @@ export function CheckoutInformationPage() {
                 onNext={handleContinue}
                 nextLabel="Continue to shipping"
                 nextDisabled={
+                  !sessionReady ||
                   !shippingAddressId ||
                   (!billingSameAsShipping && !billingAddressId) ||
                   !addresses?.some((address) => address.id === shippingAddressId)
                 }
-                isSubmitting={refreshCheckout.isPending}
+                isSubmitting={refreshCheckout.isPending || sessionPending}
               />
             </div>
-          ) : !bootstrapError ? (
+          ) : (
             <div className="border-border mt-6 rounded-lg border border-dashed p-6 text-center">
               <p className="text-sm font-medium">Unable to start checkout</p>
               <p className="text-muted-foreground mt-1 text-sm">
@@ -232,17 +292,24 @@ export function CheckoutInformationPage() {
               <Button
                 className="mt-4"
                 variant="outline"
-                onClick={() => void navigate({ to: ROUTES.cart })}
+                onClick={() => {
+                  useCheckoutStore.getState().resetCheckoutUi();
+                  void navigate({ to: ROUTES.cart });
+                }}
               >
                 Back to cart
               </Button>
             </div>
-          ) : null}
+          )}
         </section>
 
         {session ? (
           <div className="lg:sticky lg:top-24 lg:self-start">
             <CheckoutOrderSummary session={session} />
+          </div>
+        ) : sessionPending ? (
+          <div className="lg:sticky lg:top-24 lg:self-start" aria-busy="true">
+            <Skeleton className="h-64 w-full" />
           </div>
         ) : null}
       </div>

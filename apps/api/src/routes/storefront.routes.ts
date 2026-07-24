@@ -225,7 +225,19 @@ storefrontRouter.get(
 storefrontRouter.get(
   '/products/:id',
   asyncHandler(async (req, res) => {
-    const product = await productService.getById(String(req.params.id));
+    const id = String(req.params.id);
+    const cacheKey = `storefront:product:${id}`;
+    const skipCache = process.env.NODE_ENV !== 'production';
+
+    if (!skipCache) {
+      const cached = getCached<Record<string, unknown>>(cacheKey);
+      if (cached) {
+        setPublicCache(res, 120);
+        return ApiResponse.success(res, cached);
+      }
+    }
+
+    const product = await productService.getById(id);
     const record = product as unknown as Record<string, unknown>;
     const status = String(record.status ?? '');
     const visibility = String(record.visibility ?? '');
@@ -239,6 +251,11 @@ storefrontRouter.get(
     if (hiddenStatuses.has(status) || visibility === PRODUCT_VISIBILITY.HIDDEN) {
       throw ApiError.notFound('Product not found');
     }
+
+    if (!skipCache) {
+      setCache(cacheKey, record, 60_000);
+    }
+    setPublicCache(res, 120);
     ApiResponse.success(res, product);
   }),
 );

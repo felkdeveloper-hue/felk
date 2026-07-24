@@ -11,6 +11,7 @@ export const CHECKOUT_STATUS = {
   OPEN: 'open',
   RESERVED: 'reserved',
   READY: 'ready',
+  COMPLETED: 'completed',
   EXPIRED: 'expired',
   CANCELLED: 'cancelled',
 } as const;
@@ -40,6 +41,7 @@ export const CHECKOUT_AUDIT = {
   RESERVATION_RELEASED: 'checkout.reservation_released',
   RESERVATION_EXPIRED: 'checkout.reservation_expired',
   CANCELLED: 'checkout.cancelled',
+  COMPLETED: 'checkout.completed',
   REFRESHED: 'checkout.refreshed',
   VALIDATED: 'checkout.validated',
 } as const;

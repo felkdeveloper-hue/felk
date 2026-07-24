@@ -9,6 +9,23 @@ import {
 } from '@/services/sdk';
 import { useCheckoutStore } from '@/store/checkout-store';
 
+const CLOSED_CHECKOUT_STATUSES = new Set(['completed', 'cancelled', 'expired']);
+
+function isClosedCheckoutSession(session: CheckoutSession): boolean {
+  return CLOSED_CHECKOUT_STATUSES.has(session.status);
+}
+
+function isCheckoutClosedError(error: unknown): boolean {
+  return AppError.isAppError(error) && error.code === 'CHECKOUT_CLOSED';
+}
+
+function clearStaleCheckout(queryClient: ReturnType<typeof useQueryClient>, ref?: string | null) {
+  useCheckoutStore.getState().resetCheckoutUi();
+  if (ref) {
+    queryClient.removeQueries({ queryKey: QUERY_KEYS.checkout.detail(ref) });
+  }
+}
+
 function syncCheckoutSession(session: CheckoutSession) {
   const store = useCheckoutStore.getState();
   store.setCheckoutToken(session.checkoutToken);
@@ -34,16 +51,27 @@ function cacheCheckoutSession(
 export function useCheckoutSessionQuery(checkoutRef?: string | null) {
   const storedToken = useCheckoutStore((state) => state.checkoutToken);
   const ref = checkoutRef ?? storedToken;
+  const queryClient = useQueryClient();
 
   return useQuery({
     queryKey: QUERY_KEYS.checkout.detail(ref ?? 'none'),
     queryFn: async () => {
       const session = await checkoutApi.getById(ref!);
+      if (isClosedCheckoutSession(session)) {
+        clearStaleCheckout(queryClient, ref);
+        // Signal that this token is unusable so the page can start a fresh session.
+        throw new AppError(`Checkout is ${session.status} and can no longer be modified`, {
+          code: 'CHECKOUT_CLOSED',
+          status: 400,
+          details: { status: session.status, checkoutToken: session.checkoutToken },
+        });
+      }
       syncCheckoutSession(session);
       return session;
     },
     enabled: Boolean(ref),
     staleTime: 1000 * 15,
+    retry: false,
   });
 }
 
@@ -59,7 +87,18 @@ async function startOrResumeCheckout(payload: CheckoutStartPayload): Promise<Che
     ) {
       const details = error.details as { checkoutId?: string; checkoutToken?: string };
       const ref = details.checkoutToken ?? details.checkoutId;
-      if (ref) return checkoutApi.getById(ref);
+      if (ref) {
+        try {
+          return await checkoutApi.refresh(ref, { extendReservation: true });
+        } catch (refreshError) {
+          // Active session was closed between conflict and refresh — start clean.
+          if (isCheckoutClosedError(refreshError)) {
+            useCheckoutStore.getState().resetCheckoutUi();
+            return checkoutApi.start(payload);
+          }
+          throw refreshError;
+        }
+      }
     }
     throw error;
   }
@@ -91,6 +130,11 @@ export function useRefreshCheckoutMutation() {
     onSuccess: (session) => {
       syncCheckoutSession(session);
       cacheCheckoutSession(queryClient, session);
+    },
+    onError: (error, variables) => {
+      if (isCheckoutClosedError(error)) {
+        clearStaleCheckout(queryClient, variables.checkoutRef);
+      }
     },
   });
 }
@@ -130,3 +174,5 @@ export function useCancelCheckoutMutation() {
     },
   });
 }
+
+export { isCheckoutClosedError, isClosedCheckoutSession };

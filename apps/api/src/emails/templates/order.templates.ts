@@ -6,7 +6,6 @@ import {
   emailLayout,
   emailMuted,
   emailParagraph,
-  infoTable,
   orderReference,
   totalRow,
 } from '@/emails/layout';
@@ -151,6 +150,129 @@ export function refundProcessedEmail(data: {
      ${emailMuted('Funds may take 5–7 business days to appear on your statement.')}
      ${data.orderUrl ? ctaButton(data.orderUrl, 'View order') : ''}`,
     { title: 'Refund Processed', preheader: `Refund for order #${data.orderNumber}.` },
+  );
+  return { subject, html, text };
+}
+
+// ─── Generic status-update notification ──────────────────────────────────────
+
+export type NotifiableOrderStatus =
+  | 'confirmed'
+  | 'packed'
+  | 'ready_for_shipment'
+  | 'shipped'
+  | 'delivered'
+  | 'completed'
+  | 'cancelled'
+  | 'returned'
+  | 'refund_pending'
+  | 'refunded';
+
+interface StatusCopy {
+  heading: string;
+  body: string;
+  footer: string;
+}
+
+const STATUS_COPY: Record<NotifiableOrderStatus, StatusCopy> = {
+  confirmed: {
+    heading: 'Congratulations — your order is confirmed!',
+    body: "We've confirmed your order and our team is getting your items ready. Thank you for shopping with us!",
+    footer: "We'll email you again once your order is packed.",
+  },
+  packed: {
+    heading: 'Your order has been packed',
+    body: 'Great news — your order has been carefully packed and is waiting for carrier pickup.',
+    footer: "We'll notify you as soon as it ships out for delivery.",
+  },
+  ready_for_shipment: {
+    heading: 'Your order is ready to ship',
+    body: 'Your order is ready for shipment and will leave our warehouse shortly.',
+    footer: 'Expect a shipping confirmation email soon.',
+  },
+  shipped: {
+    heading: 'Your order has been shipped out for delivery!',
+    body: 'Congratulations — your order is on its way. It has been shipped out and is heading to your delivery address.',
+    footer:
+      'Delivery usually takes 3–7 business days. You can track progress anytime from your account.',
+  },
+  delivered: {
+    heading: 'Your order has been delivered',
+    body: 'Congratulations — your order has been delivered. We hope you love your new pieces!',
+    footer:
+      'If anything is missing or not as expected, contact our support team and we will help right away.',
+  },
+  completed: {
+    heading: 'Your order is complete',
+    body: 'Thank you again for shopping with Fashion Edge. Your order is now complete.',
+    footer: 'We hope to see you again soon.',
+  },
+  cancelled: {
+    heading: 'Your order has been cancelled',
+    body: 'Your order has been cancelled. If this was unexpected, please contact our support team.',
+    footer: 'If any payment was taken it will be refunded within 5–7 business days.',
+  },
+  returned: {
+    heading: 'Return started for your order',
+    body: "We've started the return process for your order. Our team will be in touch with next steps.",
+    footer: 'Please keep any return packaging or labels until the process is complete.',
+  },
+  refund_pending: {
+    heading: 'Your refund is being processed',
+    body: "Good news — your refund is now being processed. We're working to get it back to you as soon as possible.",
+    footer: 'Funds typically take 5–7 business days to appear on your statement.',
+  },
+  refunded: {
+    heading: 'Your refund has been issued',
+    body: "We've issued a refund for your order. The amount should appear in your account soon.",
+    footer: 'Please allow 5–7 business days for the funds to show on your statement.',
+  },
+};
+
+const STATUS_LABEL: Record<NotifiableOrderStatus, string> = {
+  confirmed: 'Confirmed',
+  packed: 'Packed',
+  ready_for_shipment: 'Ready for Shipment',
+  shipped: 'Shipped',
+  delivered: 'Delivered',
+  completed: 'Completed',
+  cancelled: 'Cancelled',
+  returned: 'Return Initiated',
+  refund_pending: 'Refund Pending',
+  refunded: 'Refunded',
+};
+
+export interface OrderStatusUpdateEmailData {
+  name: string;
+  orderNumber: string;
+  status: NotifiableOrderStatus;
+  /** Optional human-readable message from the admin (shown to the customer). */
+  updateMessage?: string;
+  orderUrl?: string;
+}
+
+export function orderStatusUpdateEmail(data: OrderStatusUpdateEmailData): EmailTemplate {
+  const copy = STATUS_COPY[data.status];
+  const label = STATUS_LABEL[data.status];
+  const subject = `Order Update: ${label} — #${data.orderNumber}`;
+  const updateNote = data.updateMessage ? ` Message from our team: ${data.updateMessage}` : '';
+  const text =
+    `Hi ${data.name}, your order #${data.orderNumber} has been updated to: ${label}.` +
+    ` ${copy.body}${updateNote}`;
+
+  const html = emailLayout(
+    `${orderReference('Order', `#${data.orderNumber}`)}
+     ${emailEyebrow(label)}
+     ${emailHeading(copy.heading)}
+     ${emailGreeting(data.name)}
+     ${emailParagraph(copy.body)}
+     ${data.updateMessage ? emailParagraph(`<strong>Message from our team:</strong><br/>${data.updateMessage}`) : ''}
+     ${data.orderUrl ? ctaButton(data.orderUrl, 'View order') : ''}
+     ${emailMuted(copy.footer)}`,
+    {
+      title: `Order ${label}`,
+      preheader: `Order #${data.orderNumber} — ${copy.heading.toLowerCase()}.`,
+    },
   );
   return { subject, html, text };
 }

@@ -7,7 +7,6 @@ import { CUSTOMER_AUDIT } from '@/constants/customer';
 
 export class CustomerAddressService {
   async list(customerId: string) {
-    await customerService.getById(customerId);
     return CustomerAddressModel.find({ customerId, isDeleted: false }).sort({
       isDefaultShipping: -1,
       isDefaultBilling: -1,
