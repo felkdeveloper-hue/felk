@@ -104,6 +104,10 @@ export function catalogSearchToProductParams(state: CatalogSearchState): Product
     minPrice: state.minPrice,
     maxPrice: state.maxPrice,
     gender: state.gender,
+    colorId: state.colorId,
+    sizeId: state.sizeId,
+    materialId: state.materialId,
+    occasionId: state.occasionId,
     isNewArrival: state.isNewArrival,
     isClearance: state.onSale ? true : undefined,
   };
@@ -205,12 +209,20 @@ export function applyClientCatalogFilters(products: Product[], state: CatalogSea
       if (!band || percent == null || percent < band.min || percent > band.max) return false;
     }
     if (state.colorId) {
-      const hasColor = product.variants?.some((variant) => variant.colorId === state.colorId);
-      if (product.variants?.length && !hasColor) return false;
+      const colorIds =
+        product.colorIds ??
+        product.variants?.map((variant) => variant.colorId).filter(Boolean) ??
+        [];
+      const matches = product.colorId === state.colorId || colorIds.includes(state.colorId);
+      if (!matches) return false;
     }
     if (state.sizeId) {
-      const hasSize = product.variants?.some((variant) => variant.sizeId === state.sizeId);
-      if (product.variants?.length && !hasSize) return false;
+      const sizeIds =
+        product.sizeIds ?? product.variants?.map((variant) => variant.sizeId).filter(Boolean) ?? [];
+      const hasSize =
+        sizeIds.includes(state.sizeId) ||
+        product.variants?.some((variant) => variant.sizeId === state.sizeId);
+      if (!hasSize) return false;
     }
     if (state.specs) {
       for (const [facetKey, wanted] of Object.entries(state.specs)) {

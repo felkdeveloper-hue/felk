@@ -17,8 +17,20 @@ function resolveApiUrl(raw: string | undefined, fallback: string): string {
 
 const defaultApiUrl = import.meta.env.PROD ? 'https://felk-mq41.onrender.com/api/v1' : '/api/v1';
 
+const apiUrl = resolveApiUrl(import.meta.env.VITE_API_URL, defaultApiUrl);
+
+/** Scheme + host of the API (no `/api/v1`), used to serve locally-uploaded `/uploads/...` media. */
+function resolveApiOrigin(value: string): string {
+  try {
+    return new URL(value).origin;
+  } catch {
+    return '';
+  }
+}
+
 export const env = {
-  apiUrl: resolveApiUrl(import.meta.env.VITE_API_URL, defaultApiUrl),
+  apiUrl,
+  apiOrigin: resolveApiOrigin(apiUrl),
   appName: import.meta.env.VITE_APP_NAME || 'FE',
   cdnUrl: import.meta.env.VITE_CDN_URL ?? '',
   socketUrl: import.meta.env.VITE_SOCKET_URL ?? '',

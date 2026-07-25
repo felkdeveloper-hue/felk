@@ -17,6 +17,10 @@ export interface ProductListFilters extends ListOptions {
   minPrice?: number;
   maxPrice?: number;
   gender?: string;
+  colorId?: string;
+  sizeId?: string;
+  materialId?: string;
+  occasionId?: string;
   isFeatured?: boolean;
   isTrending?: boolean;
   isMoreToLove?: boolean;
@@ -153,6 +157,58 @@ export class ProductRepository extends BaseRepository {
       filter._id = { $in: ids.map((id) => new Types.ObjectId(id)) };
     }
 
+    if (options.colorId || options.sizeId) {
+      const variantFilter: Record<string, unknown> = {
+        isDeleted: false,
+        status: 'active',
+      };
+      const colorId = toObjectId(options.colorId);
+      const sizeId = toObjectId(options.sizeId);
+      if (options.colorId && !colorId) {
+        return { data: [], meta: buildPaginationMeta(0, page, limit) };
+      }
+      if (options.sizeId && !sizeId) {
+        return { data: [], meta: buildPaginationMeta(0, page, limit) };
+      }
+      if (colorId) variantFilter.colorId = colorId;
+      if (sizeId) variantFilter.sizeId = sizeId;
+
+      const matching = await ProductVariantModel.find(variantFilter).select('productId').lean();
+      const ids = [...new Set(matching.map((row) => row.productId.toString()))];
+      if (!ids.length) {
+        return { data: [], meta: buildPaginationMeta(0, page, limit) };
+      }
+      const objectIds = ids.map((id) => new Types.ObjectId(id));
+      if (filter._id && typeof filter._id === 'object' && '$in' in (filter._id as object)) {
+        const existing = new Set(
+          ((filter._id as { $in: Types.ObjectId[] }).$in ?? []).map((id) => id.toString()),
+        );
+        const intersected = objectIds.filter((id) => existing.has(id.toString()));
+        if (!intersected.length) {
+          return { data: [], meta: buildPaginationMeta(0, page, limit) };
+        }
+        filter._id = { $in: intersected };
+      } else {
+        filter._id = { $in: objectIds };
+      }
+    }
+
+    if (options.occasionId) {
+      const occasionId = toObjectId(options.occasionId);
+      if (!occasionId) {
+        return { data: [], meta: buildPaginationMeta(0, page, limit) };
+      }
+      filter.occasionIds = occasionId;
+    }
+
+    if (options.materialId) {
+      const materialId = toObjectId(options.materialId);
+      if (!materialId) {
+        return { data: [], meta: buildPaginationMeta(0, page, limit) };
+      }
+      filter.materialId = materialId;
+    }
+
     if (options.q) {
       const q = options.q.trim();
       const skuMatch = await ProductVariantModel.find({
@@ -205,6 +261,8 @@ export class ProductRepository extends BaseRepository {
             'defaultVariantId',
             'variantCount',
             'sku',
+            'materialId',
+            'occasionIds',
             'createdAt',
             'updatedAt',
           ].join(' '),

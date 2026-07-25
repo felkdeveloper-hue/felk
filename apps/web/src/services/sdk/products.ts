@@ -60,6 +60,11 @@ export interface Product {
   variantCount?: number;
   /** When true, list/card add-to-cart should open the options drawer first. */
   requiresOptionSelection?: boolean;
+  /** Listing color for this card (from the displayed variant). */
+  colorId?: string;
+  /** All color ids available on the product's variants. */
+  colorIds?: string[];
+  sizeIds?: string[];
   thumbnailUrl?: string;
   hoverImageUrl?: string;
   media?: ProductMedia[];
@@ -89,6 +94,8 @@ export interface ProductVariant {
   status?: string;
   thumbnailUrl?: string;
   isDefault?: boolean;
+  /** When true this color/variant is surfaced as its own catalog listing with a custom title. */
+  listSeparately?: boolean;
   optionValues?: Record<string, string>;
   [key: string]: unknown;
 }
@@ -138,6 +145,10 @@ export interface ProductListParams {
   isNewArrival?: boolean;
   isBestSeller?: boolean;
   isClearance?: boolean;
+  colorId?: string;
+  sizeId?: string;
+  materialId?: string;
+  occasionId?: string;
   sku?: string;
   barcode?: string;
   includeDeleted?: boolean;

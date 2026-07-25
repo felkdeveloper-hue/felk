@@ -546,28 +546,30 @@ function VariantsSection({
   const [editingVariantId, setEditingVariantId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
 
-  const stockByVariant = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const row of stockRows) {
-      const vid =
-        row.variantId ||
-        (typeof (row as { variant?: { id?: string } }).variant === 'object'
-          ? (row as { variant?: { id?: string } }).variant?.id
-          : undefined);
-      if (!vid) continue;
-      map.set(String(vid), (map.get(String(vid)) ?? 0) + Number(row.quantityOnHand ?? 0));
-    }
-    return map;
-  }, [stockRows]);
-
   const extractStockVariantId = (row: Record<string, unknown>): string => {
     if (typeof row.variantId === 'string') return row.variantId;
     if (row.variantId && typeof row.variantId === 'object') {
       const v = row.variantId as { _id?: unknown; id?: unknown };
       return String(v._id ?? v.id ?? '');
     }
+    // Fallback for a populated `variant` relation.
+    const variant = (row as { variant?: { id?: unknown; _id?: unknown } }).variant;
+    if (variant && typeof variant === 'object') {
+      return String(variant._id ?? variant.id ?? '');
+    }
     return '';
   };
+
+  const stockByVariant = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const row of stockRows) {
+      const vid = extractStockVariantId(row as unknown as Record<string, unknown>);
+      if (!vid) continue;
+      map.set(vid, (map.get(vid) ?? 0) + Number(row.quantityOnHand ?? 0));
+    }
+    return map;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stockRows]);
 
   const variantMediaMap = useMemo(() => {
     const map = new Map<string, typeof media>();

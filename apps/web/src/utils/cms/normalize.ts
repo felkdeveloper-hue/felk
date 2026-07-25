@@ -41,10 +41,18 @@ export function resolveMediaUrl(value: unknown): string | undefined {
     if (typeof record.url === 'string') url = record.url;
   }
   if (!url) return undefined;
+  // Rewrite dev-only localhost upload URLs to the real API origin for production.
+  const localMatch = url.match(/^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?(\/uploads\/.*)$/i);
+  if (localMatch && env.apiOrigin) {
+    return `${env.apiOrigin.replace(/\/$/, '')}${localMatch[1]}`;
+  }
   if (/^(https?:|data:|blob:)/i.test(url)) return url;
   // Uploaded objects may be stored under /uploads/; R2 public URLs are already absolute.
-  if (url.startsWith('/uploads/') && env.cdnUrl) {
-    return `${env.cdnUrl.replace(/\/$/, '')}${url}`;
+  // Local uploads are served by the API host, so resolve them against the API origin
+  // when no CDN is configured (otherwise they 404 against the web/Vercel domain).
+  if (url.startsWith('/uploads/')) {
+    const base = env.cdnUrl || env.apiOrigin;
+    if (base) return `${base.replace(/\/$/, '')}${url}`;
   }
   return url;
 }

@@ -11,6 +11,7 @@ import {
   HomeEditorialBannerSection,
   HomeSectionRenderer,
   HomeSplitBannersSection,
+  ProductGridSection,
   ProductRailSection,
   SectionSkeleton,
 } from '@/components/storefront';
@@ -78,12 +79,7 @@ export function HomePage() {
       <HomeBeforeFeaturedBannerSection />
 
       <div className="pt-8 sm:pt-10">
-        <ProductRailSection
-          kind="featured"
-          eager={false}
-          spacing="none"
-          title="Featured products"
-        />
+        <ProductGridSection spacing="none" />
       </div>
 
       <AsyncSection

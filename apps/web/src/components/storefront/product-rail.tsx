@@ -120,7 +120,7 @@ export function ProductRailSection({
             >
               {query.data!.data.map((product, index) => (
                 <ProductCard
-                  key={product.id}
+                  key={`${product.id}-${product.defaultVariantId ?? 'default'}`}
                   product={product}
                   priority={eager && index < 2}
                   sizes="(max-width: 640px) 82vw, (max-width: 768px) 48vw, (max-width: 1024px) 40vw, (max-width: 1280px) 31vw, 24vw"

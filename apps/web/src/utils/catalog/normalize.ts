@@ -36,9 +36,17 @@ function resolveMediaUrl(value: unknown): string | undefined {
     url = typeof record.url === 'string' ? record.url : undefined;
   }
   if (!url) return undefined;
+  // Rewrite dev-only localhost upload URLs to the real API origin for production.
+  const localMatch = url.match(/^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?(\/uploads\/.*)$/i);
+  if (localMatch && env.apiOrigin) {
+    return `${env.apiOrigin.replace(/\/$/, '')}${localMatch[1]}`;
+  }
   if (/^(https?:|data:|blob:)/i.test(url)) return url;
-  if (url.startsWith('/uploads/') && env.cdnUrl) {
-    return `${env.cdnUrl.replace(/\/$/, '')}${url}`;
+  // Locally-uploaded media (`/uploads/...`) is served by the API, not the web host,
+  // so on production (empty CDN) resolve it against the API origin instead of Vercel.
+  if (url.startsWith('/uploads/')) {
+    const base = env.cdnUrl || env.apiOrigin;
+    if (base) return `${base.replace(/\/$/, '')}${url}`;
   }
   return url;
 }
@@ -82,6 +90,7 @@ export function normalizeProductVariant(raw: unknown): ProductVariant {
     status: typeof record.status === 'string' ? record.status : undefined,
     thumbnailUrl: resolveMediaUrl(record.thumbnailUrl),
     isDefault: Boolean(record.isDefault),
+    listSeparately: Boolean(record.listSeparately),
     optionValues: asRecord(record.optionValues) as Record<string, string>,
   };
 }
@@ -200,8 +209,11 @@ export function normalizeProduct(raw: unknown): Product {
       typeof record.requiresOptionSelection === 'boolean'
         ? record.requiresOptionSelection
         : undefined,
+    colorId: record.colorId ? String(record.colorId) : undefined,
+    colorIds: Array.isArray(record.colorIds) ? record.colorIds.map((id) => String(id)) : undefined,
+    sizeIds: Array.isArray(record.sizeIds) ? record.sizeIds.map((id) => String(id)) : undefined,
     thumbnailUrl,
-    hoverImageUrl: media?.[1]?.url,
+    hoverImageUrl: resolveMediaUrl(record.hoverImageUrl) ?? media?.[1]?.url,
     media,
     variants,
     specifications: Array.isArray(record.specifications) ? record.specifications : undefined,

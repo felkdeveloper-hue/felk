@@ -27,6 +27,31 @@ function resolveDealPrice(product: Product): ProductMoney | undefined {
   return undefined;
 }
 
+/** Auto-generated "Color / Size" labels shouldn't override the product title. */
+function isAutoColorSizeLabel(title: string): boolean {
+  return /^[^/]+ \/ [^/]+$/.test(title) && title.length <= 48;
+}
+
+/**
+ * When the selected color is surfaced as its own listing, show that color's custom
+ * title (e.g. "Women's Sky Blue …") instead of the parent product name.
+ */
+function resolveColorDisplayName(
+  variants: ProductVariant[],
+  colorId: string | undefined,
+  fallback: string,
+): string {
+  if (!colorId) return fallback;
+  const colorVariants = variants.filter((v) => v.colorId === colorId);
+  if (!colorVariants.some((v) => v.listSeparately)) return fallback;
+  const titles = colorVariants
+    .map((v) => v.title?.trim())
+    .filter((title): title is string => Boolean(title));
+  if (!titles.length) return fallback;
+  const descriptive = titles.filter((title) => !isAutoColorSizeLabel(title));
+  return descriptive[0] ?? titles[0] ?? fallback;
+}
+
 function findVariant(
   variants: ProductVariant[],
   colorId?: string,
@@ -91,6 +116,7 @@ export function ProductPurchasePanel({
 
   const dealPrice = resolveDealPrice(product);
   const compareAt = selectedVariant?.compareAtPrice ?? product.compareAtPrice;
+  const displayName = resolveColorDisplayName(variants, selectedColorId, product.name);
 
   const colors = [...new Set(variants.map((v) => v.colorId).filter(Boolean))] as string[];
   const hasSeparateSizeSelector = variants.some((v) => v.sizeId);
@@ -159,7 +185,7 @@ export function ProductPurchasePanel({
 
         <div className="flex items-start justify-between gap-4">
           <h1 className="font-display text-foreground text-xl font-bold uppercase leading-tight tracking-[0.04em] sm:text-2xl">
-            {product.name}
+            {displayName}
           </h1>
           <WishlistButton
             product={product}

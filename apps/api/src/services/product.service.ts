@@ -274,6 +274,27 @@ export class ProductService {
               ...(product as unknown as Record<string, unknown>),
               pricing: cardPricing,
             });
+            const colorIds = [
+              ...new Set(
+                productVariants
+                  .map((variant) => (variant.colorId ? String(variant.colorId) : ''))
+                  .filter(Boolean),
+              ),
+            ];
+            const sizeIds = [
+              ...new Set(
+                productVariants
+                  .map((variant) => (variant.sizeId ? String(variant.sizeId) : ''))
+                  .filter(Boolean),
+              ),
+            ];
+            const occasionIds = Array.isArray((product as { occasionIds?: unknown }).occasionIds)
+              ? ((product as { occasionIds: unknown[] }).occasionIds ?? []).map((id) => String(id))
+              : [];
+            const materialId = (product as { materialId?: Types.ObjectId | null }).materialId
+              ? String((product as { materialId: Types.ObjectId }).materialId)
+              : undefined;
+
             return {
               _id: product._id,
               id,
@@ -290,6 +311,11 @@ export class ProductService {
               categoryId: product.categoryId,
               categoryIds: product.categoryIds,
               gender: product.gender,
+              materialId,
+              occasionIds,
+              colorId: cardListingVariant?.colorId ? String(cardListingVariant.colorId) : undefined,
+              colorIds,
+              sizeIds,
               isFeatured: product.isFeatured,
               isTrending: product.isTrending,
               isMoreToLove: Boolean(
@@ -314,6 +340,34 @@ export class ProductService {
               updatedAt: product.updatedAt,
             };
           };
+
+          const filterColorId = options.colorId ? String(options.colorId) : undefined;
+
+          // When filtering by color, emit a single card using that color's image/pricing.
+          if (filterColorId) {
+            const colorVariants = productVariants.filter(
+              (variant) => variant.colorId && String(variant.colorId) === filterColorId,
+            );
+            if (!colorVariants.length) return [];
+            const colorRepresentative =
+              colorVariants.find((variant) => variant.listSeparately) ??
+              colorVariants.find((variant) => variant.isDefault) ??
+              colorVariants[0];
+            const colorPricing = resolveListingPricing(
+              product as unknown as { pricing?: Record<string, unknown> | null },
+              colorRepresentative,
+            );
+            const colorThumbs = pickThumbnail(productMedia, colorRepresentative);
+            const ownListingName = resolveOwnListingDisplayName(colorVariants, product.name);
+            return [
+              buildCard(
+                colorRepresentative,
+                colorPricing,
+                colorThumbs,
+                colorRepresentative?.listSeparately ? ownListingName : undefined,
+              ),
+            ];
+          }
 
           // Default listing keeps the product name (admin "Product Name" field).
           const cards = [buildCard(listingVariant, listingPricing, thumbs)];

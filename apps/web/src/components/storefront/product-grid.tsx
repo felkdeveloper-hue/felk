@@ -61,7 +61,6 @@ export function ProductGridSection({
         spacing={spacing}
         className="bg-background"
         title="Featured products"
-        titleAlign="center"
         action={
           <Button variant="ghost" asChild className="hidden sm:inline-flex">
             <Link to={ROUTES.products}>
@@ -76,7 +75,7 @@ export function ProductGridSection({
         ) : (
           <MotionReveal stagger className={gridLayoutClass}>
             {products.map((product, index) => (
-              <MotionItem key={product.id}>
+              <MotionItem key={`${product.id}-${product.defaultVariantId ?? 'default'}`}>
                 <ProductCard
                   product={product}
                   priority={index < 4}

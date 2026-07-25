@@ -168,6 +168,10 @@ export const productListQuerySchema = paginationQuerySchema.extend({
     .enum(['true', 'false'])
     .optional()
     .transform((v) => (v === undefined ? undefined : v === 'true')),
+  colorId: objectIdSchema.optional(),
+  sizeId: objectIdSchema.optional(),
+  materialId: objectIdSchema.optional(),
+  occasionId: objectIdSchema.optional(),
   createdFrom: z.string().optional(),
   createdTo: z.string().optional(),
   publishFrom: z.string().optional(),
