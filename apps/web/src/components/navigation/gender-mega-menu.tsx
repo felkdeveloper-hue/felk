@@ -17,7 +17,15 @@ import { resolveMegaMenuLink } from '@/utils/mega-menu-links';
 
 export type { MegaMenuGender, NavigationMenuKey };
 
-const CLOSE_DELAY_MS = 160;
+const CLOSE_DELAY_MS = 120;
+
+function pointInRect(
+  x: number,
+  y: number,
+  rect: Pick<DOMRect, 'left' | 'right' | 'top' | 'bottom'>,
+) {
+  return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+}
 
 /** Long columns (e.g. Tops) render as a balanced 2-up list to keep the panel narrower. */
 function shouldSplitLinks(column: MegaMenuColumn): boolean {
@@ -150,7 +158,13 @@ export function GenderMegaMenu({
   const panelId = useId();
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const openRef = useRef(open);
+  openRef.current = open;
+
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
   const searchGender = useRouterState({
     select: (state) => {
       const search = state.location.search as Record<string, unknown>;
@@ -185,18 +199,89 @@ export function GenderMegaMenu({
     closeTimer.current = setTimeout(() => setOpen(false), CLOSE_DELAY_MS);
   };
 
+  const closeNow = () => {
+    clearCloseTimer();
+    setOpen(false);
+  };
+
+  const isPointerInsideMenu = (x: number, y: number) => {
+    const trigger = triggerRef.current?.getBoundingClientRect();
+    const panel = panelRef.current?.getBoundingClientRect();
+    if (trigger && pointInRect(x, y, trigger)) return true;
+    if (!panel) return false;
+    // Include a vertical bridge from the nav trigger down into the panel so the
+    // portaled gap does not fire a premature close while moving the cursor.
+    if (trigger) {
+      const bridge = {
+        left: Math.min(trigger.left, panel.left),
+        right: Math.max(trigger.right, panel.right),
+        top: Math.min(trigger.bottom, panel.top),
+        bottom: panel.top,
+      };
+      if (bridge.bottom >= bridge.top && pointInRect(x, y, bridge)) return true;
+    }
+    return pointInRect(x, y, panel);
+  };
+
   useEffect(() => {
     setMounted(true);
     return () => clearCloseTimer();
   }, []);
 
+  // Close when the route changes (link click inside the menu).
+  useEffect(() => {
+    if (closeTimer.current) {
+      clearTimeout(closeTimer.current);
+      closeTimer.current = null;
+    }
+    setOpen(false);
+  }, [pathname]);
+
   useEffect(() => {
     if (!open) return;
+
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false);
+      if (event.key === 'Escape') {
+        if (closeTimer.current) {
+          clearTimeout(closeTimer.current);
+          closeTimer.current = null;
+        }
+        setOpen(false);
+      }
     };
+
+    const onPointerDown = (event: PointerEvent) => {
+      if (!isPointerInsideMenu(event.clientX, event.clientY)) {
+        if (closeTimer.current) {
+          clearTimeout(closeTimer.current);
+          closeTimer.current = null;
+        }
+        setOpen(false);
+      }
+    };
+
+    // Portaled panels can miss mouseleave when the cursor exits quickly or
+    // crosses the header gap — hit-test on move so it always closes outside.
+    const onPointerMove = (event: PointerEvent) => {
+      if (!openRef.current) return;
+      if (isPointerInsideMenu(event.clientX, event.clientY)) {
+        if (closeTimer.current) {
+          clearTimeout(closeTimer.current);
+          closeTimer.current = null;
+        }
+      } else if (!closeTimer.current) {
+        closeTimer.current = setTimeout(() => setOpen(false), CLOSE_DELAY_MS);
+      }
+    };
+
     window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
+    window.addEventListener('pointerdown', onPointerDown, true);
+    window.addEventListener('pointermove', onPointerMove, { passive: true });
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('pointerdown', onPointerDown, true);
+      window.removeEventListener('pointermove', onPointerMove);
+    };
   }, [open]);
 
   const triggerLink = (
@@ -225,15 +310,15 @@ export function GenderMegaMenu({
     mounted &&
     createPortal(
       <div
+        ref={panelRef}
         id={panelId}
         role="region"
         aria-label={`${config.label} categories`}
         aria-hidden={!open}
         onMouseEnter={show}
-        onMouseLeave={hide}
         className={cn(
           // Viewport-centered shell — never clips against the Women trigger.
-          'fixed inset-x-0 top-16 z-[120] flex justify-center px-3 pt-1 lg:top-[4.75rem] lg:px-6',
+          'fixed inset-x-0 top-16 z-[120] flex justify-center px-3 pt-0 lg:top-[4.75rem] lg:px-6',
           open
             ? 'pointer-events-auto visible opacity-100'
             : 'pointer-events-none invisible opacity-0',
@@ -283,7 +368,7 @@ export function GenderMegaMenu({
                               columnTitle={column.title}
                               menuKey={menuKey}
                               headingIndex={headingIndex}
-                              onNavigate={() => setOpen(false)}
+                              onNavigate={closeNow}
                             />
                           );
                         })}
@@ -308,7 +393,7 @@ export function GenderMegaMenu({
                       'group flex flex-col items-center gap-1.5 text-center transition-opacity duration-200',
                       'hover:!opacity-100 group-hover/specials:opacity-40',
                     )}
-                    onNavigate={() => setOpen(false)}
+                    onNavigate={closeNow}
                   >
                     <span className="bg-muted relative size-14 overflow-hidden rounded-full ring-1 ring-black/5 transition-transform duration-300 group-hover:scale-105 sm:size-16">
                       {special.imageUrl ? (
@@ -344,7 +429,7 @@ export function GenderMegaMenu({
                       'group relative block aspect-[16/10] overflow-hidden rounded-xl ring-1 ring-black/5 transition-[opacity,transform] duration-300',
                       'hover:z-[1] hover:!opacity-100 group-hover/edit:opacity-45',
                     )}
-                    onNavigate={() => setOpen(false)}
+                    onNavigate={closeNow}
                   >
                     {item.imageUrl ? (
                       <Image
@@ -377,7 +462,7 @@ export function GenderMegaMenu({
     );
 
   return (
-    <div className="relative" onMouseEnter={show} onMouseLeave={hide}>
+    <div ref={triggerRef} className="relative" onMouseEnter={show} onMouseLeave={hide}>
       {triggerLink}
       {panel}
     </div>
