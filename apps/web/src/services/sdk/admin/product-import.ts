@@ -32,6 +32,13 @@ export interface ImportProductInput {
   tags: string[];
   shortDescription: string;
   description: string;
+  seoTitle: string;
+  seoDescription: string;
+  paymentOption: 'cod' | 'prepaid' | 'both';
+  returnsAvailable: boolean;
+  returnsCriteria: string;
+  warrantyAvailable: boolean;
+  warrantyDetails: string;
   status: string;
   rows: number[];
   variants: ImportVariantInput[];

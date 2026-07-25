@@ -499,7 +499,8 @@ export class ProductService {
     const name = String(payload.name ?? '');
     let slug = payload.slug ? String(payload.slug) : slugify(name);
 
-    const existing = await productRepository.findBySlug(slug);
+    // Unique index covers soft-deleted rows too — always check including deleted.
+    const existing = await productRepository.findBySlug(slug, true);
     if (existing) {
       slug = `${slug}-${Date.now().toString(36)}`;
     }

@@ -40,6 +40,13 @@ export type ImportColumnKey =
   | 'tags'
   | 'shortDescription'
   | 'description'
+  | 'seoTitle'
+  | 'seoDescription'
+  | 'paymentOption'
+  | 'returnsAvailable'
+  | 'returnsCriteria'
+  | 'warrantyAvailable'
+  | 'warrantyDetails'
   | 'status'
   | 'color'
   | 'size'
@@ -64,15 +71,15 @@ export const IMPORT_COLUMNS: ColumnDef[] = [
     label: 'Product Name',
     aliases: ['product', 'title', 'productname'],
     required: true,
-    help: 'Repeat the same name on every row that belongs to the same product.',
-    example: "Women's Ruffle Sleeve Crop Top",
+    help: 'Repeat the SAME name on every colour/size row that belongs to one product. That is how variants are grouped.',
+    example: 'Sample Bulk Crop Top',
   },
   {
     key: 'category',
     label: 'Category',
     aliases: ['categoryname', 'categoryslug'],
     required: true,
-    help: 'Must already exist. Use the name or the slug exactly as in the Reference sheet.',
+    help: 'Must already exist. Use the name or slug from the Reference sheet.',
     example: 'Crop tops',
   },
   {
@@ -80,7 +87,7 @@ export const IMPORT_COLUMNS: ColumnDef[] = [
     label: 'Color',
     aliases: ['colour', 'variantcolor', 'variantcolour'],
     required: false,
-    help: 'One row per colour + size. Created automatically if it does not exist.',
+    help: 'Variant colour. One row per colour + size. Created automatically if missing.',
     example: 'Hot Pink',
   },
   {
@@ -88,7 +95,7 @@ export const IMPORT_COLUMNS: ColumnDef[] = [
     label: 'Size',
     aliases: ['variantsize'],
     required: false,
-    help: 'Created automatically if it does not exist. Leave blank for one-size products.',
+    help: 'Variant size. Created automatically if missing. Leave blank for one-size.',
     example: 'S',
   },
   {
@@ -96,7 +103,7 @@ export const IMPORT_COLUMNS: ColumnDef[] = [
     label: 'Price',
     aliases: ['mrp', 'regularprice', 'variantprice'],
     required: true,
-    help: 'Numbers only, in LKR. Example: 9999',
+    help: 'Variant price in LKR (numbers only).',
     example: '9999',
   },
   {
@@ -104,7 +111,7 @@ export const IMPORT_COLUMNS: ColumnDef[] = [
     label: 'Sale Price',
     aliases: ['discountprice', 'discountedprice', 'offerprice'],
     required: false,
-    help: 'Optional. Must be lower than or equal to Price.',
+    help: 'Optional sale price — must be ≤ Price.',
     example: '7999',
   },
   {
@@ -112,7 +119,7 @@ export const IMPORT_COLUMNS: ColumnDef[] = [
     label: 'Stock',
     aliases: ['quantity', 'qty', 'stockquantity', 'inventory'],
     required: false,
-    help: 'Whole number of units available for this colour + size.',
+    help: 'Units available for this colour + size.',
     example: '10',
   },
   {
@@ -120,7 +127,15 @@ export const IMPORT_COLUMNS: ColumnDef[] = [
     label: 'SKU',
     aliases: ['variantsku', 'code'],
     required: false,
-    help: 'Optional. Generated automatically when left blank.',
+    help: 'Optional variant SKU. Auto-generated when blank.',
+    example: '',
+  },
+  {
+    key: 'images',
+    label: 'Image URLs',
+    aliases: ['image', 'images', 'imageurl', 'photo', 'photos', 'imagelinks'],
+    required: false,
+    help: 'Full https links, comma-separated. Attach to this row’s colour variant.',
     example: '',
   },
   {
@@ -152,7 +167,7 @@ export const IMPORT_COLUMNS: ColumnDef[] = [
     label: 'Occasions',
     aliases: ['occasion'],
     required: false,
-    help: 'Separate multiple values with commas.',
+    help: 'Comma-separated. Created automatically if missing.',
     example: 'Party, Casual',
   },
   {
@@ -160,7 +175,7 @@ export const IMPORT_COLUMNS: ColumnDef[] = [
     label: 'Tags',
     aliases: ['tag', 'keywords'],
     required: false,
-    help: 'Separate multiple values with commas.',
+    help: 'Comma-separated product tags.',
     example: 'new, summer',
   },
   {
@@ -168,15 +183,71 @@ export const IMPORT_COLUMNS: ColumnDef[] = [
     label: 'Short Description',
     aliases: ['shortdesc', 'summary'],
     required: false,
-    help: 'One line shown in listings.',
-    example: 'Ruffle sleeve crop top',
+    help: 'One-line summary shown in listings.',
+    example: 'Soft ruffle crop top',
   },
   {
     key: 'description',
     label: 'Description',
     aliases: ['longdescription', 'details', 'fulldescription'],
     required: false,
-    help: 'Full product description.',
+    help: 'Full product description (PDP body).',
+    example: '',
+  },
+  {
+    key: 'seoTitle',
+    label: 'SEO Title',
+    aliases: ['metatitle', 'seotitle', 'pagetitle'],
+    required: false,
+    help: 'Optional Google/browser title. Defaults to product name when blank.',
+    example: '',
+  },
+  {
+    key: 'seoDescription',
+    label: 'SEO Description',
+    aliases: ['metadescription', 'seodescription', 'metadesc'],
+    required: false,
+    help: 'Optional meta description for search engines.',
+    example: '',
+  },
+  {
+    key: 'paymentOption',
+    label: 'Payment',
+    aliases: ['payment', 'paymentmethod', 'codprepaid'],
+    required: false,
+    help: 'cod, prepaid or both. Defaults to both.',
+    example: 'both',
+  },
+  {
+    key: 'returnsAvailable',
+    label: 'Returns',
+    aliases: ['return', 'returnavailable', 'acceptsreturns'],
+    required: false,
+    help: 'yes / no. Defaults to yes.',
+    example: 'yes',
+  },
+  {
+    key: 'returnsCriteria',
+    label: 'Return Policy',
+    aliases: ['returncriteria', 'returnspolicy', 'returnnote'],
+    required: false,
+    help: 'Optional return rules text shown on the product.',
+    example: '7-day exchange if unused with tags',
+  },
+  {
+    key: 'warrantyAvailable',
+    label: 'Warranty',
+    aliases: ['haswarranty', 'warrantyavailable'],
+    required: false,
+    help: 'yes / no. Defaults to no.',
+    example: 'no',
+  },
+  {
+    key: 'warrantyDetails',
+    label: 'Warranty Details',
+    aliases: ['warrantynote', 'warrantydetail'],
+    required: false,
+    help: 'Optional warranty text when Warranty is yes.',
     example: '',
   },
   {
@@ -184,23 +255,15 @@ export const IMPORT_COLUMNS: ColumnDef[] = [
     label: 'Status',
     aliases: ['productstatus', 'publishstatus'],
     required: false,
-    help: 'draft or active. Defaults to draft so you can review before going live.',
+    help: 'draft or active. Defaults to draft.',
     example: 'draft',
-  },
-  {
-    key: 'images',
-    label: 'Image URLs',
-    aliases: ['image', 'images', 'imageurl', 'photo', 'photos', 'imagelinks'],
-    required: false,
-    help: 'Full https links, separated by commas. Images attach to this row\u2019s colour.',
-    example: '',
   },
   {
     key: 'handle',
     label: 'Handle',
     aliases: ['slug', 'producthandle', 'group'],
     required: false,
-    help: 'Optional grouping key / URL slug. Defaults to the product name.',
+    help: 'Optional URL slug / grouping key. Leave blank to use the product name.',
     example: '',
   },
 ];
@@ -262,6 +325,13 @@ export interface ImportProductInput {
   tags: string[];
   shortDescription: string;
   description: string;
+  seoTitle: string;
+  seoDescription: string;
+  paymentOption: 'cod' | 'prepaid' | 'both';
+  returnsAvailable: boolean;
+  returnsCriteria: string;
+  warrantyAvailable: boolean;
+  warrantyDetails: string;
   status: string;
   rows: number[];
   variants: ImportVariantInput[];
@@ -393,6 +463,32 @@ function parseWholeNumber(value: string): number | null {
 
 function isHttpUrl(value: string): boolean {
   return /^https?:\/\/\S+$/i.test(value);
+}
+
+function parseYesNo(value: string, fallback: boolean): boolean | null {
+  const key = normalizeKey(value);
+  if (!key) return fallback;
+  if (['yes', 'y', 'true', '1', 'on'].includes(key)) return true;
+  if (['no', 'n', 'false', '0', 'off'].includes(key)) return false;
+  return null;
+}
+
+function parsePaymentOption(value: string): 'cod' | 'prepaid' | 'both' | null {
+  const key = normalizeKey(value).replace(/\s+/g, '');
+  if (!key) return 'both';
+  if (key === 'cod' || key === 'cashondelivery') return 'cod';
+  if (key === 'prepaid' || key === 'online' || key === 'card') return 'prepaid';
+  if (key === 'both' || key === 'all' || key === 'codprepaid') return 'both';
+  return null;
+}
+
+function isDuplicateKeyError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const record = error as { code?: number; message?: string };
+  return (
+    record.code === 11000 ||
+    (typeof record.message === 'string' && record.message.includes('E11000'))
+  );
 }
 
 /* -------------------------------------------------------------------------- */
@@ -588,6 +684,36 @@ function buildProducts(rows: RawRow[]): { products: ImportProductInput[]; issues
         continue;
       }
 
+      const paymentOption = parsePaymentOption(values.paymentOption ?? '');
+      if (paymentOption === null) {
+        issues.push({
+          row,
+          column: 'Payment',
+          message: `"${values.paymentOption}" is not valid. Use cod, prepaid or both.`,
+        });
+        continue;
+      }
+
+      const returnsAvailable = parseYesNo(values.returnsAvailable ?? '', true);
+      if (returnsAvailable === null) {
+        issues.push({
+          row,
+          column: 'Returns',
+          message: `"${values.returnsAvailable}" is not valid. Use yes or no.`,
+        });
+        continue;
+      }
+
+      const warrantyAvailable = parseYesNo(values.warrantyAvailable ?? '', false);
+      if (warrantyAvailable === null) {
+        issues.push({
+          row,
+          column: 'Warranty',
+          message: `"${values.warrantyAvailable}" is not valid. Use yes or no.`,
+        });
+        continue;
+      }
+
       const slug = slugify(values.handle ? values.handle : name);
       const slugOwner = usedSlugs.get(slug);
       if (slugOwner && slugOwner !== handle) {
@@ -612,6 +738,13 @@ function buildProducts(rows: RawRow[]): { products: ImportProductInput[]; issues
         tags: splitList(values.tags ?? ''),
         shortDescription: values.shortDescription ?? '',
         description: values.description ?? '',
+        seoTitle: values.seoTitle ?? '',
+        seoDescription: values.seoDescription ?? '',
+        paymentOption,
+        returnsAvailable,
+        returnsCriteria: values.returnsCriteria ?? '',
+        warrantyAvailable,
+        warrantyDetails: values.warrantyDetails ?? '',
         status,
         rows: [],
         variants: [],
@@ -765,6 +898,8 @@ export class ProductImportService {
       }
     }
 
+    // Only active (non-deleted) products block an import. Soft-deleted slugs are
+    // auto-suffixed on create so they never throw a Mongo duplicate-key error.
     const slugs = products.map((product) => product.slug);
     const existing = slugs.length
       ? await ProductModel.find({ slug: { $in: slugs }, isDeleted: false })
@@ -842,16 +977,26 @@ export class ProductImportService {
           continue;
         }
 
-        const duplicate = await ProductModel.exists({ slug: product.slug, isDeleted: false });
-        if (duplicate) {
+        const activeDuplicate = await ProductModel.exists({
+          slug: product.slug,
+          isDeleted: false,
+        });
+        if (activeDuplicate) {
           results.push({
             handle: product.handle,
             name: product.name,
             row,
             status: 'skipped',
-            message: 'A product with this web address already exists.',
+            message:
+              'A live product with this name/URL already exists. Rename it or delete the old one first.',
           });
           continue;
+        }
+
+        // Soft-deleted products still occupy the unique slug index — pick a free slug.
+        let slug = product.slug;
+        if (await ProductModel.exists({ slug })) {
+          slug = `${product.slug}-${Date.now().toString(36)}`;
         }
 
         const [brandId, materialId] = await Promise.all([
@@ -872,7 +1017,7 @@ export class ProductImportService {
         const created = await productService.create(
           {
             name: product.name,
-            slug: product.slug,
+            slug,
             shortDescription: product.shortDescription || undefined,
             description: product.description || undefined,
             categoryId,
@@ -882,6 +1027,15 @@ export class ProductImportService {
             occasionIds,
             gender: product.gender || undefined,
             tags: product.tags,
+            paymentOption: product.paymentOption,
+            returnsAvailable: product.returnsAvailable,
+            returnsCriteria: product.returnsCriteria || null,
+            warrantyAvailable: product.warrantyAvailable,
+            warrantyDetails: product.warrantyDetails || null,
+            seo: {
+              title: product.seoTitle || product.name,
+              description: product.seoDescription || product.shortDescription || undefined,
+            },
             status: options.publish ? PRODUCT_STATUS.ACTIVE : product.status,
             price: basePrice,
             salePrice: baseVariant?.salePrice ?? undefined,
@@ -953,8 +1107,12 @@ export class ProductImportService {
           handle: product.handle,
           name: product.name,
           row,
-          status: 'failed',
-          message: error instanceof Error ? error.message : 'Unknown error',
+          status: isDuplicateKeyError(error) ? 'skipped' : 'failed',
+          message: isDuplicateKeyError(error)
+            ? 'A product with this web address already exists. Rename the product or set a unique Handle.'
+            : error instanceof Error
+              ? error.message
+              : 'Unknown error',
         });
       }
     }
@@ -984,12 +1142,24 @@ export class ProductImportService {
     }
     guide.addRow({});
     guide.addRow({
-      column: 'One row = one size',
-      help: 'Repeat the product name on each row. Rows sharing a name become one product with many colours and sizes.',
+      column: 'Variants',
+      help: 'One Excel row = one colour + size. Repeat the Product Name so those rows become ONE product with many variants.',
     });
     guide.addRow({
       column: 'Categories',
-      help: 'Categories must already exist — see the Reference sheet. Colours, sizes, brands and materials are created for you.',
+      help: 'Categories must already exist — see the Reference sheet. Colours, sizes, brands, materials and occasions are created for you.',
+    });
+    guide.addRow({
+      column: 'Images',
+      help: 'Put full https image links in Image URLs (comma-separated). They attach to that row’s colour.',
+    });
+    guide.addRow({
+      column: 'SEO / Returns / Payment',
+      help: 'Optional columns: SEO Title, SEO Description, Payment (cod/prepaid/both), Returns (yes/no), Return Policy, Warranty (yes/no), Warranty Details.',
+    });
+    guide.addRow({
+      column: 'Important',
+      help: 'Delete or replace the example rows before importing for real — example names are unique so they will not clash with your live catalogue.',
     });
 
     const sheet = workbook.addWorksheet('Products');
@@ -1009,35 +1179,51 @@ export class ProductImportService {
       .limit(1)
       .lean();
     const exampleCategory = (category as { name?: string } | undefined)?.name ?? 'Crop tops';
+    const exampleName = `Bulk Template Sample Top ${new Date().toISOString().slice(0, 10)}`;
+    const sampleImage = 'https://images.unsplash.com/photo-1564257631407-4deb1f99d992?w=900&q=80';
 
     sheet.addRow({
-      name: "Women's Ruffle Sleeve Crop Top",
+      name: exampleName,
       category: exampleCategory,
       color: 'Hot Pink',
       size: 'S',
       price: 9999,
       salePrice: 7999,
       stock: 10,
+      images: sampleImage,
       gender: 'women',
       material: 'Cotton',
+      occasions: 'Casual, Party',
+      tags: 'sample',
+      shortDescription: 'Example product from the bulk upload template',
+      description:
+        'Replace these example rows with your real catalogue. Same product name = same product with multiple variants.',
+      seoTitle: `${exampleName} | FE`,
+      seoDescription: 'Soft ruffle crop top available in multiple colours and sizes.',
+      paymentOption: 'both',
+      returnsAvailable: 'yes',
+      returnsCriteria: '7-day exchange if unused with tags',
+      warrantyAvailable: 'no',
       status: 'draft',
     });
     sheet.addRow({
-      name: "Women's Ruffle Sleeve Crop Top",
+      name: exampleName,
       category: exampleCategory,
       color: 'Hot Pink',
       size: 'M',
       price: 9999,
       salePrice: 7999,
       stock: 6,
+      images: sampleImage,
     });
     sheet.addRow({
-      name: "Women's Ruffle Sleeve Crop Top",
+      name: exampleName,
       category: exampleCategory,
       color: 'Olive',
       size: 'S',
       price: 9999,
       stock: 4,
+      images: 'https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=900&q=80',
     });
 
     const reference = workbook.addWorksheet('Reference');

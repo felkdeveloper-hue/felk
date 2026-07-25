@@ -165,8 +165,9 @@ export function BulkProductUploadDialog({
         <DialogHeader>
           <DialogTitle>Bulk upload products</DialogTitle>
           <DialogDescription>
-            Fill one row per colour and size, then upload the sheet. Rows sharing a product name
-            become one product with all its variants, prices and stock.
+            Download the template first — it includes variants (colour/size), prices, stock, image
+            links, description, SEO, returns, warranty and COD/prepaid. One Excel row = one colour +
+            size; repeat the product name to group variants into one product.
           </DialogDescription>
         </DialogHeader>
 
@@ -176,17 +177,22 @@ export function BulkProductUploadDialog({
               <li className="flex gap-2">
                 <span className="font-bold">1.</span>
                 <span>
-                  Download the template. It already lists your categories, colours and sizes on the
-                  Reference sheet.
+                  Download the template. The Reference sheet lists your categories; the Products
+                  sheet has every column (variants, SEO, returns, payment, warranty, images).
                 </span>
               </li>
               <li className="flex gap-2">
                 <span className="font-bold">2.</span>
-                <span>Fill the Products sheet in Excel and save it as .xlsx or .csv.</span>
+                <span>
+                  Replace the example rows with your catalogue. Same Product Name on multiple rows =
+                  one product with those colour/size variants.
+                </span>
               </li>
               <li className="flex gap-2">
                 <span className="font-bold">3.</span>
-                <span>Upload it here. Nothing is created until you review and confirm.</span>
+                <span>
+                  Upload here, check the preview, then confirm. Nothing is created until then.
+                </span>
               </li>
             </ol>
 
