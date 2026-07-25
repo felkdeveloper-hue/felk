@@ -97,6 +97,11 @@ export class InventoryRepository extends BaseRepository {
         warehouseId: warehousePop?._id ?? row.warehouseId,
         variant: variantPop ?? undefined,
         warehouse: warehousePop ?? undefined,
+        // Keep the admin API contract explicit. The database uses the concise
+        // field names, while the product editor consumes quantity* aliases.
+        quantityOnHand: Number(row.onHand ?? 0),
+        quantityReserved: Number(row.reserved ?? 0),
+        quantityAvailable: Number(row.available ?? 0),
       };
     });
 

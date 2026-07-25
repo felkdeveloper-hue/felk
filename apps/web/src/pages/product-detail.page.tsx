@@ -98,8 +98,12 @@ function resolveCareLabel(specifications?: unknown[]): string | undefined {
 export function ProductDetailPage() {
   const { slug } = useParams({ strict: false }) as { slug: string };
   const navigate = useNavigate();
-  // variant param passed from product card so we pre-select the right color
-  const { variant: hintVariantId } = useSearch({ strict: false }) as { variant?: string };
+  // Product cards pass both hints so an own-listing color remains selected
+  // even if variant ordering or cached detail data changes.
+  const { variant: hintVariantId, color: hintColorId } = useSearch({ strict: false }) as {
+    variant?: string;
+    color?: string;
+  };
   const query = useProductDetail(slug);
   const product = query.data;
   const { recentlyViewedIds } = useRecentlyViewed(product);
@@ -117,20 +121,26 @@ export function ProductDetailPage() {
       navigate({
         to: '/products/$slug',
         params: { slug: product.slug },
-        search: { variant: hintVariantId },
+        search: { variant: hintVariantId, color: hintColorId },
         replace: true,
       });
     }
-  }, [navigate, product?.slug, slug, hintVariantId]);
+  }, [navigate, product?.slug, slug, hintVariantId, hintColorId]);
 
   useEffect(() => {
     if (!product?.variants?.length) return;
     // Prefer the hinted variant (from product card link), then defaultVariantId, then first
-    const hinted = hintVariantId
+    const hintedById = hintVariantId
       ? product.variants.find(
           (v) => v.id === hintVariantId || String(v.id) === String(hintVariantId),
         )
       : undefined;
+    const hinted =
+      hintedById && (!hintColorId || hintedById.colorId === hintColorId)
+        ? hintedById
+        : hintColorId
+          ? product.variants.find((v) => v.colorId === hintColorId)
+          : hintedById;
     const defaultVariant =
       hinted ??
       product.variants.find((v) => v.id === product.defaultVariantId) ??
@@ -143,9 +153,11 @@ export function ProductDetailPage() {
       ...new Set(product.variants.map((v) => v.colorId).filter(Boolean)),
     ] as string[];
     const colorId =
-      defaultVariant.colorId && allColorIds.includes(defaultVariant.colorId)
-        ? defaultVariant.colorId
-        : allColorIds[0];
+      hintColorId && allColorIds.includes(hintColorId)
+        ? hintColorId
+        : defaultVariant.colorId && allColorIds.includes(defaultVariant.colorId)
+          ? defaultVariant.colorId
+          : allColorIds[0];
     setSelectedColorId(colorId);
     // If the resolved default variant had no colorId but we chose one, sync the variant
     if (colorId && !defaultVariant.colorId) {
@@ -154,7 +166,7 @@ export function ProductDetailPage() {
     }
     // Do NOT auto-select size — the user must pick one explicitly
     setSelectedSizeId(undefined);
-  }, [product?.defaultVariantId, product?.variants, hintVariantId]);
+  }, [product?.defaultVariantId, product?.variants, hintVariantId, hintColorId]);
 
   const sizeLabels = useMemo(() => {
     const map: Record<string, string> = {};

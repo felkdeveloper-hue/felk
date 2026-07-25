@@ -49,18 +49,26 @@ function normalizeConfig(
       }))
     : fallback.columns;
 
-  const mapTiles = (tiles: unknown, fallbackTiles: MegaMenuTile[]): MegaMenuTile[] =>
-    Array.isArray(tiles)
-      ? (tiles as MegaMenuTile[]).map((tile) => ({
-          label: String(tile.label ?? ''),
-          slug: String(tile.slug ?? ''),
-          imageUrl: String(tile.imageUrl ?? ''),
-          imageClassName:
-            typeof tile.imageClassName === 'string'
-              ? tile.imageClassName
-              : (tile.imageClassName ?? null),
-        }))
-      : fallbackTiles;
+  const mapTiles = (tiles: unknown, fallbackTiles: MegaMenuTile[]): MegaMenuTile[] => {
+    if (!Array.isArray(tiles)) return fallbackTiles;
+    return (tiles as MegaMenuTile[]).map((tile, index) => {
+      const rawUrl = String(tile.imageUrl ?? '').trim();
+      // Vite `/src/...` paths only work in local `vite` — never persist/show them in admin.
+      const imageUrl =
+        rawUrl && !rawUrl.startsWith('/src/') && !rawUrl.includes('/src/assets/')
+          ? rawUrl
+          : String(fallbackTiles[index]?.imageUrl ?? '');
+      return {
+        label: String(tile.label ?? fallbackTiles[index]?.label ?? ''),
+        slug: String(tile.slug ?? fallbackTiles[index]?.slug ?? ''),
+        imageUrl,
+        imageClassName:
+          typeof tile.imageClassName === 'string'
+            ? tile.imageClassName
+            : (tile.imageClassName ?? fallbackTiles[index]?.imageClassName ?? null),
+      };
+    });
+  };
 
   return {
     key,

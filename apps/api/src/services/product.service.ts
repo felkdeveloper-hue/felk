@@ -230,17 +230,13 @@ export class ProductService {
       const forVariant = listingId
         ? productMedia.filter((item) => item.variantId?.toString() === listingId)
         : [];
-      // Prefer images attached to the listing variant, then product-level (no variant), then any
-      const pool =
-        forVariant.length > 0
-          ? forVariant
-          : productMedia.filter((item) => !item.variantId).length > 0
-            ? productMedia.filter((item) => !item.variantId)
-            : productMedia;
+      // Prefer images attached to the listing variant, then product-level images.
+      // Never fall back to another variant's media: a blue listing must not turn
+      // pink when its card is hovered.
+      const pool = listingId ? forVariant : productMedia.filter((item) => !item.variantId);
       const primary = pool.find((item) => item.isPrimary) ?? pool[0];
       const hover = primary
-        ? (pool.find((item) => item._id.toString() !== primary._id.toString()) ??
-          productMedia.find((item) => item._id.toString() !== primary._id.toString()))
+        ? pool.find((item) => item._id.toString() !== primary._id.toString())
         : undefined;
       return {
         thumbnailUrl:

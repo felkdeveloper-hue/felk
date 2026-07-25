@@ -31,9 +31,12 @@ export const productsRoute = createRoute({
 export const productDetailRoute = createRoute({
   getParentRoute: () => publicLayoutRoute,
   path: '/products/$slug',
-  validateSearch: (search: Record<string, unknown>) => ({
-    variant: typeof search.variant === 'string' ? search.variant : undefined,
-  }),
+  validateSearch: (search: Record<string, unknown>): { variant?: string; color?: string } => {
+    const result: { variant?: string; color?: string } = {};
+    if (typeof search.variant === 'string') result.variant = search.variant;
+    if (typeof search.color === 'string') result.color = search.color;
+    return result;
+  },
   component: ProductDetailPage,
 });
 

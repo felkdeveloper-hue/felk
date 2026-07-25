@@ -213,7 +213,9 @@ export function normalizeProduct(raw: unknown): Product {
     colorIds: Array.isArray(record.colorIds) ? record.colorIds.map((id) => String(id)) : undefined,
     sizeIds: Array.isArray(record.sizeIds) ? record.sizeIds.map((id) => String(id)) : undefined,
     thumbnailUrl,
-    hoverImageUrl: resolveMediaUrl(record.hoverImageUrl) ?? media?.[1]?.url,
+    // The API chooses a hover image from the same listing variant. Do not use
+    // an arbitrary second product image here because it may belong to another color.
+    hoverImageUrl: resolveMediaUrl(record.hoverImageUrl),
     media,
     variants,
     specifications: Array.isArray(record.specifications) ? record.specifications : undefined,

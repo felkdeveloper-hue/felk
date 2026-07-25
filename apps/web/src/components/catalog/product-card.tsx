@@ -43,12 +43,31 @@ export function ProductCard({
   priority = false,
   sizes = '(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw',
 }: ProductCardProps) {
+  const listingVariant = product.variants?.find(
+    (variant) => variant.id === product.defaultVariantId,
+  );
+  const listingVariantIds = new Set(
+    product.variants
+      ?.filter(
+        (variant) =>
+          variant.id === product.defaultVariantId ||
+          (listingVariant?.colorId && variant.colorId === listingVariant.colorId),
+      )
+      .map((variant) => variant.id) ?? [],
+  );
+  const productLevelMedia = product.media?.filter((item) => !item.variantId) ?? [];
+  const listingMedia =
+    product.defaultVariantId && listingVariantIds.size
+      ? (product.media?.filter((item) => item.variantId && listingVariantIds.has(item.variantId)) ??
+        [])
+      : [];
+  const cardMedia = product.defaultVariantId ? listingMedia : productLevelMedia;
   const candidates = [
     product.thumbnailUrl,
-    product.media?.find((item) => item.isPrimary)?.url,
-    product.media?.[0]?.url,
+    cardMedia.find((item) => item.isPrimary)?.url,
+    cardMedia[0]?.url,
     product.hoverImageUrl,
-    product.media?.[1]?.url,
+    cardMedia[1]?.url,
   ].filter((url): url is string => Boolean(url));
 
   const [primaryBroken, setPrimaryBroken] = useState(false);
@@ -93,6 +112,7 @@ export function ProductCard({
             params={{ slug: product.slug }}
             search={{
               variant: product.defaultVariantId ? String(product.defaultVariantId) : undefined,
+              color: product.colorId,
             }}
             preload="intent"
             aria-label={`View ${product.name}`}
@@ -198,6 +218,7 @@ export function ProductCard({
                 params={{ slug: product.slug }}
                 search={{
                   variant: product.defaultVariantId ? String(product.defaultVariantId) : undefined,
+                  color: product.colorId,
                 }}
                 preload="intent"
                 className="hover:underline"

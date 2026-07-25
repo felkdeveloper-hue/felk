@@ -43,13 +43,14 @@ function resolveColorDisplayName(
 ): string {
   if (!colorId) return fallback;
   const colorVariants = variants.filter((v) => v.colorId === colorId);
-  if (!colorVariants.some((v) => v.listSeparately)) return fallback;
   const titles = colorVariants
     .map((v) => v.title?.trim())
     .filter((title): title is string => Boolean(title));
   if (!titles.length) return fallback;
   const descriptive = titles.filter((title) => !isAutoColorSizeLabel(title));
-  return descriptive[0] ?? titles[0] ?? fallback;
+  // A descriptive per-color title is intentional admin content. Use it even
+  // if an older API response omitted the listSeparately flag.
+  return [...descriptive].sort((a, b) => b.length - a.length)[0] ?? fallback;
 }
 
 function findVariant(
