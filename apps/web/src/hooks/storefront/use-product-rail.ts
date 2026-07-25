@@ -8,7 +8,8 @@ import type { PaginatedResult } from '@/types';
 const PRODUCT_STALE = 1000 * 60 * 3;
 const RANDOM_PICK = 8;
 
-export type ProductRailKind = 'trending' | 'best-sellers' | 'new-arrivals' | 'random';
+export type ProductRailKind =
+  'trending' | 'best-sellers' | 'new-arrivals' | 'more-to-love' | 'featured' | 'random';
 
 export interface ProductRailScope {
   categoryId?: string;
@@ -38,6 +39,20 @@ const railParams: Record<ProductRailKind, ProductListParams> = {
     sortBy: 'createdAt',
     sortOrder: 'desc',
     limit: 8,
+  },
+  'more-to-love': {
+    status: 'active',
+    isMoreToLove: true,
+    sortBy: 'updatedAt',
+    sortOrder: 'desc',
+    limit: 8,
+  },
+  featured: {
+    status: 'active',
+    isFeatured: true,
+    sortBy: 'updatedAt',
+    sortOrder: 'desc',
+    limit: 12,
   },
   random: {
     status: 'active',

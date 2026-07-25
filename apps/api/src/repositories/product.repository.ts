@@ -19,6 +19,7 @@ export interface ProductListFilters extends ListOptions {
   gender?: string;
   isFeatured?: boolean;
   isTrending?: boolean;
+  isMoreToLove?: boolean;
   isNewArrival?: boolean;
   isBestSeller?: boolean;
   isClearance?: boolean;
@@ -90,7 +91,17 @@ export class ProductRepository extends BaseRepository {
     }
     if (options.categoryId) {
       const categoryId = toObjectId(options.categoryId);
-      if (categoryId) filter.categoryId = categoryId;
+      if (categoryId) {
+        // Match primary category OR any entry in categoryIds (use $and so other $or filters still work)
+        const categoryClause = {
+          $or: [{ categoryId }, { categoryIds: categoryId }],
+        };
+        if (Array.isArray(filter.$and)) {
+          (filter.$and as unknown[]).push(categoryClause);
+        } else {
+          filter.$and = [categoryClause];
+        }
+      }
     }
     if (options.subcategoryId) {
       const subcategoryId = toObjectId(options.subcategoryId);
@@ -103,11 +114,12 @@ export class ProductRepository extends BaseRepository {
     if (options.tag) filter.tags = options.tag;
     if (options.tags?.length) filter.tags = { $all: options.tags };
     if (options.gender) filter.gender = options.gender;
-    if (options.isFeatured !== undefined) filter.isFeatured = options.isFeatured;
-    if (options.isTrending !== undefined) filter.isTrending = options.isTrending;
-    if (options.isNewArrival !== undefined) filter.isNewArrival = options.isNewArrival;
-    if (options.isBestSeller !== undefined) filter.isBestSeller = options.isBestSeller;
-    if (options.isClearance !== undefined) filter.isClearance = options.isClearance;
+    if (options.isFeatured !== undefined) filter.isFeatured = Boolean(options.isFeatured);
+    if (options.isTrending !== undefined) filter.isTrending = Boolean(options.isTrending);
+    if (options.isMoreToLove !== undefined) filter.isMoreToLove = Boolean(options.isMoreToLove);
+    if (options.isNewArrival !== undefined) filter.isNewArrival = Boolean(options.isNewArrival);
+    if (options.isBestSeller !== undefined) filter.isBestSeller = Boolean(options.isBestSeller);
+    if (options.isClearance !== undefined) filter.isClearance = Boolean(options.isClearance);
 
     if (options.minPrice != null || options.maxPrice != null) {
       const price: Record<string, number> = {};
@@ -180,9 +192,11 @@ export class ProductRepository extends BaseRepository {
             'pricing',
             'brandId',
             'categoryId',
+            'categoryIds',
             'gender',
             'isFeatured',
             'isTrending',
+            'isMoreToLove',
             'isNewArrival',
             'isBestSeller',
             'isClearance',

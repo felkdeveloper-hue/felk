@@ -30,6 +30,16 @@ const railCopy: Record<ProductRailKind, { eyebrow: string; title: string; descri
     title: 'New arrivals',
     description: 'Fresh silhouettes and fabrics, added weekly.',
   },
+  'more-to-love': {
+    eyebrow: 'Keep exploring',
+    title: 'More to love',
+    description: 'Hand-picked pieces we think you will love next.',
+  },
+  featured: {
+    eyebrow: 'Editor’s pick',
+    title: 'Featured products',
+    description: 'Standout styles from this week’s edit.',
+  },
   random: {
     eyebrow: 'From the edit',
     title: 'Picked for you',

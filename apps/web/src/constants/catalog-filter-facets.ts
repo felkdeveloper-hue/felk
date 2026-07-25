@@ -55,6 +55,7 @@ export const DEFAULT_CATALOG_FACET_KEYS: CatalogFacetKey[] = [
   'category',
   'color',
   'material',
+  'occasion',
   'discount',
 ];
 

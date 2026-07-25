@@ -155,6 +155,9 @@ export function normalizeProduct(raw: unknown): Product {
     brandId: record.brandId ? String(record.brandId) : undefined,
     brandName: typeof record.brandName === 'string' ? record.brandName : undefined,
     categoryId: record.categoryId ? String(record.categoryId) : undefined,
+    categoryIds: Array.isArray(record.categoryIds)
+      ? record.categoryIds.map((id) => String(id))
+      : undefined,
     subcategoryId: record.subcategoryId ? String(record.subcategoryId) : undefined,
     collectionIds: Array.isArray(record.collectionIds)
       ? record.collectionIds.map((id) => String(id))
@@ -168,6 +171,7 @@ export function normalizeProduct(raw: unknown): Product {
     tags: Array.isArray(record.tags) ? record.tags.map(String) : undefined,
     isFeatured: Boolean(record.isFeatured),
     isTrending: Boolean(record.isTrending),
+    isMoreToLove: Boolean(record.isMoreToLove),
     isNewArrival: Boolean(record.isNewArrival),
     isBestSeller: Boolean(record.isBestSeller),
     isClearance: Boolean(record.isClearance),

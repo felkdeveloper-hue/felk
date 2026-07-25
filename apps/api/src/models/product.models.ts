@@ -86,6 +86,8 @@ export interface ProductDocument extends Document {
   description?: string | null;
   brandId?: Types.ObjectId | null;
   categoryId?: Types.ObjectId | null;
+  /** Extra categories beyond the primary categoryId. */
+  categoryIds: Types.ObjectId[];
   subcategoryId?: Types.ObjectId | null;
   collectionIds: Types.ObjectId[];
   seasonId?: Types.ObjectId | null;
@@ -102,6 +104,8 @@ export interface ProductDocument extends Document {
   warrantyDetails?: string | null;
   isFeatured: boolean;
   isTrending: boolean;
+  /** Homepage “More to love” rail */
+  isMoreToLove: boolean;
   isNewArrival: boolean;
   isBestSeller: boolean;
   isClearance: boolean;
@@ -148,6 +152,8 @@ const productSchema = new Schema<ProductDocument>(
     description: { type: String, default: null },
     brandId: { type: Schema.Types.ObjectId, ref: 'Brand', default: null, index: true },
     categoryId: { type: Schema.Types.ObjectId, ref: 'Category', default: null, index: true },
+    /** Additional categories this product appears under (primary is still categoryId). */
+    categoryIds: [{ type: Schema.Types.ObjectId, ref: 'Category', index: true }],
     subcategoryId: { type: Schema.Types.ObjectId, ref: 'Category', default: null, index: true },
     collectionIds: [{ type: Schema.Types.ObjectId, ref: 'Collection', index: true }],
     seasonId: { type: Schema.Types.ObjectId, ref: 'SeasonCollection', default: null },
@@ -167,8 +173,9 @@ const productSchema = new Schema<ProductDocument>(
     warrantyDetails: { type: String, default: null },
     isFeatured: { type: Boolean, default: false, index: true },
     isTrending: { type: Boolean, default: false },
+    isMoreToLove: { type: Boolean, default: false, index: true },
     isNewArrival: { type: Boolean, default: false },
-    isBestSeller: { type: Boolean, default: false },
+    isBestSeller: { type: Boolean, default: false, index: true },
     isClearance: { type: Boolean, default: false },
     status: {
       type: String,

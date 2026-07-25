@@ -72,6 +72,7 @@ export const productCreateSchema = z.object({
   description: z.string().max(50000).nullable().optional(),
   brandId: nullableObjectId,
   categoryId: nullableObjectId,
+  categoryIds: z.array(objectIdSchema).optional(),
   subcategoryId: nullableObjectId,
   collectionIds: z.array(objectIdSchema).optional(),
   seasonId: nullableObjectId,
@@ -93,6 +94,7 @@ export const productCreateSchema = z.object({
   warrantyDetails: z.string().trim().max(500).nullable().optional(),
   isFeatured: z.boolean().optional(),
   isTrending: z.boolean().optional(),
+  isMoreToLove: z.boolean().optional(),
   isNewArrival: z.boolean().optional(),
   isBestSeller: z.boolean().optional(),
   isClearance: z.boolean().optional(),
@@ -147,6 +149,10 @@ export const productListQuerySchema = paginationQuerySchema.extend({
     .optional()
     .transform((v) => (v === undefined ? undefined : v === 'true')),
   isTrending: z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((v) => (v === undefined ? undefined : v === 'true')),
+  isMoreToLove: z
     .enum(['true', 'false'])
     .optional()
     .transform((v) => (v === undefined ? undefined : v === 'true')),

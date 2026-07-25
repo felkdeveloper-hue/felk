@@ -69,7 +69,7 @@ export class InventoryRepository extends BaseRepository {
     const sort = parseSort(options, this.sortableFields);
     const skip = getPaginationSkip(page, limit);
 
-    const [data, total] = await Promise.all([
+    const [raw, total] = await Promise.all([
       InventoryItemModel.find(filter as FilterQuery<InventoryItemDocument>)
         .sort(sort)
         .skip(skip)
@@ -79,6 +79,26 @@ export class InventoryRepository extends BaseRepository {
         .lean(),
       InventoryItemModel.countDocuments(filter as FilterQuery<InventoryItemDocument>),
     ]);
+
+    // Keep variantId / warehouseId as plain ObjectIds for clients that key by id.
+    // Populated docs are exposed separately so admin UIs can still show SKU/title.
+    const data = raw.map((row) => {
+      const variantPop =
+        row.variantId && typeof row.variantId === 'object' && '_id' in row.variantId
+          ? (row.variantId as { _id: Types.ObjectId; sku?: string; title?: string; price?: number })
+          : null;
+      const warehousePop =
+        row.warehouseId && typeof row.warehouseId === 'object' && '_id' in row.warehouseId
+          ? (row.warehouseId as { _id: Types.ObjectId; name?: string; code?: string })
+          : null;
+      return {
+        ...row,
+        variantId: variantPop?._id ?? row.variantId,
+        warehouseId: warehousePop?._id ?? row.warehouseId,
+        variant: variantPop ?? undefined,
+        warehouse: warehousePop ?? undefined,
+      };
+    });
 
     return { data, meta: buildPaginationMeta(total, page, limit) };
   }

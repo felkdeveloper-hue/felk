@@ -23,6 +23,7 @@ export interface AdminProduct {
   brandName?: string;
   brandId?: string;
   categoryId?: string;
+  categoryIds?: string[];
   materialId?: string;
   collectionIds?: string[];
   gender?: string;
@@ -39,6 +40,7 @@ export interface AdminProduct {
   description?: string;
   isFeatured?: boolean;
   isTrending?: boolean;
+  isMoreToLove?: boolean;
   isNewArrival?: boolean;
   isBestSeller?: boolean;
   isClearance?: boolean;
@@ -126,6 +128,9 @@ function normalizeProduct(raw: unknown): AdminProduct {
     brandName: typeof record.brandName === 'string' ? record.brandName : undefined,
     brandId: record.brandId ? String(record.brandId) : undefined,
     categoryId: record.categoryId ? String(record.categoryId) : undefined,
+    categoryIds: Array.isArray(record.categoryIds)
+      ? record.categoryIds.map((id) => String(id))
+      : undefined,
     materialId: record.materialId ? String(record.materialId) : undefined,
     collectionIds: Array.isArray(record.collectionIds)
       ? record.collectionIds.map((id) => String(id))
@@ -158,6 +163,7 @@ function normalizeProduct(raw: unknown): AdminProduct {
     description: typeof record.description === 'string' ? record.description : undefined,
     isFeatured: Boolean(record.isFeatured),
     isTrending: Boolean(record.isTrending),
+    isMoreToLove: Boolean(record.isMoreToLove),
     isNewArrival: Boolean(record.isNewArrival),
     isBestSeller: Boolean(record.isBestSeller),
     isClearance: Boolean(record.isClearance),
@@ -220,6 +226,7 @@ export interface ProductInput {
   description?: string;
   brandId?: string | null;
   categoryId?: string | null;
+  categoryIds?: string[];
   materialId?: string | null;
   collectionIds?: string[];
   gender?: string | null;
@@ -234,6 +241,7 @@ export interface ProductInput {
   warrantyDetails?: string | null;
   isFeatured?: boolean;
   isTrending?: boolean;
+  isMoreToLove?: boolean;
   isNewArrival?: boolean;
   isBestSeller?: boolean;
   isClearance?: boolean;

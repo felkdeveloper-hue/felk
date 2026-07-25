@@ -11,7 +11,6 @@ import {
   HomeEditorialBannerSection,
   HomeSectionRenderer,
   HomeSplitBannersSection,
-  ProductGridSection,
   ProductRailSection,
   SectionSkeleton,
 } from '@/components/storefront';
@@ -66,7 +65,12 @@ export function HomePage() {
         <ProductRailSection kind="best-sellers" eager spacing="none" title="Best Sellers" />
         <HomeCategoriesSection />
         <div className="pt-2 sm:pt-3">
-          <ProductRailSection kind="random" eager={false} spacing="none" title="More to love" />
+          <ProductRailSection
+            kind="more-to-love"
+            eager={false}
+            spacing="none"
+            title="More to love"
+          />
         </div>
       </div>
 
@@ -74,7 +78,12 @@ export function HomePage() {
       <HomeBeforeFeaturedBannerSection />
 
       <div className="pt-8 sm:pt-10">
-        <ProductGridSection spacing="none" />
+        <ProductRailSection
+          kind="featured"
+          eager={false}
+          spacing="none"
+          title="Featured products"
+        />
       </div>
 
       <AsyncSection

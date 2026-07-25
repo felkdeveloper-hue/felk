@@ -117,19 +117,24 @@ export function ProductDetailPage() {
       navigate({
         to: '/products/$slug',
         params: { slug: product.slug },
-        search: { variant: undefined },
+        search: { variant: hintVariantId },
         replace: true,
       });
     }
-  }, [navigate, product?.slug, slug]);
+  }, [navigate, product?.slug, slug, hintVariantId]);
 
   useEffect(() => {
     if (!product?.variants?.length) return;
     // Prefer the hinted variant (from product card link), then defaultVariantId, then first
-    const hinted = hintVariantId ? product.variants.find((v) => v.id === hintVariantId) : undefined;
+    const hinted = hintVariantId
+      ? product.variants.find(
+          (v) => v.id === hintVariantId || String(v.id) === String(hintVariantId),
+        )
+      : undefined;
     const defaultVariant =
       hinted ??
       product.variants.find((v) => v.id === product.defaultVariantId) ??
+      product.variants.find((v) => v.isDefault) ??
       product.variants[0];
     if (!defaultVariant) return;
     setSelectedVariantId(defaultVariant.id);

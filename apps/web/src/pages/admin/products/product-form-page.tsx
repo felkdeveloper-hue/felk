@@ -54,6 +54,7 @@ const productSchema = z.object({
   compareAtPrice: z.string().optional(),
   isFeatured: z.boolean().default(false),
   isTrending: z.boolean().default(false),
+  isMoreToLove: z.boolean().default(false),
   isNewArrival: z.boolean().default(false),
   isBestSeller: z.boolean().default(false),
   isClearance: z.boolean().default(false),
@@ -548,11 +549,25 @@ function VariantsSection({
   const stockByVariant = useMemo(() => {
     const map = new Map<string, number>();
     for (const row of stockRows) {
-      if (!row.variantId) continue;
-      map.set(row.variantId, (map.get(row.variantId) ?? 0) + row.quantityOnHand);
+      const vid =
+        row.variantId ||
+        (typeof (row as { variant?: { id?: string } }).variant === 'object'
+          ? (row as { variant?: { id?: string } }).variant?.id
+          : undefined);
+      if (!vid) continue;
+      map.set(String(vid), (map.get(String(vid)) ?? 0) + Number(row.quantityOnHand ?? 0));
     }
     return map;
   }, [stockRows]);
+
+  const extractStockVariantId = (row: Record<string, unknown>): string => {
+    if (typeof row.variantId === 'string') return row.variantId;
+    if (row.variantId && typeof row.variantId === 'object') {
+      const v = row.variantId as { _id?: unknown; id?: unknown };
+      return String(v._id ?? v.id ?? '');
+    }
+    return '';
+  };
 
   const variantMediaMap = useMemo(() => {
     const map = new Map<string, typeof media>();
@@ -679,18 +694,66 @@ function VariantsSection({
   const setStockMutation = useMutation({
     mutationFn: ({ variantId, quantity }: { variantId: string; quantity: number }) =>
       inventoryApi.setStock({ variantId, quantity }),
+    onMutate: async ({ variantId, quantity }) => {
+      await queryClient.cancelQueries({
+        queryKey: QUERY_KEYS.inventory.items({ productId, limit: 200 }),
+      });
+      const previous = queryClient.getQueryData<{
+        data: Array<{ variantId?: string; quantityOnHand: number }>;
+      }>(QUERY_KEYS.inventory.items({ productId, limit: 200 }));
+      queryClient.setQueryData(
+        QUERY_KEYS.inventory.items({ productId, limit: 200 }),
+        (old: { data?: Array<Record<string, unknown>> } | undefined) => {
+          if (!old?.data) {
+            return {
+              data: [
+                { variantId, quantityOnHand: quantity, productId, warehouseId: '', id: variantId },
+              ],
+            };
+          }
+          const found = old.data.some((row) => extractStockVariantId(row) === variantId);
+          return {
+            ...old,
+            data: found
+              ? old.data.map((row) =>
+                  extractStockVariantId(row) === variantId
+                    ? { ...row, quantityOnHand: quantity, onHand: quantity }
+                    : row,
+                )
+              : [
+                  ...old.data,
+                  {
+                    variantId,
+                    quantityOnHand: quantity,
+                    onHand: quantity,
+                    productId,
+                    id: `tmp-${variantId}`,
+                  },
+                ],
+          };
+        },
+      );
+      return { previous };
+    },
     onSuccess: async () => {
       await queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.inventory.items({ productId, limit: 200 }),
       });
       toast.success('Stock updated');
     },
-    onError: (err) =>
+    onError: (err, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(
+          QUERY_KEYS.inventory.items({ productId, limit: 200 }),
+          context.previous,
+        );
+      }
       toast.error(
         err instanceof AppError
           ? err.message
           : 'Unable to update stock. Check inventory permissions.',
-      ),
+      );
+    },
   });
 
   const updatePriceMutation = useMutation({
@@ -1043,6 +1106,7 @@ export function ProductFormPage({ productId }: { productId?: string }) {
       compareAtPrice: '',
       isFeatured: false,
       isTrending: false,
+      isMoreToLove: false,
       isNewArrival: false,
       isBestSeller: false,
       isClearance: false,
@@ -1078,6 +1142,7 @@ export function ProductFormPage({ productId }: { productId?: string }) {
       compareAtPrice: product.compareAtPrice ? String(product.compareAtPrice) : '',
       isFeatured: product.isFeatured ?? false,
       isTrending: product.isTrending ?? false,
+      isMoreToLove: product.isMoreToLove ?? false,
       isNewArrival: product.isNewArrival ?? false,
       isBestSeller: product.isBestSeller ?? false,
       isClearance: product.isClearance ?? false,
@@ -1091,7 +1156,11 @@ export function ProductFormPage({ productId }: { productId?: string }) {
     if (product.specifications?.length) setSpecRows(product.specifications);
     setSeoTitle(product.seoTitle ?? '');
     setSeoDescription(product.seoDescription ?? '');
-    if (product.categoryId) setCategoryIds([product.categoryId]);
+    if (product.categoryIds?.length) {
+      setCategoryIds(product.categoryIds);
+    } else if (product.categoryId) {
+      setCategoryIds([product.categoryId]);
+    }
     if (product.occasionIds?.length) setOccasionIds(product.occasionIds);
   }, [product, reset]);
 
@@ -1109,6 +1178,8 @@ export function ProductFormPage({ productId }: { productId?: string }) {
     shortDescription: data.shortDescription?.trim() || undefined,
     description: data.description?.trim() || undefined,
     categoryId: categoryIds[0] || undefined,
+    categoryIds: categoryIds.length ? categoryIds : undefined,
+    subcategoryId: undefined,
     brandId: data.brandId || undefined,
     materialId: data.materialId || undefined,
     gender: data.gender || undefined,
@@ -1125,6 +1196,7 @@ export function ProductFormPage({ productId }: { productId?: string }) {
     currency: 'LKR',
     isFeatured: data.isFeatured,
     isTrending: data.isTrending,
+    isMoreToLove: data.isMoreToLove,
     isNewArrival: data.isNewArrival,
     isBestSeller: data.isBestSeller,
     isClearance: data.isClearance,
@@ -1653,34 +1725,22 @@ export function ProductFormPage({ productId }: { productId?: string }) {
                 Homepage sections
               </p>
               <PlacementToggle
-                label="Best Sellers"
+                label="Best Seller"
                 description="Shows in the Best Sellers row on the home page"
                 checked={w.isBestSeller ?? false}
                 onChange={(v) => setFlag('isBestSeller', v)}
               />
               <PlacementToggle
-                label="New Arrivals"
-                description="Shows in the New Arrivals row on the home page"
-                checked={w.isNewArrival ?? false}
-                onChange={(v) => setFlag('isNewArrival', v)}
+                label="More To Love"
+                description="Shows in the More to love row on the home page"
+                checked={w.isMoreToLove ?? false}
+                onChange={(v) => setFlag('isMoreToLove', v)}
               />
               <PlacementToggle
-                label="Trending Now"
-                description="Shows in the Trending section on the home page"
-                checked={w.isTrending ?? false}
-                onChange={(v) => setFlag('isTrending', v)}
-              />
-              <PlacementToggle
-                label="Featured / Editor's Pick"
-                description="Shows in the Featured section on the home page"
+                label="Featured Product of home page"
+                description="Shows in the Featured products grid on the home page"
                 checked={w.isFeatured ?? false}
                 onChange={(v) => setFlag('isFeatured', v)}
-              />
-              <PlacementToggle
-                label="On Sale / Clearance"
-                description="Adds SAVE badge on the product card"
-                checked={w.isClearance ?? false}
-                onChange={(v) => setFlag('isClearance', v)}
               />
             </SidebarCard>
 

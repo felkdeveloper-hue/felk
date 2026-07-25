@@ -35,6 +35,7 @@ export interface Product {
   brandId?: string;
   brandName?: string;
   categoryId?: string;
+  categoryIds?: string[];
   subcategoryId?: string;
   collectionIds?: string[];
   materialId?: string;
@@ -44,6 +45,7 @@ export interface Product {
   tags?: string[];
   isFeatured?: boolean;
   isTrending?: boolean;
+  isMoreToLove?: boolean;
   isNewArrival?: boolean;
   isBestSeller?: boolean;
   isClearance?: boolean;
@@ -122,6 +124,7 @@ export interface ProductListParams {
   visibility?: string;
   brandId?: string;
   categoryId?: string;
+  categoryIds?: string[];
   subcategoryId?: string;
   collectionId?: string;
   tag?: string;
@@ -131,6 +134,7 @@ export interface ProductListParams {
   gender?: string;
   isFeatured?: boolean;
   isTrending?: boolean;
+  isMoreToLove?: boolean;
   isNewArrival?: boolean;
   isBestSeller?: boolean;
   isClearance?: boolean;

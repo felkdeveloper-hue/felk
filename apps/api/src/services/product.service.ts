@@ -154,6 +154,28 @@ function listingRequiresOptionSelection(
   return sizeIds.size > 1 || colorIds.size > 1 || variants.length > 1;
 }
 
+/**
+ * Own-listing color cards should show the edited variant title (e.g. sky blue name),
+ * not the parent product name (e.g. Hot Pink). Skip auto "Color / Size" labels when
+ * a longer descriptive title exists on any size of that color.
+ */
+function resolveOwnListingDisplayName(
+  colorVariants: Array<{ title?: string | null }>,
+  fallbackProductName: string,
+): string {
+  const titles = colorVariants
+    .map((variant) => variant.title?.trim())
+    .filter((title): title is string => Boolean(title));
+  if (!titles.length) return fallbackProductName;
+
+  const isAutoColorSizeLabel = (title: string) =>
+    /^[^/]+ \/ [^/]+$/.test(title) && title.length <= 48;
+
+  const descriptive = titles.filter((title) => !isAutoColorSizeLabel(title));
+  const pool = descriptive.length ? descriptive : titles;
+  return [...pool].sort((a, b) => b.length - a.length)[0] ?? fallbackProductName;
+}
+
 export class ProductService {
   async list(options: ProductListFilters) {
     const result = await productRepository.listCatalog(options);
@@ -246,6 +268,7 @@ export class ProductService {
             cardListingVariant: (typeof variants)[number] | undefined,
             cardPricing: ReturnType<typeof resolveListingPricing>,
             cardThumbs: { thumbnailUrl?: string; hoverImageUrl?: string | undefined },
+            displayName?: string,
           ) => {
             const cardComputed = withComputedPricing({
               ...(product as unknown as Record<string, unknown>),
@@ -254,7 +277,8 @@ export class ProductService {
             return {
               _id: product._id,
               id,
-              name: product.name,
+              // Own-listing colors can override the catalog title with a variant name.
+              name: displayName?.trim() || product.name,
               slug: product.slug,
               shortDescription: product.shortDescription,
               status: product.status,
@@ -264,15 +288,23 @@ export class ProductService {
               brandId: product.brandId,
               brandName: product.brandId ? brandById.get(product.brandId.toString()) : undefined,
               categoryId: product.categoryId,
+              categoryIds: product.categoryIds,
               gender: product.gender,
               isFeatured: product.isFeatured,
               isTrending: product.isTrending,
+              isMoreToLove: Boolean(
+                (product as { isMoreToLove?: boolean }).isMoreToLove ?? product.isTrending,
+              ),
               isNewArrival: product.isNewArrival,
               isBestSeller: product.isBestSeller,
               isClearance: product.isClearance,
               averageRating: product.averageRating ?? 0,
               reviewCount: product.reviewCount ?? 0,
-              defaultVariantId: cardListingVariant?._id ?? product.defaultVariantId,
+              defaultVariantId: cardListingVariant?._id
+                ? String(cardListingVariant._id)
+                : product.defaultVariantId
+                  ? String(product.defaultVariantId)
+                  : undefined,
               variantCount: productVariants.length || product.variantCount || 0,
               requiresOptionSelection: listingRequiresOptionSelection(productVariants),
               sku: product.sku ?? cardListingVariant?.sku,
@@ -283,6 +315,7 @@ export class ProductService {
             };
           };
 
+          // Default listing keeps the product name (admin "Product Name" field).
           const cards = [buildCard(listingVariant, listingPricing, thumbs)];
 
           // Extra catalog cards for colors marked "show as own listing"
@@ -295,18 +328,19 @@ export class ProductService {
             const colorKey = variant.colorId ? String(variant.colorId) : `v:${variant._id}`;
             if (seenColors.has(colorKey)) continue;
             seenColors.add(colorKey);
-            // Prefer the first variant of this color (already sorted)
+            const colorVariants = productVariants.filter(
+              (v) => (v.colorId ? String(v.colorId) : `v:${v._id}`) === colorKey,
+            );
+            // Prefer the first variant of this color marked own-listing (already sorted)
             const colorRepresentative =
-              productVariants.find(
-                (v) =>
-                  (v.colorId ? String(v.colorId) : `v:${v._id}`) === colorKey && v.listSeparately,
-              ) ?? variant;
+              colorVariants.find((v) => v.listSeparately) ?? colorVariants[0] ?? variant;
             const extraPricing = resolveListingPricing(
               product as unknown as { pricing?: Record<string, unknown> | null },
               colorRepresentative,
             );
             const extraThumbs = pickThumbnail(productMedia, colorRepresentative);
-            cards.push(buildCard(colorRepresentative, extraPricing, extraThumbs));
+            const ownListingName = resolveOwnListingDisplayName(colorVariants, product.name);
+            cards.push(buildCard(colorRepresentative, extraPricing, extraThumbs, ownListingName));
           }
 
           return cards;
@@ -467,6 +501,11 @@ export class ProductService {
       description: sanitizeRichText(payload.description as string | undefined) ?? null,
       brandId: payload.brandId ?? null,
       categoryId: payload.categoryId ?? null,
+      categoryIds: Array.isArray(payload.categoryIds)
+        ? payload.categoryIds
+        : payload.categoryId
+          ? [payload.categoryId]
+          : [],
       subcategoryId: payload.subcategoryId ?? null,
       collectionIds: payload.collectionIds ?? [],
       seasonId: payload.seasonId ?? null,
@@ -483,6 +522,7 @@ export class ProductService {
       warrantyDetails: (payload.warrantyDetails as string | null | undefined) ?? null,
       isFeatured: Boolean(payload.isFeatured),
       isTrending: Boolean(payload.isTrending),
+      isMoreToLove: Boolean(payload.isMoreToLove ?? payload.isTrending),
       isNewArrival: Boolean(payload.isNewArrival),
       isBestSeller: Boolean(payload.isBestSeller),
       isClearance: Boolean(payload.isClearance),
