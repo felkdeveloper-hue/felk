@@ -19,7 +19,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
-import { PageMotion } from '@/components/admin';
+import { PageMotion, CategoryTreePicker, type CategoryPickerNode } from '@/components/admin';
 import { ADMIN_ROUTES, QUERY_KEYS } from '@/constants';
 import { useAdminPermissions } from '@/hooks/admin';
 import { AppError } from '@/lib/errors';
@@ -1063,7 +1063,18 @@ export function ProductFormPage({ productId }: { productId?: string }) {
   // Fetch CMS data
   const categoriesQuery = useQuery({
     queryKey: ['cms', 'categories', 'product-form'],
-    queryFn: () => cmsApi.categories.list({ limit: 100, status: 'active' }),
+    queryFn: async () => {
+      // API zod max for list `limit` is 100 — higher values 400 and leave the picker empty.
+      const result = await cmsApi.categories.list({
+        limit: 100,
+        sortBy: 'sortOrder',
+        sortOrder: 'asc',
+      });
+      const active = result.data.filter(
+        (row) => !row.status || row.status === 'active' || row.status === 'published',
+      );
+      return { ...result, data: active.length ? active : result.data };
+    },
   });
   const brandsQuery = useQuery({
     queryKey: ['cms', 'brands', 'product-form'],
@@ -1105,7 +1116,7 @@ export function ProductFormPage({ productId }: { productId?: string }) {
       description: '',
       brandId: '',
       materialId: '',
-      gender: '',
+      gender: 'women',
       tags: '',
       price: '',
       salePrice: '',
@@ -1141,7 +1152,7 @@ export function ProductFormPage({ productId }: { productId?: string }) {
       description: product.description ?? '',
       brandId: product.brandId ?? '',
       materialId: product.materialId ?? '',
-      gender: product.gender ?? '',
+      gender: 'women',
       tags: product.tags?.join(', ') ?? '',
       price: product.price ? String(product.price) : '',
       salePrice: product.salePrice ? String(product.salePrice) : '',
@@ -1188,7 +1199,7 @@ export function ProductFormPage({ productId }: { productId?: string }) {
     subcategoryId: undefined,
     brandId: data.brandId || undefined,
     materialId: data.materialId || undefined,
-    gender: data.gender || undefined,
+    gender: 'women',
     occasionIds,
     tags: data.tags?.trim()
       ? data.tags
@@ -1263,6 +1274,115 @@ export function ProductFormPage({ productId }: { productId?: string }) {
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
 
+  const categories = categoriesQuery.data?.data ?? [];
+  const brands = brandsQuery.data?.data ?? [];
+  const occasions = occasionsQuery.data?.data ?? [];
+  const materials = materialsQuery.data?.data ?? [];
+
+  const categoryTree = useMemo(() => {
+    const OWNER_ROOT_SLUGS = [
+      'all-tops',
+      'all-bottoms',
+      'all-dresses',
+      'co-ords',
+      'all-footwear',
+    ] as const;
+    const OWNER_ROOT_SET = new Set<string>(OWNER_ROOT_SLUGS);
+
+    type Node = CategoryPickerNode & { sortOrder: number };
+    const map = new Map<string, Node>();
+
+    for (const row of categories) {
+      const parentRaw = row.parentId as unknown;
+      let parentId: string | null = null;
+      if (parentRaw != null && parentRaw !== '') {
+        if (typeof parentRaw === 'object' && parentRaw !== null) {
+          const record = parentRaw as { _id?: unknown; id?: unknown };
+          parentId = String(record._id ?? record.id ?? '');
+          if (!parentId || parentId === 'undefined') parentId = null;
+        } else {
+          parentId = String(parentRaw);
+        }
+      }
+
+      map.set(row.id, {
+        id: row.id,
+        name: row.name,
+        slug: row.slug ?? '',
+        parentId,
+        children: [],
+        sortOrder: Number(row.sortOrder ?? 0),
+      });
+    }
+
+    // Also link by path when parentId is missing (e.g. /all-tops/long-sleeves).
+    const bySlug = new Map([...map.values()].map((node) => [node.slug, node]));
+    for (const row of categories) {
+      const node = map.get(row.id);
+      if (!node || node.parentId) continue;
+      const path = typeof row.path === 'string' ? row.path : '';
+      const parts = path.split('/').filter(Boolean);
+      if (parts.length >= 2) {
+        const parentSlug = parts[parts.length - 2];
+        const parent = parentSlug ? bySlug.get(parentSlug) : undefined;
+        if (parent && parent.id !== node.id) node.parentId = parent.id;
+      }
+    }
+
+    const roots: Node[] = [];
+    for (const node of map.values()) {
+      if (node.parentId && map.has(node.parentId)) {
+        map.get(node.parentId)!.children!.push(node);
+      } else {
+        roots.push(node);
+      }
+    }
+
+    const sortNodes = (list: Node[]) => {
+      list.sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
+      for (const item of list) {
+        if (item.children?.length) sortNodes(item.children as Node[]);
+      }
+    };
+    sortNodes(roots);
+
+    const ownerRoots = OWNER_ROOT_SLUGS.map((slug) => roots.find((r) => r.slug === slug)).filter(
+      (node): node is Node => Boolean(node),
+    );
+    if (ownerRoots.length) return ownerRoots;
+
+    // Fallback: any roots that look like the owner catalog, else all non-campaign roots.
+    const filtered = roots.filter((root) => OWNER_ROOT_SET.has(root.slug));
+    if (filtered.length) return filtered;
+    return roots.filter((root) => !['new-arrivals', 'oversized'].includes(root.slug));
+  }, [categories]);
+
+  const flatCategoryOptions = useMemo(
+    () =>
+      categories.map((row) => {
+        const parentRaw = row.parentId as unknown;
+        let parentId: string | null = null;
+        if (parentRaw != null && parentRaw !== '') {
+          parentId =
+            typeof parentRaw === 'object' && parentRaw !== null
+              ? String(
+                  (parentRaw as { _id?: unknown; id?: unknown })._id ??
+                    (parentRaw as { id?: unknown }).id ??
+                    '',
+                )
+              : String(parentRaw);
+          if (!parentId || parentId === 'undefined') parentId = null;
+        }
+        return {
+          id: row.id,
+          name: row.name,
+          slug: row.slug ?? '',
+          parentId,
+        };
+      }),
+    [categories],
+  );
+
   if (isEdit && detailQuery.isLoading) {
     return (
       <PageMotion>
@@ -1272,33 +1392,6 @@ export function ProductFormPage({ productId }: { productId?: string }) {
       </PageMotion>
     );
   }
-
-  const categories = categoriesQuery.data?.data ?? [];
-  const brands = brandsQuery.data?.data ?? [];
-  const occasions = occasionsQuery.data?.data ?? [];
-  const materials = materialsQuery.data?.data ?? [];
-
-  // Category tree — grouped by top-level section
-  const womenCats = categories.filter((c) => {
-    const gender = c['gender'] as string | undefined;
-    const parentSlug = c['parentSlug'] as string | undefined;
-    const parentId = c['parentId'] as string | undefined;
-    return (
-      gender === 'women' ||
-      parentSlug === 'women' ||
-      parentSlug?.includes('women') ||
-      (parentId && !c['parentSlug'])
-    );
-  });
-  const accessoriesCats = categories.filter((c) => {
-    const parentSlug = c['parentSlug'] as string | undefined;
-    return parentSlug === 'accessories' || parentSlug?.includes('accessor');
-  });
-  const parentCats = categories.filter((c) => {
-    const parentId = c['parentId'] as string | undefined;
-    const slug = c.slug ?? '';
-    return !parentId && !['men', 'women', 'accessories'].includes(slug);
-  });
 
   return (
     <PageMotion>
@@ -1620,96 +1713,18 @@ export function ProductFormPage({ productId }: { productId?: string }) {
 
             {/* Category & Placement */}
             <SidebarCard title="Category & Where it appears">
-              {/* Multi-select categories */}
               <div>
                 <p className={labelCls}>Category — select all that apply</p>
                 <p className="mb-2 text-[11px] text-[var(--admin-ink-muted)]">
-                  First selected = primary. Product appears in all checked sections.
+                  Search and pick styles. Parents like All Tops are attached automatically. First
+                  selected = primary.
                 </p>
-                <div className="max-h-52 space-y-1 overflow-y-auto rounded-none border border-[var(--admin-line)] p-2">
-                  {womenCats.length ? (
-                    <>
-                      <p className="px-1 pt-1 text-[10px] font-bold uppercase tracking-wider text-[var(--admin-ink-muted)]">
-                        Women
-                      </p>
-                      {womenCats.map((c) => (
-                        <label
-                          key={c.id}
-                          className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-[var(--admin-panel-soft)]"
-                        >
-                          <input
-                            type="checkbox"
-                            className="accent-[var(--admin-accent)]"
-                            checked={categoryIds.includes(c.id)}
-                            onChange={(e) =>
-                              setCategoryIds((prev) =>
-                                e.target.checked
-                                  ? [...prev, c.id]
-                                  : prev.filter((id) => id !== c.id),
-                              )
-                            }
-                          />
-                          <span className="text-xs text-[var(--admin-ink)]">{c.name}</span>
-                          {categoryIds[0] === c.id && categoryIds.length > 1 ? (
-                            <span className="ml-auto text-[10px] text-[var(--admin-accent)]">
-                              Primary
-                            </span>
-                          ) : null}
-                        </label>
-                      ))}
-                    </>
-                  ) : null}
-                  {accessoriesCats.length ? (
-                    <>
-                      <p className="px-1 pt-2 text-[10px] font-bold uppercase tracking-wider text-[var(--admin-ink-muted)]">
-                        Accessories
-                      </p>
-                      {accessoriesCats.map((c) => (
-                        <label
-                          key={c.id}
-                          className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-[var(--admin-panel-soft)]"
-                        >
-                          <input
-                            type="checkbox"
-                            className="accent-[var(--admin-accent)]"
-                            checked={categoryIds.includes(c.id)}
-                            onChange={(e) =>
-                              setCategoryIds((prev) =>
-                                e.target.checked
-                                  ? [...prev, c.id]
-                                  : prev.filter((id) => id !== c.id),
-                              )
-                            }
-                          />
-                          <span className="text-xs text-[var(--admin-ink)]">{c.name}</span>
-                        </label>
-                      ))}
-                    </>
-                  ) : null}
-                  {parentCats.map((c) => (
-                    <label
-                      key={c.id}
-                      className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-[var(--admin-panel-soft)]"
-                    >
-                      <input
-                        type="checkbox"
-                        className="accent-[var(--admin-accent)]"
-                        checked={categoryIds.includes(c.id)}
-                        onChange={(e) =>
-                          setCategoryIds((prev) =>
-                            e.target.checked ? [...prev, c.id] : prev.filter((id) => id !== c.id),
-                          )
-                        }
-                      />
-                      <span className="text-xs text-[var(--admin-ink)]">{c.name}</span>
-                    </label>
-                  ))}
-                  {!categories.length ? (
-                    <p className="px-1 py-2 text-xs text-[var(--admin-ink-muted)]">
-                      No categories configured yet.
-                    </p>
-                  ) : null}
-                </div>
+                <CategoryTreePicker
+                  nodes={categoryTree}
+                  flatOptions={flatCategoryOptions}
+                  selectedIds={categoryIds}
+                  onChange={setCategoryIds}
+                />
                 {categoryIds.length > 0 ? (
                   <p className="mt-1 text-[11px] text-[var(--admin-accent)]">
                     {categoryIds.length} selected · Primary:{' '}
@@ -1720,11 +1735,11 @@ export function ProductFormPage({ productId }: { productId?: string }) {
 
               <Field label="Gender">
                 <select {...register('gender')} className={fieldCls}>
-                  <option value="">— Not specified —</option>
                   <option value="women">Women</option>
-                  <option value="men">Men</option>
-                  <option value="unisex">Unisex</option>
                 </select>
+                <p className="mt-1 text-[11px] text-[var(--admin-ink-muted)]">
+                  This store sells women’s products only — Women is preselected.
+                </p>
               </Field>
 
               <p className="pt-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--admin-ink-muted)]">

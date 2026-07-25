@@ -6,7 +6,6 @@ import { useCartStore, selectCartItemCount, useUiStore } from '@/store';
 
 const NAV_LINKS = [
   { label: 'Women', to: `${ROUTES.products}?gender=women` },
-  { label: 'Accessories', to: '/categories/accessories' },
   { label: 'Browse', to: ROUTES.categories },
   { label: 'Contact', to: ROUTES.contact },
 ];

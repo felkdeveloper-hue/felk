@@ -117,36 +117,9 @@ const OCCASIONS = [
 const SIZES = ['XXS', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', 'Free Size'];
 
 const CATEGORIES: Array<{ name: string; slug: string; sortOrder: number }> = [
-  { name: 'Accessories', slug: 'accessories', sortOrder: 5 },
-  { name: 'All Topwear', slug: 'all-topwear', sortOrder: 20 },
-  { name: 'All Bottomwear', slug: 'all-bottomwear', sortOrder: 21 },
-  { name: 'All Winterwear', slug: 'all-winterwear', sortOrder: 22 },
-  { name: 'Oversized', slug: 'oversized', sortOrder: 30 },
-  { name: 'New Arrivals', slug: 'new-arrivals', sortOrder: 31 },
-  { name: 'Corset', slug: 'corset', sortOrder: 32 },
-  { name: 'Jeans', slug: 'jeans', sortOrder: 33 },
-  { name: 'Hoodies', slug: 'hoodies', sortOrder: 34 },
-  { name: 'Jackets', slug: 'jackets', sortOrder: 35 },
-  { name: 'Bags', slug: 'bags', sortOrder: 50 },
-  { name: 'Handbags', slug: 'handbags', sortOrder: 51 },
-  { name: 'Tote Bags', slug: 'tote-bags', sortOrder: 52 },
-  { name: 'Crossbody Bags', slug: 'crossbody-bags', sortOrder: 53 },
-  { name: 'Clutches', slug: 'clutches', sortOrder: 54 },
-  { name: 'Shoes', slug: 'shoes', sortOrder: 60 },
-  { name: 'Heels', slug: 'heels', sortOrder: 61 },
-  { name: 'Flats', slug: 'flats', sortOrder: 62 },
-  { name: 'Sneakers', slug: 'sneakers', sortOrder: 63 },
-  { name: 'Boots', slug: 'boots', sortOrder: 64 },
-  { name: 'Jewellery', slug: 'jewellery', sortOrder: 70 },
-  { name: 'Earrings', slug: 'earrings', sortOrder: 71 },
-  { name: 'Necklaces', slug: 'necklaces', sortOrder: 72 },
-  { name: 'Bracelets', slug: 'bracelets', sortOrder: 73 },
-  { name: 'Rings', slug: 'rings', sortOrder: 74 },
-  { name: 'Belts', slug: 'belts', sortOrder: 80 },
-  { name: 'Scarves', slug: 'scarves', sortOrder: 81 },
-  { name: 'Sunglasses', slug: 'sunglasses', sortOrder: 82 },
-  { name: 'Hair Accessories', slug: 'hair-accessories', sortOrder: 83 },
-  { name: 'Watches', slug: 'watches', sortOrder: 84 },
+  // Deprecated flat list — category hierarchy is seeded by
+  // `src/scripts/seed-owner-category-tree.ts`. Kept empty so this script
+  // cannot resurrect old topwear / accessories options.
 ];
 
 const ACCESSORIES_MENU = {
@@ -214,6 +187,12 @@ const ACCESSORIES_MENU = {
 };
 
 async function upsertCategories() {
+  if (!CATEGORIES.length) {
+    logger.info(
+      'Skipping flat category seed — run seed-owner-category-tree.ts for the owner hierarchy',
+    );
+    return;
+  }
   for (const item of CATEGORIES) {
     await CategoryModel.updateOne(
       { slug: item.slug },

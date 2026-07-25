@@ -1,10 +1,13 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useRouterState } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { ROUTES } from '@/constants';
 import {
   DEFAULT_MEGA_MENUS,
+  type MegaMenuColumn,
   type MegaMenuGender,
+  type MegaMenuLink,
   type NavigationMenuKey,
 } from '@/constants/mega-menu-defaults';
 import { Image } from '@/components/media/image';
@@ -15,6 +18,11 @@ import { resolveMegaMenuLink } from '@/utils/mega-menu-links';
 export type { MegaMenuGender, NavigationMenuKey };
 
 const CLOSE_DELAY_MS = 160;
+
+/** Long columns (e.g. Tops) render as a balanced 2-up list to keep the panel narrower. */
+function shouldSplitLinks(column: MegaMenuColumn): boolean {
+  return column.links.filter((link) => !link.heading).length >= 10;
+}
 
 function MegaMenuNavLink({
   route,
@@ -72,6 +80,49 @@ function MegaMenuNavLink({
   );
 }
 
+function CategoryLinkItem({
+  link,
+  columnTitle,
+  menuKey,
+  onNavigate,
+  headingIndex,
+}: {
+  link: MegaMenuLink;
+  columnTitle: string;
+  menuKey: NavigationMenuKey;
+  onNavigate: () => void;
+  /** 0 for the first heading in a column; later headings get extra top space. */
+  headingIndex?: number;
+}) {
+  if (link.heading) {
+    return (
+      <li className={cn((headingIndex ?? 0) > 0 ? 'pt-6' : 'pt-2.5', 'first:pt-0')}>
+        <span className="text-foreground text-[11px] font-semibold uppercase tracking-[0.14em]">
+          {link.label}
+        </span>
+      </li>
+    );
+  }
+
+  return (
+    <li>
+      <MegaMenuNavLink
+        route={link.slug}
+        menuKey={menuKey}
+        className={cn(
+          // Strong default contrast — muted grey looked dull on white.
+          'text-foreground/90 hover:text-foreground block whitespace-nowrap text-[13px] font-medium leading-snug tracking-[0.01em] transition-[opacity,color,transform] duration-200 ease-out',
+          // Soft sibling fade (not washed-out grey): hovered link stays full strength.
+          'hover:translate-x-0.5 hover:!opacity-100 group-hover/cats:opacity-45',
+        )}
+        onNavigate={onNavigate}
+      >
+        {link.label}
+      </MegaMenuNavLink>
+    </li>
+  );
+}
+
 export interface GenderMegaMenuProps {
   /** @deprecated Prefer menuKey */
   gender?: NavigationMenuKey;
@@ -98,6 +149,7 @@ export function GenderMegaMenu({
   const config = menuQuery.data ?? DEFAULT_MEGA_MENUS[menuKey];
   const panelId = useId();
   const [open, setOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchGender = useRouterState({
     select: (state) => {
@@ -109,8 +161,7 @@ export function GenderMegaMenu({
     (menuKey === 'women' || menuKey === 'men') &&
     activeHref === ROUTES.products &&
     searchGender === menuKey;
-  const isAccessoriesActive = menuKey === 'accessories' && activeHref === '/categories/accessories';
-  const showUnderline = open || isActive || isAccessoriesActive;
+  const showUnderline = open || isActive;
   const triggerClassName = cn(
     'relative inline-flex pb-1 text-sm font-semibold tracking-wide transition-colors',
     transparent ? 'text-white/85 hover:text-white' : 'text-muted-foreground hover:text-foreground',
@@ -134,7 +185,10 @@ export function GenderMegaMenu({
     closeTimer.current = setTimeout(() => setOpen(false), CLOSE_DELAY_MS);
   };
 
-  useEffect(() => () => clearCloseTimer(), []);
+  useEffect(() => {
+    setMounted(true);
+    return () => clearCloseTimer();
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -145,172 +199,187 @@ export function GenderMegaMenu({
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [open]);
 
-  const triggerLink =
-    menuKey === 'accessories' ? (
-      <Link
-        to="/categories/$slug"
-        params={{ slug: 'accessories' }}
-        preload="intent"
-        aria-expanded={open}
-        aria-controls={panelId}
-        aria-haspopup="true"
-        aria-current={isAccessoriesActive ? 'page' : undefined}
-        className={triggerClassName}
-      >
-        {config.label}
-        <span
-          aria-hidden
-          className={cn(
-            'absolute inset-x-0 -bottom-0.5 h-[3px] origin-left bg-[#E8C547] transition-transform duration-200',
-            showUnderline ? 'scale-x-100' : 'scale-x-0',
-          )}
-        />
-      </Link>
-    ) : (
-      <Link
-        to={ROUTES.products}
-        search={{ gender: config.gender ?? menuKey }}
-        preload="intent"
-        aria-expanded={open}
-        aria-controls={panelId}
-        aria-haspopup="true"
-        aria-current={isActive ? 'page' : undefined}
-        className={triggerClassName}
-      >
-        {config.label}
-        <span
-          aria-hidden
-          className={cn(
-            'absolute inset-x-0 -bottom-0.5 h-[3px] origin-left bg-[#E8C547] transition-transform duration-200',
-            showUnderline ? 'scale-x-100' : 'scale-x-0',
-          )}
-        />
-      </Link>
-    );
+  const triggerLink = (
+    <Link
+      to={ROUTES.products}
+      search={{ gender: config.gender ?? (menuKey === 'men' ? 'men' : 'women') }}
+      preload="intent"
+      aria-expanded={open}
+      aria-controls={panelId}
+      aria-haspopup="true"
+      aria-current={isActive ? 'page' : undefined}
+      className={triggerClassName}
+    >
+      {config.label}
+      <span
+        aria-hidden
+        className={cn(
+          'absolute inset-x-0 -bottom-0.5 h-[3px] origin-left bg-[#E8C547] transition-transform duration-200',
+          showUnderline ? 'scale-x-100' : 'scale-x-0',
+        )}
+      />
+    </Link>
+  );
 
-  return (
-    <div className="relative" onMouseEnter={show} onMouseLeave={hide}>
-      {triggerLink}
-
+  const panel =
+    mounted &&
+    createPortal(
       <div
         id={panelId}
         role="region"
         aria-label={`${config.label} categories`}
         aria-hidden={!open}
+        onMouseEnter={show}
+        onMouseLeave={hide}
         className={cn(
-          'border-border/70 bg-background absolute left-1/2 top-full z-50 mt-3 w-[min(96vw,68rem)] -translate-x-1/2 overflow-hidden rounded-2xl border shadow-[var(--shadow-elevated)]',
+          // Viewport-centered shell — never clips against the Women trigger.
+          'fixed inset-x-0 top-16 z-[120] flex justify-center px-3 pt-1 lg:top-[4.75rem] lg:px-6',
           open
             ? 'pointer-events-auto visible opacity-100'
             : 'pointer-events-none invisible opacity-0',
           'transition-opacity duration-150',
         )}
       >
-        <div aria-hidden className="absolute inset-x-0 -top-3 h-3" />
-
-        {/* Category columns + Specials in a flex row so Specials is ALWAYS the rightmost column */}
-        <div className="divide-border/50 flex divide-x">
-          {/* Category link columns — equal width, flexible */}
-          <div className="flex min-w-0 flex-1">
-            {config.columns.map((column, idx) => (
+        <div className="border-border/60 bg-background w-full max-w-[72rem] overflow-hidden rounded-2xl border shadow-[0_28px_80px_-36px_rgba(0,0,0,0.45)]">
+          <div className="flex min-w-0">
+            <div className="group/cats premium-scroll min-w-0 flex-1 overflow-x-auto">
               <div
-                key={column.title}
                 className={cn(
-                  'flex-1 px-5 py-5',
-                  idx < config.columns.length - 1 && 'border-border/50 border-r',
+                  'grid min-w-0 gap-0',
+                  config.columns.length >= 4
+                    ? 'grid-cols-2 lg:grid-cols-4'
+                    : config.columns.length === 3
+                      ? 'grid-cols-2 sm:grid-cols-3'
+                      : 'grid-cols-2',
                 )}
               >
-                <p className="text-foreground mb-3 text-sm font-bold">{column.title}</p>
-                <ul className="space-y-2">
-                  {column.links.map((link) => (
-                    <li key={`${column.title}-${link.label}`}>
-                      <MegaMenuNavLink
-                        route={link.slug}
-                        menuKey={menuKey}
-                        className="text-muted-foreground hover:text-foreground text-[13px] transition-colors"
-                        onNavigate={() => setOpen(false)}
-                      >
-                        {link.label}
-                      </MegaMenuNavLink>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-
-          {/* SPECIALS — always pinned to the right */}
-          <div className="bg-muted/35 w-52 shrink-0 px-5 py-5">
-            <p className="text-foreground mb-4 text-sm font-bold uppercase tracking-[0.12em]">
-              Specials
-            </p>
-            <div className="grid grid-cols-2 gap-x-3 gap-y-4">
-              {config.specials.map((special) => (
-                <MegaMenuNavLink
-                  key={special.label}
-                  route={special.slug}
-                  menuKey={menuKey}
-                  className="group flex flex-col items-center gap-1.5 text-center"
-                  onNavigate={() => setOpen(false)}
-                >
-                  <span className="bg-muted relative size-14 overflow-hidden rounded-full ring-1 ring-black/5 transition-transform duration-300 group-hover:scale-105 sm:size-16">
-                    {special.imageUrl ? (
-                      <Image
-                        src={special.imageUrl}
-                        alt=""
-                        className="size-full object-cover object-[center_20%]"
-                        containerClassName="size-full rounded-none"
-                      />
-                    ) : null}
-                  </span>
-                  <span className="text-muted-foreground group-hover:text-foreground max-w-[5.5rem] text-[11px] font-medium leading-tight transition-colors">
-                    {special.label}
-                  </span>
-                </MegaMenuNavLink>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {config.featured?.length ? (
-          <div className="border-border/50 border-t px-4 py-4 sm:px-5">
-            <p className="text-foreground mb-3 text-sm font-bold uppercase tracking-[0.12em]">
-              Shop the edit
-            </p>
-            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
-              {config.featured.map((item) => (
-                <MegaMenuNavLink
-                  key={item.label}
-                  route={item.slug}
-                  menuKey={menuKey}
-                  className="group relative block aspect-[16/10] overflow-hidden rounded-xl ring-1 ring-black/5"
-                  onNavigate={() => setOpen(false)}
-                >
-                  {item.imageUrl ? (
-                    <Image
-                      src={item.imageUrl}
-                      alt={item.label}
+                {config.columns.map((column, idx) => {
+                  const split = shouldSplitLinks(column);
+                  let headingCount = 0;
+                  return (
+                    <div
+                      key={column.title}
                       className={cn(
-                        'size-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.04]',
-                        item.imageClassName,
+                        'min-w-0 px-4 py-5 sm:px-5',
+                        idx > 0 && 'border-border/40 border-l',
                       )}
-                      containerClassName="absolute inset-0 size-full rounded-none"
-                    />
-                  ) : (
-                    <span className="bg-muted absolute inset-0" />
-                  )}
-                  <span
-                    aria-hidden
-                    className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent"
-                  />
-                  <span className="absolute inset-x-0 bottom-0 px-2.5 pb-2.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-white sm:text-xs">
-                    {item.label}
-                  </span>
-                </MegaMenuNavLink>
-              ))}
+                    >
+                      <p className="text-foreground mb-3 text-[11px] font-bold uppercase tracking-[0.16em]">
+                        {column.title}
+                      </p>
+                      <ul
+                        className={cn(
+                          'space-y-1.5',
+                          split &&
+                            'columns-2 gap-x-6 space-y-0 [column-fill:_balance] [&_li]:mb-1.5 [&_li]:break-inside-avoid',
+                        )}
+                      >
+                        {column.links.map((link) => {
+                          const headingIndex = link.heading ? headingCount++ : undefined;
+                          return (
+                            <CategoryLinkItem
+                              key={`${column.title}-${link.label}-${link.heading ? 'h' : 'l'}`}
+                              link={link}
+                              columnTitle={column.title}
+                              menuKey={menuKey}
+                              headingIndex={headingIndex}
+                              onNavigate={() => setOpen(false)}
+                            />
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="border-border/40 bg-muted/30 w-[11.5rem] shrink-0 border-l px-4 py-5 sm:w-52 sm:px-5">
+              <p className="text-foreground mb-4 text-[11px] font-bold uppercase tracking-[0.16em]">
+                Specials
+              </p>
+              <div className="group/specials grid grid-cols-2 gap-x-3 gap-y-4">
+                {config.specials.map((special) => (
+                  <MegaMenuNavLink
+                    key={special.label}
+                    route={special.slug}
+                    menuKey={menuKey}
+                    className={cn(
+                      'group flex flex-col items-center gap-1.5 text-center transition-opacity duration-200',
+                      'hover:!opacity-100 group-hover/specials:opacity-40',
+                    )}
+                    onNavigate={() => setOpen(false)}
+                  >
+                    <span className="bg-muted relative size-14 overflow-hidden rounded-full ring-1 ring-black/5 transition-transform duration-300 group-hover:scale-105 sm:size-16">
+                      {special.imageUrl ? (
+                        <Image
+                          src={special.imageUrl}
+                          alt=""
+                          className="size-full object-cover object-[center_20%]"
+                          containerClassName="size-full rounded-none"
+                        />
+                      ) : null}
+                    </span>
+                    <span className="text-muted-foreground group-hover:text-foreground max-w-[5.5rem] text-[11px] font-medium leading-tight transition-colors">
+                      {special.label}
+                    </span>
+                  </MegaMenuNavLink>
+                ))}
+              </div>
             </div>
           </div>
-        ) : null}
-      </div>
+
+          {config.featured?.length ? (
+            <div className="border-border/50 border-t px-4 py-4 sm:px-5">
+              <p className="text-foreground mb-3 text-[11px] font-bold uppercase tracking-[0.16em]">
+                Shop the edit
+              </p>
+              <div className="group/edit grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
+                {config.featured.map((item) => (
+                  <MegaMenuNavLink
+                    key={item.label}
+                    route={item.slug}
+                    menuKey={menuKey}
+                    className={cn(
+                      'group relative block aspect-[16/10] overflow-hidden rounded-xl ring-1 ring-black/5 transition-[opacity,transform] duration-300',
+                      'hover:z-[1] hover:!opacity-100 group-hover/edit:opacity-45',
+                    )}
+                    onNavigate={() => setOpen(false)}
+                  >
+                    {item.imageUrl ? (
+                      <Image
+                        src={item.imageUrl}
+                        alt={item.label}
+                        className={cn(
+                          'size-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.04]',
+                          item.imageClassName,
+                        )}
+                        containerClassName="absolute inset-0 size-full rounded-none"
+                      />
+                    ) : (
+                      <span className="bg-muted absolute inset-0" />
+                    )}
+                    <span
+                      aria-hidden
+                      className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent"
+                    />
+                    <span className="absolute inset-x-0 bottom-0 px-2.5 pb-2.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-white sm:text-xs">
+                      {item.label}
+                    </span>
+                  </MegaMenuNavLink>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </div>,
+      document.body,
+    );
+
+  return (
+    <div className="relative" onMouseEnter={show} onMouseLeave={hide}>
+      {triggerLink}
+      {panel}
     </div>
   );
 }

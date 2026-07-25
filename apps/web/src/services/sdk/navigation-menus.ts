@@ -5,7 +5,7 @@ import type {
   MegaMenuGender,
   MegaMenuTile,
 } from '@/constants/mega-menu-defaults';
-import { DEFAULT_MEGA_MENUS } from '@/constants/mega-menu-defaults';
+import { DEFAULT_MEGA_MENUS, isLegacyWomenMegaMenuColumns } from '@/constants/mega-menu-defaults';
 
 /**
  * Mega-menu tiles saved from local Vite admin often persist `/src/assets/...`
@@ -44,7 +44,11 @@ function asColumns(raw: unknown): MegaMenuColumn[] {
     const links = Array.isArray(record.links)
       ? record.links.map((link) => {
           const row = link as Record<string, unknown>;
-          return { label: String(row.label ?? ''), slug: String(row.slug ?? '') };
+          return {
+            label: String(row.label ?? ''),
+            slug: String(row.slug ?? ''),
+            ...(row.heading ? { heading: true as const } : {}),
+          };
         })
       : [];
     return { title: String(record.title ?? ''), links };
@@ -97,11 +101,22 @@ export const navigationMenusApi = {
       const specials = asTiles(raw.specials);
       const featured = asTiles(raw.featured);
       const fallback = DEFAULT_MEGA_MENUS[key];
+      // Keep CMS Specials / Shop the edit, but replace the old Topwear columns
+      // with the owner catalog so a previously saved women menu does not hide it.
+      const resolvedColumns =
+        key === 'women' && isLegacyWomenMegaMenuColumns(columns)
+          ? fallback.columns.map((column) => ({
+              ...column,
+              links: column.links.map((link) => ({ ...link })),
+            }))
+          : columns.length
+            ? columns
+            : fallback.columns;
       return {
         key,
         label: String(raw.label ?? fallback.label),
         gender: key === 'women' || key === 'men' ? key : undefined,
-        columns: columns.length ? columns : fallback.columns,
+        columns: resolvedColumns,
         specials: mergeTilesWithFallback(specials, fallback.specials),
         featured: mergeTilesWithFallback(featured, fallback.featured),
       };

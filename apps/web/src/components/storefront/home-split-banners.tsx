@@ -14,7 +14,7 @@ const FALLBACK_SPLIT: LocalPromoBanner[] = [
     title: 'Bottoms',
     imageUrl: bottomsImage,
     mobileImageUrl: bottomsImageMobile,
-    linkUrl: '/categories/all-bottomwear',
+    linkUrl: '/categories/all-bottoms',
     ctaLabel: 'Shop Now',
     placement: 'home_split',
     priority: 20,
@@ -24,7 +24,7 @@ const FALLBACK_SPLIT: LocalPromoBanner[] = [
     title: 'Tops',
     imageUrl: topsImage,
     mobileImageUrl: topsImageMobile,
-    linkUrl: '/categories/all-topwear',
+    linkUrl: '/categories/all-tops',
     ctaLabel: 'Shop Now',
     placement: 'home_split',
     priority: 10,
@@ -67,8 +67,7 @@ export function HomeSplitBannersSection() {
           eyebrow={banner.subtitle}
           ctaLabel={banner.ctaLabel ?? 'Shop Now'}
           href={
-            banner.linkUrl ??
-            (index === 0 ? '/categories/all-bottomwear' : '/categories/all-topwear')
+            banner.linkUrl ?? (index === 0 ? '/categories/all-bottoms' : '/categories/all-tops')
           }
           imageSrc={banner.imageUrl ?? (index === 0 ? bottomsImage : topsImage)}
           mobileImageSrc={banner.mobileImageUrl}

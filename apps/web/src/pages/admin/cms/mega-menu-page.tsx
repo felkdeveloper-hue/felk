@@ -5,6 +5,7 @@ import { AdminPageHeader, AdminPanel, PageMotion } from '@/components/admin';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   DEFAULT_MEGA_MENUS,
+  isLegacyWomenMegaMenuColumns,
   type GenderMegaMenuConfig,
   type MegaMenuColumn,
   type MegaMenuGender,
@@ -37,17 +38,25 @@ function normalizeConfig(
   const fallback = DEFAULT_MEGA_MENUS[key];
   if (!raw) return structuredClone(fallback);
 
-  const columns = Array.isArray(raw.columns)
+  const parsedColumns = Array.isArray(raw.columns)
     ? (raw.columns as MegaMenuColumn[]).map((col) => ({
         title: String(col.title ?? ''),
         links: Array.isArray(col.links)
           ? col.links.map((link) => ({
               label: String(link.label ?? ''),
               slug: String(link.slug ?? ''),
+              ...(link.heading ? { heading: true as const } : {}),
             }))
           : [],
       }))
     : fallback.columns;
+
+  const columns =
+    key === 'women' && isLegacyWomenMegaMenuColumns(parsedColumns)
+      ? structuredClone(fallback.columns)
+      : parsedColumns.length
+        ? parsedColumns
+        : fallback.columns;
 
   const mapTiles = (tiles: unknown, fallbackTiles: MegaMenuTile[]): MegaMenuTile[] => {
     if (!Array.isArray(tiles)) return fallbackTiles;
@@ -110,8 +119,12 @@ function MegaMenuEditor({ menuKey }: { menuKey: MegaMenuGender }) {
           .map((col) => ({
             title: col.title.trim(),
             links: col.links
-              .map((link) => ({ label: link.label.trim(), slug: link.slug.trim() }))
-              .filter((link) => link.label && link.slug),
+              .map((link) => ({
+                label: link.label.trim(),
+                slug: link.slug.trim(),
+                ...(link.heading ? { heading: true as const } : {}),
+              }))
+              .filter((link) => link.label && (link.heading || link.slug)),
           }))
           .filter((col) => col.title),
         specials: config.specials
@@ -422,22 +435,18 @@ export function MegaMenuPage() {
     <PageMotion>
       <AdminPageHeader
         title="Mega menu"
-        description="Edit Women, Men, and Accessories navigation columns, Specials tiles, and Shop the edit banners — including images and category links."
+        description="Edit Women and Men navigation columns, Specials tiles, and Shop the edit banners — including images and category links."
       />
       <Tabs defaultValue="women" className="space-y-6">
         <TabsList>
           <TabsTrigger value="women">Women</TabsTrigger>
           <TabsTrigger value="men">Men</TabsTrigger>
-          <TabsTrigger value="accessories">Accessories</TabsTrigger>
         </TabsList>
         <TabsContent value="women">
           <MegaMenuEditor menuKey="women" />
         </TabsContent>
         <TabsContent value="men">
           <MegaMenuEditor menuKey="men" />
-        </TabsContent>
-        <TabsContent value="accessories">
-          <MegaMenuEditor menuKey="accessories" />
         </TabsContent>
       </Tabs>
     </PageMotion>

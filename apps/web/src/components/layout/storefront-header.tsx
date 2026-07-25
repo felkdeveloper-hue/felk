@@ -29,7 +29,6 @@ import { MegaMenuPlaceholder } from '@/components/navigation/mega-menu-placehold
 
 const DEFAULT_NAV: NavItem[] = [
   { label: 'Women', href: ROUTES.products, gender: 'women' },
-  { label: 'Accessories', href: '/categories/accessories' },
   { label: 'Browse', href: ROUTES.categories },
   { label: 'Contact', href: ROUTES.contact },
 ];
@@ -114,15 +113,6 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
             if (item.label === 'Women') {
               return (
                 <GenderMegaMenu menuKey="women" transparent={lightChrome} activeHref={pathname} />
-              );
-            }
-            if (item.label === 'Accessories') {
-              return (
-                <GenderMegaMenu
-                  menuKey="accessories"
-                  transparent={lightChrome}
-                  activeHref={pathname}
-                />
               );
             }
             if (item.label === 'Browse') {

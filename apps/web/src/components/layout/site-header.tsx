@@ -8,7 +8,6 @@ import { Container } from '@/components/layout/container';
 
 const DEFAULT_NAV_ITEMS: NavItem[] = [
   { label: 'Women', href: '/products?gender=women' },
-  { label: 'Accessories', href: '/categories/accessories' },
   { label: 'Browse', href: '/categories' },
   { label: 'Contact', href: '/contact' },
 ];
