@@ -34,6 +34,34 @@ export function singleImageUpload(fieldName = 'file') {
   return memoryUpload.single(fieldName);
 }
 
+/**
+ * Spreadsheet uploader for catalog imports. Browsers report inconsistent mime
+ * types for .xlsx/.csv, so the extension is the authority here.
+ */
+const SPREADSHEET_EXTENSIONS = /\.(xlsx|xlsm|csv)$/i;
+
+export const spreadsheetUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024, files: 1 },
+  fileFilter(_req, file, cb) {
+    if (!SPREADSHEET_EXTENSIONS.test(file.originalname ?? '')) {
+      cb(
+        ApiError.badRequest(
+          'Upload an Excel (.xlsx) or CSV (.csv) file',
+          undefined,
+          'INVALID_FILE_TYPE',
+        ),
+      );
+      return;
+    }
+    cb(null, true);
+  },
+});
+
+export function singleSpreadsheetUpload(fieldName = 'file') {
+  return spreadsheetUpload.single(fieldName);
+}
+
 export function multiImageUpload(fieldName = 'files', maxCount = 10) {
   return memoryUpload.array(fieldName, maxCount);
 }

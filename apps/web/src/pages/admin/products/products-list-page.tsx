@@ -5,6 +5,7 @@ import {
   AdminErrorState,
   AdminPageHeader,
   AdminStatCard,
+  BulkProductUploadDialog,
   DataTable,
   ListToolbar,
   PageMotion,
@@ -32,6 +33,7 @@ export function ProductsListPage() {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkUploadOpen, setBulkUploadOpen] = useState(false);
 
   const params = useMemo(
     () => ({
@@ -126,12 +128,35 @@ export function ProductsListPage() {
         title="Products"
         description="Manage catalog products, variants, media, and SEO."
         actions={
-          products.create ? (
-            <Link to={ADMIN_ROUTES.productNew} className="admin-btn admin-btn-primary admin-btn-lg">
-              Add product
-            </Link>
-          ) : null
+          <>
+            {products.import || products.create ? (
+              <button
+                type="button"
+                className="admin-btn admin-btn-secondary admin-btn-lg"
+                onClick={() => setBulkUploadOpen(true)}
+              >
+                Bulk upload products
+              </button>
+            ) : null}
+            {products.create ? (
+              <Link
+                to={ADMIN_ROUTES.productNew}
+                className="admin-btn admin-btn-primary admin-btn-lg"
+              >
+                Add product
+              </Link>
+            ) : null}
+          </>
         }
+      />
+
+      <BulkProductUploadDialog
+        open={bulkUploadOpen}
+        onOpenChange={setBulkUploadOpen}
+        onImported={() => {
+          void queryClient.invalidateQueries({ queryKey: ['products'] });
+          void queryClient.invalidateQueries({ queryKey: ['admin', 'products'] });
+        }}
       />
 
       <div className="mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

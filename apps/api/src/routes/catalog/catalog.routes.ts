@@ -5,6 +5,7 @@ import { authenticate, authorizeAny, validate } from '@/middlewares';
 import { actorFromRequest } from '@/services/cms-crud.service';
 import { productService } from '@/services/product.service';
 import { productVariantService } from '@/services/product-variant.service';
+import { productImportService } from '@/services/product-import.service';
 import { productMediaService } from '@/services/product-media.service';
 import { productRelationshipService } from '@/services/product-relationship.service';
 import {
@@ -13,8 +14,13 @@ import {
 } from '@/services/product-attribute.service';
 import { asyncHandler } from '@/utils/async-handler';
 import { ApiResponse } from '@/utils/response/api-response';
-import { multiImageUpload, singleImageUpload } from '@/utils/file-upload.helper';
+import {
+  multiImageUpload,
+  singleImageUpload,
+  singleSpreadsheetUpload,
+} from '@/utils/file-upload.helper';
 import { cmsListQuerySchema } from '@/schemas/cms.shared.schema';
+import { productImportSchema } from '@/schemas/product-import.schema';
 import * as S from '@/schemas/product.schema';
 import type { RelationshipType } from '@/constants/product';
 
@@ -26,7 +32,8 @@ const updatePerms = [P.PRODUCTS_UPDATE] as const;
 const deletePerms = [P.PRODUCTS_DELETE] as const;
 const publishPerms = [P.PRODUCTS_PUBLISH] as const;
 const exportPerms = [P.PRODUCTS_EXPORT, P.PRODUCTS_VIEW, P.PRODUCTS_READ] as const;
-const importPerms = [P.PRODUCTS_IMPORT] as const;
+// Bulk import is product creation in bulk, so either permission unlocks it.
+const importPerms = [P.PRODUCTS_IMPORT, P.PRODUCTS_CREATE] as const;
 const attrView = [P.ATTRIBUTES_VIEW, P.ATTRIBUTES_MANAGE] as const;
 const attrManage = [P.ATTRIBUTES_MANAGE] as const;
 
@@ -175,11 +182,47 @@ catalogRouter.get(
   }),
 );
 
+catalogRouter.get(
+  '/products/import/template',
+  authorizeAny(...importPerms),
+  asyncHandler(async (_req, res) => {
+    const workbook = await productImportService.buildTemplate();
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename="felk-product-import-template.xlsx"',
+    );
+    res.send(workbook);
+  }),
+);
+
+catalogRouter.post(
+  '/products/import/preview',
+  authorizeAny(...importPerms),
+  singleSpreadsheetUpload('file'),
+  asyncHandler(async (req, res) => {
+    if (!req.file) {
+      return ApiResponse.error(res, 'File is required', 400, 'FILE_REQUIRED');
+    }
+    ApiResponse.success(res, await productImportService.preview(req.file));
+  }),
+);
+
 catalogRouter.post(
   '/products/import',
   authorizeAny(...importPerms),
+  validate({ body: productImportSchema }),
   asyncHandler(async (req, res) => {
-    ApiResponse.success(res, await productService.importPlaceholder(actorFromRequest(req)));
+    ApiResponse.success(
+      res,
+      await productImportService.importProducts(req.body.products, actorFromRequest(req), {
+        publish: req.body.publish === true,
+      }),
+      'Import batch complete',
+    );
   }),
 );
 

@@ -25,6 +25,9 @@ export const PRODUCT_STATUS = {
 
 export type ProductStatus = (typeof PRODUCT_STATUS)[keyof typeof PRODUCT_STATUS];
 
+/** Products created per bulk-import request; the admin uploads in batches of this size. */
+export const PRODUCT_IMPORT_BATCH_LIMIT = 25;
+
 export const PRODUCT_VISIBILITY = {
   PUBLIC: 'public',
   HIDDEN: 'hidden',

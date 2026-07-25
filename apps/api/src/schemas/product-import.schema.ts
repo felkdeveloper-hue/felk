@@ -1,0 +1,35 @@
+import { z } from 'zod';
+import { PRODUCT_IMPORT_BATCH_LIMIT, PRODUCT_STATUS } from '@/constants/product';
+
+const importVariantSchema = z.object({
+  row: z.number().int().min(0).default(0),
+  color: z.string().trim().max(120).default(''),
+  size: z.string().trim().max(120).default(''),
+  price: z.number().positive(),
+  salePrice: z.number().min(0).nullable().default(null),
+  stock: z.number().int().min(0).nullable().default(null),
+  sku: z.string().trim().max(64).default(''),
+  images: z.array(z.string().url()).max(12).default([]),
+});
+
+const importProductSchema = z.object({
+  handle: z.string().trim().min(1).max(220),
+  name: z.string().trim().min(1).max(200),
+  slug: z.string().trim().min(1).max(220),
+  category: z.string().trim().min(1).max(160),
+  gender: z.string().trim().max(40).default(''),
+  brand: z.string().trim().max(160).default(''),
+  material: z.string().trim().max(160).default(''),
+  occasions: z.array(z.string().trim().min(1).max(160)).max(20).default([]),
+  tags: z.array(z.string().trim().min(1).max(60)).max(40).default([]),
+  shortDescription: z.string().trim().max(500).default(''),
+  description: z.string().trim().max(20_000).default(''),
+  status: z.enum([PRODUCT_STATUS.DRAFT, PRODUCT_STATUS.ACTIVE]).default(PRODUCT_STATUS.DRAFT),
+  rows: z.array(z.number().int().min(0)).default([]),
+  variants: z.array(importVariantSchema).min(1).max(200),
+});
+
+export const productImportSchema = z.object({
+  publish: z.boolean().optional(),
+  products: z.array(importProductSchema).min(1).max(PRODUCT_IMPORT_BATCH_LIMIT),
+});

@@ -8,6 +8,15 @@ export type {
   VariantInput,
 } from './products';
 
+export { productImportApi, PRODUCT_IMPORT_BATCH_SIZE } from './product-import';
+export type {
+  ImportIssue,
+  ImportPreview,
+  ImportProductInput,
+  ImportProductResult,
+  ImportVariantInput,
+} from './product-import';
+
 export { inventoryApi } from './inventory';
 export type {
   InventoryItemCreateInput,

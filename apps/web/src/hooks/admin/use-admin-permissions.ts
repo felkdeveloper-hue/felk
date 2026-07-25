@@ -20,6 +20,7 @@ export function useAdminPermissions() {
       update: hasPermission(PERMISSIONS.PRODUCTS_UPDATE),
       delete: hasPermission(PERMISSIONS.PRODUCTS_DELETE),
       publish: hasPermission(PERMISSIONS.PRODUCTS_PUBLISH),
+      import: hasPermission(PERMISSIONS.PRODUCTS_IMPORT),
     },
     orders: {
       view: hasAnyPermission([PERMISSIONS.ORDERS_VIEW, PERMISSIONS.ORDERS_READ]),
