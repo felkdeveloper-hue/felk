@@ -13,7 +13,12 @@ export const publicLayoutRoute = createRoute({
   getParentRoute: () => rootRoute,
   id: 'public-layout',
   component: PublicLayout,
-  beforeLoad: ({ context }) => prefetchStorefrontBootstrap(context.queryClient),
+  // Warm the shared bootstrap cache without awaiting it. Returning the promise
+  // here made every public route wait on the API, so a cold backend produced a
+  // blank screen for as long as the request took to resolve.
+  beforeLoad: ({ context }) => {
+    void prefetchStorefrontBootstrap(context.queryClient);
+  },
 });
 
 export const authLayoutRoute = createRoute({

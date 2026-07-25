@@ -16,12 +16,30 @@ import {
 } from '@/utils/cms';
 
 /**
+ * Shared in-flight request. `main.tsx` and the public layout both warm this
+ * cache, and on a cold backend the call can stay open for a while — without
+ * this guard they would each issue their own duplicate request.
+ */
+let inFlight: Promise<void> | null = null;
+
+/**
  * Fetches `/storefront/bootstrap` once and seeds individual React Query
  * caches so layout + homepage hooks resolve without N parallel round-trips.
+ *
+ * Callers should not await this on a render-blocking path: it is a cache warm,
+ * and every consuming hook can fetch its own data if it never resolves.
  */
-export async function prefetchStorefrontBootstrap(queryClient: QueryClient): Promise<void> {
-  if (queryClient.getQueryData(QUERY_KEYS.storefront.bootstrap())) return;
+export function prefetchStorefrontBootstrap(queryClient: QueryClient): Promise<void> {
+  if (queryClient.getQueryData(QUERY_KEYS.storefront.bootstrap())) return Promise.resolve();
+  if (inFlight) return inFlight;
 
+  inFlight = runPrefetch(queryClient).finally(() => {
+    inFlight = null;
+  });
+  return inFlight;
+}
+
+async function runPrefetch(queryClient: QueryClient): Promise<void> {
   try {
     const payload: StorefrontBootstrapPayload = await storefrontApi.getBootstrap();
     const now = Date.now();

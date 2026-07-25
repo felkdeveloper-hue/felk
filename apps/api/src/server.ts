@@ -15,6 +15,26 @@ async function bootstrap(): Promise<void> {
   const app = createApp();
   const server = http.createServer(app);
 
+  // Start accepting connections before touching MongoDB. Index repairs plus
+  // Atlas server selection can take tens of seconds on a cold instance, and
+  // listening afterwards meant health checks and every storefront request hung
+  // for that entire window instead of getting a fast response.
+  server.listen(appConfig.server.port, appConfig.server.host, () => {
+    logStorageBackend();
+    logger.info(
+      {
+        host: appConfig.server.host,
+        port: appConfig.server.port,
+        prefix: appConfig.server.apiPrefix,
+        docs: appConfig.server.docsPath,
+        env: appConfig.app.env,
+      },
+      'API listening',
+    );
+  });
+
+  registerGracefulShutdown(server);
+
   try {
     await connectDatabase();
 
@@ -52,22 +72,6 @@ async function bootstrap(): Promise<void> {
   } catch (error) {
     logger.warn({ err: error }, 'MongoDB unavailable — starting in degraded mode');
   }
-
-  server.listen(appConfig.server.port, appConfig.server.host, () => {
-    logStorageBackend();
-    logger.info(
-      {
-        host: appConfig.server.host,
-        port: appConfig.server.port,
-        prefix: appConfig.server.apiPrefix,
-        docs: appConfig.server.docsPath,
-        env: appConfig.app.env,
-      },
-      'API listening',
-    );
-  });
-
-  registerGracefulShutdown(server);
 }
 
 bootstrap().catch((error) => {

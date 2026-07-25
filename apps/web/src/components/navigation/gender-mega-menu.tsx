@@ -91,8 +91,9 @@ export function GenderMegaMenu({
   const menuQuery = useQuery({
     queryKey: ['storefront', 'navigation-menus', menuKey],
     queryFn: () => navigationMenusApi.getByKey(menuKey),
-    staleTime: 1000 * 30,
-    refetchOnMount: 'always',
+    // A hardcoded fallback renders instantly, so this never needs to refetch on
+    // every mount — that only added header requests during the first load.
+    staleTime: 1000 * 60 * 5,
   });
   const config = menuQuery.data ?? DEFAULT_MEGA_MENUS[menuKey];
   const panelId = useId();

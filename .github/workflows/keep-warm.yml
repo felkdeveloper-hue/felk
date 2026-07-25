@@ -1,0 +1,35 @@
+name: Keep API warm
+
+# Render free/starter instances sleep after ~15 minutes of inactivity, and the
+# cold start is what made the first storefront visit take minutes. Pinging the
+# cheap liveness endpoint on a schedule keeps the instance resident.
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: keep-warm
+  cancel-in-progress: true
+
+jobs:
+  ping:
+    name: Ping liveness endpoint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Ping /health/live
+        env:
+          # Override with a repository variable if the API host changes.
+          API_URL: ${{ vars.API_URL || 'https://felk-mq41.onrender.com/api/v1' }}
+        run: |
+          # Retry so a ping that lands mid-wake still succeeds.
+          curl --fail --silent --show-error \
+            --location "$API_URL/health/live" \
+            --max-time 90 \
+            --retry 5 \
+            --retry-delay 15 \
+            --retry-connrefused \
+            --output /dev/null
+          echo "API is awake."
