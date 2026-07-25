@@ -31,6 +31,7 @@ import {
   mediaApi,
   productsApi,
   type AdminVariant,
+  type InventoryItemRow,
   type ProductSpecification,
 } from '@/services/sdk/admin';
 
@@ -187,6 +188,7 @@ function ColorVariantCard({
   isOwnListing,
   sizes,
   stockByVariant,
+  stockReady,
   canCreate,
   canUpdate,
   canDelete,
@@ -211,6 +213,7 @@ function ColorVariantCard({
   isOwnListing: boolean;
   sizes: Array<{ id: string; name: string }>;
   stockByVariant: Map<string, number>;
+  stockReady: boolean;
   canCreate: boolean;
   canUpdate: boolean;
   canDelete: boolean;
@@ -430,13 +433,15 @@ function ColorVariantCard({
                     </td>
                     <td className="py-2 pr-2 text-center">
                       <input
-                        key={`${variant.id}:stock:${stock}`}
+                        key={`${variant.id}:stock:${stockReady ? stock : 'pending'}`}
                         type="number"
                         min={0}
-                        defaultValue={stock}
-                        disabled={!canUpdate}
-                        className="w-16 rounded-none border border-[var(--admin-line)] bg-white px-2 py-1 text-center text-xs outline-none focus:border-[var(--admin-accent)]"
+                        defaultValue={stockReady ? stock : ''}
+                        placeholder={stockReady ? undefined : '—'}
+                        disabled={!canUpdate || !stockReady}
+                        className="w-16 rounded-none border border-[var(--admin-line)] bg-white px-2 py-1 text-center text-xs outline-none focus:border-[var(--admin-accent)] disabled:bg-[var(--admin-panel)]"
                         onBlur={(e) => {
+                          if (!stockReady) return;
                           const qty = Number(e.target.value);
                           if (Number.isFinite(qty) && qty !== stock) onSetStock(variant.id, qty);
                         }}
@@ -510,9 +515,10 @@ function VariantsSection({
     queryKey: [...QUERY_KEYS.products.detail(productId), 'variants'],
     queryFn: () => productsApi.listVariants(productId),
   });
+  const stockQueryKey = QUERY_KEYS.inventory.items({ productId, scope: 'product-editor' });
   const stockQuery = useQuery({
-    queryKey: QUERY_KEYS.inventory.items({ productId, limit: 200 }),
-    queryFn: () => inventoryApi.listItems({ productId, limit: 200 }),
+    queryKey: stockQueryKey,
+    queryFn: () => inventoryApi.listAllItems({ productId }),
   });
   const mediaQuery = useQuery({
     queryKey: [...QUERY_KEYS.products.detail(productId), 'media'],
@@ -528,7 +534,7 @@ function VariantsSection({
   });
 
   const variants = variantsQuery.data ?? [];
-  const stockRows = stockQuery.data?.data ?? [];
+  const stockRows = stockQuery.data ?? [];
   const media = mediaQuery.data ?? [];
   const sizes = sizesQuery.data?.data ?? [];
   const colors = colorsQuery.data?.data ?? [];
@@ -599,9 +605,7 @@ function VariantsSection({
       queryClient.invalidateQueries({
         queryKey: [...QUERY_KEYS.products.detail(productId), 'media'],
       }),
-      queryClient.invalidateQueries({
-        queryKey: QUERY_KEYS.inventory.items({ productId, limit: 200 }),
-      }),
+      queryClient.invalidateQueries({ queryKey: stockQueryKey }),
     ]);
   };
 
@@ -697,58 +701,42 @@ function VariantsSection({
     mutationFn: ({ variantId, quantity }: { variantId: string; quantity: number }) =>
       inventoryApi.setStock({ variantId, quantity }),
     onMutate: async ({ variantId, quantity }) => {
-      await queryClient.cancelQueries({
-        queryKey: QUERY_KEYS.inventory.items({ productId, limit: 200 }),
+      await queryClient.cancelQueries({ queryKey: stockQueryKey });
+      const previous = queryClient.getQueryData<InventoryItemRow[]>(stockQueryKey);
+      queryClient.setQueryData(stockQueryKey, (old: InventoryItemRow[] | undefined) => {
+        const rows = old ?? [];
+        const found = rows.some(
+          (row) => extractStockVariantId(row as unknown as Record<string, unknown>) === variantId,
+        );
+        if (found) {
+          return rows.map((row) =>
+            extractStockVariantId(row as unknown as Record<string, unknown>) === variantId
+              ? { ...row, quantityOnHand: quantity, quantityAvailable: quantity }
+              : row,
+          );
+        }
+        return [
+          ...rows,
+          {
+            id: `tmp-${variantId}`,
+            productId,
+            variantId,
+            warehouseId: '',
+            quantityOnHand: quantity,
+            quantityReserved: 0,
+            quantityAvailable: quantity,
+          },
+        ];
       });
-      const previous = queryClient.getQueryData<{
-        data: Array<{ variantId?: string; quantityOnHand: number }>;
-      }>(QUERY_KEYS.inventory.items({ productId, limit: 200 }));
-      queryClient.setQueryData(
-        QUERY_KEYS.inventory.items({ productId, limit: 200 }),
-        (old: { data?: Array<Record<string, unknown>> } | undefined) => {
-          if (!old?.data) {
-            return {
-              data: [
-                { variantId, quantityOnHand: quantity, productId, warehouseId: '', id: variantId },
-              ],
-            };
-          }
-          const found = old.data.some((row) => extractStockVariantId(row) === variantId);
-          return {
-            ...old,
-            data: found
-              ? old.data.map((row) =>
-                  extractStockVariantId(row) === variantId
-                    ? { ...row, quantityOnHand: quantity, onHand: quantity }
-                    : row,
-                )
-              : [
-                  ...old.data,
-                  {
-                    variantId,
-                    quantityOnHand: quantity,
-                    onHand: quantity,
-                    productId,
-                    id: `tmp-${variantId}`,
-                  },
-                ],
-          };
-        },
-      );
       return { previous };
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: QUERY_KEYS.inventory.items({ productId, limit: 200 }),
-      });
+      await queryClient.invalidateQueries({ queryKey: stockQueryKey });
       toast.success('Stock updated');
     },
     onError: (err, _vars, context) => {
       if (context?.previous) {
-        queryClient.setQueryData(
-          QUERY_KEYS.inventory.items({ productId, limit: 200 }),
-          context.previous,
-        );
+        queryClient.setQueryData(stockQueryKey, context.previous);
       }
       toast.error(
         err instanceof AppError
@@ -830,6 +818,21 @@ function VariantsSection({
 
   return (
     <div className="space-y-4">
+      {stockQuery.isError ? (
+        <div className="flex items-center justify-between gap-3 border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-700">
+          <span>
+            Stock could not be loaded, so quantities are hidden to avoid overwriting them.
+          </span>
+          <button
+            type="button"
+            className="shrink-0 border border-red-400 px-2 py-1 font-bold uppercase tracking-wide"
+            onClick={() => stockQuery.refetch()}
+          >
+            Retry
+          </button>
+        </div>
+      ) : null}
+
       {/* Existing variant groups */}
       {[...colorGroups.entries()].map(([colorKey, colorVariants]) => {
         const colorLabel =
@@ -852,6 +855,7 @@ function VariantsSection({
             isOwnListing={isOwnListing}
             sizes={sizes}
             stockByVariant={stockByVariant}
+            stockReady={stockQuery.isSuccess}
             canCreate={canCreate}
             canUpdate={canUpdate}
             canDelete={canDelete}

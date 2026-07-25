@@ -74,15 +74,19 @@ export interface SetStockInput {
   quantity: number;
 }
 
+export type InventoryListFilters = ListQueryParams & {
+  warehouseId?: string;
+  productId?: string;
+  variantId?: string;
+  lowStockOnly?: boolean;
+};
+
+/** `/inventory/items` rejects any `limit` above 100 with a 400. */
+const ITEMS_MAX_PAGE_SIZE = 100;
+const ITEMS_MAX_PAGES = 20;
+
 export const inventoryApi = {
-  async listItems(
-    params?: ListQueryParams & {
-      warehouseId?: string;
-      productId?: string;
-      variantId?: string;
-      lowStockOnly?: boolean;
-    },
-  ): Promise<PaginatedResult<InventoryItemRow>> {
+  async listItems(params?: InventoryListFilters): Promise<PaginatedResult<InventoryItemRow>> {
     const result = await http.getPaginated<unknown>('/inventory/items', {
       params: {
         ...params,
@@ -90,6 +94,25 @@ export const inventoryApi = {
       },
     });
     return { ...result, data: normalizeList(result.data, normalizeInventoryItem) };
+  },
+
+  /**
+   * Every matching row, walking pages so a product with many colour/size
+   * variants still reports complete stock.
+   */
+  async listAllItems(params?: InventoryListFilters): Promise<InventoryItemRow[]> {
+    const rows: InventoryItemRow[] = [];
+    for (let page = 1; page <= ITEMS_MAX_PAGES; page += 1) {
+      const result = await inventoryApi.listItems({
+        ...params,
+        page,
+        limit: ITEMS_MAX_PAGE_SIZE,
+      });
+      rows.push(...result.data);
+      const totalPages = Number(result.meta?.totalPages ?? 1);
+      if (!result.data.length || page >= totalPages) break;
+    }
+    return rows;
   },
 
   async listWarehouses(): Promise<WarehouseRow[]> {
