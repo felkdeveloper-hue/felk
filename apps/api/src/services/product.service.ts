@@ -14,7 +14,12 @@ import { ApiError } from '@/utils/errors/api-error';
 import { slugify } from '@/utils/slug.helper';
 import { sanitizeRichText } from '@/utils/sanitize-html';
 import { assertSalePriceValid, buildProductJsonLd, computePricing } from '@/utils/pricing.helper';
-import { PRODUCT_AUDIT, PRODUCT_STATUS } from '@/constants/product';
+import {
+  OFFICIAL_BRAND_NAME,
+  OFFICIAL_BRAND_SLUG,
+  PRODUCT_AUDIT,
+  PRODUCT_STATUS,
+} from '@/constants/product';
 import { allocateUniqueParentSku, isSkuTaken } from '@/services/sku-allocation.service';
 
 function toPlain(doc: { toObject?: () => Record<string, unknown> } | Record<string, unknown>) {
@@ -544,13 +549,22 @@ export class ProductService {
       });
     }
 
+    let brandId = payload.brandId ?? null;
+    if (!brandId) {
+      const official = await BrandModel.findOne({
+        isDeleted: false,
+        $or: [{ slug: OFFICIAL_BRAND_SLUG }, { name: OFFICIAL_BRAND_NAME }],
+      }).select('_id');
+      brandId = official?._id ?? null;
+    }
+
     const doc = await ProductModel.create({
       name,
       slug,
       sku,
       shortDescription: payload.shortDescription ?? null,
       description: sanitizeRichText(payload.description as string | undefined) ?? null,
-      brandId: payload.brandId ?? null,
+      brandId,
       categoryId: payload.categoryId ?? null,
       categoryIds: Array.isArray(payload.categoryIds)
         ? payload.categoryIds

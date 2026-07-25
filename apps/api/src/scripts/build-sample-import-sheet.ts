@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url';
 import ExcelJS from 'exceljs';
 import { connectDatabase, disconnectDatabase } from '@/config';
 import { CategoryModel } from '@/models/master-data.models';
+import { OFFICIAL_BRAND_NAME } from '@/constants/product';
 import { IMPORT_COLUMNS } from '@/services/product-import.service';
 
 const OUT =
@@ -91,9 +92,11 @@ async function main() {
       occasions: 'Party, Casual',
       tags: 'sample, bulk-test',
       status: 'active',
+      brand: OFFICIAL_BRAND_NAME,
       shortDescription: 'Soft floral midi dress — bulk upload sample',
       description:
         'Created by the sample bulk upload sheet so you can verify images, variants and stock.',
+      specifications: 'Fit: Regular | Length: Midi | Fabric care: Hand Wash | Closure: Zip',
       seoTitle: `Sample Floral Midi Dress (${stamp}) | FE`,
       seoDescription: 'Floral midi dress available in Hot Pink and Black, sizes S and M.',
       paymentOption: 'both',
@@ -145,8 +148,11 @@ async function main() {
       occasions: 'Casual',
       tags: 'sample, bulk-test',
       status: 'active',
+      brand: OFFICIAL_BRAND_NAME,
       shortDescription: 'Everyday ruffle crop top — bulk upload sample',
       description: 'Second sample product with two colours and two sizes.',
+      specifications:
+        'Fit: Slim Fit | Neckline: Round Neck | Sleeve length: Short Sleeves | Fabric care: Machine Wash',
       seoTitle: `Sample Ruffle Crop Top (${stamp}) | FE`,
       seoDescription: 'Ruffle crop top in Olive and Hot Pink.',
       paymentOption: 'cod',
@@ -197,8 +203,11 @@ async function main() {
       occasions: 'Casual',
       tags: 'sample, bulk-test',
       status: 'active',
+      brand: OFFICIAL_BRAND_NAME,
       shortDescription: 'Classic high-rise denim — bulk upload sample',
       description: 'Third sample product so you can see jeans with multiple sizes.',
+      specifications:
+        'Fit: Slim Fit | Rise: High Rise | Closure: Button | Fabric care: Machine Wash',
       seoTitle: `Sample High-Rise Denim (${stamp}) | FE`,
       seoDescription: 'High-rise jeans in Blue and Black.',
       paymentOption: 'prepaid',

@@ -24,6 +24,16 @@ const importProductSchema = z.object({
   tags: z.array(z.string().trim().min(1).max(60)).max(40).default([]),
   shortDescription: z.string().trim().max(500).default(''),
   description: z.string().trim().max(20_000).default(''),
+  specifications: z
+    .array(
+      z.object({
+        name: z.string().trim().min(1).max(80),
+        value: z.string().trim().min(1).max(300),
+        sortOrder: z.number().int().min(0).default(0),
+      }),
+    )
+    .max(40)
+    .default([]),
   seoTitle: z.string().trim().max(200).default(''),
   seoDescription: z.string().trim().max(500).default(''),
   paymentOption: z.enum(['cod', 'prepaid', 'both']).default('both'),

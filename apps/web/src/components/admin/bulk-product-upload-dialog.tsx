@@ -165,9 +165,9 @@ export function BulkProductUploadDialog({
         <DialogHeader>
           <DialogTitle>Bulk upload products</DialogTitle>
           <DialogDescription>
-            Download the template first — it includes variants (colour/size), prices, stock, image
-            links, description, SEO, returns, warranty and COD/prepaid. One Excel row = one colour +
-            size; repeat the product name to group variants into one product.
+            Download the template first — it includes variants, prices, stock, images, description,
+            product specifications (Fit, Fabric care…), SEO, returns, warranty, COD/prepaid, and
+            brand (defaults to FE.LK OFFICIAL). One Excel row = one colour + size.
           </DialogDescription>
         </DialogHeader>
 

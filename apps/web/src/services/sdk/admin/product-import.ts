@@ -32,6 +32,7 @@ export interface ImportProductInput {
   tags: string[];
   shortDescription: string;
   description: string;
+  specifications: Array<{ name: string; value: string; sortOrder: number }>;
   seoTitle: string;
   seoDescription: string;
   paymentOption: 'cod' | 'prepaid' | 'both';

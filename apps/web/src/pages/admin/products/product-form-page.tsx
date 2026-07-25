@@ -21,6 +21,7 @@ import { toast } from 'sonner';
 import { z } from 'zod';
 import { PageMotion, CategoryTreePicker, type CategoryPickerNode } from '@/components/admin';
 import { ADMIN_ROUTES, QUERY_KEYS } from '@/constants';
+import { findOfficialBrandId, OFFICIAL_BRAND_NAME } from '@/constants/store-brand';
 import { useAdminPermissions } from '@/hooks/admin';
 import { AppError } from '@/lib/errors';
 import { isProductLive } from '@/lib/product-status';
@@ -1080,6 +1081,10 @@ export function ProductFormPage({ productId }: { productId?: string }) {
     queryKey: ['cms', 'brands', 'product-form'],
     queryFn: () => cmsApi.brands.list({ limit: 100, status: 'active' }),
   });
+  const officialBrandId = useMemo(
+    () => findOfficialBrandId(brandsQuery.data?.data ?? []),
+    [brandsQuery.data?.data],
+  );
   const occasionsQuery = useQuery({
     queryKey: ['cms', 'occasions', 'product-form'],
     queryFn: () => cmsApi.occasions.list({ limit: 100, status: 'active' }),
@@ -1114,7 +1119,7 @@ export function ProductFormPage({ productId }: { productId?: string }) {
       visibility: 'public',
       shortDescription: '',
       description: '',
-      brandId: '',
+      brandId: officialBrandId || '',
       materialId: '',
       gender: 'women',
       tags: '',
@@ -1150,7 +1155,7 @@ export function ProductFormPage({ productId }: { productId?: string }) {
       visibility: product.visibility ?? 'public',
       shortDescription: product.shortDescription ?? '',
       description: product.description ?? '',
-      brandId: product.brandId ?? '',
+      brandId: product.brandId || officialBrandId || '',
       materialId: product.materialId ?? '',
       gender: 'women',
       tags: product.tags?.join(', ') ?? '',
@@ -1179,7 +1184,17 @@ export function ProductFormPage({ productId }: { productId?: string }) {
       setCategoryIds([product.categoryId]);
     }
     if (product.occasionIds?.length) setOccasionIds(product.occasionIds);
-  }, [product, reset]);
+  }, [product, reset, officialBrandId]);
+
+  const brandIdVal = watch('brandId');
+
+  // Always default new (and brand-less) products to the house brand.
+  useEffect(() => {
+    if (!officialBrandId) return;
+    if (!brandIdVal) {
+      setValue('brandId', officialBrandId, { shouldDirty: false });
+    }
+  }, [officialBrandId, brandIdVal, setValue]);
 
   // Auto-slug from name
   const nameVal = watch('name');
@@ -1769,13 +1784,17 @@ export function ProductFormPage({ productId }: { productId?: string }) {
             <SidebarCard title="Product details" defaultOpen={false}>
               <Field label="Brand">
                 <select {...register('brandId')} className={fieldCls}>
-                  <option value="">— No brand —</option>
+                  {!officialBrandId ? <option value="">— No brand —</option> : null}
                   {brands.map((b) => (
                     <option key={b.id} value={b.id}>
                       {b.name}
+                      {b.id === officialBrandId ? ' (default)' : ''}
                     </option>
                   ))}
                 </select>
+                <p className="mt-1 text-[11px] text-[var(--admin-ink-muted)]">
+                  Default brand is {OFFICIAL_BRAND_NAME}.
+                </p>
               </Field>
               <Field label="Fabric / Material">
                 <select {...register('materialId')} className={fieldCls}>

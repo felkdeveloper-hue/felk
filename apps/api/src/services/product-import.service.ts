@@ -7,7 +7,12 @@
  * admin can preview exactly what will happen before anything is created.
  */
 import ExcelJS from 'exceljs';
-import { PRODUCT_IMPORT_BATCH_LIMIT, PRODUCT_STATUS } from '@/constants/product';
+import {
+  OFFICIAL_BRAND_NAME,
+  OFFICIAL_BRAND_SLUG,
+  PRODUCT_IMPORT_BATCH_LIMIT,
+  PRODUCT_STATUS,
+} from '@/constants/product';
 import {
   BrandModel,
   CategoryModel,
@@ -40,6 +45,7 @@ export type ImportColumnKey =
   | 'tags'
   | 'shortDescription'
   | 'description'
+  | 'specifications'
   | 'seoTitle'
   | 'seoDescription'
   | 'paymentOption'
@@ -151,8 +157,8 @@ export const IMPORT_COLUMNS: ColumnDef[] = [
     label: 'Brand',
     aliases: ['brandname'],
     required: false,
-    help: 'Created automatically if it does not exist.',
-    example: '',
+    help: `Defaults to ${OFFICIAL_BRAND_NAME} for every product. Leave blank unless you need a different brand.`,
+    example: OFFICIAL_BRAND_NAME,
   },
   {
     key: 'material',
@@ -193,6 +199,14 @@ export const IMPORT_COLUMNS: ColumnDef[] = [
     required: false,
     help: 'Full product description (PDP body).',
     example: '',
+  },
+  {
+    key: 'specifications',
+    label: 'Specifications',
+    aliases: ['specs', 'productspecs', 'attributes', 'detailspecs'],
+    required: false,
+    help: 'Detail-table rows as Name: Value pairs, separated by | . Example: Fit: Slim Fit | Fabric care: Machine Wash | Neckline: Round Neck',
+    example: 'Fit: Regular | Fabric care: Machine Wash | Neckline: Round Neck',
   },
   {
     key: 'seoTitle',
@@ -325,6 +339,7 @@ export interface ImportProductInput {
   tags: string[];
   shortDescription: string;
   description: string;
+  specifications: Array<{ name: string; value: string; sortOrder: number }>;
   seoTitle: string;
   seoDescription: string;
   paymentOption: 'cod' | 'prepaid' | 'both';
@@ -489,6 +504,51 @@ function isDuplicateKeyError(error: unknown): boolean {
     record.code === 11000 ||
     (typeof record.message === 'string' && record.message.includes('E11000'))
   );
+}
+
+/** Parses `Fit: Slim | Fabric care: Machine Wash` into specification rows. */
+function parseSpecifications(
+  value: string,
+): Array<{ name: string; value: string; sortOrder: number }> {
+  if (!value.trim()) return [];
+  const parts = value
+    .split('|')
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const rows: Array<{ name: string; value: string; sortOrder: number }> = [];
+  for (const [index, part] of parts.entries()) {
+    const colon = part.indexOf(':');
+    if (colon === -1) continue;
+    const name = part.slice(0, colon).trim();
+    const specValue = part.slice(colon + 1).trim();
+    if (!name || !specValue) continue;
+    rows.push({ name, value: specValue, sortOrder: index });
+  }
+  return rows;
+}
+
+async function ensureOfficialBrandId(): Promise<string> {
+  const existing = await BrandModel.findOne({
+    isDeleted: false,
+    $or: [
+      { slug: OFFICIAL_BRAND_SLUG },
+      { name: new RegExp(`^${OFFICIAL_BRAND_NAME.replace(/\./g, '\\.')}$`, 'i') },
+    ],
+  });
+  if (existing) {
+    if (existing.name !== OFFICIAL_BRAND_NAME || existing.slug !== OFFICIAL_BRAND_SLUG) {
+      existing.set({ name: OFFICIAL_BRAND_NAME, slug: OFFICIAL_BRAND_SLUG, status: 'active' });
+      await existing.save();
+    }
+    return String(existing._id);
+  }
+  const created = await BrandModel.create({
+    name: OFFICIAL_BRAND_NAME,
+    slug: OFFICIAL_BRAND_SLUG,
+    status: 'active',
+    sortOrder: 0,
+  });
+  return String(created._id);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -732,12 +792,13 @@ function buildProducts(rows: RawRow[]): { products: ImportProductInput[]; issues
         slug,
         category,
         gender,
-        brand: values.brand ?? '',
+        brand: values.brand?.trim() || OFFICIAL_BRAND_NAME,
         material: values.material ?? '',
         occasions: splitList(values.occasions ?? ''),
         tags: splitList(values.tags ?? ''),
         shortDescription: values.shortDescription ?? '',
         description: values.description ?? '',
+        specifications: parseSpecifications(values.specifications ?? ''),
         seoTitle: values.seoTitle ?? '',
         seoDescription: values.seoDescription ?? '',
         paymentOption,
@@ -999,12 +1060,15 @@ export class ProductImportService {
           slug = `${product.slug}-${Date.now().toString(36)}`;
         }
 
-        const [brandId, materialId] = await Promise.all([
-          product.brand ? lookups.brands.ensure(product.brand) : Promise.resolve(undefined),
-          product.material
-            ? lookups.materials.ensure(product.material)
-            : Promise.resolve(undefined),
-        ]);
+        const brandName = product.brand?.trim() || OFFICIAL_BRAND_NAME;
+        const brandId =
+          normalizeKey(brandName) === normalizeKey(OFFICIAL_BRAND_NAME) ||
+          normalizeKey(brandName) === normalizeKey(OFFICIAL_BRAND_SLUG)
+            ? await ensureOfficialBrandId()
+            : await lookups.brands.ensure(brandName);
+        const materialId = product.material
+          ? await lookups.materials.ensure(product.material)
+          : undefined;
         const occasionIds: string[] = [];
         for (const occasion of product.occasions) {
           occasionIds.push(await lookups.occasions.ensure(occasion));
@@ -1032,6 +1096,7 @@ export class ProductImportService {
             returnsCriteria: product.returnsCriteria || null,
             warrantyAvailable: product.warrantyAvailable,
             warrantyDetails: product.warrantyDetails || null,
+            specifications: product.specifications,
             seo: {
               title: product.seoTitle || product.name,
               description: product.seoDescription || product.shortDescription || undefined,
@@ -1192,12 +1257,14 @@ export class ProductImportService {
       stock: 10,
       images: sampleImage,
       gender: 'women',
+      brand: OFFICIAL_BRAND_NAME,
       material: 'Cotton',
       occasions: 'Casual, Party',
       tags: 'sample',
       shortDescription: 'Example product from the bulk upload template',
       description:
         'Replace these example rows with your real catalogue. Same product name = same product with multiple variants.',
+      specifications: 'Fit: Regular | Fabric care: Machine Wash | Neckline: Round Neck',
       seoTitle: `${exampleName} | FE`,
       seoDescription: 'Soft ruffle crop top available in multiple colours and sizes.',
       paymentOption: 'both',
