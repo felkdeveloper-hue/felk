@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { Eye, Star } from 'lucide-react';
-import { motion } from 'framer-motion';
-import type { Product, ProductMoney } from '@/services/sdk';
+import type { Product } from '@/services/sdk';
 import { Image } from '@/components/media/image';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -26,14 +25,6 @@ function readAverageRating(product: Product): number | undefined {
   const value = typeof raw === 'number' ? raw : Number(raw);
   if (!Number.isFinite(value) || value <= 0) return undefined;
   return Math.round(value * 10) / 10;
-}
-
-function resolveDealPrice(product: Product): ProductMoney | undefined {
-  const display = product.salePrice ?? product.effectivePrice ?? product.price;
-  const deal = product.effectivePrice;
-  if (!display || !deal) return undefined;
-  if (deal.amount > 0 && deal.amount < display.amount) return deal;
-  return undefined;
 }
 
 export function ProductCard({
@@ -93,18 +84,20 @@ export function ProductCard({
 
   return (
     <>
-      <motion.article
-        layout
-        className={cn('group relative', isList && 'flex gap-4', className)}
-        whileHover={{ y: isList ? 0 : -4 }}
-        transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+      <article
+        className={cn(
+          'group relative transition-transform duration-300 ease-out',
+          !isList && 'hover:-translate-y-1',
+          isList && 'flex gap-4',
+          className,
+        )}
         onMouseEnter={() => setWantHover(true)}
         onFocusCapture={() => setWantHover(true)}
       >
         <div
           className={cn(
             'bg-muted relative overflow-hidden',
-            isList ? 'w-36 shrink-0 rounded-xl sm:w-48' : 'w-full',
+            isList ? 'w-40 shrink-0 rounded-xl sm:w-48' : 'w-full',
           )}
         >
           <Link
@@ -122,10 +115,10 @@ export function ProductCard({
               key={primaryImage}
               src={primaryImage}
               alt={product.media?.[0]?.alt ?? product.name}
-              aspectRatio="3/4"
               sizes={sizes}
               loading={priority ? 'eager' : 'lazy'}
               fetchPriority={priority ? 'high' : 'auto'}
+              containerClassName={isList ? 'aspect-[3/4]' : 'aspect-[4/5] sm:aspect-[3/4]'}
               className={cn(
                 'transition-all duration-700 ease-out group-hover:scale-[1.06]',
                 hoverImage && hoverReady ? 'group-hover:opacity-0' : undefined,
@@ -136,7 +129,6 @@ export function ProductCard({
               <Image
                 src={hoverImage}
                 alt=""
-                aspectRatio="3/4"
                 sizes={sizes}
                 loading="lazy"
                 containerClassName={cn(
@@ -196,7 +188,7 @@ export function ProductCard({
               <AddToCartButton
                 product={product}
                 label="Add to cart"
-                className="h-11 w-full rounded-none border-0 bg-zinc-950 text-[11px] font-semibold uppercase tracking-[0.18em] text-white shadow-none hover:bg-zinc-900 hover:text-white"
+                className="h-12 w-full rounded-none border-0 bg-zinc-950 text-xs font-semibold uppercase tracking-[0.16em] text-white shadow-none hover:bg-zinc-900 hover:text-white sm:h-11 sm:text-[11px] sm:tracking-[0.18em]"
               />
             </div>
           ) : (
@@ -210,9 +202,9 @@ export function ProductCard({
           )}
         </div>
 
-        <div className={cn('pt-2', isList && 'flex flex-1 flex-col justify-center py-1')}>
+        <div className={cn('pt-2.5 sm:pt-2', isList && 'flex flex-1 flex-col justify-center py-1')}>
           <div className="flex items-start justify-between gap-1">
-            <h3 className="text-foreground line-clamp-1 text-sm font-medium leading-snug">
+            <h3 className="text-foreground line-clamp-2 text-[15px] font-medium leading-snug sm:line-clamp-1 sm:text-sm">
               <Link
                 to="/products/$slug"
                 params={{ slug: product.slug }}
@@ -240,7 +232,7 @@ export function ProductCard({
             discountPercent={product.discountPercent}
           />
         </div>
-      </motion.article>
+      </article>
 
       <QuickViewModal product={product} open={quickOpen} onOpenChange={setQuickOpen} />
     </>

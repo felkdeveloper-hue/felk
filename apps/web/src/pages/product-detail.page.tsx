@@ -107,7 +107,10 @@ export function ProductDetailPage() {
   const query = useProductDetail(slug);
   const product = query.data;
   const { recentlyViewedIds } = useRecentlyViewed(product);
-  const { sizes, materials, colors, occasions } = useCatalogFilterFacets();
+  const { sizes, materials, colors, occasions } = useCatalogFilterFacets({
+    includeBrands: false,
+    includeCollections: false,
+  });
   const categoriesQuery = useCategoriesList();
 
   const [selectedVariantId, setSelectedVariantId] = useState<string | undefined>();

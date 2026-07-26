@@ -238,6 +238,10 @@ productSchema.index({ isDeleted: 1, status: 1, createdAt: -1 });
 productSchema.index({ gender: 1, isDeleted: 1, status: 1, createdAt: -1 });
 // Home-page rails filter on a boolean flag + status and sort by newest.
 productSchema.index({ isFeatured: 1, isDeleted: 1, status: 1, createdAt: -1 });
+productSchema.index({ isBestSeller: 1, isDeleted: 1, status: 1, updatedAt: -1 });
+productSchema.index({ isTrending: 1, isDeleted: 1, status: 1, updatedAt: -1 });
+productSchema.index({ isMoreToLove: 1, isDeleted: 1, status: 1, updatedAt: -1 });
+productSchema.index({ isNewArrival: 1, isDeleted: 1, status: 1, createdAt: -1 });
 productSchema.index({
   name: 'text',
   shortDescription: 'text',

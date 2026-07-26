@@ -1,4 +1,5 @@
 import { http } from '@/lib/http-client';
+import { AppError } from '@/lib/errors';
 import { mapList } from '@/utils/cms';
 import {
   normalizeProduct,
@@ -129,6 +130,8 @@ export interface ProductListParams {
   q?: string;
   status?: string;
   visibility?: string;
+  /** Comma-separated or array of Mongo product ids. */
+  ids?: string | string[];
   brandId?: string;
   categoryId?: string;
   categoryIds?: string[];
@@ -167,10 +170,21 @@ export const productsApi = {
   },
 
   async getBySlug(slug: string): Promise<Product | null> {
-    const result = await this.list({ q: slug, limit: 50, status: 'active' });
-    const match = result.data.find((product) => product.slug === slug);
-    if (!match) return null;
-    return this.getById(match.id);
+    try {
+      const doc = await http.get<unknown>(
+        `/storefront/products/by-slug/${encodeURIComponent(slug)}`,
+      );
+      return normalizeProduct(doc);
+    } catch (error) {
+      if (AppError.isAppError(error) && (error.isUnauthorized || error.isForbidden)) {
+        throw error;
+      }
+      // Fallback when the by-slug route is not deployed yet, or product missing.
+      const result = await this.list({ q: slug, limit: 50, status: 'active' });
+      const match = result.data.find((product) => product.slug === slug);
+      if (!match) return null;
+      return this.getById(match.id);
+    }
   },
 
   /** Accepts a storefront slug or MongoDB product id (legacy cart links). */
@@ -183,6 +197,19 @@ export const productsApi = {
       }
     }
     return this.getBySlug(slugOrId);
+  },
+
+  /** Lightweight list fetch for a set of product ids (recently viewed, etc.). */
+  async listByIds(ids: string[]): Promise<Product[]> {
+    const unique = [...new Set(ids.filter(Boolean))];
+    if (!unique.length) return [];
+    const result = await this.list({
+      ids: unique.join(','),
+      limit: Math.min(unique.length, 24),
+      status: 'active',
+    });
+    const byId = new Map(result.data.map((product) => [product.id, product]));
+    return unique.map((id) => byId.get(id)).filter((p): p is Product => Boolean(p));
   },
 
   async listVariants(productId: string): Promise<ProductVariant[]> {

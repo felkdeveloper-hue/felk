@@ -183,6 +183,48 @@ storefrontRouter.get(
 );
 
 storefrontRouter.get(
+  '/products/by-slug/:slug',
+  asyncHandler(async (req, res) => {
+    const slug = String(req.params.slug ?? '').trim();
+    if (!slug) throw ApiError.notFound('Product not found');
+
+    const cacheKey = `storefront:product:slug:${slug}`;
+    const skipCache = process.env.NODE_ENV !== 'production';
+
+    if (!skipCache) {
+      const cached = getCached<Record<string, unknown>>(cacheKey);
+      if (cached) {
+        setPublicCache(res, 120);
+        return ApiResponse.success(res, cached);
+      }
+    }
+
+    const product = await productService.getBySlug(slug);
+    const record = product as unknown as Record<string, unknown>;
+    const status = String(record.status ?? '');
+    const visibility = String(record.visibility ?? '');
+    const hiddenStatuses = new Set<string>([
+      PRODUCT_STATUS.DRAFT,
+      PRODUCT_STATUS.ARCHIVED,
+      PRODUCT_STATUS.DISCONTINUED,
+      PRODUCT_STATUS.HIDDEN,
+      PRODUCT_STATUS.SCHEDULED,
+    ]);
+    if (hiddenStatuses.has(status) || visibility === PRODUCT_VISIBILITY.HIDDEN) {
+      throw ApiError.notFound('Product not found');
+    }
+
+    if (!skipCache) {
+      setCache(cacheKey, record, 60_000);
+      const id = String(record.id ?? record._id ?? '');
+      if (id) setCache(`storefront:product:${id}`, record, 60_000);
+    }
+    setPublicCache(res, 120);
+    ApiResponse.success(res, product);
+  }),
+);
+
+storefrontRouter.get(
   '/products/:productId/variants',
   asyncHandler(async (req, res) => {
     const rows = await ProductVariantModel.find({

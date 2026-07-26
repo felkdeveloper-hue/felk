@@ -114,7 +114,7 @@ export function HorizontalCarousel({
     <div className={cn('group/carousel relative', className)} aria-label={label}>
       <div
         ref={scrollerRef}
-        className="hide-scrollbar flex snap-x snap-mandatory scroll-pl-4 gap-3 overflow-x-auto scroll-smooth pb-2 sm:scroll-pl-5 sm:gap-4 lg:scroll-pl-6"
+        className="hide-scrollbar flex snap-x snap-mandatory scroll-pl-4 gap-3.5 overflow-x-auto scroll-smooth pb-2 sm:scroll-pl-5 sm:gap-4 lg:scroll-pl-6"
       >
         {/* Edge spacers — more reliable than padding on overflow flex rows */}
         <div className="w-4 shrink-0 sm:w-5 lg:w-6" aria-hidden />
@@ -124,7 +124,7 @@ export function HorizontalCarousel({
             data-carousel-item
             className={cn(
               'shrink-0 snap-start',
-              itemClassName ?? 'w-[82%] sm:w-[48%] md:w-[40%] lg:w-[31%] xl:w-[24%]',
+              itemClassName ?? 'w-[88%] sm:w-[52%] md:w-[40%] lg:w-[31%] xl:w-[24%]',
             )}
           >
             {child}

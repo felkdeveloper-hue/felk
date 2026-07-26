@@ -8,7 +8,7 @@ export interface ProductSkeletonProps {
 export function ProductSkeleton({ className }: ProductSkeletonProps) {
   return (
     <div className={cn('space-y-2.5', className)}>
-      <Skeleton className="aspect-[3/4] w-full rounded-t-2xl" />
+      <Skeleton className="aspect-[4/5] w-full rounded-t-2xl sm:aspect-[3/4]" />
       <div className="flex items-center justify-between gap-2">
         <Skeleton className="h-4 w-2/3" />
         <Skeleton className="size-7 shrink-0 rounded-full" />

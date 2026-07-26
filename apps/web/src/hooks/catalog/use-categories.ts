@@ -30,16 +30,24 @@ export function useCategoryBySlug(slug: string) {
   });
 }
 
-export function useCatalogFilterFacets() {
+export function useCatalogFilterFacets(options?: {
+  includeBrands?: boolean;
+  includeCollections?: boolean;
+}) {
+  const includeBrands = options?.includeBrands ?? true;
+  const includeCollections = options?.includeCollections ?? true;
+
   const brands = useQuery({
     queryKey: QUERY_KEYS.cms.brands({ active: true }),
     queryFn: () => cmsApi.listBrands({ status: 'active', limit: 100 }),
     staleTime: 1000 * 60 * 10,
+    enabled: includeBrands,
   });
   const collections = useQuery({
     queryKey: QUERY_KEYS.cms.collections({ active: true }),
     queryFn: () => cmsApi.listCollections({ status: 'active', limit: 100 }),
     staleTime: 1000 * 60 * 10,
+    enabled: includeCollections,
   });
   const categories = useCategoriesList();
   const colors = useQuery({

@@ -70,7 +70,7 @@ export function PriceDisplay({
     );
   }
 
-  const priceSize = size === 'md' ? 'text-base' : 'text-sm';
+  const priceSize = size === 'md' ? 'text-base sm:text-lg' : 'text-[15px] sm:text-sm';
 
   return (
     <div className={cn('flex flex-wrap items-baseline gap-x-2 gap-y-0.5', className)}>

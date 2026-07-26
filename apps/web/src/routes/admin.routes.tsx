@@ -1,22 +1,53 @@
+import { lazy } from 'react';
 import { createRoute, redirect } from '@tanstack/react-router';
 import { ADMIN_ROUTES, PERMISSIONS } from '@/constants';
 import { AdminLayout } from '@/layouts';
 import { AdminStaffRoute, AdminPermissionRoute } from '@/guards';
 import { PlaceholderModulePage } from '@/components/admin';
-import { DashboardPage } from '@/pages/admin/dashboard/dashboard-page';
-import { OrdersListPage } from '@/pages/admin/orders/orders-list-page';
-import { OrderDetailPage } from '@/pages/admin/orders/order-detail-page';
-import { ProductsListPage } from '@/pages/admin/products/products-list-page';
-import { ProductFormPage } from '@/pages/admin/products/product-form-page';
-import { UsersListPage } from '@/pages/admin/users/users-list-page';
-import { CollectionsPage } from '@/pages/admin/catalog/catalog-pages';
-import { CategoryFormPage } from '@/pages/admin/catalog/category-form-page';
-import { FiltersPage } from '@/pages/admin/catalog/filters-page';
-import { BannersPage } from '@/pages/admin/cms/banners-page';
-import { MegaMenuPage } from '@/pages/admin/cms/mega-menu-page';
-import { InventoryPage } from '@/pages/admin/inventory/inventory-page';
-import { ForbiddenPage } from '@/pages/admin/auth/forbidden-page';
 import { rootRoute } from './root-route';
+
+/** Keep admin pages out of the storefront JS bundle. */
+const DashboardPage = lazy(() =>
+  import('@/pages/admin/dashboard/dashboard-page').then((m) => ({ default: m.DashboardPage })),
+);
+const OrdersListPage = lazy(() =>
+  import('@/pages/admin/orders/orders-list-page').then((m) => ({ default: m.OrdersListPage })),
+);
+const OrderDetailPage = lazy(() =>
+  import('@/pages/admin/orders/order-detail-page').then((m) => ({ default: m.OrderDetailPage })),
+);
+const ProductsListPage = lazy(() =>
+  import('@/pages/admin/products/products-list-page').then((m) => ({
+    default: m.ProductsListPage,
+  })),
+);
+const ProductFormPage = lazy(() =>
+  import('@/pages/admin/products/product-form-page').then((m) => ({ default: m.ProductFormPage })),
+);
+const UsersListPage = lazy(() =>
+  import('@/pages/admin/users/users-list-page').then((m) => ({ default: m.UsersListPage })),
+);
+const CollectionsPage = lazy(() =>
+  import('@/pages/admin/catalog/catalog-pages').then((m) => ({ default: m.CollectionsPage })),
+);
+const CategoryFormPage = lazy(() =>
+  import('@/pages/admin/catalog/category-form-page').then((m) => ({ default: m.CategoryFormPage })),
+);
+const FiltersPage = lazy(() =>
+  import('@/pages/admin/catalog/filters-page').then((m) => ({ default: m.FiltersPage })),
+);
+const BannersPage = lazy(() =>
+  import('@/pages/admin/cms/banners-page').then((m) => ({ default: m.BannersPage })),
+);
+const MegaMenuPage = lazy(() =>
+  import('@/pages/admin/cms/mega-menu-page').then((m) => ({ default: m.MegaMenuPage })),
+);
+const InventoryPage = lazy(() =>
+  import('@/pages/admin/inventory/inventory-page').then((m) => ({ default: m.InventoryPage })),
+);
+const ForbiddenPage = lazy(() =>
+  import('@/pages/admin/auth/forbidden-page').then((m) => ({ default: m.ForbiddenPage })),
+);
 
 export const adminLayoutRoute = createRoute({
   getParentRoute: () => rootRoute,

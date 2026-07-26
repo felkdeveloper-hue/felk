@@ -1,5 +1,4 @@
 import { useEffect, type ReactNode } from 'react';
-import { LoadingLayout } from '@/layouts';
 import { authApi } from '@/services/sdk';
 import { useAuthStore } from '@/store';
 import { normalizeAuthUser } from '@/utils/auth';
@@ -9,9 +8,8 @@ interface AuthProviderProps {
 }
 
 /**
- * Waits for the persisted auth session to rehydrate from storage before
- * rendering the app (avoids a flash of "logged out" UI), then silently
- * re-validates the session against `/auth/me` in the background.
+ * Rehydrates the persisted auth session in the background so the storefront
+ * can paint immediately (avoids a blank loading shell on every visit).
  */
 export function AuthProvider({ children }: AuthProviderProps) {
   const hasHydrated = useAuthStore((state) => state.hasHydrated);
@@ -19,14 +17,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const setUser = useAuthStore((state) => state.setUser);
   const clearSession = useAuthStore((state) => state.clearSession);
 
-  // Failsafe: never leave visitors on a blank loading shell if persist stalls.
+  // Failsafe: never leave auth stuck unhydrated if persist stalls.
   useEffect(() => {
     if (hasHydrated) return;
     const timer = window.setTimeout(() => {
       if (!useAuthStore.getState().hasHydrated) {
         useAuthStore.getState().setHasHydrated(true);
       }
-    }, 1200);
+    }, 400);
     return () => window.clearTimeout(timer);
   }, [hasHydrated]);
 
@@ -40,10 +38,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // Only re-validate when the token identity changes, not on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasHydrated, accessToken]);
-
-  if (!hasHydrated) {
-    return <LoadingLayout />;
-  }
 
   return <>{children}</>;
 }

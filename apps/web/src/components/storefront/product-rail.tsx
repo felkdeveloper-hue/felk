@@ -11,7 +11,6 @@ import { Button } from '@/components/ui/button';
 import { ProductGridSkeleton } from '@/components/feedback/skeletons';
 import { ROUTES } from '@/constants';
 import { HorizontalCarousel } from './horizontal-carousel';
-import { MotionReveal } from './motion-reveal';
 import { ProductCard } from './product-card';
 
 const railCopy: Record<ProductRailKind, { eyebrow: string; title: string; description: string }> = {
@@ -108,26 +107,24 @@ export function ProductRailSection({
         }
       >
         {!inView || query.isLoading || (query.isFetching && !hasProducts) ? (
-          <div className="px-3 sm:px-4 lg:px-6">
+          <div className="px-4 sm:px-4 lg:px-6">
             <ProductGridSkeleton count={4} />
           </div>
         ) : hasProducts ? (
-          <MotionReveal>
-            <HorizontalCarousel
-              label={title ?? copy.title}
-              itemClassName="w-[82%] sm:w-[48%] md:w-[40%] lg:w-[31%] xl:w-[24%]"
-              scrollByItem
-            >
-              {query.data!.data.map((product, index) => (
-                <ProductCard
-                  key={`${product.id}-${product.defaultVariantId ?? 'default'}`}
-                  product={product}
-                  priority={eager && index < 2}
-                  sizes="(max-width: 640px) 82vw, (max-width: 768px) 48vw, (max-width: 1024px) 40vw, (max-width: 1280px) 31vw, 24vw"
-                />
-              ))}
-            </HorizontalCarousel>
-          </MotionReveal>
+          <HorizontalCarousel
+            label={title ?? copy.title}
+            itemClassName="w-[88%] sm:w-[52%] md:w-[40%] lg:w-[31%] xl:w-[24%]"
+            scrollByItem
+          >
+            {query.data!.data.map((product, index) => (
+              <ProductCard
+                key={`${product.id}-${product.defaultVariantId ?? 'default'}`}
+                product={product}
+                priority={eager && index < 2}
+                sizes="(max-width: 640px) 88vw, (max-width: 768px) 52vw, (max-width: 1024px) 40vw, (max-width: 1280px) 31vw, 24vw"
+              />
+            ))}
+          </HorizontalCarousel>
         ) : null}
       </Section>
     </div>

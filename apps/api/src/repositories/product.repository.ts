@@ -6,6 +6,7 @@ import { buildPaginationMeta, getPaginationSkip, parsePagination } from '@/utils
 import { parseSort } from '@/utils/sorting';
 
 export interface ProductListFilters extends ListOptions {
+  ids?: string | string[];
   sku?: string;
   barcode?: string;
   brandId?: string;
@@ -78,6 +79,21 @@ export class ProductRepository extends BaseRepository {
 
     if (!options.includeDeleted) {
       filter.isDeleted = false;
+    }
+    if (options.ids?.length) {
+      const rawIds = Array.isArray(options.ids)
+        ? options.ids
+        : String(options.ids)
+            .split(',')
+            .map((id) => id.trim())
+            .filter(Boolean);
+      const objectIds = rawIds
+        .map((id) => toObjectId(id))
+        .filter((id): id is Types.ObjectId => Boolean(id));
+      if (!objectIds.length) {
+        return { data: [], meta: buildPaginationMeta(0, page, limit) };
+      }
+      filter._id = { $in: objectIds };
     }
     if (options.status) {
       filter.status = options.status;

@@ -8,13 +8,12 @@ import { Section } from '@/components/common/section';
 import { Button } from '@/components/ui/button';
 import { ProductGridSkeleton } from '@/components/feedback/skeletons';
 import { productsApi, type Product } from '@/services/sdk';
-import { MotionItem, MotionReveal } from './motion-reveal';
 import { ProductCard } from './product-card';
 
 const GRID_COUNT = 12; // 4 columns × 3 rows
 
 const gridLayoutClass =
-  'w-full grid grid-cols-2 gap-3 px-3 sm:grid-cols-2 sm:gap-4 sm:px-4 md:grid-cols-3 md:gap-5 lg:grid-cols-4 lg:gap-6 lg:px-5 xl:px-6';
+  'w-full grid grid-cols-2 gap-4 px-4 sm:grid-cols-2 sm:gap-4 sm:px-4 md:grid-cols-3 md:gap-5 lg:grid-cols-4 lg:gap-6 lg:px-5 xl:px-6';
 
 function shuffleProducts(products: Product[]): Product[] {
   const next = [...products];
@@ -42,8 +41,8 @@ export function ProductGridSection({
         limit: GRID_COUNT,
       }),
     staleTime: 1000 * 60 * 3,
-    retry: 3,
-    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8_000),
+    retry: 1,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 4_000),
     enabled: inView,
   });
 
@@ -73,17 +72,16 @@ export function ProductGridSection({
         {!inView || query.isLoading || (query.isFetching && !products.length) ? (
           <ProductGridSkeleton count={GRID_COUNT} className={gridLayoutClass} />
         ) : (
-          <MotionReveal stagger className={gridLayoutClass}>
+          <div className={gridLayoutClass}>
             {products.map((product, index) => (
-              <MotionItem key={`${product.id}-${product.defaultVariantId ?? 'default'}`}>
-                <ProductCard
-                  product={product}
-                  priority={index < 4}
-                  sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                />
-              </MotionItem>
+              <ProductCard
+                key={`${product.id}-${product.defaultVariantId ?? 'default'}`}
+                product={product}
+                priority={index < 4}
+                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+              />
             ))}
-          </MotionReveal>
+          </div>
         )}
       </Section>
     </div>

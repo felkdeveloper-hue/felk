@@ -220,10 +220,17 @@ export class ProductService {
       const key = variant.productId.toString();
       variantsByProduct.set(key, [...(variantsByProduct.get(key) ?? []), variant]);
     }
+    // Cards only need primary + hover per color/variant group.
     const mediaByProduct = new Map<string, typeof media>();
+    const mediaGroupCounts = new Map<string, number>();
     for (const item of media) {
-      const key = item.productId.toString();
-      mediaByProduct.set(key, [...(mediaByProduct.get(key) ?? []), item]);
+      const productKey = item.productId.toString();
+      const variantKey = item.variantId ? item.variantId.toString() : '__product__';
+      const groupKey = `${productKey}:${variantKey}`;
+      const count = mediaGroupCounts.get(groupKey) ?? 0;
+      if (count >= 2) continue;
+      mediaGroupCounts.set(groupKey, count + 1);
+      mediaByProduct.set(productKey, [...(mediaByProduct.get(productKey) ?? []), item]);
     }
     const brandById = new Map(brands.map((brand) => [brand._id.toString(), brand.name]));
 
@@ -410,15 +417,36 @@ export class ProductService {
   async getById(id: string, includeDeleted = false) {
     const doc = await productRepository.findById(id, includeDeleted);
     if (!doc) throw ApiError.notFound('Product not found');
+    return this.hydrateProductDetail(doc as never, id);
+  }
 
-    // Reuse the already-loaded product doc so ensureDefaultVariant doesn't re-query it.
-    const defaultVariant = await this.ensureDefaultVariant(id, {}, doc as never);
+  async getBySlug(slug: string, includeDeleted = false) {
+    const doc = await productRepository.findBySlug(slug, includeDeleted);
+    if (!doc) throw ApiError.notFound('Product not found');
+    return this.hydrateProductDetail(doc as never, String((doc as { _id: unknown })._id));
+  }
 
+  /**
+   * Shared PDP enrichment: one parallel batch for variants/media/relationships.
+   * Only creates a default variant when the product has none (avoids an extra find on every hit).
+   */
+  private async hydrateProductDetail(
+    doc: {
+      defaultVariantId?: unknown;
+      pricing?: {
+        price?: number;
+        salePrice?: number | null;
+        compareAtPrice?: number | null;
+        currency?: string;
+      } | null;
+      name?: string;
+      brandId?: unknown;
+    },
+    id: string,
+  ) {
     const plain = toPlain(doc) as Record<string, unknown>;
     const brandId = plain.brandId ? String(plain.brandId) : undefined;
 
-    // Fetch variants/media/relationships/brand in one parallel batch; lean() skips
-    // Mongoose document hydration since these are read-only for the response.
     const [variants, media, relationships, brand] = await Promise.all([
       ProductVariantModel.find({ productId: id, isDeleted: false })
         .sort({ displayOrder: 1 })
@@ -430,16 +458,33 @@ export class ProductService {
       brandId ? BrandModel.findById(brandId).select('name').lean() : Promise.resolve(null),
     ]);
 
-    // ensureDefaultVariant may have created/linked a default variant after `doc` was read.
-    if (defaultVariant && !plain.defaultVariantId) {
-      plain.defaultVariantId = (defaultVariant as { _id?: unknown })._id;
+    let resolvedVariants = variants;
+    if (!variants.length) {
+      const created = await this.ensureDefaultVariant(id, {}, doc);
+      if (created) {
+        const lean =
+          typeof (created as { toObject?: () => unknown }).toObject === 'function'
+            ? (created as { toObject: () => unknown }).toObject()
+            : created;
+        resolvedVariants = [lean as (typeof variants)[number]];
+        if (!plain.defaultVariantId) {
+          plain.defaultVariantId = (created as { _id?: unknown })._id;
+        }
+      }
+    } else if (!plain.defaultVariantId) {
+      plain.defaultVariantId = variants[0]?._id;
+      void ProductModel.updateOne(
+        { _id: id },
+        { $set: { defaultVariantId: variants[0]?._id } },
+      ).exec();
     }
+
     const brandName = brand?.name ? String(brand.name) : undefined;
 
     return {
       ...withComputedPricing(plain),
       brandName,
-      variants,
+      variants: resolvedVariants,
       media,
       relationships,
     };

@@ -30,10 +30,14 @@ export function RelatedProducts({ productId, title = 'You May Also Like' }: Rela
           <HorizontalCarousel
             label={title}
             alwaysShowControls
-            itemClassName="w-[55%] sm:w-[35%] lg:w-[22%]"
+            itemClassName="w-[68%] sm:w-[38%] lg:w-[22%]"
           >
             {products.map((product) => (
-              <ProductCard key={product.id} product={product} />
+              <ProductCard
+                key={product.id}
+                product={product}
+                sizes="(max-width: 640px) 68vw, (max-width: 1024px) 38vw, 22vw"
+              />
             ))}
           </HorizontalCarousel>
         )}

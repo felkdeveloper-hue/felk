@@ -1,7 +1,17 @@
+import { Suspense, useEffect } from 'react';
 import { Outlet } from '@tanstack/react-router';
-import { useEffect } from 'react';
 import { AdminBreadcrumbs, AdminSidebar, AdminTopbar } from '@/components/admin';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useAdminUiStore } from '@/store';
+
+function AdminPageFallback() {
+  return (
+    <div className="space-y-4 py-2" aria-busy="true">
+      <Skeleton className="h-8 w-48" />
+      <Skeleton className="h-64 w-full" />
+    </div>
+  );
+}
 
 export function AdminLayout() {
   const theme = useAdminUiStore((state) => state.theme);
@@ -26,7 +36,9 @@ export function AdminLayout() {
         <AdminTopbar />
         <main id="admin-main" className="flex-1 overflow-y-auto px-5 py-5 lg:px-8 lg:py-6">
           <AdminBreadcrumbs />
-          <Outlet />
+          <Suspense fallback={<AdminPageFallback />}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
     </div>

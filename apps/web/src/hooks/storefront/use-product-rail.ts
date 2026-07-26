@@ -135,8 +135,8 @@ export function useProductRail(
       }
     },
     staleTime: PRODUCT_STALE,
-    retry: 3,
-    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8_000),
+    retry: 1,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 4_000),
     enabled: options?.enabled ?? true,
   });
 

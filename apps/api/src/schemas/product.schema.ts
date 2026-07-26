@@ -124,6 +124,14 @@ export const productListQuerySchema = paginationQuerySchema.extend({
   visibility: z.string().optional(),
   sku: z.string().trim().optional(),
   barcode: z.string().trim().optional(),
+  ids: z
+    .union([z.string(), z.array(z.string())])
+    .optional()
+    .transform((v) => {
+      if (!v) return undefined;
+      const list = Array.isArray(v) ? v : v.split(',');
+      return list.map((id) => id.trim()).filter(Boolean);
+    }),
   brandId: objectIdSchema.optional(),
   categoryId: objectIdSchema.optional(),
   subcategoryId: objectIdSchema.optional(),

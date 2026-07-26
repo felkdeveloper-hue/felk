@@ -7,8 +7,8 @@ function shouldRetry(failureCount: number, error: unknown): boolean {
     return false;
   }
   if (appError?.isValidationError) return false;
-  // Transient outages / overload — give storefront rails a few chances.
-  return failureCount < 3;
+  // Transient outages / overload — one retry is enough for storefront UX.
+  return failureCount < 1;
 }
 
 function retryDelay(attemptIndex: number): number {
