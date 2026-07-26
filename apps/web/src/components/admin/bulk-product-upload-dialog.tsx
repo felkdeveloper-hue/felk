@@ -1,5 +1,13 @@
 import { useMutation } from '@tanstack/react-query';
-import { AlertTriangle, CheckCircle2, Download, FileSpreadsheet, Upload } from 'lucide-react';
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Download,
+  FileSpreadsheet,
+  FileText,
+  Upload,
+  X,
+} from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
@@ -23,7 +31,6 @@ import {
 interface BulkProductUploadDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Called after products were created so the list can refresh. */
   onImported: () => void;
 }
 
@@ -33,7 +40,15 @@ function errorMessage(error: unknown, fallback: string) {
   return AppError.isAppError(error) ? error.message : fallback;
 }
 
-function Stat({ label, value, tone }: { label: string; value: number; tone?: 'warn' | 'good' }) {
+function Stat({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone?: 'warn' | 'good' | 'neutral';
+}) {
   return (
     <div
       className={cn(
@@ -48,6 +63,31 @@ function Stat({ label, value, tone }: { label: string; value: number; tone?: 'wa
   );
 }
 
+/** Editable row in the preview table. */
+function EditableCell({
+  value,
+  onChange,
+  type = 'text',
+  className,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  type?: 'text' | 'number';
+  className?: string;
+}) {
+  return (
+    <input
+      type={type}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className={cn(
+        'w-full rounded border border-transparent bg-transparent px-1 py-0.5 text-xs focus:border-[var(--admin-accent)] focus:bg-white focus:outline-none',
+        className,
+      )}
+    />
+  );
+}
+
 export function BulkProductUploadDialog({
   open,
   onOpenChange,
@@ -57,6 +97,8 @@ export function BulkProductUploadDialog({
   const [stage, setStage] = useState<Stage>('select');
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<ImportPreview | null>(null);
+  // Editable local copy of products
+  const [editedProducts, setEditedProducts] = useState<ImportProductInput[]>([]);
   const [publish, setPublish] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [results, setResults] = useState<ImportProductResult[]>([]);
@@ -68,18 +110,19 @@ export function BulkProductUploadDialog({
     const importable: ImportProductInput[] = [];
     const blocked: ImportProductInput[] = [];
     const duplicates: ImportProductInput[] = [];
-    for (const product of preview.products) {
+    for (const product of editedProducts) {
       if (missingCategories.has(product.category)) blocked.push(product);
       else if (duplicateSlugs.has(product.slug)) duplicates.push(product);
       else importable.push(product);
     }
     return { importable, blocked, duplicates };
-  }, [preview]);
+  }, [preview, editedProducts]);
 
   const reset = () => {
     setStage('select');
     setFile(null);
     setPreview(null);
+    setEditedProducts([]);
     setPublish(false);
     setProgress({ done: 0, total: 0 });
     setResults([]);
@@ -93,13 +136,19 @@ export function BulkProductUploadDialog({
 
   const templateMutation = useMutation({
     mutationFn: () => productImportApi.downloadTemplate(),
-    onError: (error) => toast.error(errorMessage(error, 'Could not download the template.')),
+    onError: (error) => toast.error(errorMessage(error, 'Could not download the Excel template.')),
+  });
+
+  const csvTemplateMutation = useMutation({
+    mutationFn: () => productImportApi.downloadTemplateCsv(),
+    onError: (error) => toast.error(errorMessage(error, 'Could not download the CSV template.')),
   });
 
   const previewMutation = useMutation({
     mutationFn: (selected: File) => productImportApi.preview(selected),
     onSuccess: (data) => {
       setPreview(data);
+      setEditedProducts(data.products);
       setStage('preview');
     },
     onError: (error) => {
@@ -112,6 +161,52 @@ export function BulkProductUploadDialog({
     if (!selected) return;
     setFile(selected);
     previewMutation.mutate(selected);
+  };
+
+  /** Update a field in the editable preview. */
+  const updateProduct = (index: number, field: keyof ImportProductInput, value: string) => {
+    setEditedProducts((prev) => {
+      const next = [...prev];
+      const product = { ...next[index]! };
+      if (
+        field === 'status' ||
+        field === 'visibility' ||
+        field === 'category' ||
+        field === 'name'
+      ) {
+        (product as Record<string, unknown>)[field] = value;
+      }
+      next[index] = product;
+      return next;
+    });
+  };
+
+  const updateVariantPrice = (productIndex: number, variantIndex: number, value: string) => {
+    setEditedProducts((prev) => {
+      const next = [...prev];
+      const product = { ...next[productIndex]! };
+      const variants = [...product.variants];
+      const variant = { ...variants[variantIndex]! };
+      variant.price = parseFloat(value) || variant.price;
+      variants[variantIndex] = variant;
+      product.variants = variants;
+      next[productIndex] = product;
+      return next;
+    });
+  };
+
+  const updateVariantStock = (productIndex: number, variantIndex: number, value: string) => {
+    setEditedProducts((prev) => {
+      const next = [...prev];
+      const product = { ...next[productIndex]! };
+      const variants = [...product.variants];
+      const variant = { ...variants[variantIndex]! };
+      variant.stock = parseInt(value, 10) || 0;
+      variants[variantIndex] = variant;
+      product.variants = variants;
+      next[productIndex] = product;
+      return next;
+    });
   };
 
   const runImport = async () => {
@@ -145,53 +240,55 @@ export function BulkProductUploadDialog({
     setResults(collected);
     setStage('done');
 
-    const created = collected.filter((result) => result.status === 'created').length;
+    const created = collected.filter((r) => r.status === 'created').length;
     if (created) {
       toast.success(`${created} product${created === 1 ? '' : 's'} imported`);
       onImported();
     } else {
-      toast.error('No products were imported. Check the report below.');
+      toast.error('No products were imported. Check the error report below.');
     }
   };
 
-  const createdCount = results.filter((result) => result.status === 'created').length;
-  const skippedCount = results.filter((result) => result.status === 'skipped').length;
-  const failedCount = results.filter((result) => result.status === 'failed').length;
+  const createdCount = results.filter((r) => r.status === 'created').length;
+  const skippedCount = results.filter((r) => r.status === 'skipped').length;
+  const failedCount = results.filter((r) => r.status === 'failed').length;
   const percent = progress.total ? Math.round((progress.done / progress.total) * 100) : 0;
 
   return (
     <Dialog open={open} onOpenChange={close}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
         <DialogHeader>
           <DialogTitle>Bulk upload products</DialogTitle>
           <DialogDescription>
-            Download the template first — it includes variants, prices, stock, images, description,
-            product specifications (Fit, Fabric care…), SEO, returns, warranty, COD/prepaid, and
-            brand (defaults to FE.LK OFFICIAL). One Excel row = one colour + size.
+            Download the Excel template, fill in your products (one row = one colour + size), then
+            upload. Preview and edit before confirming. Nothing is created until you click Import.
           </DialogDescription>
         </DialogHeader>
 
+        {/* ── Stage: Select ───────────────────────────────────────────────── */}
         {stage === 'select' ? (
-          <div className="space-y-4 py-2">
+          <div className="space-y-5 py-2">
             <ol className="space-y-2 text-sm text-[var(--admin-ink)]">
               <li className="flex gap-2">
                 <span className="font-bold">1.</span>
                 <span>
-                  Download the template. The Reference sheet lists your categories; the Products
-                  sheet has every column (variants, SEO, returns, payment, warranty, images).
+                  Download the Excel or CSV template. The Reference sheet lists your categories,
+                  brands, sizes and colors. The Instructions sheet explains every column.
                 </span>
               </li>
               <li className="flex gap-2">
                 <span className="font-bold">2.</span>
                 <span>
-                  Replace the example rows with your catalogue. Same Product Name on multiple rows =
-                  one product with those colour/size variants.
+                  Fill in your catalogue. Same Product Name on multiple rows = one product with
+                  those colour/size variants. Leave Image URLs blank on same-color rows to reuse
+                  earlier images.
                 </span>
               </li>
               <li className="flex gap-2">
                 <span className="font-bold">3.</span>
                 <span>
-                  Upload here, check the preview, then confirm. Nothing is created until then.
+                  Upload here, review the preview (you can edit prices, stock and status inline),
+                  then confirm.
                 </span>
               </li>
             </ol>
@@ -204,8 +301,19 @@ export function BulkProductUploadDialog({
                 onClick={() => templateMutation.mutate()}
               >
                 <Download className="h-4 w-4" />
-                {templateMutation.isPending ? 'Preparing…' : 'Download Excel template'}
+                {templateMutation.isPending ? 'Preparing…' : 'Download Sample Excel'}
               </button>
+
+              <button
+                type="button"
+                className="admin-btn admin-btn-secondary inline-flex items-center gap-2"
+                disabled={csvTemplateMutation.isPending}
+                onClick={() => csvTemplateMutation.mutate()}
+              >
+                <FileText className="h-4 w-4" />
+                {csvTemplateMutation.isPending ? 'Preparing…' : 'Download CSV'}
+              </button>
+
               <button
                 type="button"
                 className="admin-btn admin-btn-primary inline-flex items-center gap-2"
@@ -213,8 +321,9 @@ export function BulkProductUploadDialog({
                 onClick={() => fileInputRef.current?.click()}
               >
                 <Upload className="h-4 w-4" />
-                {previewMutation.isPending ? 'Checking sheet…' : 'Choose file'}
+                {previewMutation.isPending ? 'Checking sheet…' : 'Upload Excel / CSV'}
               </button>
+
               <input
                 ref={fileInputRef}
                 type="file"
@@ -236,29 +345,34 @@ export function BulkProductUploadDialog({
           </div>
         ) : null}
 
+        {/* ── Stage: Preview ──────────────────────────────────────────────── */}
         {stage === 'preview' && preview ? (
           <div className="space-y-4 py-2">
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+            {/* Summary stats */}
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
               <Stat label="Products" value={preview.summary.products} />
               <Stat label="Variants" value={preview.summary.variants} />
               <Stat label="Stock units" value={preview.summary.stockUnits} />
-              <Stat label="Rows with errors" value={preview.summary.issues} tone="warn" />
+              <Stat label="Images" value={preview.summary.images} />
+              <Stat label="Row errors" value={preview.summary.issues} tone="warn" />
               <Stat label="Already exist" value={groups.duplicates.length} tone="warn" />
+              <Stat label="Will import" value={groups.importable.length} tone="good" />
             </div>
 
-            {preview.issues.length ? (
+            {/* Validation issues */}
+            {preview.issues.length > 0 ? (
               <div className="border border-amber-300 bg-amber-50">
                 <p className="flex items-center gap-2 border-b border-amber-200 px-3 py-2 text-xs font-bold uppercase tracking-wide text-amber-900">
                   <AlertTriangle className="h-4 w-4" />
-                  {preview.issues.length} row{preview.issues.length === 1 ? '' : 's'} need fixing —
-                  they will not be imported
+                  {preview.issues.length} row{preview.issues.length === 1 ? '' : 's'} with errors —
+                  these rows will not be imported
                 </p>
-                <div className="max-h-48 overflow-y-auto">
+                <div className="max-h-40 overflow-y-auto">
                   <table className="w-full text-xs">
                     <tbody>
-                      {preview.issues.slice(0, 100).map((issue, index) => (
-                        <tr key={`${issue.row}-${index}`} className="border-b border-amber-100">
-                          <td className="w-20 px-3 py-1.5 font-semibold text-amber-900">
+                      {preview.issues.slice(0, 100).map((issue, i) => (
+                        <tr key={`${issue.row}-${i}`} className="border-b border-amber-100">
+                          <td className="w-16 px-3 py-1.5 font-semibold text-amber-900">
                             Row {issue.row}
                           </td>
                           <td className="w-32 px-3 py-1.5 text-amber-800">{issue.column ?? ''}</td>
@@ -271,6 +385,7 @@ export function BulkProductUploadDialog({
               </div>
             ) : null}
 
+            {/* Auto-create notices */}
             {preview.newValues.colors.length ||
             preview.newValues.sizes.length ||
             preview.newValues.brands.length ? (
@@ -278,7 +393,7 @@ export function BulkProductUploadDialog({
                 Will be created automatically:{' '}
                 {[
                   preview.newValues.colors.length
-                    ? `colours (${preview.newValues.colors.join(', ')})`
+                    ? `colors (${preview.newValues.colors.join(', ')})`
                     : '',
                   preview.newValues.sizes.length
                     ? `sizes (${preview.newValues.sizes.join(', ')})`
@@ -292,15 +407,149 @@ export function BulkProductUploadDialog({
               </p>
             ) : null}
 
-            {groups.duplicates.length ? (
+            {/* Duplicates notice */}
+            {groups.duplicates.length > 0 ? (
               <p className="text-xs text-[var(--admin-ink-muted)]">
-                {groups.duplicates.length} product
-                {groups.duplicates.length === 1 ? '' : 's'} already exist and will be skipped:{' '}
+                {groups.duplicates.length} product{groups.duplicates.length === 1 ? '' : 's'}{' '}
+                already exist and will be skipped:{' '}
                 {groups.duplicates
                   .slice(0, 5)
-                  .map((product) => product.name)
+                  .map((p) => p.name)
                   .join(', ')}
                 {groups.duplicates.length > 5 ? '…' : ''}
+              </p>
+            ) : null}
+
+            {/* Editable product table */}
+            {groups.importable.length > 0 ? (
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--admin-ink-muted)]">
+                  Preview — click cells to edit before importing
+                </p>
+                <div className="max-h-64 overflow-auto border border-[var(--admin-line)]">
+                  <table className="w-full text-xs">
+                    <thead className="sticky top-0 bg-[var(--admin-panel)]">
+                      <tr className="border-b border-[var(--admin-line)]">
+                        <th className="px-2 py-2 text-left text-[var(--admin-ink-muted)]">
+                          Product
+                        </th>
+                        <th className="px-2 py-2 text-left text-[var(--admin-ink-muted)]">
+                          Category
+                        </th>
+                        <th className="px-2 py-2 text-left text-[var(--admin-ink-muted)]">
+                          Status
+                        </th>
+                        <th className="px-2 py-2 text-right text-[var(--admin-ink-muted)]">
+                          Variants
+                        </th>
+                        <th className="px-2 py-2 text-right text-[var(--admin-ink-muted)]">
+                          Stock
+                        </th>
+                        <th className="px-2 py-2 text-right text-[var(--admin-ink-muted)]">
+                          Min Price
+                        </th>
+                        <th className="w-6 px-2 py-2" />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {editedProducts.map((product, pIdx) => {
+                        const isBlocked = preview.newValues.categories.includes(product.category);
+                        const isDupe = preview.duplicates.includes(product.slug);
+                        const totalStock = product.variants.reduce(
+                          (sum, v) => sum + (v.stock ?? 0),
+                          0,
+                        );
+                        const minPrice = Math.min(...product.variants.map((v) => v.price));
+                        return (
+                          <tr
+                            key={product.handle}
+                            className={cn(
+                              'border-b border-[var(--admin-line)] last:border-0',
+                              isBlocked && 'bg-red-50 opacity-60',
+                              isDupe && 'bg-amber-50 opacity-70',
+                            )}
+                          >
+                            <td className="px-2 py-1.5">
+                              <EditableCell
+                                value={product.name}
+                                onChange={(v) => updateProduct(pIdx, 'name', v)}
+                              />
+                              {(isBlocked || isDupe) && (
+                                <span className="ml-1 text-[10px] text-red-600">
+                                  {isBlocked ? 'missing category' : 'duplicate'}
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-2 py-1.5">
+                              <EditableCell
+                                value={product.category}
+                                onChange={(v) => updateProduct(pIdx, 'category', v)}
+                              />
+                            </td>
+                            <td className="px-2 py-1.5">
+                              <select
+                                value={product.status}
+                                onChange={(e) => updateProduct(pIdx, 'status', e.target.value)}
+                                className="w-full rounded border border-transparent bg-transparent text-xs focus:border-[var(--admin-accent)] focus:bg-white focus:outline-none"
+                              >
+                                <option value="draft">draft</option>
+                                <option value="active">active</option>
+                              </select>
+                            </td>
+                            <td className="px-2 py-1.5 text-right text-[var(--admin-ink-muted)]">
+                              {product.variants.length}
+                            </td>
+                            <td className="px-2 py-1.5 text-right">
+                              <EditableCell
+                                value={String(totalStock)}
+                                type="number"
+                                className="text-right"
+                                onChange={(v) => {
+                                  const newStock = parseInt(v, 10) || 0;
+                                  product.variants.forEach((_, vIdx) =>
+                                    updateVariantStock(pIdx, vIdx, String(newStock)),
+                                  );
+                                }}
+                              />
+                            </td>
+                            <td className="px-2 py-1.5 text-right">
+                              <EditableCell
+                                value={String(minPrice)}
+                                type="number"
+                                className="text-right"
+                                onChange={(v) =>
+                                  product.variants.forEach((_, vIdx) =>
+                                    updateVariantPrice(pIdx, vIdx, v),
+                                  )
+                                }
+                              />
+                            </td>
+                            <td className="px-2 py-1.5">
+                              <button
+                                type="button"
+                                title="Remove from import"
+                                onClick={() =>
+                                  setEditedProducts((prev) => prev.filter((_, i) => i !== pIdx))
+                                }
+                                className="text-[var(--admin-ink-muted)] hover:text-red-600"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : null}
+
+            {groups.blocked.length > 0 ? (
+              <p className="rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                {groups.blocked.length} product{groups.blocked.length === 1 ? '' : 's'} blocked
+                because their category does not exist. Create the category in Admin → Filters →
+                Categories, then re-upload.
               </p>
             ) : null}
 
@@ -311,11 +560,12 @@ export function BulkProductUploadDialog({
                 onChange={(event) => setPublish(event.target.checked)}
                 className="accent-[var(--admin-accent)]"
               />
-              Publish immediately (otherwise they are created as drafts)
+              Publish immediately (otherwise products are created as drafts)
             </label>
           </div>
         ) : null}
 
+        {/* ── Stage: Importing ────────────────────────────────────────────── */}
         {stage === 'importing' ? (
           <div className="space-y-3 py-6">
             <p className="text-sm font-medium text-[var(--admin-ink)]">
@@ -328,43 +578,78 @@ export function BulkProductUploadDialog({
               />
             </div>
             <p className="text-xs text-[var(--admin-ink-muted)]">
-              Keep this window open until it finishes.
+              Images are being downloaded and uploaded to storage. Keep this window open.
             </p>
           </div>
         ) : null}
 
+        {/* ── Stage: Done ─────────────────────────────────────────────────── */}
         {stage === 'done' ? (
           <div className="space-y-4 py-2">
             <div className="grid grid-cols-3 gap-2">
-              <Stat label="Created" value={createdCount} tone="good" />
-              <Stat label="Skipped" value={skippedCount} />
+              <Stat label="Imported" value={createdCount} tone="good" />
+              <Stat label="Skipped" value={skippedCount} tone="neutral" />
               <Stat label="Failed" value={failedCount} tone="warn" />
             </div>
 
-            {failedCount || skippedCount ? (
-              <div className="max-h-56 overflow-y-auto border border-[var(--admin-line)]">
-                <table className="w-full text-xs">
-                  <tbody>
-                    {results
-                      .filter((result) => result.status !== 'created')
-                      .map((result) => (
-                        <tr
-                          key={`${result.handle}-${result.row}`}
-                          className="border-b border-[var(--admin-line)] last:border-0"
-                        >
-                          <td className="w-20 px-3 py-1.5 text-[var(--admin-ink-muted)]">
-                            Row {result.row}
-                          </td>
-                          <td className="px-3 py-1.5 font-medium text-[var(--admin-ink)]">
-                            {result.name}
-                          </td>
-                          <td className="px-3 py-1.5 text-[var(--admin-ink-muted)]">
-                            {result.message ?? result.status}
-                          </td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
+            {results.some((r) => r.status !== 'created') ? (
+              <div className="space-y-2">
+                <div className="max-h-52 overflow-y-auto border border-[var(--admin-line)]">
+                  <table className="w-full text-xs">
+                    <thead className="sticky top-0 bg-[var(--admin-panel)]">
+                      <tr className="border-b border-[var(--admin-line)]">
+                        <th className="px-3 py-1.5 text-left text-[var(--admin-ink-muted)]">Row</th>
+                        <th className="px-3 py-1.5 text-left text-[var(--admin-ink-muted)]">
+                          Product
+                        </th>
+                        <th className="px-3 py-1.5 text-left text-[var(--admin-ink-muted)]">
+                          Status
+                        </th>
+                        <th className="px-3 py-1.5 text-left text-[var(--admin-ink-muted)]">
+                          Reason
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {results
+                        .filter((r) => r.status !== 'created')
+                        .map((r) => (
+                          <tr
+                            key={`${r.handle}-${r.row}`}
+                            className="border-b border-[var(--admin-line)] last:border-0"
+                          >
+                            <td className="px-3 py-1.5 text-[var(--admin-ink-muted)]">
+                              {r.row || '—'}
+                            </td>
+                            <td className="px-3 py-1.5 font-medium text-[var(--admin-ink)]">
+                              {r.name}
+                            </td>
+                            <td
+                              className={cn(
+                                'px-3 py-1.5',
+                                r.status === 'failed'
+                                  ? 'text-red-600'
+                                  : 'text-[var(--admin-ink-muted)]',
+                              )}
+                            >
+                              {r.status}
+                            </td>
+                            <td className="px-3 py-1.5 text-[var(--admin-ink-muted)]">
+                              {r.message ?? '—'}
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+                <button
+                  type="button"
+                  className="admin-btn admin-btn-secondary inline-flex items-center gap-2"
+                  onClick={() => productImportApi.buildErrorReportCsv(results)}
+                >
+                  <Download className="h-4 w-4" />
+                  Download Error Report (CSV)
+                </button>
               </div>
             ) : (
               <p className="flex items-center gap-2 text-sm text-emerald-700">
@@ -372,10 +657,30 @@ export function BulkProductUploadDialog({
                 Everything imported cleanly.
               </p>
             )}
+
+            {/* Summary */}
+            <p className="text-xs text-[var(--admin-ink-muted)]">
+              {createdCount} product{createdCount === 1 ? '' : 's'} created
+              {createdCount > 0
+                ? ` with ${results.filter((r) => r.status === 'created').reduce((s, r) => s + (r.variants ?? 0), 0)} variants`
+                : ''}
+              {skippedCount > 0 ? ` · ${skippedCount} skipped` : ''}
+              {failedCount > 0 ? ` · ${failedCount} failed` : ''}
+            </p>
           </div>
         ) : null}
 
         <DialogFooter>
+          {stage === 'select' ? (
+            <button
+              type="button"
+              className="admin-btn admin-btn-secondary"
+              onClick={() => close(false)}
+            >
+              Cancel
+            </button>
+          ) : null}
+
           {stage === 'preview' ? (
             <>
               <button type="button" className="admin-btn admin-btn-secondary" onClick={reset}>
@@ -394,20 +699,10 @@ export function BulkProductUploadDialog({
             </>
           ) : null}
 
-          {stage === 'select' ? (
-            <button
-              type="button"
-              className="admin-btn admin-btn-secondary"
-              onClick={() => close(false)}
-            >
-              Cancel
-            </button>
-          ) : null}
-
           {stage === 'done' ? (
             <>
               <button type="button" className="admin-btn admin-btn-secondary" onClick={reset}>
-                Upload another sheet
+                Upload another file
               </button>
               <button
                 type="button"

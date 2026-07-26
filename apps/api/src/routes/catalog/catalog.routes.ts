@@ -6,6 +6,7 @@ import { actorFromRequest } from '@/services/cms-crud.service';
 import { productService } from '@/services/product.service';
 import { productVariantService } from '@/services/product-variant.service';
 import { productImportService } from '@/services/product-import.service';
+import { productExportService } from '@/services/product-export.service';
 import { productMediaService } from '@/services/product-media.service';
 import { productRelationshipService } from '@/services/product-relationship.service';
 import {
@@ -175,10 +176,19 @@ catalogRouter.get(
 catalogRouter.get(
   '/products/export',
   authorizeAny(...exportPerms),
-  validate({ query: S.productListQuerySchema }),
   asyncHandler(async (req, res) => {
-    const result = await productService.exportAll(req.query as never);
-    ApiResponse.success(res, result.data, 'Export ready', 200, result.meta);
+    const format = String(req.query.format ?? 'xlsx');
+    if (format === 'json') {
+      const result = await productService.exportAll(req.query as never);
+      return ApiResponse.success(res, result.data, 'Export ready', 200, result.meta);
+    }
+    const buffer = await productExportService.exportWorkbook(req.query as never);
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader('Content-Disposition', 'attachment; filename="felk-products-export.xlsx"');
+    res.send(buffer);
   }),
 );
 
@@ -196,6 +206,17 @@ catalogRouter.get(
       'attachment; filename="felk-product-import-template.xlsx"',
     );
     res.send(workbook);
+  }),
+);
+
+catalogRouter.get(
+  '/products/import/template.csv',
+  authorizeAny(...importPerms),
+  asyncHandler(async (_req, res) => {
+    const csv = productImportService.buildCsvTemplate();
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="felk-product-import-template.csv"');
+    res.send(csv);
   }),
 );
 

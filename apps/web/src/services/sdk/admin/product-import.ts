@@ -15,9 +15,14 @@ export interface ImportVariantInput {
   size: string;
   price: number;
   salePrice: number | null;
+  comparePrice: number | null;
   stock: number | null;
   sku: string;
   images: string[];
+  ownListing: boolean;
+  defaultListing: boolean;
+  displayOrder: number;
+  variantPosition: number;
 }
 
 export interface ImportProductInput {
@@ -41,6 +46,10 @@ export interface ImportProductInput {
   warrantyAvailable: boolean;
   warrantyDetails: string;
   status: string;
+  visibility: string;
+  isBestSeller: boolean;
+  isMoreToLove: boolean;
+  isFeatured: boolean;
   rows: number[];
   variants: ImportVariantInput[];
 }
@@ -83,7 +92,6 @@ function saveFile(blob: Blob, filename: string) {
 }
 
 export const productImportApi = {
-  /** Downloads the Excel template, pre-filled with the store's own categories. */
   async downloadTemplate(): Promise<void> {
     const response = await httpClient.get<Blob>('/catalog/products/import/template', {
       responseType: 'blob',
@@ -91,7 +99,13 @@ export const productImportApi = {
     saveFile(response.data, 'felk-product-import-template.xlsx');
   },
 
-  /** Validates a sheet and reports what would be created. Writes nothing. */
+  async downloadTemplateCsv(): Promise<void> {
+    const response = await httpClient.get<Blob>('/catalog/products/import/template.csv', {
+      responseType: 'blob',
+    });
+    saveFile(response.data, 'felk-product-import-template.csv');
+  },
+
   async preview(file: File): Promise<ImportPreview> {
     const form = new FormData();
     form.append('file', file);
@@ -106,5 +120,27 @@ export const productImportApi = {
       products,
       publish,
     });
+  },
+
+  async exportProducts(filters?: Record<string, string>): Promise<void> {
+    const qs = filters ? `?${new URLSearchParams(filters).toString()}` : '';
+    const response = await httpClient.get<Blob>(`/catalog/products/export${qs}`, {
+      responseType: 'blob',
+    });
+    saveFile(response.data, 'felk-products-export.xlsx');
+  },
+
+  /** Generate a downloadable CSV from error / skip results. */
+  buildErrorReportCsv(results: ImportProductResult[]): void {
+    const failed = results.filter((r) => r.status !== 'created');
+    if (!failed.length) return;
+    const header = '"Row","Product Name","Status","Reason"';
+    const rows = failed.map(
+      (r) =>
+        `"${r.row}","${r.name.replace(/"/g, '""')}","${r.status}","${(r.message ?? '').replace(/"/g, '""')}"`,
+    );
+    const csv = [header, ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    saveFile(blob, 'felk-import-errors.csv');
   },
 };

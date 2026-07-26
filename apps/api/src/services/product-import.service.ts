@@ -12,6 +12,7 @@ import {
   OFFICIAL_BRAND_SLUG,
   PRODUCT_IMPORT_BATCH_LIMIT,
   PRODUCT_STATUS,
+  PRODUCT_VISIBILITY,
 } from '@/constants/product';
 import {
   BrandModel,
@@ -24,7 +25,7 @@ import {
 import { ProductModel } from '@/models/product.models';
 import type { ActorMeta } from '@/services/cms-crud.service';
 import { inventoryService } from '@/services/inventory.service';
-import { productMediaService } from '@/services/product-media.service';
+import { attachImportImages } from '@/services/product-import-image.service';
 import { productService } from '@/services/product.service';
 import { productVariantService } from '@/services/product-variant.service';
 import { ApiError } from '@/utils/errors/api-error';
@@ -37,30 +38,42 @@ import { slugify } from '@/utils/slug.helper';
 export type ImportColumnKey =
   | 'name'
   | 'handle'
+  | 'shortDescription'
+  | 'description'
+  | 'status'
+  | 'visibility'
   | 'category'
   | 'gender'
   | 'brand'
   | 'material'
   | 'occasions'
   | 'tags'
-  | 'shortDescription'
-  | 'description'
+  | 'price'
+  | 'salePrice'
+  | 'comparePrice'
+  | 'color'
+  | 'size'
+  | 'stock'
+  | 'sku'
+  | 'ownListing'
+  | 'defaultListing'
+  | 'isBestSeller'
+  | 'isMoreToLove'
+  | 'isFeatured'
+  | 'fit'
+  | 'fabricCare'
   | 'specifications'
   | 'seoTitle'
   | 'seoDescription'
-  | 'paymentOption'
-  | 'returnsAvailable'
-  | 'returnsCriteria'
-  | 'warrantyAvailable'
+  | 'returns'
+  | 'returnPolicy'
+  | 'warranty'
   | 'warrantyDetails'
-  | 'status'
-  | 'color'
-  | 'size'
-  | 'price'
-  | 'salePrice'
-  | 'stock'
-  | 'sku'
-  | 'images';
+  | 'paymentMethod'
+  | 'images'
+  | 'displayOrder'
+  | 'variantPosition'
+  | 'productPosition';
 
 interface ColumnDef {
   key: ImportColumnKey;
@@ -72,14 +85,57 @@ interface ColumnDef {
 }
 
 export const IMPORT_COLUMNS: ColumnDef[] = [
+  // ── Product identity ──────────────────────────────────────────────────────
   {
     key: 'name',
     label: 'Product Name',
-    aliases: ['product', 'title', 'productname'],
+    aliases: ['product', 'title', 'productname', 'productname'],
     required: true,
     help: 'Repeat the SAME name on every colour/size row that belongs to one product. That is how variants are grouped.',
     example: 'Sample Bulk Crop Top',
   },
+  {
+    key: 'handle',
+    label: 'Handle',
+    aliases: ['slug', 'producthandle', 'group', 'urlslug'],
+    required: false,
+    help: 'Optional URL slug / grouping key. Leave blank to derive from Product Name.',
+    example: '',
+  },
+  {
+    key: 'shortDescription',
+    label: 'Short Description',
+    aliases: ['shortdesc', 'summary', 'subtitle'],
+    required: false,
+    help: 'One-line summary shown in product listings.',
+    example: 'Soft ruffle crop top',
+  },
+  {
+    key: 'description',
+    label: 'Description',
+    aliases: ['longdescription', 'fulldescription', 'details', 'body'],
+    required: false,
+    help: 'Full product description (HTML allowed).',
+    example: '',
+  },
+  // ── Status & visibility ───────────────────────────────────────────────────
+  {
+    key: 'status',
+    label: 'Status',
+    aliases: ['productstatus', 'publishstatus'],
+    required: false,
+    help: 'draft or active. Defaults to draft.',
+    example: 'draft',
+  },
+  {
+    key: 'visibility',
+    label: 'Visibility',
+    aliases: ['productvisibility'],
+    required: false,
+    help: 'public, hidden or catalog_only. Defaults to public.',
+    example: 'public',
+  },
+  // ── Taxonomy ──────────────────────────────────────────────────────────────
   {
     key: 'category',
     label: 'Category',
@@ -87,62 +143,6 @@ export const IMPORT_COLUMNS: ColumnDef[] = [
     required: true,
     help: 'Must already exist. Use the name or slug from the Reference sheet.',
     example: 'Crop tops',
-  },
-  {
-    key: 'color',
-    label: 'Color',
-    aliases: ['colour', 'variantcolor', 'variantcolour'],
-    required: false,
-    help: 'Variant colour. One row per colour + size. Created automatically if missing.',
-    example: 'Hot Pink',
-  },
-  {
-    key: 'size',
-    label: 'Size',
-    aliases: ['variantsize'],
-    required: false,
-    help: 'Variant size. Created automatically if missing. Leave blank for one-size.',
-    example: 'S',
-  },
-  {
-    key: 'price',
-    label: 'Price',
-    aliases: ['mrp', 'regularprice', 'variantprice'],
-    required: true,
-    help: 'Variant price in LKR (numbers only).',
-    example: '9999',
-  },
-  {
-    key: 'salePrice',
-    label: 'Sale Price',
-    aliases: ['discountprice', 'discountedprice', 'offerprice'],
-    required: false,
-    help: 'Optional sale price — must be ≤ Price.',
-    example: '7999',
-  },
-  {
-    key: 'stock',
-    label: 'Stock',
-    aliases: ['quantity', 'qty', 'stockquantity', 'inventory'],
-    required: false,
-    help: 'Units available for this colour + size.',
-    example: '10',
-  },
-  {
-    key: 'sku',
-    label: 'SKU',
-    aliases: ['variantsku', 'code'],
-    required: false,
-    help: 'Optional variant SKU. Auto-generated when blank.',
-    example: '',
-  },
-  {
-    key: 'images',
-    label: 'Image URLs',
-    aliases: ['image', 'images', 'imageurl', 'photo', 'photos', 'imagelinks'],
-    required: false,
-    help: 'Full https links, comma-separated. Attach to this row’s colour variant.',
-    example: '',
   },
   {
     key: 'gender',
@@ -157,13 +157,13 @@ export const IMPORT_COLUMNS: ColumnDef[] = [
     label: 'Brand',
     aliases: ['brandname'],
     required: false,
-    help: `Defaults to ${OFFICIAL_BRAND_NAME} for every product. Leave blank unless you need a different brand.`,
+    help: `Defaults to ${OFFICIAL_BRAND_NAME}. Leave blank unless you need a different brand.`,
     example: OFFICIAL_BRAND_NAME,
   },
   {
     key: 'material',
     label: 'Material',
-    aliases: ['fabric'],
+    aliases: ['fabric', 'fabrictype'],
     required: false,
     help: 'Created automatically if it does not exist.',
     example: 'Cotton',
@@ -184,36 +184,144 @@ export const IMPORT_COLUMNS: ColumnDef[] = [
     help: 'Comma-separated product tags.',
     example: 'new, summer',
   },
+  // ── Prices ────────────────────────────────────────────────────────────────
   {
-    key: 'shortDescription',
-    label: 'Short Description',
-    aliases: ['shortdesc', 'summary'],
-    required: false,
-    help: 'One-line summary shown in listings.',
-    example: 'Soft ruffle crop top',
+    key: 'price',
+    label: 'Selling Price',
+    aliases: ['price', 'mrp', 'regularprice', 'variantprice', 'sellingprice'],
+    required: true,
+    help: 'Variant selling price (numbers only).',
+    example: '9999',
   },
   {
-    key: 'description',
-    label: 'Description',
-    aliases: ['longdescription', 'details', 'fulldescription'],
+    key: 'salePrice',
+    label: 'Sale Price',
+    aliases: ['discountprice', 'discountedprice', 'offerprice', 'saleprice'],
     required: false,
-    help: 'Full product description (PDP body).',
+    help: 'Optional sale price — must be ≤ Selling Price.',
+    example: '7999',
+  },
+  {
+    key: 'comparePrice',
+    label: 'Compare Price',
+    aliases: [
+      'compareatprice',
+      'compareeprice',
+      'originalretailprice',
+      'rrp',
+      'strikethroughprice',
+    ],
+    required: false,
+    help: 'Crossed-out "was" price shown next to the sale price.',
+    example: '11999',
+  },
+  // ── Variant ───────────────────────────────────────────────────────────────
+  {
+    key: 'color',
+    label: 'Color',
+    aliases: ['colour', 'variantcolor', 'variantcolour', 'colorname'],
+    required: false,
+    help: 'Variant colour. One row per colour + size. Created automatically if missing.',
+    example: 'Hot Pink',
+  },
+  {
+    key: 'size',
+    label: 'Size',
+    aliases: ['variantsize', 'sizename'],
+    required: false,
+    help: 'Variant size. Leave blank for one-size. Created automatically if missing.',
+    example: 'S',
+  },
+  {
+    key: 'stock',
+    label: 'Stock',
+    aliases: ['quantity', 'qty', 'stockquantity', 'inventory', 'stockqty'],
+    required: false,
+    help: 'Units available for this colour + size. Defaults to 0.',
+    example: '10',
+  },
+  {
+    key: 'sku',
+    label: 'Variant SKU',
+    aliases: ['variantsku', 'code', 'itemcode'],
+    required: false,
+    help: 'Optional variant SKU. Auto-generated when blank. Must be unique.',
     example: '',
+  },
+  // ── Listing flags ─────────────────────────────────────────────────────────
+  {
+    key: 'ownListing',
+    label: 'Own Listing',
+    aliases: ['ownlisting', 'listingcolor', 'separatelisting', 'listseparately'],
+    required: false,
+    help: 'TRUE/FALSE — show this colour as its own product card on the storefront.',
+    example: 'TRUE',
+  },
+  {
+    key: 'defaultListing',
+    label: 'Default Listing',
+    aliases: ['defaultlisting', 'isdefault', 'defaultvariant'],
+    required: false,
+    help: 'TRUE/FALSE — one colour per product. Controls the primary card shown in listings.',
+    example: 'TRUE',
+  },
+  // ── Homepage flags ────────────────────────────────────────────────────────
+  {
+    key: 'isBestSeller',
+    label: 'Homepage Best Seller',
+    aliases: ['bestseller', 'isbestseller', 'homepagebestseller', 'featuredhome'],
+    required: false,
+    help: 'TRUE/FALSE — appear in the Best Sellers homepage section.',
+    example: 'FALSE',
+  },
+  {
+    key: 'isMoreToLove',
+    label: 'Homepage More To Love',
+    aliases: ['moretolove', 'ismoretolove', 'homepagemoretolove'],
+    required: false,
+    help: 'TRUE/FALSE — appear in the More To Love homepage section.',
+    example: 'FALSE',
+  },
+  {
+    key: 'isFeatured',
+    label: 'Homepage Featured',
+    aliases: ['featured', 'isfeatured', 'homepagefeatured'],
+    required: false,
+    help: 'TRUE/FALSE — appear in the Featured homepage section.',
+    example: 'FALSE',
+  },
+  // ── Specifications ────────────────────────────────────────────────────────
+  {
+    key: 'fit',
+    label: 'Fit',
+    aliases: ['fittype', 'fitdescription'],
+    required: false,
+    help: 'Fit type (e.g. Slim Fit, Regular, Oversized). Added as a specification row.',
+    example: 'Regular',
+  },
+  {
+    key: 'fabricCare',
+    label: 'Fabric Care',
+    aliases: ['fabriccare', 'washcare', 'care', 'careinstruction'],
+    required: false,
+    help: 'Wash/care instructions. Added as a specification row.',
+    example: 'Machine Wash Cold',
   },
   {
     key: 'specifications',
-    label: 'Specifications',
-    aliases: ['specs', 'productspecs', 'attributes', 'detailspecs'],
+    label: 'Additional Specifications',
+    aliases: ['specs', 'productspecs', 'attributes', 'detailspecs', 'specifications'],
     required: false,
-    help: 'Detail-table rows as Name: Value pairs, separated by | . Example: Fit: Slim Fit | Fabric care: Machine Wash | Neckline: Round Neck',
-    example: 'Fit: Regular | Fabric care: Machine Wash | Neckline: Round Neck',
+    help: 'Extra detail-table rows: Name: Value pairs separated by | . Example: Neckline: Round Neck | Sleeve: Full Sleeve',
+    example: 'Neckline: Round Neck | Sleeve: Full Sleeve',
   },
+  // ── SEO ───────────────────────────────────────────────────────────────────
   {
     key: 'seoTitle',
     label: 'SEO Title',
     aliases: ['metatitle', 'seotitle', 'pagetitle'],
     required: false,
-    help: 'Optional Google/browser title. Defaults to product name when blank.',
+    help: 'Browser/Google title. Defaults to product name when blank.',
     example: '',
   },
   {
@@ -221,37 +329,30 @@ export const IMPORT_COLUMNS: ColumnDef[] = [
     label: 'SEO Description',
     aliases: ['metadescription', 'seodescription', 'metadesc'],
     required: false,
-    help: 'Optional meta description for search engines.',
+    help: 'Meta description for search engines.',
     example: '',
   },
+  // ── Returns / Warranty / Payment ─────────────────────────────────────────
   {
-    key: 'paymentOption',
-    label: 'Payment',
-    aliases: ['payment', 'paymentmethod', 'codprepaid'],
-    required: false,
-    help: 'cod, prepaid or both. Defaults to both.',
-    example: 'both',
-  },
-  {
-    key: 'returnsAvailable',
+    key: 'returns',
     label: 'Returns',
-    aliases: ['return', 'returnavailable', 'acceptsreturns'],
+    aliases: ['return', 'returnavailable', 'acceptsreturns', 'returnsavailable'],
     required: false,
     help: 'yes / no. Defaults to yes.',
     example: 'yes',
   },
   {
-    key: 'returnsCriteria',
+    key: 'returnPolicy',
     label: 'Return Policy',
-    aliases: ['returncriteria', 'returnspolicy', 'returnnote'],
+    aliases: ['returncriteria', 'returnspolicy', 'returnnote', 'returnpolicy', 'returnscriteria'],
     required: false,
-    help: 'Optional return rules text shown on the product.',
+    help: 'Return policy text shown on the product page.',
     example: '7-day exchange if unused with tags',
   },
   {
-    key: 'warrantyAvailable',
+    key: 'warranty',
     label: 'Warranty',
-    aliases: ['haswarranty', 'warrantyavailable'],
+    aliases: ['haswarranty', 'warrantyavailable', 'warrantyyes'],
     required: false,
     help: 'yes / no. Defaults to no.',
     example: 'no',
@@ -259,25 +360,51 @@ export const IMPORT_COLUMNS: ColumnDef[] = [
   {
     key: 'warrantyDetails',
     label: 'Warranty Details',
-    aliases: ['warrantynote', 'warrantydetail'],
+    aliases: ['warrantynote', 'warrantydetail', 'warrantydetails'],
     required: false,
-    help: 'Optional warranty text when Warranty is yes.',
+    help: 'Warranty text when Warranty is yes.',
     example: '',
   },
   {
-    key: 'status',
-    label: 'Status',
-    aliases: ['productstatus', 'publishstatus'],
+    key: 'paymentMethod',
+    label: 'Payment Method',
+    aliases: ['payment', 'paymentoption', 'paymentmethod', 'codprepaid'],
     required: false,
-    help: 'draft or active. Defaults to draft.',
-    example: 'draft',
+    help: 'cod, prepaid or both. Defaults to both.',
+    example: 'both',
+  },
+  // ── Images ────────────────────────────────────────────────────────────────
+  {
+    key: 'images',
+    label: 'Image URLs',
+    aliases: ['image', 'images', 'imageurl', 'photo', 'photos', 'imagelinks', 'imageurls'],
+    required: false,
+    help: "Full https links, comma-separated. Attach to this row's colour variant. Blank rows of the same colour reuse earlier images.",
+    example: 'https://example.com/img1.jpg, https://example.com/img2.jpg',
+  },
+  // ── Positions ─────────────────────────────────────────────────────────────
+  {
+    key: 'displayOrder',
+    label: 'Display Order',
+    aliases: ['displayorder', 'sortorder', 'order'],
+    required: false,
+    help: 'Numeric. Controls sort order of this variant within its colour.',
+    example: '1',
   },
   {
-    key: 'handle',
-    label: 'Handle',
-    aliases: ['slug', 'producthandle', 'group'],
+    key: 'variantPosition',
+    label: 'Variant Position',
+    aliases: ['variantposition', 'variantorder'],
     required: false,
-    help: 'Optional URL slug / grouping key. Leave blank to use the product name.',
+    help: 'Numeric. Overall position of this variant among all variants for this product.',
+    example: '1',
+  },
+  {
+    key: 'productPosition',
+    label: 'Product Position',
+    aliases: ['productposition', 'productorder', 'productrank'],
+    required: false,
+    help: 'Optional. Not used for sorting yet; preserved in the export for re-import.',
     example: '',
   },
 ];
@@ -303,6 +430,7 @@ const GENDER_ALIASES: Record<string, string> = {
 };
 
 const ALLOWED_STATUSES = new Set<string>([PRODUCT_STATUS.DRAFT, PRODUCT_STATUS.ACTIVE]);
+const ALLOWED_VISIBILITIES = new Set<string>(Object.values(PRODUCT_VISIBILITY));
 
 const MAX_ROWS = 5000;
 
@@ -322,9 +450,14 @@ export interface ImportVariantInput {
   size: string;
   price: number;
   salePrice: number | null;
+  comparePrice: number | null;
   stock: number | null;
   sku: string;
   images: string[];
+  ownListing: boolean;
+  defaultListing: boolean;
+  displayOrder: number;
+  variantPosition: number;
 }
 
 export interface ImportProductInput {
@@ -348,6 +481,10 @@ export interface ImportProductInput {
   warrantyAvailable: boolean;
   warrantyDetails: string;
   status: string;
+  visibility: string;
+  isBestSeller: boolean;
+  isMoreToLove: boolean;
+  isFeatured: boolean;
   rows: number[];
   variants: ImportVariantInput[];
 }
@@ -457,7 +594,7 @@ function parseCsv(text: string): string[][] {
 
 function splitList(value: string): string[] {
   return value
-    .split(/[,;|\n]/)
+    .split(/[,;\n]/)
     .map((item) => item.trim())
     .filter(Boolean);
 }
@@ -527,6 +664,32 @@ function parseSpecifications(
   return rows;
 }
 
+/**
+ * Build combined specifications: Fit + Fabric Care (from named columns) +
+ * Additional Specifications (from the pipe-delimited column).
+ */
+function buildSpecifications(values: Partial<Record<ImportColumnKey, string>>): Array<{
+  name: string;
+  value: string;
+  sortOrder: number;
+}> {
+  const specs: Array<{ name: string; value: string; sortOrder: number }> = [];
+  let order = 0;
+
+  const fit = values.fit?.trim();
+  if (fit) specs.push({ name: 'Fit', value: fit, sortOrder: order++ });
+
+  const care = values.fabricCare?.trim();
+  if (care) specs.push({ name: 'Fabric Care', value: care, sortOrder: order++ });
+
+  const extra = parseSpecifications(values.specifications ?? '');
+  for (const spec of extra) {
+    specs.push({ ...spec, sortOrder: order++ });
+  }
+
+  return specs;
+}
+
 async function ensureOfficialBrandId(): Promise<string> {
   const existing = await BrandModel.findOne({
     isDeleted: false,
@@ -567,7 +730,6 @@ async function readSheet(file: Express.Multer.File): Promise<string[][]> {
 
   const workbook = new ExcelJS.Workbook();
   try {
-    // ExcelJS ships its own Buffer typing, which no longer lines up with @types/node.
     await workbook.xlsx.load(file.buffer as unknown as Parameters<typeof workbook.xlsx.load>[0]);
   } catch {
     throw ApiError.badRequest(
@@ -631,7 +793,6 @@ function toRawRows(grid: string[][]): { rows: RawRow[]; headers: ImportColumnKey
       hasContent = true;
     });
     if (!hasContent) continue;
-    // Spreadsheet row numbers are 1-based and include the header row.
     rows.push({ row: index + 1, values });
   }
 
@@ -662,6 +823,8 @@ function buildProducts(rows: RawRow[]): { products: ImportProductInput[]; issues
   const products = new Map<string, ImportProductInput>();
   const seenVariants = new Map<string, Set<string>>();
   const usedSlugs = new Map<string, string>();
+  // Track SKUs used in this file to catch intra-file duplicates
+  const usedSkus = new Map<string, number>();
 
   for (const { row, values } of rows) {
     const name = values.name ?? '';
@@ -671,13 +834,23 @@ function buildProducts(rows: RawRow[]): { products: ImportProductInput[]; issues
     }
 
     const handle = normalizeKey(values.handle ?? name);
+
+    // ── Prices ──────────────────────────────────────────────────────────────
     const price = parseMoney(values.price ?? '');
     if (price === null) {
-      issues.push({ row, column: 'Price', message: 'Price is required and must be a number.' });
+      issues.push({
+        row,
+        column: 'Selling Price',
+        message: 'Selling price is required and must be a number.',
+      });
       continue;
     }
     if (price <= 0) {
-      issues.push({ row, column: 'Price', message: 'Price must be greater than 0.' });
+      issues.push({
+        row,
+        column: 'Selling Price',
+        message: 'Selling price must be greater than 0.',
+      });
       continue;
     }
 
@@ -691,18 +864,27 @@ function buildProducts(rows: RawRow[]): { products: ImportProductInput[]; issues
       issues.push({
         row,
         column: 'Sale Price',
-        message: `Sale price ${salePrice} cannot be higher than price ${price}.`,
+        message: `Sale price (${salePrice}) cannot be higher than selling price (${price}).`,
       });
       continue;
     }
 
+    const comparePriceRaw = values.comparePrice ?? '';
+    const comparePrice = comparePriceRaw ? parseMoney(comparePriceRaw) : null;
+    if (comparePriceRaw && comparePrice === null) {
+      issues.push({ row, column: 'Compare Price', message: 'Compare price must be a number.' });
+      continue;
+    }
+
+    // ── Stock ───────────────────────────────────────────────────────────────
     const stockRaw = values.stock ?? '';
-    const stock = stockRaw ? parseWholeNumber(stockRaw) : null;
-    if (stockRaw && (stock === null || stock < 0)) {
+    const stock = stockRaw ? parseWholeNumber(stockRaw) : 0;
+    if (stock === null || stock < 0) {
       issues.push({ row, column: 'Stock', message: 'Stock must be a whole number of 0 or more.' });
       continue;
     }
 
+    // ── Images ──────────────────────────────────────────────────────────────
     const images = splitList(values.images ?? '');
     const badImage = images.find((url) => !isHttpUrl(url));
     if (badImage) {
@@ -714,8 +896,35 @@ function buildProducts(rows: RawRow[]): { products: ImportProductInput[]; issues
       continue;
     }
 
+    // ── SKU duplicate check ─────────────────────────────────────────────────
+    const sku = values.sku?.trim() ?? '';
+    if (sku) {
+      const prevRow = usedSkus.get(sku.toUpperCase());
+      if (prevRow !== undefined) {
+        issues.push({
+          row,
+          column: 'Variant SKU',
+          message: `SKU "${sku}" is already used on row ${prevRow} of this sheet. SKUs must be unique.`,
+        });
+        continue;
+      }
+      usedSkus.set(sku.toUpperCase(), row);
+    }
+
+    // ── Positions ───────────────────────────────────────────────────────────
+    const displayOrder = parseWholeNumber(values.displayOrder ?? '') ?? 0;
+    const variantPosition = parseWholeNumber(values.variantPosition ?? '') ?? 0;
+
+    // ── Boolean flags ────────────────────────────────────────────────────────
+    const ownListing = parseYesNo(values.ownListing ?? '', false) ?? false;
+    const defaultListing = parseYesNo(values.defaultListing ?? '', false) ?? false;
+    const isBestSeller = parseYesNo(values.isBestSeller ?? '', false) ?? false;
+    const isMoreToLove = parseYesNo(values.isMoreToLove ?? '', false) ?? false;
+    const isFeatured = parseYesNo(values.isFeatured ?? '', false) ?? false;
+
     let existing = products.get(handle);
     if (!existing) {
+      // ── Product-level fields (only parsed on first row of a product) ───────
       const category = values.category ?? '';
       if (!category) {
         issues.push({ row, column: 'Category', message: 'Category is required.' });
@@ -744,32 +953,45 @@ function buildProducts(rows: RawRow[]): { products: ImportProductInput[]; issues
         continue;
       }
 
-      const paymentOption = parsePaymentOption(values.paymentOption ?? '');
-      if (paymentOption === null) {
+      const visibilityRaw = values.visibility ?? '';
+      const visibility = visibilityRaw
+        ? normalizeKey(visibilityRaw).replace(/\s/g, '_')
+        : PRODUCT_VISIBILITY.PUBLIC;
+      if (visibilityRaw && !ALLOWED_VISIBILITIES.has(visibility)) {
         issues.push({
           row,
-          column: 'Payment',
-          message: `"${values.paymentOption}" is not valid. Use cod, prepaid or both.`,
+          column: 'Visibility',
+          message: `"${visibilityRaw}" is not valid. Use public, hidden or catalog_only.`,
         });
         continue;
       }
 
-      const returnsAvailable = parseYesNo(values.returnsAvailable ?? '', true);
+      const paymentOption = parsePaymentOption(values.paymentMethod ?? '');
+      if (paymentOption === null) {
+        issues.push({
+          row,
+          column: 'Payment Method',
+          message: `"${values.paymentMethod}" is not valid. Use cod, prepaid or both.`,
+        });
+        continue;
+      }
+
+      const returnsAvailable = parseYesNo(values.returns ?? '', true);
       if (returnsAvailable === null) {
         issues.push({
           row,
           column: 'Returns',
-          message: `"${values.returnsAvailable}" is not valid. Use yes or no.`,
+          message: `"${values.returns}" is not valid. Use yes or no.`,
         });
         continue;
       }
 
-      const warrantyAvailable = parseYesNo(values.warrantyAvailable ?? '', false);
+      const warrantyAvailable = parseYesNo(values.warranty ?? '', false);
       if (warrantyAvailable === null) {
         issues.push({
           row,
           column: 'Warranty',
-          message: `"${values.warrantyAvailable}" is not valid. Use yes or no.`,
+          message: `"${values.warranty}" is not valid. Use yes or no.`,
         });
         continue;
       }
@@ -798,15 +1020,19 @@ function buildProducts(rows: RawRow[]): { products: ImportProductInput[]; issues
         tags: splitList(values.tags ?? ''),
         shortDescription: values.shortDescription ?? '',
         description: values.description ?? '',
-        specifications: parseSpecifications(values.specifications ?? ''),
+        specifications: buildSpecifications(values),
         seoTitle: values.seoTitle ?? '',
         seoDescription: values.seoDescription ?? '',
         paymentOption,
         returnsAvailable,
-        returnsCriteria: values.returnsCriteria ?? '',
+        returnsCriteria: values.returnPolicy ?? '',
         warrantyAvailable,
         warrantyDetails: values.warrantyDetails ?? '',
         status,
+        visibility,
+        isBestSeller,
+        isMoreToLove,
+        isFeatured,
         rows: [],
         variants: [],
       };
@@ -827,6 +1053,14 @@ function buildProducts(rows: RawRow[]): { products: ImportProductInput[]; issues
     }
     seen?.add(variantKey);
 
+    // Only one default listing per product — use the last one that has TRUE
+    if (defaultListing) {
+      // Clear any previous default on this product
+      for (const v of existing.variants) {
+        v.defaultListing = false;
+      }
+    }
+
     existing.rows.push(row);
     existing.variants.push({
       row,
@@ -834,10 +1068,29 @@ function buildProducts(rows: RawRow[]): { products: ImportProductInput[]; issues
       size,
       price,
       salePrice,
+      comparePrice,
       stock,
-      sku: values.sku ?? '',
+      sku,
       images,
+      ownListing,
+      defaultListing,
+      displayOrder,
+      variantPosition,
     });
+  }
+
+  // Image inheritance: reuse first color's images on subsequent same-color rows
+  for (const product of products.values()) {
+    const colorImages = new Map<string, string[]>();
+    for (const variant of product.variants) {
+      const colorKey = normalizeKey(variant.color || '__nocolor__');
+      if (variant.images.length > 0) {
+        colorImages.set(colorKey, variant.images);
+      } else {
+        const inherited = colorImages.get(colorKey);
+        if (inherited) variant.images = inherited;
+      }
+    }
   }
 
   return { products: [...products.values()], issues };
@@ -861,7 +1114,6 @@ async function loadLookup(model: LookupModel): Promise<Map<string, string>> {
   return map;
 }
 
-/** Creates a lookup row on demand, keeping `code`/`slug` unique. */
 async function createLookup(
   model: LookupModel,
   name: string,
@@ -959,9 +1211,31 @@ export class ProductImportService {
       }
     }
 
-    // Only active (non-deleted) products block an import. Soft-deleted slugs are
-    // auto-suffixed on create so they never throw a Mongo duplicate-key error.
-    const slugs = products.map((product) => product.slug);
+    // Check DB-level SKU duplicates
+    const skusFromSheet = products.flatMap((p) =>
+      p.variants.filter((v) => v.sku).map((v) => v.sku.toUpperCase()),
+    );
+    if (skusFromSheet.length) {
+      const { ProductVariantModel } = await import('@/models/product.models');
+      const existingSkus = await ProductVariantModel.find({
+        sku: { $in: skusFromSheet },
+        isDeleted: false,
+      })
+        .select('sku')
+        .lean();
+      for (const row of existingSkus) {
+        const skuVal = String((row as { sku?: string }).sku ?? '');
+        if (skuVal) {
+          issues.push({
+            row: 0,
+            column: 'Variant SKU',
+            message: `SKU "${skuVal}" already exists in the database. Remove or change it.`,
+          });
+        }
+      }
+    }
+
+    const slugs = products.map((p) => p.slug);
     const existing = slugs.length
       ? await ProductModel.find({ slug: { $in: slugs }, isDeleted: false })
           .select('slug')
@@ -969,15 +1243,13 @@ export class ProductImportService {
       : [];
     const duplicates = new Set(existing.map((row) => String(row.slug)));
 
-    const variants = products.reduce((total, product) => total + product.variants.length, 0);
+    const variants = products.reduce((total, p) => total + p.variants.length, 0);
     const stockUnits = products.reduce(
-      (total, product) =>
-        total + product.variants.reduce((sum, variant) => sum + (variant.stock ?? 0), 0),
+      (total, p) => total + p.variants.reduce((sum, v) => sum + (v.stock ?? 0), 0),
       0,
     );
     const images = products.reduce(
-      (total, product) =>
-        total + product.variants.reduce((sum, variant) => sum + variant.images.length, 0),
+      (total, p) => total + p.variants.reduce((sum, v) => sum + v.images.length, 0),
       0,
     );
 
@@ -1003,10 +1275,7 @@ export class ProductImportService {
     };
   }
 
-  /**
-   * Create one batch of previously validated products. Each product is
-   * independent so a single bad row cannot abort the whole upload.
-   */
+  /** Create one batch of previously validated products. */
   async importProducts(
     products: ImportProductInput[],
     actor: ActorMeta,
@@ -1025,6 +1294,8 @@ export class ProductImportService {
 
     for (const product of products) {
       const row = product.rows[0] ?? 0;
+      let createdProductId: string | null = null;
+
       try {
         const categoryId = lookups.categories.get(product.category);
         if (!categoryId) {
@@ -1038,10 +1309,7 @@ export class ProductImportService {
           continue;
         }
 
-        const activeDuplicate = await ProductModel.exists({
-          slug: product.slug,
-          isDeleted: false,
-        });
+        const activeDuplicate = await ProductModel.exists({ slug: product.slug, isDeleted: false });
         if (activeDuplicate) {
           results.push({
             handle: product.handle,
@@ -1054,7 +1322,6 @@ export class ProductImportService {
           continue;
         }
 
-        // Soft-deleted products still occupy the unique slug index — pick a free slug.
         let slug = product.slug;
         if (await ProductModel.exists({ slug })) {
           slug = `${product.slug}-${Date.now().toString(36)}`;
@@ -1066,17 +1333,19 @@ export class ProductImportService {
           normalizeKey(brandName) === normalizeKey(OFFICIAL_BRAND_SLUG)
             ? await ensureOfficialBrandId()
             : await lookups.brands.ensure(brandName);
+
         const materialId = product.material
           ? await lookups.materials.ensure(product.material)
           : undefined;
+
         const occasionIds: string[] = [];
         for (const occasion of product.occasions) {
           occasionIds.push(await lookups.occasions.ensure(occasion));
         }
 
-        const prices = product.variants.map((variant) => variant.price);
+        const prices = product.variants.map((v) => v.price);
         const basePrice = prices.length ? Math.min(...prices) : 0;
-        const baseVariant = product.variants.find((variant) => variant.price === basePrice);
+        const baseVariant = product.variants.find((v) => v.price === basePrice);
 
         const created = await productService.create(
           {
@@ -1102,17 +1371,36 @@ export class ProductImportService {
               description: product.seoDescription || product.shortDescription || undefined,
             },
             status: options.publish ? PRODUCT_STATUS.ACTIVE : product.status,
+            visibility: product.visibility,
+            isBestSeller: product.isBestSeller,
+            isMoreToLove: product.isMoreToLove,
+            isFeatured: product.isFeatured,
             price: basePrice,
             salePrice: baseVariant?.salePrice ?? undefined,
+            compareAtPrice: baseVariant?.comparePrice ?? undefined,
             currency: 'LKR',
           },
           actor,
         );
 
-        const productId = String(created._id);
+        createdProductId = String(created._id);
+        const productId = createdProductId;
         let primaryAssigned = false;
 
-        for (const [index, variant] of product.variants.entries()) {
+        // Resolve the "default" variant (explicit flag wins; else first row)
+        const explicitDefault = product.variants.findIndex((v) => v.defaultListing);
+        const defaultIndex = explicitDefault >= 0 ? explicitDefault : 0;
+
+        // Group images per color to handle inheritance at write time
+        const colorFirstImageSet = new Map<string, boolean>();
+
+        // Sort variants by variantPosition if provided
+        const sortedVariants = [...product.variants].sort(
+          (a, b) => (a.variantPosition || 0) - (b.variantPosition || 0),
+        );
+
+        for (const [index, variant] of sortedVariants.entries()) {
+          const isDefaultVariant = index === defaultIndex;
           const [colorId, sizeId] = await Promise.all([
             variant.color ? lookups.colors.ensure(variant.color) : Promise.resolve(null),
             variant.size ? lookups.sizes.ensure(variant.size) : Promise.resolve(null),
@@ -1127,34 +1415,37 @@ export class ProductImportService {
               colorId,
               sizeId,
               price: variant.price,
-              salePrice: variant.salePrice,
+              salePrice: variant.salePrice ?? undefined,
+              compareAtPrice: variant.comparePrice ?? undefined,
               currency: 'LKR',
               sku: variant.sku || undefined,
-              displayOrder: index,
-              isDefault: index === 0,
+              displayOrder: variant.displayOrder || index,
+              isDefault: isDefaultVariant,
+              listSeparately: variant.ownListing,
             },
             actor,
           );
 
           const variantId = String(createdVariant._id);
 
-          if (variant.stock && variant.stock > 0) {
+          if (variant.stock !== null && variant.stock > 0) {
             await inventoryService.setStockQuantity({ variantId, quantity: variant.stock }, actor);
           }
 
-          for (const [imageIndex, url] of variant.images.entries()) {
-            await productMediaService.createRemote(
+          // Attach images — download→storage with remote fallback
+          if (variant.images.length > 0) {
+            const colorKey = normalizeKey(variant.color || '__nocolor__');
+            const isFirstForColor = !colorFirstImageSet.has(colorKey);
+            colorFirstImageSet.set(colorKey, true);
+
+            await attachImportImages({
               productId,
-              {
-                url,
-                variantId,
-                alt: title,
-                priority: index * 10 + imageIndex,
-                isPrimary: !primaryAssigned,
-                isGallery: true,
-              },
-              actor,
-            );
+              variantId,
+              altText: title,
+              urls: variant.images,
+              priorityBase: index * 10,
+              setPrimary: !primaryAssigned && isFirstForColor,
+            });
             primaryAssigned = true;
           }
         }
@@ -1168,6 +1459,16 @@ export class ProductImportService {
           variants: product.variants.length,
         });
       } catch (error) {
+        // If product was created but variants/media failed, clean up
+        if (createdProductId) {
+          try {
+            await ProductModel.findByIdAndUpdate(createdProductId, {
+              $set: { isDeleted: true, deletedAt: new Date() },
+            });
+          } catch {
+            // best effort cleanup
+          }
+        }
         results.push({
           handle: product.handle,
           name: product.name,
@@ -1185,58 +1486,24 @@ export class ProductImportService {
     return { results };
   }
 
-  /** Workbook with the expected columns, examples and the owner's own reference data. */
+  /** Full 3-sheet Excel template with Products, Reference, and Instructions. */
   async buildTemplate(): Promise<Buffer> {
     const workbook = new ExcelJS.Workbook();
     workbook.creator = 'FE Admin';
     workbook.created = new Date();
 
-    const guide = workbook.addWorksheet('How to use');
-    guide.columns = [
-      { header: 'Column', key: 'column', width: 22 },
-      { header: 'Required', key: 'required', width: 12 },
-      { header: 'What to enter', key: 'help', width: 78 },
-    ];
-    guide.getRow(1).font = { bold: true };
-    for (const column of IMPORT_COLUMNS) {
-      guide.addRow({
-        column: column.label,
-        required: column.required ? 'Yes' : 'Optional',
-        help: column.help,
-      });
-    }
-    guide.addRow({});
-    guide.addRow({
-      column: 'Variants',
-      help: 'One Excel row = one colour + size. Repeat the Product Name so those rows become ONE product with many variants.',
-    });
-    guide.addRow({
-      column: 'Categories',
-      help: 'Categories must already exist — see the Reference sheet. Colours, sizes, brands, materials and occasions are created for you.',
-    });
-    guide.addRow({
-      column: 'Images',
-      help: 'Put full https image links in Image URLs (comma-separated). They attach to that row’s colour.',
-    });
-    guide.addRow({
-      column: 'SEO / Returns / Payment',
-      help: 'Optional columns: SEO Title, SEO Description, Payment (cod/prepaid/both), Returns (yes/no), Return Policy, Warranty (yes/no), Warranty Details.',
-    });
-    guide.addRow({
-      column: 'Important',
-      help: 'Delete or replace the example rows before importing for real — example names are unique so they will not clash with your live catalogue.',
-    });
-
+    // ── Sheet 1: Products ──────────────────────────────────────────────────
     const sheet = workbook.addWorksheet('Products');
-    sheet.columns = IMPORT_COLUMNS.map((column) => ({
-      header: column.label,
-      key: column.key,
-      width: Math.max(14, Math.min(38, column.label.length + 10)),
+    sheet.columns = IMPORT_COLUMNS.map((col) => ({
+      header: col.label,
+      key: col.key,
+      width: Math.max(16, Math.min(40, col.label.length + 12)),
     }));
     const header = sheet.getRow(1);
     header.font = { bold: true };
-    header.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F1F1' } };
-    header.alignment = { vertical: 'middle' };
+    header.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1A1A2E' } };
+    header.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    header.alignment = { vertical: 'middle', wrapText: false };
     sheet.views = [{ state: 'frozen', ySplit: 1 }];
 
     const [category] = await CategoryModel.find({ isDeleted: false, status: 'active' })
@@ -1245,88 +1512,333 @@ export class ProductImportService {
       .lean();
     const exampleCategory = (category as { name?: string } | undefined)?.name ?? 'Crop tops';
     const exampleName = `Bulk Template Sample Top ${new Date().toISOString().slice(0, 10)}`;
-    const sampleImage = 'https://images.unsplash.com/photo-1564257631407-4deb1f99d992?w=900&q=80';
+    const sampleImage1 = 'https://images.unsplash.com/photo-1564257631407-4deb1f99d992?w=900&q=80';
+    const sampleImage2 = 'https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=900&q=80';
 
+    // Row 1: Pink / S (with full product-level fields)
     sheet.addRow({
       name: exampleName,
+      handle: '',
+      shortDescription: 'Soft ruffle crop top',
+      description: 'Replace these rows with your real catalogue.',
+      status: 'draft',
+      visibility: 'public',
       category: exampleCategory,
-      color: 'Hot Pink',
-      size: 'S',
-      price: 9999,
-      salePrice: 7999,
-      stock: 10,
-      images: sampleImage,
       gender: 'women',
       brand: OFFICIAL_BRAND_NAME,
       material: 'Cotton',
       occasions: 'Casual, Party',
-      tags: 'sample',
-      shortDescription: 'Example product from the bulk upload template',
-      description:
-        'Replace these example rows with your real catalogue. Same product name = same product with multiple variants.',
-      specifications: 'Fit: Regular | Fabric care: Machine Wash | Neckline: Round Neck',
+      tags: 'sample, new',
+      price: 9999,
+      salePrice: 7999,
+      comparePrice: 11999,
+      color: 'Hot Pink',
+      size: 'S',
+      stock: 10,
+      sku: '',
+      ownListing: 'TRUE',
+      defaultListing: 'TRUE',
+      isBestSeller: 'FALSE',
+      isMoreToLove: 'FALSE',
+      isFeatured: 'FALSE',
+      fit: 'Regular',
+      fabricCare: 'Machine Wash Cold',
+      specifications: 'Neckline: Round Neck | Sleeve: Short Sleeve',
       seoTitle: `${exampleName} | FE`,
       seoDescription: 'Soft ruffle crop top available in multiple colours and sizes.',
-      paymentOption: 'both',
-      returnsAvailable: 'yes',
-      returnsCriteria: '7-day exchange if unused with tags',
-      warrantyAvailable: 'no',
-      status: 'draft',
+      returns: 'yes',
+      returnPolicy: '7-day exchange if unused with tags',
+      warranty: 'no',
+      warrantyDetails: '',
+      paymentMethod: 'both',
+      images: `${sampleImage1}, ${sampleImage2}`,
+      displayOrder: 1,
+      variantPosition: 1,
+      productPosition: 1,
     });
+    // Row 2: Pink / M (inherits images — leave blank)
     sheet.addRow({
       name: exampleName,
-      category: exampleCategory,
       color: 'Hot Pink',
       size: 'M',
       price: 9999,
       salePrice: 7999,
       stock: 6,
-      images: sampleImage,
+      ownListing: 'TRUE',
+      displayOrder: 2,
+      variantPosition: 2,
     });
+    // Row 3: Blue / S (new color, new images)
     sheet.addRow({
       name: exampleName,
-      category: exampleCategory,
-      color: 'Olive',
+      color: 'Blue',
       size: 'S',
       price: 9999,
       stock: 4,
-      images: 'https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=900&q=80',
+      ownListing: 'TRUE',
+      images: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=900&q=80',
+      displayOrder: 1,
+      variantPosition: 3,
+    });
+    // Row 4: Blue / M (inherits Blue images)
+    sheet.addRow({
+      name: exampleName,
+      color: 'Blue',
+      size: 'M',
+      price: 9999,
+      stock: 5,
+      ownListing: 'TRUE',
+      displayOrder: 2,
+      variantPosition: 4,
     });
 
+    // Mark required columns in yellow
+    const reqCols = new Set(IMPORT_COLUMNS.filter((c) => c.required).map((c) => c.key));
+    sheet.getRow(1).eachCell((cell, colNumber) => {
+      const colDef = IMPORT_COLUMNS[colNumber - 1];
+      if (colDef && reqCols.has(colDef.key)) {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFCC8800' } };
+      }
+    });
+
+    // ── Sheet 2: Reference ─────────────────────────────────────────────────
     const reference = workbook.addWorksheet('Reference');
     reference.columns = [
-      { header: 'Categories (use these)', key: 'category', width: 34 },
-      { header: 'Category slug', key: 'categorySlug', width: 30 },
-      { header: 'Existing colours', key: 'color', width: 24 },
-      { header: 'Existing sizes', key: 'size', width: 18 },
-      { header: 'Existing brands', key: 'brand', width: 24 },
+      { header: 'Categories (required)', key: 'category', width: 34 },
+      { header: 'Category Slug', key: 'categorySlug', width: 26 },
+      { header: 'Brands', key: 'brand', width: 24 },
+      { header: 'Materials / Fabric', key: 'material', width: 24 },
+      { header: 'Occasions', key: 'occasion', width: 24 },
+      { header: 'Sizes', key: 'size', width: 16 },
+      { header: 'Colors', key: 'color', width: 20 },
+      { header: 'Allowed Status', key: 'status', width: 18 },
+      { header: 'Allowed Gender', key: 'gender', width: 18 },
+      { header: 'Allowed Visibility', key: 'visibility', width: 22 },
+      { header: 'Allowed Payment', key: 'payment', width: 20 },
     ];
     reference.getRow(1).font = { bold: true };
+    reference.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F1F1' } };
 
-    const [categories, colors, sizes, brands] = await Promise.all([
+    const [categories, brands, materials, occasions, sizes, colors] = await Promise.all([
       CategoryModel.find({ isDeleted: false, status: 'active' })
         .select('name slug')
         .sort({ name: 1 })
         .lean(),
-      ColorModel.find({ isDeleted: false }).select('name').sort({ name: 1 }).lean(),
-      SizeModel.find({ isDeleted: false }).select('name').sort({ name: 1 }).lean(),
       BrandModel.find({ isDeleted: false }).select('name').sort({ name: 1 }).lean(),
+      MaterialModel.find({ isDeleted: false }).select('name').sort({ name: 1 }).lean(),
+      OccasionModel.find({ isDeleted: false }).select('name').sort({ name: 1 }).lean(),
+      SizeModel.find({ isDeleted: false }).select('name').sort({ name: 1 }).lean(),
+      ColorModel.find({ isDeleted: false }).select('name').sort({ name: 1 }).lean(),
     ]);
 
+    const staticStatus = ['draft', 'active'];
+    const staticGender = ['women', 'men', 'unisex', 'kids'];
+    const staticVisibility = ['public', 'hidden', 'catalog_only'];
+    const staticPayment = ['both', 'cod', 'prepaid'];
+
     const nameOf = (row: unknown) => String((row as { name?: string })?.name ?? '');
-    const rowCount = Math.max(categories.length, colors.length, sizes.length, brands.length);
-    for (let index = 0; index < rowCount; index += 1) {
+    const slugOf = (row: unknown) => String((row as { slug?: string })?.slug ?? '');
+    const rowCount = Math.max(
+      categories.length,
+      brands.length,
+      materials.length,
+      occasions.length,
+      sizes.length,
+      colors.length,
+      staticStatus.length,
+    );
+    for (let i = 0; i < rowCount; i += 1) {
       reference.addRow({
-        category: nameOf(categories[index]),
-        categorySlug: String((categories[index] as { slug?: string } | undefined)?.slug ?? ''),
-        color: nameOf(colors[index]),
-        size: nameOf(sizes[index]),
-        brand: nameOf(brands[index]),
+        category: nameOf(categories[i]),
+        categorySlug: slugOf(categories[i]),
+        brand: nameOf(brands[i]),
+        material: nameOf(materials[i]),
+        occasion: nameOf(occasions[i]),
+        size: nameOf(sizes[i]),
+        color: nameOf(colors[i]),
+        status: staticStatus[i] ?? '',
+        gender: staticGender[i] ?? '',
+        visibility: staticVisibility[i] ?? '',
+        payment: staticPayment[i] ?? '',
       });
     }
 
+    // ── Sheet 3: Instructions ──────────────────────────────────────────────
+    const instructions = workbook.addWorksheet('Instructions');
+    instructions.columns = [
+      { header: 'Topic', key: 'topic', width: 26 },
+      { header: 'Explanation', key: 'explanation', width: 90 },
+    ];
+    instructions.getRow(1).font = { bold: true };
+    instructions.getRow(1).fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF1A1A2E' },
+    };
+    instructions.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+
+    const instructionRows: Array<{ topic: string; explanation: string }> = [
+      {
+        topic: 'Overview',
+        explanation:
+          'One Excel row = one Color + Size variant. Rows that share the same Product Name (or Handle) become ONE product with many variants.',
+      },
+      {
+        topic: 'Required columns',
+        explanation:
+          'Product Name, Category, Selling Price are required on every row. All other columns are optional.',
+      },
+      {
+        topic: 'Adding variants',
+        explanation:
+          'To add multiple sizes to one color: repeat the Product Name, same Color, different Size on each row. To add multiple colors: repeat the Product Name, new Color, and new images.',
+      },
+      {
+        topic: 'Adding colors',
+        explanation:
+          'Each color should appear on its own row. Use Own Listing = TRUE to show the color as a separate product card on the storefront.',
+      },
+      {
+        topic: 'Default Listing',
+        explanation:
+          'Set Default Listing = TRUE on exactly one color row per product. This controls which card appears in category listings. If none is set, the first variant becomes default.',
+      },
+      {
+        topic: 'Multiple images',
+        explanation:
+          "Paste comma-separated image URLs in the Image URLs column. Example: https://cdn.example.com/img1.jpg, https://cdn.example.com/img2.jpg. Images download into your store's storage.",
+      },
+      {
+        topic: 'Image inheritance',
+        explanation:
+          'Leave Image URLs blank on same-color rows. The first image set for that color is automatically reused for every size of that color.',
+      },
+      {
+        topic: 'Specifications',
+        explanation:
+          'Use Additional Specifications for detail rows in the format: Name: Value | Name: Value. Fit and Fabric Care have their own shortcut columns.',
+      },
+      {
+        topic: 'Fit & Fabric Care',
+        explanation:
+          'Fill the Fit column (e.g. Regular, Slim Fit) and the Fabric Care column (e.g. Machine Wash Cold) to auto-add those as product specifications.',
+      },
+      {
+        topic: 'Homepage sections',
+        explanation:
+          'Set Homepage Best Seller / More To Love / Featured = TRUE to feature the product in those homepage sections.',
+      },
+      {
+        topic: 'Duplicate rows',
+        explanation:
+          'Each Color + Size combination must be unique per product. Remove exact duplicate rows before uploading.',
+      },
+      {
+        topic: 'Categories',
+        explanation:
+          'Categories must already exist in the admin. Use the exact name or slug from the Reference sheet. Colors, Sizes, Brands, Materials, and Occasions are created automatically if missing.',
+      },
+      {
+        topic: 'Status',
+        explanation:
+          'draft = saved but not visible. active = live on storefront. You can also "Publish immediately" in the upload dialog.',
+      },
+      {
+        topic: 'Visibility',
+        explanation:
+          'public = visible everywhere. hidden = not shown. catalog_only = shown in catalog but not in search.',
+      },
+      {
+        topic: 'Common mistakes',
+        explanation:
+          '1) Misspelling the Category name (check Reference sheet). 2) Putting a sale price higher than the selling price. 3) Non-https image URLs. 4) Different product names for the same product (check spelling and whitespace).',
+      },
+      {
+        topic: 'CSV support',
+        explanation:
+          'You can also upload a .csv file instead of .xlsx. The same column names apply. Use comma as separator.',
+      },
+      {
+        topic: 'Export & re-import',
+        explanation:
+          'You can export existing products from Admin → Products → Export Products. The export uses the same column format so you can edit and re-import.',
+      },
+    ];
+
+    for (const instr of instructionRows) {
+      const r = instructions.addRow(instr);
+      r.getCell('explanation').alignment = { wrapText: true };
+    }
+    instructions.getRow(1).height = 22;
+
     const buffer = await workbook.xlsx.writeBuffer();
     return Buffer.from(buffer);
+  }
+
+  /** Single-sheet CSV template (headers + sample rows). */
+  buildCsvTemplate(): string {
+    const headers = IMPORT_COLUMNS.map((c) => `"${c.label}"`).join(',');
+    const sampleImage1 = 'https://images.unsplash.com/photo-1564257631407-4deb1f99d992?w=900&q=80';
+    const sampleName = `Bulk Template Sample Top`;
+
+    const row1Values: Record<string, string | number> = {
+      'Product Name': sampleName,
+      Handle: '',
+      'Short Description': 'Soft ruffle crop top',
+      Description: 'Replace these rows with your real catalogue.',
+      Status: 'draft',
+      Visibility: 'public',
+      Category: 'Crop tops',
+      Gender: 'women',
+      Brand: OFFICIAL_BRAND_NAME,
+      Material: 'Cotton',
+      Occasions: 'Casual, Party',
+      Tags: 'sample',
+      'Selling Price': 9999,
+      'Sale Price': 7999,
+      'Compare Price': 11999,
+      Color: 'Hot Pink',
+      Size: 'S',
+      Stock: 10,
+      'Variant SKU': '',
+      'Own Listing': 'TRUE',
+      'Default Listing': 'TRUE',
+      'Homepage Best Seller': 'FALSE',
+      'Homepage More To Love': 'FALSE',
+      'Homepage Featured': 'FALSE',
+      Fit: 'Regular',
+      'Fabric Care': 'Machine Wash Cold',
+      'Additional Specifications': 'Neckline: Round Neck | Sleeve: Short Sleeve',
+      'SEO Title': `${sampleName} | FE`,
+      'SEO Description': 'Soft ruffle crop top.',
+      Returns: 'yes',
+      'Return Policy': '7-day exchange if unused with tags',
+      Warranty: 'no',
+      'Warranty Details': '',
+      'Payment Method': 'both',
+      'Image URLs': sampleImage1,
+      'Display Order': 1,
+      'Variant Position': 1,
+      'Product Position': 1,
+    };
+    const row2Values: Record<string, string | number> = {
+      'Product Name': sampleName,
+      Color: 'Hot Pink',
+      Size: 'M',
+      'Selling Price': 9999,
+      'Sale Price': 7999,
+      Stock: 6,
+      'Variant Position': 2,
+    };
+
+    const toCsvRow = (values: Record<string, string | number>) => {
+      return IMPORT_COLUMNS.map((col) => {
+        const v = values[col.label] ?? '';
+        return `"${String(v).replace(/"/g, '""')}"`;
+      }).join(',');
+    };
+
+    return `${headers}\n${toCsvRow(row1Values)}\n${toCsvRow(row2Values)}\n`;
   }
 }
 

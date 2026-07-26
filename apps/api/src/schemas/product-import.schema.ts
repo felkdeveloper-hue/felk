@@ -1,5 +1,9 @@
 import { z } from 'zod';
-import { PRODUCT_IMPORT_BATCH_LIMIT, PRODUCT_STATUS } from '@/constants/product';
+import {
+  PRODUCT_IMPORT_BATCH_LIMIT,
+  PRODUCT_STATUS,
+  PRODUCT_VISIBILITY,
+} from '@/constants/product';
 
 const importVariantSchema = z.object({
   row: z.number().int().min(0).default(0),
@@ -7,9 +11,14 @@ const importVariantSchema = z.object({
   size: z.string().trim().max(120).default(''),
   price: z.number().positive(),
   salePrice: z.number().min(0).nullable().default(null),
+  comparePrice: z.number().min(0).nullable().default(null),
   stock: z.number().int().min(0).nullable().default(null),
   sku: z.string().trim().max(64).default(''),
-  images: z.array(z.string().url()).max(12).default([]),
+  images: z.array(z.string().url()).max(20).default([]),
+  ownListing: z.boolean().default(false),
+  defaultListing: z.boolean().default(false),
+  displayOrder: z.number().int().min(0).default(0),
+  variantPosition: z.number().int().min(0).default(0),
 });
 
 const importProductSchema = z.object({
@@ -42,6 +51,10 @@ const importProductSchema = z.object({
   warrantyAvailable: z.boolean().default(false),
   warrantyDetails: z.string().trim().max(500).default(''),
   status: z.enum([PRODUCT_STATUS.DRAFT, PRODUCT_STATUS.ACTIVE]).default(PRODUCT_STATUS.DRAFT),
+  visibility: z.string().trim().max(40).default(PRODUCT_VISIBILITY.PUBLIC),
+  isBestSeller: z.boolean().default(false),
+  isMoreToLove: z.boolean().default(false),
+  isFeatured: z.boolean().default(false),
   rows: z.array(z.number().int().min(0)).default([]),
   variants: z.array(importVariantSchema).min(1).max(200),
 });

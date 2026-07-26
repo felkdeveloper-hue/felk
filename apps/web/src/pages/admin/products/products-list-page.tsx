@@ -14,7 +14,7 @@ import { ADMIN_ROUTES, QUERY_KEYS } from '@/constants';
 import { useAdminPermissions } from '@/hooks/admin';
 import { cn, formatCurrency, formatDate } from '@/lib/utils';
 import { normalizeProductStatusFilter } from '@/lib/product-status';
-import { inventoryApi, productsApi } from '@/services/sdk/admin';
+import { inventoryApi, productsApi, productImportApi } from '@/services/sdk/admin';
 
 function productHref(productId: string, section?: string) {
   const base = ADMIN_ROUTES.productDetail.replace('$productId', productId);
@@ -34,6 +34,7 @@ export function ProductsListPage() {
   const [status, setStatus] = useState('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkUploadOpen, setBulkUploadOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const params = useMemo(
     () => ({
@@ -129,6 +130,22 @@ export function ProductsListPage() {
         description="Manage catalog products, variants, media, and SEO."
         actions={
           <>
+            {products.export ? (
+              <button
+                type="button"
+                className="admin-btn admin-btn-secondary admin-btn-lg"
+                disabled={exporting}
+                onClick={() => {
+                  setExporting(true);
+                  productImportApi
+                    .exportProducts(status ? { status } : undefined)
+                    .catch(() => {})
+                    .finally(() => setExporting(false));
+                }}
+              >
+                {exporting ? 'Exporting…' : 'Export products'}
+              </button>
+            ) : null}
             {products.import || products.create ? (
               <button
                 type="button"
