@@ -1,9 +1,10 @@
-import { lazy } from 'react';
-import { createRoute, redirect } from '@tanstack/react-router';
+import { lazy, Suspense } from 'react';
+import { createRoute, Outlet, redirect } from '@tanstack/react-router';
 import { ADMIN_ROUTES, PERMISSIONS } from '@/constants';
 import { AdminLayout } from '@/layouts';
 import { AdminStaffRoute, AdminPermissionRoute } from '@/guards';
 import { PlaceholderModulePage } from '@/components/admin';
+import { Skeleton } from '@/components/ui/skeleton';
 import { rootRoute } from './root-route';
 
 /** Keep admin pages out of the storefront JS bundle. */
@@ -49,6 +50,15 @@ const ForbiddenPage = lazy(() =>
   import('@/pages/admin/auth/forbidden-page').then((m) => ({ default: m.ForbiddenPage })),
 );
 
+function AdminLazyFallback() {
+  return (
+    <div className="space-y-4 py-2" aria-busy="true">
+      <Skeleton className="h-8 w-48" />
+      <Skeleton className="h-64 w-full" />
+    </div>
+  );
+}
+
 export const adminLayoutRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/admin',
@@ -80,7 +90,9 @@ const adminDashboardRoute = createRoute({
     <AdminPermissionRoute
       permissions={[PERMISSIONS.REPORTS_VIEW, PERMISSIONS.ANALYTICS_VIEW, PERMISSIONS.ORDERS_VIEW]}
     >
-      <DashboardPage />
+      <Suspense fallback={<AdminLazyFallback />}>
+        <DashboardPage />
+      </Suspense>
     </AdminPermissionRoute>
   ),
 });
@@ -88,31 +100,43 @@ const adminDashboardRoute = createRoute({
 const adminProductsRoute = createRoute({
   getParentRoute: () => adminLayoutRoute,
   path: 'products',
+  component: () => <Outlet />,
+});
+
+const adminProductsIndexRoute = createRoute({
+  getParentRoute: () => adminProductsRoute,
+  path: '/',
   component: () => (
     <AdminPermissionRoute permissions={[PERMISSIONS.PRODUCTS_VIEW]}>
-      <ProductsListPage />
+      <Suspense fallback={<AdminLazyFallback />}>
+        <ProductsListPage />
+      </Suspense>
     </AdminPermissionRoute>
   ),
 });
 
 const adminProductNewRoute = createRoute({
-  getParentRoute: () => adminLayoutRoute,
-  path: 'products/new',
+  getParentRoute: () => adminProductsRoute,
+  path: 'new',
   component: () => (
     <AdminPermissionRoute permissions={[PERMISSIONS.PRODUCTS_CREATE]}>
-      <ProductFormPage />
+      <Suspense fallback={<AdminLazyFallback />}>
+        <ProductFormPage />
+      </Suspense>
     </AdminPermissionRoute>
   ),
 });
 
 const adminProductDetailRoute = createRoute({
-  getParentRoute: () => adminLayoutRoute,
-  path: 'products/$productId',
+  getParentRoute: () => adminProductsRoute,
+  path: '$productId',
   component: function AdminProductDetailRoute() {
     const { productId } = adminProductDetailRoute.useParams();
     return (
       <AdminPermissionRoute permissions={[PERMISSIONS.PRODUCTS_VIEW]}>
-        <ProductFormPage productId={productId} />
+        <Suspense fallback={<AdminLazyFallback />}>
+          <ProductFormPage productId={productId} />
+        </Suspense>
       </AdminPermissionRoute>
     );
   },
@@ -349,9 +373,11 @@ export const adminRouteTree = adminLayoutRoute.addChildren([
   adminIndexRoute,
   adminForbiddenRoute,
   adminDashboardRoute,
-  adminProductNewRoute,
-  adminProductDetailRoute,
-  adminProductsRoute,
+  adminProductsRoute.addChildren([
+    adminProductsIndexRoute,
+    adminProductNewRoute,
+    adminProductDetailRoute,
+  ]),
   adminFiltersRoute,
   adminBannersRoute,
   adminMegaMenuRoute,

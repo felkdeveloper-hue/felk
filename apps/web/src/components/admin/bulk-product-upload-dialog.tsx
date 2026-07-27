@@ -3,6 +3,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   Download,
+  FileArchive,
   FileSpreadsheet,
   FileText,
   Upload,
@@ -94,8 +95,11 @@ export function BulkProductUploadDialog({
   onImported,
 }: BulkProductUploadDialogProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const zipInputRef = useRef<HTMLInputElement>(null);
   const [stage, setStage] = useState<Stage>('select');
   const [file, setFile] = useState<File | null>(null);
+  const [imagesZip, setImagesZip] = useState<File | null>(null);
+  const [imagesSessionId, setImagesSessionId] = useState<string | null>(null);
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   // Editable local copy of products
   const [editedProducts, setEditedProducts] = useState<ImportProductInput[]>([]);
@@ -121,6 +125,8 @@ export function BulkProductUploadDialog({
   const reset = () => {
     setStage('select');
     setFile(null);
+    setImagesZip(null);
+    setImagesSessionId(null);
     setPreview(null);
     setEditedProducts([]);
     setPublish(false);
@@ -144,23 +150,32 @@ export function BulkProductUploadDialog({
     onError: (error) => toast.error(errorMessage(error, 'Could not download the CSV template.')),
   });
 
+  const sampleZipMutation = useMutation({
+    mutationFn: () => productImportApi.downloadSampleImagesZip(),
+    onError: (error) =>
+      toast.error(errorMessage(error, 'Could not download the sample images ZIP.')),
+  });
+
   const previewMutation = useMutation({
-    mutationFn: (selected: File) => productImportApi.preview(selected),
+    mutationFn: ({ sheet, zip }: { sheet: File; zip: File | null }) =>
+      productImportApi.preview(sheet, zip),
     onSuccess: (data) => {
       setPreview(data);
       setEditedProducts(data.products);
+      setImagesSessionId(data.imagesSessionId ?? null);
       setStage('preview');
     },
     onError: (error) => {
-      setFile(null);
       toast.error(errorMessage(error, 'Could not read that file.'));
     },
   });
 
-  const handleFile = (selected: File | undefined) => {
-    if (!selected) return;
-    setFile(selected);
-    previewMutation.mutate(selected);
+  const runPreview = () => {
+    if (!file) {
+      toast.error('Choose an Excel or CSV file first.');
+      return;
+    }
+    previewMutation.mutate({ sheet: file, zip: imagesZip });
   };
 
   /** Update a field in the editable preview. */
@@ -220,7 +235,11 @@ export function BulkProductUploadDialog({
     for (let index = 0; index < queue.length; index += PRODUCT_IMPORT_BATCH_SIZE) {
       const batch = queue.slice(index, index + PRODUCT_IMPORT_BATCH_SIZE);
       try {
-        const response = await productImportApi.importBatch(batch, publish);
+        const response = await productImportApi.importBatch(batch, publish, {
+          imagesSessionId,
+          // Without a preview session, re-send ZIP each batch so filename refs still resolve
+          imagesZip: imagesSessionId ? null : imagesZip,
+        });
         collected.push(...response.results);
       } catch (error) {
         for (const product of batch) {
@@ -260,8 +279,8 @@ export function BulkProductUploadDialog({
         <DialogHeader>
           <DialogTitle>Bulk upload products</DialogTitle>
           <DialogDescription>
-            Download the Excel template, fill in your products (one row = one colour + size), then
-            upload. Preview and edit before confirming. Nothing is created until you click Import.
+            Download the template, fill your catalogue, optionally attach an images ZIP, then
+            preview before importing. Nothing is created until you click Import.
           </DialogDescription>
         </DialogHeader>
 
@@ -271,25 +290,30 @@ export function BulkProductUploadDialog({
             <ol className="space-y-2 text-sm text-[var(--admin-ink)]">
               <li className="flex gap-2">
                 <span className="font-bold">1.</span>
-                <span>
-                  Download the Excel or CSV template. The Reference sheet lists your categories,
-                  brands, sizes and colors. The Instructions sheet explains every column.
-                </span>
+                <span>Download Template</span>
               </li>
               <li className="flex gap-2">
                 <span className="font-bold">2.</span>
                 <span>
-                  Fill in your catalogue. Same Product Name on multiple rows = one product with
-                  those colour/size variants. Leave Image URLs blank on same-color rows to reuse
-                  earlier images.
+                  Fill Excel — same Product Name on multiple rows = one product with those
+                  colour/size variants. Leave Images blank on same-color rows to reuse earlier
+                  images.
                 </span>
               </li>
               <li className="flex gap-2">
                 <span className="font-bold">3.</span>
                 <span>
-                  Upload here, review the preview (you can edit prices, stock and status inline),
-                  then confirm.
+                  (Optional) Upload ZIP containing all product images. The image names inside the
+                  ZIP should match the names used in the Excel.
                 </span>
+              </li>
+              <li className="flex gap-2">
+                <span className="font-bold">4.</span>
+                <span>Preview</span>
+              </li>
+              <li className="flex gap-2">
+                <span className="font-bold">5.</span>
+                <span>Import</span>
               </li>
             </ol>
 
@@ -316,32 +340,127 @@ export function BulkProductUploadDialog({
 
               <button
                 type="button"
-                className="admin-btn admin-btn-primary inline-flex items-center gap-2"
-                disabled={previewMutation.isPending}
-                onClick={() => fileInputRef.current?.click()}
+                className="admin-btn admin-btn-secondary inline-flex items-center gap-2"
+                disabled={sampleZipMutation.isPending}
+                onClick={() => sampleZipMutation.mutate()}
               >
-                <Upload className="h-4 w-4" />
-                {previewMutation.isPending ? 'Checking sheet…' : 'Upload Excel / CSV'}
+                <FileArchive className="h-4 w-4" />
+                {sampleZipMutation.isPending ? 'Preparing…' : 'Download Sample ZIP'}
               </button>
-
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".xlsx,.xlsm,.csv"
-                className="hidden"
-                onChange={(event) => {
-                  handleFile(event.target.files?.[0]);
-                  event.target.value = '';
-                }}
-              />
             </div>
 
-            {file ? (
-              <p className="flex items-center gap-2 text-xs text-[var(--admin-ink-muted)]">
-                <FileSpreadsheet className="h-4 w-4" />
-                {file.name}
-              </p>
-            ) : null}
+            <div className="space-y-3 border border-[var(--admin-line)] p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  className="admin-btn admin-btn-primary inline-flex items-center gap-2"
+                  disabled={previewMutation.isPending}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Upload className="h-4 w-4" />
+                  Choose Excel / CSV
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".xlsx,.xlsm,.csv"
+                  className="hidden"
+                  onChange={(event) => {
+                    const selected = event.target.files?.[0];
+                    if (selected) setFile(selected);
+                    event.target.value = '';
+                  }}
+                />
+                {file ? (
+                  <span className="inline-flex items-center gap-2 text-xs text-[var(--admin-ink)]">
+                    <FileSpreadsheet className="h-4 w-4" />
+                    {file.name}
+                    <button
+                      type="button"
+                      className="text-[var(--admin-ink-muted)] hover:text-[var(--admin-ink)]"
+                      aria-label="Remove spreadsheet"
+                      onClick={() => setFile(null)}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </span>
+                ) : (
+                  <span className="text-xs text-[var(--admin-ink-muted)]">Required</span>
+                )}
+              </div>
+
+              <div className="border-t border-[var(--admin-line)] pt-3">
+                <p className="text-sm font-semibold text-[var(--admin-ink)]">
+                  Product Images (Optional)
+                </p>
+                <p className="mt-1 text-xs text-[var(--admin-ink-muted)]">
+                  Upload a ZIP containing all product images. Supported: .zip
+                </p>
+                <p className="mt-1 font-mono text-[11px] leading-relaxed text-[var(--admin-ink-muted)]">
+                  Example:
+                  <br />
+                  shirt-black-front.jpg
+                  <br />
+                  shirt-black-back.jpg
+                  <br />
+                  shirt-white-front.jpg
+                  <br />
+                  hoodie-1.jpg
+                </p>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    className="admin-btn admin-btn-secondary inline-flex items-center gap-2"
+                    disabled={previewMutation.isPending}
+                    onClick={() => zipInputRef.current?.click()}
+                  >
+                    <FileArchive className="h-4 w-4" />
+                    Choose ZIP
+                  </button>
+                  <input
+                    ref={zipInputRef}
+                    type="file"
+                    accept=".zip,application/zip"
+                    className="hidden"
+                    onChange={(event) => {
+                      const selected = event.target.files?.[0];
+                      if (!selected) return;
+                      if (!/\.zip$/i.test(selected.name)) {
+                        toast.error('Only .zip files are supported for product images.');
+                        event.target.value = '';
+                        return;
+                      }
+                      setImagesZip(selected);
+                      event.target.value = '';
+                    }}
+                  />
+                  {imagesZip ? (
+                    <span className="inline-flex items-center gap-2 text-xs text-[var(--admin-ink)]">
+                      <FileArchive className="h-4 w-4" />
+                      {imagesZip.name}
+                      <button
+                        type="button"
+                        className="text-[var(--admin-ink-muted)] hover:text-[var(--admin-ink)]"
+                        aria-label="Remove images ZIP"
+                        onClick={() => setImagesZip(null)}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              className="admin-btn admin-btn-primary inline-flex items-center gap-2"
+              disabled={!file || previewMutation.isPending}
+              onClick={runPreview}
+            >
+              <Upload className="h-4 w-4" />
+              {previewMutation.isPending ? 'Checking files…' : 'Preview'}
+            </button>
           </div>
         ) : null}
 
@@ -358,6 +477,13 @@ export function BulkProductUploadDialog({
               <Stat label="Already exist" value={groups.duplicates.length} tone="warn" />
               <Stat label="Will import" value={groups.importable.length} tone="good" />
             </div>
+
+            {preview.zipSummary ? (
+              <p className="text-xs text-[var(--admin-ink-muted)]">
+                Images ZIP ready: {preview.zipSummary.imageCount} image
+                {preview.zipSummary.imageCount === 1 ? '' : 's'} extracted for this import session.
+              </p>
+            ) : null}
 
             {/* Validation issues */}
             {preview.issues.length > 0 ? (

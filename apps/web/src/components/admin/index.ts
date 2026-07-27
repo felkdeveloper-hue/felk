@@ -23,7 +23,6 @@ export {
 export { CmsResourceListPage } from './cms-resource-list-page';
 export { ModuleHubPage, PlaceholderModulePage } from './placeholder-module-page';
 export { ProductCommercePanels, type ProductSection } from './product-commerce-panels';
-export { BulkProductUploadDialog } from './bulk-product-upload-dialog';
 export { ImageUploader } from './image-uploader';
 export { CategoryTreePicker } from './category-tree-picker';
 export type { CategoryPickerNode } from './category-tree-picker';

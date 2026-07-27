@@ -17,9 +17,12 @@ import { asyncHandler } from '@/utils/async-handler';
 import { ApiResponse } from '@/utils/response/api-response';
 import {
   multiImageUpload,
+  productImportPreviewUpload,
+  productImportZipOnlyUpload,
   singleImageUpload,
-  singleSpreadsheetUpload,
 } from '@/utils/file-upload.helper';
+import { unlink } from 'node:fs/promises';
+import type { NextFunction, Request, Response } from 'express';
 import { cmsListQuerySchema } from '@/schemas/cms.shared.schema';
 import { productImportSchema } from '@/schemas/product-import.schema';
 import * as S from '@/schemas/product.schema';
@@ -220,30 +223,87 @@ catalogRouter.get(
   }),
 );
 
+catalogRouter.get(
+  '/products/import/sample-images.zip',
+  authorizeAny(...importPerms),
+  asyncHandler(async (_req, res) => {
+    const zip = await productImportService.buildSampleImagesZip();
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename="felk-product-import-sample-images.zip"',
+    );
+    res.send(zip);
+  }),
+);
+
 catalogRouter.post(
   '/products/import/preview',
   authorizeAny(...importPerms),
-  singleSpreadsheetUpload('file'),
+  ...productImportPreviewUpload(),
   asyncHandler(async (req, res) => {
-    if (!req.file) {
+    const uploaded = req.files as { [field: string]: Express.Multer.File[] } | undefined;
+    const sheet = uploaded?.file?.[0];
+    const imagesZip = uploaded?.imagesZip?.[0];
+    if (!sheet) {
       return ApiResponse.error(res, 'File is required', 400, 'FILE_REQUIRED');
     }
-    ApiResponse.success(res, await productImportService.preview(req.file));
+    try {
+      ApiResponse.success(res, await productImportService.preview(sheet, imagesZip));
+    } finally {
+      for (const file of [sheet, imagesZip]) {
+        if (file?.path) void unlink(file.path).catch(() => undefined);
+      }
+    }
   }),
 );
 
 catalogRouter.post(
   '/products/import',
   authorizeAny(...importPerms),
+  (req: Request, res: Response, next: NextFunction) => {
+    const contentType = String(req.headers['content-type'] ?? '');
+    if (!contentType.includes('multipart/form-data')) {
+      next();
+      return;
+    }
+    productImportZipOnlyUpload.single('imagesZip')(req, res, (err: unknown) => {
+      if (err) {
+        next(err);
+        return;
+      }
+      try {
+        if (typeof req.body.products === 'string') {
+          req.body.products = JSON.parse(req.body.products);
+        }
+        if (typeof req.body.publish === 'string') {
+          req.body.publish = req.body.publish === 'true';
+        }
+        if (typeof req.body.imagesSessionId === 'string' && !req.body.imagesSessionId.trim()) {
+          delete req.body.imagesSessionId;
+        }
+      } catch {
+        ApiResponse.error(res, 'Invalid products payload', 400, 'INVALID_PAYLOAD');
+        return;
+      }
+      next();
+    });
+  },
   validate({ body: productImportSchema }),
   asyncHandler(async (req, res) => {
-    ApiResponse.success(
-      res,
-      await productImportService.importProducts(req.body.products, actorFromRequest(req), {
-        publish: req.body.publish === true,
-      }),
-      'Import batch complete',
-    );
+    try {
+      ApiResponse.success(
+        res,
+        await productImportService.importProducts(req.body.products, actorFromRequest(req), {
+          publish: req.body.publish === true,
+          imagesSessionId: req.body.imagesSessionId,
+          imagesZip: req.file,
+        }),
+        'Import batch complete',
+      );
+    } finally {
+      if (req.file?.path) void unlink(req.file.path).catch(() => undefined);
+    }
   }),
 );
 

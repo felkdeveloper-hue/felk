@@ -1,4 +1,3 @@
-import { Link } from '@tanstack/react-router';
 import { ROUTES } from '@/constants';
 
 interface ErrorLayoutProps {
@@ -30,12 +29,13 @@ export function ErrorLayout({
             Try again
           </button>
         ) : null}
-        <Link
-          to={ROUTES.home}
+        {/* Plain anchor — ErrorBoundary renders this outside RouterProvider */}
+        <a
+          href={ROUTES.home}
           className="rounded-md border border-neutral-200 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-100"
         >
           Back home
-        </Link>
+        </a>
       </div>
     </div>
   );

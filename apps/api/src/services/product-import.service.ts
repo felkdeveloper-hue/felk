@@ -25,9 +25,17 @@ import {
 import { ProductModel } from '@/models/product.models';
 import type { ActorMeta } from '@/services/cms-crud.service';
 import { inventoryService } from '@/services/inventory.service';
-import { attachImportImages } from '@/services/product-import-image.service';
+import { attachImportImages, uploadImportZipImage } from '@/services/product-import-image.service';
+import {
+  createImportZipSession,
+  getImportZipSession,
+  isSupportedImportImageFilename,
+  buildSampleImagesZip,
+  type ImportZipSession,
+} from '@/services/product-import-zip.service';
 import { productService } from '@/services/product.service';
 import { productVariantService } from '@/services/product-variant.service';
+import { readFile } from 'node:fs/promises';
 import { ApiError } from '@/utils/errors/api-error';
 import { slugify } from '@/utils/slug.helper';
 
@@ -376,11 +384,11 @@ export const IMPORT_COLUMNS: ColumnDef[] = [
   // ── Images ────────────────────────────────────────────────────────────────
   {
     key: 'images',
-    label: 'Image URLs',
+    label: 'Images',
     aliases: ['image', 'images', 'imageurl', 'photo', 'photos', 'imagelinks', 'imageurls'],
     required: false,
-    help: "Full https links, comma-separated. Attach to this row's colour variant. Blank rows of the same colour reuse earlier images.",
-    example: 'https://example.com/img1.jpg, https://example.com/img2.jpg',
+    help: 'HTTPS image links and/or ZIP filenames, comma-separated (e.g. https://cdn.example.com/a.jpg or shirt-front.jpg). Upload an images ZIP with matching filenames. Blank same-colour rows reuse earlier images.',
+    example: 'shirt-front.jpg, shirt-back.jpg',
   },
   // ── Positions ─────────────────────────────────────────────────────────────
   {
@@ -503,6 +511,9 @@ export interface ImportPreview {
     issues: number;
     duplicates: number;
   };
+  /** Present when an images ZIP was uploaded — pass back on import batches. */
+  imagesSessionId?: string | null;
+  zipSummary?: { imageCount: number } | null;
 }
 
 export interface ImportProductResult {
@@ -617,6 +628,64 @@ function isHttpUrl(value: string): boolean {
   return /^https?:\/\/\S+$/i.test(value);
 }
 
+function validateImageRef(
+  value: string,
+  zipLookup: Map<string, string> | null,
+): { ok: true } | { ok: false; message: string } {
+  if (isHttpUrl(value)) return { ok: true };
+  if (!isSupportedImportImageFilename(value)) {
+    return {
+      ok: false,
+      message: `Image "${value}" has an unsupported format. Use jpg, jpeg, png, webp, avif, or a full https:// link.`,
+    };
+  }
+  if (!zipLookup) {
+    return {
+      ok: false,
+      message: `Image "${value}" is not a URL. Upload an images ZIP or use a full https:// link.`,
+    };
+  }
+  if (!zipLookup.has(value.trim().toLowerCase())) {
+    return {
+      ok: false,
+      message: `Image "${value}" not found in ZIP.`,
+    };
+  }
+  return { ok: true };
+}
+
+async function resolveImportImageUrls(
+  images: string[],
+  productHandle: string,
+  zipLookup: Map<string, string> | null,
+  urlCache: Map<string, string>,
+): Promise<string[]> {
+  const resolved: string[] = [];
+  for (const ref of images) {
+    if (isHttpUrl(ref)) {
+      resolved.push(ref);
+      continue;
+    }
+    const key = ref.trim().toLowerCase();
+    const cached = urlCache.get(key);
+    if (cached) {
+      resolved.push(cached);
+      continue;
+    }
+    if (!zipLookup) {
+      throw new Error(`Image "${ref}" requires an images ZIP.`);
+    }
+    const localPath = zipLookup.get(key);
+    if (!localPath) {
+      throw new Error(`Image "${ref}" not found in ZIP.`);
+    }
+    const publicUrl = await uploadImportZipImage(localPath, productHandle);
+    urlCache.set(key, publicUrl);
+    resolved.push(publicUrl);
+  }
+  return resolved;
+}
+
 function parseYesNo(value: string, fallback: boolean): boolean | null {
   const key = normalizeKey(value);
   if (!key) return fallback;
@@ -726,11 +795,21 @@ async function readSheet(file: Express.Multer.File): Promise<string[][]> {
     file.mimetype === 'application/csv' ||
     /\.csv$/i.test(file.originalname ?? '');
 
-  if (isCsv) return parseCsv(file.buffer.toString('utf8'));
+  const buffer =
+    file.buffer && file.buffer.length > 0
+      ? file.buffer
+      : file.path
+        ? await readFile(file.path)
+        : null;
+  if (!buffer) {
+    throw ApiError.badRequest('Uploaded file has no content.', undefined, 'IMPORT_FILE_EMPTY');
+  }
+
+  if (isCsv) return parseCsv(buffer.toString('utf8'));
 
   const workbook = new ExcelJS.Workbook();
   try {
-    await workbook.xlsx.load(file.buffer as unknown as Parameters<typeof workbook.xlsx.load>[0]);
+    await workbook.xlsx.load(buffer as unknown as Parameters<typeof workbook.xlsx.load>[0]);
   } catch {
     throw ApiError.badRequest(
       'That file could not be read. Save it as .xlsx or .csv and try again.',
@@ -818,7 +897,10 @@ function toRawRows(grid: string[][]): { rows: RawRow[]; headers: ImportColumnKey
 /* Rows -> validated products                                                 */
 /* -------------------------------------------------------------------------- */
 
-function buildProducts(rows: RawRow[]): { products: ImportProductInput[]; issues: ImportIssue[] } {
+function buildProducts(
+  rows: RawRow[],
+  zipLookup: Map<string, string> | null = null,
+): { products: ImportProductInput[]; issues: ImportIssue[] } {
   const issues: ImportIssue[] = [];
   const products = new Map<string, ImportProductInput>();
   const seenVariants = new Map<string, Set<string>>();
@@ -886,12 +968,19 @@ function buildProducts(rows: RawRow[]): { products: ImportProductInput[]; issues
 
     // ── Images ──────────────────────────────────────────────────────────────
     const images = splitList(values.images ?? '');
-    const badImage = images.find((url) => !isHttpUrl(url));
-    if (badImage) {
+    let imageError: string | null = null;
+    for (const ref of images) {
+      const check = validateImageRef(ref, zipLookup);
+      if (!check.ok) {
+        imageError = check.message;
+        break;
+      }
+    }
+    if (imageError) {
       issues.push({
         row,
-        column: 'Image URLs',
-        message: `"${badImage}" is not a full link. Use an address starting with https://`,
+        column: 'Images',
+        message: imageError,
       });
       continue;
     }
@@ -1183,10 +1272,27 @@ async function buildLookups() {
 
 export class ProductImportService {
   /** Parse + validate a sheet without writing anything. */
-  async preview(file: Express.Multer.File): Promise<ImportPreview> {
+  async preview(
+    file: Express.Multer.File,
+    imagesZip?: Express.Multer.File,
+  ): Promise<ImportPreview> {
+    let zipSession: ImportZipSession | null = null;
+    let zipLookup: Map<string, string> | null = null;
+    const zipIssues: ImportIssue[] = [];
+
+    if (imagesZip?.path) {
+      const { session, issues: extractIssues } = await createImportZipSession(imagesZip.path);
+      zipSession = session;
+      zipLookup = session.lookup;
+      for (const message of extractIssues) {
+        zipIssues.push({ row: 0, column: 'Images ZIP', message });
+      }
+    }
+
     const grid = await readSheet(file);
     const { rows } = toRawRows(grid);
-    const { products, issues } = buildProducts(rows);
+    const { products, issues } = buildProducts(rows, zipLookup);
+    issues.push(...zipIssues);
 
     const lookups = await buildLookups();
     const newColors = new Set<string>();
@@ -1272,6 +1378,8 @@ export class ProductImportService {
         issues: issues.length,
         duplicates: duplicates.size,
       },
+      imagesSessionId: zipSession?.id ?? null,
+      zipSummary: zipSession ? { imageCount: zipSession.imageCount } : null,
     };
   }
 
@@ -1279,7 +1387,11 @@ export class ProductImportService {
   async importProducts(
     products: ImportProductInput[],
     actor: ActorMeta,
-    options: { publish?: boolean } = {},
+    options: {
+      publish?: boolean;
+      imagesSessionId?: string;
+      imagesZip?: Express.Multer.File;
+    } = {},
   ): Promise<{ results: ImportProductResult[] }> {
     if (products.length > PRODUCT_IMPORT_BATCH_LIMIT) {
       throw ApiError.badRequest(
@@ -1289,14 +1401,54 @@ export class ProductImportService {
       );
     }
 
+    let zipLookup: Map<string, string> | null = null;
+    if (options.imagesZip?.path) {
+      const { session } = await createImportZipSession(options.imagesZip.path);
+      zipLookup = session.lookup;
+    } else if (options.imagesSessionId) {
+      const session = getImportZipSession(options.imagesSessionId);
+      if (!session) {
+        throw ApiError.badRequest(
+          'Images ZIP session expired. Upload the spreadsheet and ZIP again, then preview.',
+          undefined,
+          'ZIP_SESSION_EXPIRED',
+        );
+      }
+      zipLookup = session.lookup;
+    }
+
+    const needsZip = products.some((product) =>
+      product.variants.some((variant) => variant.images.some((ref) => !isHttpUrl(ref))),
+    );
+    if (needsZip && !zipLookup) {
+      throw ApiError.badRequest(
+        'This import includes image filenames. Upload an images ZIP (or use the session from preview).',
+        undefined,
+        'ZIP_REQUIRED',
+      );
+    }
+
     const lookups = await buildLookups();
     const results: ImportProductResult[] = [];
+    const urlCache = new Map<string, string>();
 
     for (const product of products) {
       const row = product.rows[0] ?? 0;
       let createdProductId: string | null = null;
 
       try {
+        // Upload ZIP filenames to R2 first, then keep URL-only attach path
+        const resolvedVariants = [];
+        for (const variant of product.variants) {
+          const urls = await resolveImportImageUrls(
+            variant.images,
+            product.handle,
+            zipLookup,
+            urlCache,
+          );
+          resolvedVariants.push({ ...variant, images: urls });
+        }
+
         const categoryId = lookups.categories.get(product.category);
         if (!categoryId) {
           results.push({
@@ -1343,9 +1495,9 @@ export class ProductImportService {
           occasionIds.push(await lookups.occasions.ensure(occasion));
         }
 
-        const prices = product.variants.map((v) => v.price);
+        const prices = resolvedVariants.map((v) => v.price);
         const basePrice = prices.length ? Math.min(...prices) : 0;
-        const baseVariant = product.variants.find((v) => v.price === basePrice);
+        const baseVariant = resolvedVariants.find((v) => v.price === basePrice);
 
         const created = await productService.create(
           {
@@ -1388,14 +1540,14 @@ export class ProductImportService {
         let primaryAssigned = false;
 
         // Resolve the "default" variant (explicit flag wins; else first row)
-        const explicitDefault = product.variants.findIndex((v) => v.defaultListing);
+        const explicitDefault = resolvedVariants.findIndex((v) => v.defaultListing);
         const defaultIndex = explicitDefault >= 0 ? explicitDefault : 0;
 
         // Group images per color to handle inheritance at write time
         const colorFirstImageSet = new Map<string, boolean>();
 
         // Sort variants by variantPosition if provided
-        const sortedVariants = [...product.variants].sort(
+        const sortedVariants = [...resolvedVariants].sort(
           (a, b) => (a.variantPosition || 0) - (b.variantPosition || 0),
         );
 
@@ -1456,7 +1608,7 @@ export class ProductImportService {
           row,
           status: 'created',
           productId,
-          variants: product.variants.length,
+          variants: resolvedVariants.length,
         });
       } catch (error) {
         // If product was created but variants/media failed, clean up
@@ -1486,6 +1638,11 @@ export class ProductImportService {
     return { results };
   }
 
+  /** Sample images ZIP matching the template filename examples. */
+  async buildSampleImagesZip(): Promise<Buffer> {
+    return buildSampleImagesZip();
+  }
+
   /** Full 3-sheet Excel template with Products, Reference, and Instructions. */
   async buildTemplate(): Promise<Buffer> {
     const workbook = new ExcelJS.Workbook();
@@ -1512,8 +1669,9 @@ export class ProductImportService {
       .lean();
     const exampleCategory = (category as { name?: string } | undefined)?.name ?? 'Crop tops';
     const exampleName = `Bulk Template Sample Top ${new Date().toISOString().slice(0, 10)}`;
-    const sampleImage1 = 'https://images.unsplash.com/photo-1564257631407-4deb1f99d992?w=900&q=80';
-    const sampleImage2 = 'https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=900&q=80';
+    const sampleImage1 = 'shirt-black-front.jpg';
+    const sampleImage2 = 'shirt-black-back.jpg';
+    const sampleImage3 = 'shirt-white-front.jpg';
 
     // Row 1: Pink / S (with full product-level fields)
     sheet.addRow({
@@ -1576,7 +1734,7 @@ export class ProductImportService {
       price: 9999,
       stock: 4,
       ownListing: 'TRUE',
-      images: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=900&q=80',
+      images: sampleImage3,
       displayOrder: 1,
       variantPosition: 3,
     });
@@ -1706,12 +1864,17 @@ export class ProductImportService {
       {
         topic: 'Multiple images',
         explanation:
-          "Paste comma-separated image URLs in the Image URLs column. Example: https://cdn.example.com/img1.jpg, https://cdn.example.com/img2.jpg. Images download into your store's storage.",
+          'In the Images column use comma-separated HTTPS links and/or ZIP filenames. Example: https://cdn.example.com/img1.jpg or shirt-front.jpg,shirt-back.jpg. Filenames must match files inside the optional images ZIP uploaded with the sheet.',
+      },
+      {
+        topic: 'Images ZIP (optional)',
+        explanation:
+          'Upload a .zip of product images together with the spreadsheet. Put image filenames (not full URLs) in the Images column. During import, files are uploaded to storage and attached automatically. Preview never uploads images.',
       },
       {
         topic: 'Image inheritance',
         explanation:
-          'Leave Image URLs blank on same-color rows. The first image set for that color is automatically reused for every size of that color.',
+          'Leave Images blank on same-color rows. The first image set for that color is automatically reused for every size of that color. Later rows may specify different filenames for variant-specific images.',
       },
       {
         topic: 'Specifications',
@@ -1778,7 +1941,7 @@ export class ProductImportService {
   /** Single-sheet CSV template (headers + sample rows). */
   buildCsvTemplate(): string {
     const headers = IMPORT_COLUMNS.map((c) => `"${c.label}"`).join(',');
-    const sampleImage1 = 'https://images.unsplash.com/photo-1564257631407-4deb1f99d992?w=900&q=80';
+    const sampleImage1 = 'shirt-black-front.jpg';
     const sampleName = `Bulk Template Sample Top`;
 
     const row1Values: Record<string, string | number> = {
@@ -1816,7 +1979,7 @@ export class ProductImportService {
       Warranty: 'no',
       'Warranty Details': '',
       'Payment Method': 'both',
-      'Image URLs': sampleImage1,
+      Images: sampleImage1,
       'Display Order': 1,
       'Variant Position': 1,
       'Product Position': 1,

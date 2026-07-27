@@ -5,20 +5,26 @@ import {
   AdminErrorState,
   AdminPageHeader,
   AdminStatCard,
-  BulkProductUploadDialog,
   DataTable,
   ListToolbar,
   PageMotion,
 } from '@/components/admin';
+import { BulkProductUploadDialog } from '@/components/admin/bulk-product-upload-dialog';
 import { ADMIN_ROUTES, QUERY_KEYS } from '@/constants';
 import { useAdminPermissions } from '@/hooks/admin';
 import { cn, formatCurrency, formatDate } from '@/lib/utils';
 import { normalizeProductStatusFilter } from '@/lib/product-status';
 import { inventoryApi, productsApi, productImportApi } from '@/services/sdk/admin';
 
-function productHref(productId: string, section?: string) {
-  const base = ADMIN_ROUTES.productDetail.replace('$productId', productId);
-  return section ? `${base}?section=${section}` : base;
+function productEditTo(productId: string) {
+  return {
+    to: ADMIN_ROUTES.productDetail,
+    params: { productId },
+  } as const;
+}
+
+function productSectionHref(productId: string, section: string) {
+  return `${ADMIN_ROUTES.products}/${productId}?section=${encodeURIComponent(section)}`;
 }
 
 const actionBtn = 'admin-btn';
@@ -257,7 +263,7 @@ export function ProductsListPage() {
                 header: 'Product',
                 cell: (row) => (
                   <Link
-                    to={productHref(row.id)}
+                    {...productEditTo(row.id)}
                     className="font-medium text-[var(--admin-ink)] hover:underline"
                   >
                     {row.name}
@@ -296,31 +302,31 @@ export function ProductsListPage() {
                 cell: (row) => (
                   <div className="flex flex-wrap items-center justify-end gap-1">
                     {products.update || products.view ? (
-                      <a href={productHref(row.id)} className={cn(actionBtn, actionPrimary)}>
+                      <Link {...productEditTo(row.id)} className={cn(actionBtn, actionPrimary)}>
                         Edit
-                      </a>
+                      </Link>
                     ) : null}
                     <a
-                      href={productHref(row.id, 'images')}
+                      href={productSectionHref(row.id, 'images')}
                       className={cn(actionBtn, actionSecondary)}
                     >
                       Images
                     </a>
                     <a
-                      href={productHref(row.id, 'variants')}
+                      href={productSectionHref(row.id, 'variants')}
                       className={cn(actionBtn, actionSecondary)}
                     >
                       Variants
                     </a>
                     <a
-                      href={productHref(row.id, 'prices')}
+                      href={productSectionHref(row.id, 'prices')}
                       className={cn(actionBtn, actionSecondary)}
                     >
                       Prices
                     </a>
                     {(inventory.view || inventory.adjust) && (
                       <a
-                        href={productHref(row.id, 'stock')}
+                        href={productSectionHref(row.id, 'stock')}
                         className={cn(actionBtn, actionSecondary)}
                       >
                         Stock

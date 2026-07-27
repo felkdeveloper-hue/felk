@@ -5,15 +5,57 @@
  * uploadImage), and store it in the configured storage adapter (R2 / S3 /
  * local).  On any failure it logs a warning and falls back to
  * `createRemote` so the import never fails because of a bad image URL.
+ *
+ * ZIP filenames are uploaded to R2 first (see uploadImportZipImage) so the
+ * existing URL-based attach path can stay unchanged.
  */
 import { randomUUID } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import type { IncomingMessage } from 'node:http';
 import https from 'node:https';
 import http from 'node:http';
+import path from 'node:path';
 import { ProductMediaModel } from '@/models/product.models';
 import { storageService } from '@/services/storage.factory';
 import { getImageMetadata, processImage } from '@/utils/image.helper';
 import { logger } from '@/config';
+
+const MIME_BY_EXT: Record<string, string> = {
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  webp: 'image/webp',
+  avif: 'image/avif',
+};
+
+/**
+ * Upload a local ZIP-extracted image to object storage and return its public URL.
+ * Path: products/{productHandle}/{uuid}.{ext}
+ */
+export async function uploadImportZipImage(
+  localPath: string,
+  productHandle: string,
+): Promise<string> {
+  const buffer = await readFile(localPath);
+  const ext = path.extname(localPath).toLowerCase().replace('.', '') || 'jpg';
+  const contentType = MIME_BY_EXT[ext] ?? 'application/octet-stream';
+  const id = randomUUID();
+  const safeHandle =
+    productHandle
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9-_]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 80) || 'product';
+  const key = `products/${safeHandle}/${id}.${ext}`;
+  const stored = await storageService.upload({
+    key,
+    body: buffer,
+    contentType,
+    isPublic: true,
+  });
+  return stored.url;
+}
 
 interface AttachOptions {
   productId: string;

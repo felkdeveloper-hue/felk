@@ -1246,7 +1246,7 @@ export function ProductFormPage({ productId }: { productId?: string }) {
     onSuccess: async (created) => {
       toast.success('Product created — now add images and variants');
       await queryClient.invalidateQueries({ queryKey: ['products'] });
-      navigate({ to: ADMIN_ROUTES.productDetail.replace('$productId', created.id) });
+      navigate({ to: ADMIN_ROUTES.productDetail, params: { productId: created.id } });
     },
     onError: (err) =>
       toast.error(err instanceof AppError ? err.message : 'Unable to create product'),

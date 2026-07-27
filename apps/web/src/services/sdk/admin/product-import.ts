@@ -3,6 +3,9 @@ import { http, httpClient } from '@/lib/http-client';
 /** Products sent per import request — must match the API batch limit. */
 export const PRODUCT_IMPORT_BATCH_SIZE = 25;
 
+/** Large ZIPs need a longer client timeout than the default 30s. */
+const IMPORT_UPLOAD_TIMEOUT_MS = 10 * 60 * 1000;
+
 export interface ImportIssue {
   row: number;
   column?: string;
@@ -68,6 +71,9 @@ export interface ImportPreview {
     issues: number;
     duplicates: number;
   };
+  /** Pass back on import when an images ZIP was uploaded at preview. */
+  imagesSessionId?: string | null;
+  zipSummary?: { imageCount: number } | null;
 }
 
 export interface ImportProductResult {
@@ -106,20 +112,50 @@ export const productImportApi = {
     saveFile(response.data, 'felk-product-import-template.csv');
   },
 
-  async preview(file: File): Promise<ImportPreview> {
+  async downloadSampleImagesZip(): Promise<void> {
+    const response = await httpClient.get<Blob>('/catalog/products/import/sample-images.zip', {
+      responseType: 'blob',
+    });
+    saveFile(response.data, 'felk-product-import-sample-images.zip');
+  },
+
+  async preview(file: File, imagesZip?: File | null): Promise<ImportPreview> {
     const form = new FormData();
     form.append('file', file);
-    return http.post<ImportPreview>('/catalog/products/import/preview', form);
+    if (imagesZip) form.append('imagesZip', imagesZip);
+    return http.post<ImportPreview>('/catalog/products/import/preview', form, {
+      timeout: IMPORT_UPLOAD_TIMEOUT_MS,
+    });
   },
 
   async importBatch(
     products: ImportProductInput[],
     publish: boolean,
+    options?: { imagesSessionId?: string | null; imagesZip?: File | null },
   ): Promise<{ results: ImportProductResult[] }> {
-    return http.post<{ results: ImportProductResult[] }>('/catalog/products/import', {
-      products,
-      publish,
-    });
+    const imagesSessionId = options?.imagesSessionId ?? undefined;
+    const imagesZip = options?.imagesZip ?? null;
+
+    if (imagesZip) {
+      const form = new FormData();
+      form.append('products', JSON.stringify(products));
+      form.append('publish', publish ? 'true' : 'false');
+      if (imagesSessionId) form.append('imagesSessionId', imagesSessionId);
+      form.append('imagesZip', imagesZip);
+      return http.post<{ results: ImportProductResult[] }>('/catalog/products/import', form, {
+        timeout: IMPORT_UPLOAD_TIMEOUT_MS,
+      });
+    }
+
+    return http.post<{ results: ImportProductResult[] }>(
+      '/catalog/products/import',
+      {
+        products,
+        publish,
+        ...(imagesSessionId ? { imagesSessionId } : {}),
+      },
+      { timeout: IMPORT_UPLOAD_TIMEOUT_MS },
+    );
   },
 
   async exportProducts(filters?: Record<string, string>): Promise<void> {
