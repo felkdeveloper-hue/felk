@@ -24,6 +24,13 @@ function toMoney(amount: unknown, currency: string): ProductMoney | undefined {
   return { amount: Number(amount), currency };
 }
 
+/** Money used for display prices — ignores 0 / negative (common for unset salePrice). */
+function toPositiveMoney(amount: unknown, currency: string): ProductMoney | undefined {
+  const money = toMoney(amount, currency);
+  if (!money || money.amount <= 0) return undefined;
+  return money;
+}
+
 /**
  * Absolute CDN/R2 URL for uploaded media (`/uploads/...`).
  * Bundled storefront assets (`/catalog/...`) stay site-relative.
@@ -81,9 +88,9 @@ export function normalizeProductVariant(raw: unknown): ProductVariant {
     productId: String(record.productId ?? ''),
     sku: String(record.sku ?? ''),
     title: typeof record.title === 'string' ? record.title : undefined,
-    price: toMoney(record.price, currency),
-    salePrice: toMoney(record.salePrice, currency),
-    compareAtPrice: toMoney(record.compareAtPrice, currency),
+    price: toPositiveMoney(record.price, currency),
+    salePrice: toPositiveMoney(record.salePrice, currency),
+    compareAtPrice: toPositiveMoney(record.compareAtPrice, currency),
     colorId: record.colorId ? String(record.colorId) : undefined,
     sizeId: record.sizeId ? String(record.sizeId) : undefined,
     stock: typeof record.stock === 'number' ? record.stock : undefined,
@@ -99,11 +106,18 @@ export function normalizePricingInsights(raw: unknown): ProductPricingInsights |
   const record = asRecord(raw);
   if (!Object.keys(record).length) return undefined;
   const currency = String(record.currency ?? 'LKR');
+  const effectivePrice = toPositiveMoney(record.effectivePrice, currency);
+  const isOnSale = Boolean(record.isOnSale) && Boolean(effectivePrice);
+  const discountPercent =
+    typeof record.discountPercent === 'number' &&
+    record.discountPercent > 0 &&
+    record.discountPercent < 100
+      ? record.discountPercent
+      : undefined;
   return {
-    effectivePrice: toMoney(record.effectivePrice, currency),
-    isOnSale: Boolean(record.isOnSale),
-    discountPercent:
-      typeof record.discountPercent === 'number' ? record.discountPercent : undefined,
+    effectivePrice,
+    isOnSale,
+    discountPercent,
   };
 }
 
@@ -129,17 +143,18 @@ export function normalizeProduct(raw: unknown): Product {
     media?.find((item) => item.isPrimary)?.url ??
     media?.[0]?.url;
 
-  const productPrice = toMoney(pricing.price, currency);
-  const productSalePrice = toMoney(pricing.salePrice, currency);
-  const productCompareAtPrice = toMoney(pricing.compareAtPrice, currency);
+  const productPrice = toPositiveMoney(pricing.price, currency);
+  const productSalePrice = toPositiveMoney(pricing.salePrice, currency);
+  const productCompareAtPrice = toPositiveMoney(pricing.compareAtPrice, currency);
 
-  const price =
-    productPrice && productPrice.amount > 0
-      ? productPrice
-      : (defaultVariant?.price ?? productPrice);
+  const price = productPrice ?? defaultVariant?.price;
   const salePrice = productSalePrice ?? defaultVariant?.salePrice;
   const compareAtPrice = productCompareAtPrice ?? defaultVariant?.compareAtPrice;
   const insights = normalizePricingInsights(record.pricingInsights);
+  const effectivePrice = insights?.effectivePrice ?? salePrice ?? price;
+  const isOnSale =
+    insights?.isOnSale ??
+    Boolean(salePrice && price && salePrice.amount > 0 && salePrice.amount < price.amount);
 
   return {
     id: pickId(record),
@@ -153,14 +168,9 @@ export function normalizeProduct(raw: unknown): Product {
     price,
     salePrice,
     compareAtPrice,
-    effectivePrice: insights?.effectivePrice ?? salePrice ?? price,
-    isOnSale:
-      insights?.isOnSale ??
-      (salePrice != null &&
-        price != null &&
-        salePrice.amount > 0 &&
-        salePrice.amount < price.amount),
-    discountPercent: insights?.discountPercent,
+    effectivePrice,
+    isOnSale,
+    discountPercent: isOnSale ? insights?.discountPercent : undefined,
     brandId: record.brandId ? String(record.brandId) : undefined,
     brandName: typeof record.brandName === 'string' ? record.brandName : undefined,
     categoryId: record.categoryId ? String(record.categoryId) : undefined,

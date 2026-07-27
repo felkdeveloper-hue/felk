@@ -72,13 +72,21 @@ export function ProductCard({
 
   const averageRating = readAverageRating(product);
   const title = product.name;
-  // Compute discount % for image badge
-  const displayPrice = product.salePrice ?? product.effectivePrice ?? product.price;
-  const originalPrice = product.salePrice ? product.price : product.compareAtPrice;
+  // Compute discount % for image badge — ignore unset salePrice: 0 / bogus 100% offs.
+  const liveSale =
+    product.salePrice && product.salePrice.amount > 0 ? product.salePrice : undefined;
+  const displayPrice = liveSale ?? product.effectivePrice ?? product.price;
+  const originalPrice = liveSale ? product.price : product.compareAtPrice;
   const discountPct =
-    displayPrice && originalPrice && originalPrice.amount > displayPrice.amount
+    displayPrice &&
+    displayPrice.amount > 0 &&
+    originalPrice &&
+    originalPrice.amount > displayPrice.amount
       ? Math.round(((originalPrice.amount - displayPrice.amount) / originalPrice.amount) * 100)
-      : typeof product.discountPercent === 'number' && product.discountPercent > 0
+      : product.isOnSale &&
+          typeof product.discountPercent === 'number' &&
+          product.discountPercent > 0 &&
+          product.discountPercent < 100
         ? Math.round(product.discountPercent)
         : null;
 
@@ -227,9 +235,9 @@ export function ProductCard({
 
           <PriceDisplay
             price={product.price}
-            salePrice={product.salePrice ?? product.effectivePrice}
+            salePrice={liveSale}
             compareAtPrice={product.compareAtPrice}
-            discountPercent={product.discountPercent}
+            discountPercent={product.isOnSale ? product.discountPercent : undefined}
           />
         </div>
       </article>

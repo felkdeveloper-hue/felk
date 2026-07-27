@@ -36,8 +36,9 @@ export function PriceDisplay({
   size = 'sm',
   premium = false,
 }: PriceDisplayProps) {
-  const display = salePrice ?? price;
-  const original = salePrice && price ? price : compareAtPrice;
+  const liveSale = salePrice && salePrice.amount > 0 ? salePrice : undefined;
+  const display = liveSale ?? price;
+  const original = liveSale && price && price.amount > liveSale.amount ? price : compareAtPrice;
 
   if (!display || display.amount <= 0) return null;
 

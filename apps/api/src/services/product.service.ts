@@ -21,6 +21,23 @@ import {
   PRODUCT_STATUS,
 } from '@/constants/product';
 import { allocateUniqueParentSku, isSkuTaken } from '@/services/sku-allocation.service';
+import { env } from '@/config/env';
+
+/** Rewrite localhost upload URLs to the public API host (or path-only). */
+function publicMediaUrl(url?: string | null): string | undefined {
+  if (!url) return undefined;
+  const localMatch = url.match(/^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?(\/uploads\/.*)$/i);
+  if (localMatch) {
+    const publicOrigin = (env.API_PUBLIC_URL || env.CDN_BASE_URL || '')
+      .replace(/\/api\/v1\/?$/, '')
+      .replace(/\/$/, '');
+    if (publicOrigin && !/localhost|127\.0\.0\.1/i.test(publicOrigin)) {
+      return `${publicOrigin}${localMatch[1]}`;
+    }
+    return localMatch[1];
+  }
+  return url;
+}
 
 function toPlain(doc: { toObject?: () => Record<string, unknown> } | Record<string, unknown>) {
   if (doc && typeof (doc as { toObject?: () => Record<string, unknown> }).toObject === 'function') {
@@ -101,10 +118,22 @@ function withComputedPricing<T extends { pricing?: Record<string, unknown> | nul
     saleEndsAt?: Date | null;
     currency?: string;
   };
+  const saleRaw = pricing.salePrice;
+  const sanitized = {
+    ...pricing,
+    // Persist/legacy rows may store salePrice: 0 — never treat that as a live sale.
+    salePrice: saleRaw != null && Number(saleRaw) > 0 ? Number(saleRaw) : null,
+  };
   return {
     ...product,
-    pricingInsights: computePricing(pricing),
+    pricing: sanitized,
+    pricingInsights: computePricing(sanitized),
   };
+}
+
+function positivePrice(value: unknown): number | null {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : null;
 }
 
 function resolveListingPricing(
@@ -117,16 +146,24 @@ function resolveListingPricing(
   } | null,
 ) {
   const base = (product.pricing ?? { price: 0, currency: 'LKR' }) as Record<string, unknown>;
-  const basePrice = Number(base.price ?? 0);
-  if (!variant || basePrice > 0) {
-    return base;
+  const basePrice = positivePrice(base.price) ?? 0;
+  const variantPrice = positivePrice(variant?.price);
+
+  // Prefer a real variant price when the parent product still has price 0.
+  if (!variant || (basePrice > 0 && !variantPrice)) {
+    return {
+      ...base,
+      price: basePrice,
+      salePrice: positivePrice(base.salePrice),
+      compareAtPrice: positivePrice(base.compareAtPrice),
+    };
   }
 
   return {
     ...base,
-    price: variant.price ?? basePrice,
-    salePrice: variant.salePrice ?? base.salePrice ?? null,
-    compareAtPrice: variant.compareAtPrice ?? base.compareAtPrice ?? null,
+    price: variantPrice ?? basePrice,
+    salePrice: positivePrice(variant.salePrice) ?? positivePrice(base.salePrice),
+    compareAtPrice: positivePrice(variant.compareAtPrice) ?? positivePrice(base.compareAtPrice),
     currency: variant.currency ?? base.currency ?? 'LKR',
   };
 }
@@ -218,7 +255,9 @@ export class ProductService {
     const variantsByProduct = new Map<string, typeof variants>();
     for (const variant of variants) {
       const key = variant.productId.toString();
-      variantsByProduct.set(key, [...(variantsByProduct.get(key) ?? []), variant]);
+      const bucket = variantsByProduct.get(key);
+      if (bucket) bucket.push(variant);
+      else variantsByProduct.set(key, [variant]);
     }
     // Cards only need primary + hover per color/variant group.
     const mediaByProduct = new Map<string, typeof media>();
@@ -230,7 +269,9 @@ export class ProductService {
       const count = mediaGroupCounts.get(groupKey) ?? 0;
       if (count >= 2) continue;
       mediaGroupCounts.set(groupKey, count + 1);
-      mediaByProduct.set(productKey, [...(mediaByProduct.get(productKey) ?? []), item]);
+      const bucket = mediaByProduct.get(productKey);
+      if (bucket) bucket.push(item);
+      else mediaByProduct.set(productKey, [item]);
     }
     const brandById = new Map(brands.map((brand) => [brand._id.toString(), brand.name]));
 
@@ -242,18 +283,20 @@ export class ProductService {
       const forVariant = listingId
         ? productMedia.filter((item) => item.variantId?.toString() === listingId)
         : [];
-      // Prefer images attached to the listing variant, then product-level images.
-      // Never fall back to another variant's media: a blue listing must not turn
-      // pink when its card is hovered.
-      const pool = listingId ? forVariant : productMedia.filter((item) => !item.variantId);
+      const productLevel = productMedia.filter((item) => !item.variantId);
+      // Prefer listing-variant media, then product-level (never another color).
+      const pool = forVariant.length ? forVariant : productLevel;
       const primary = pool.find((item) => item.isPrimary) ?? pool[0];
       const hover = primary
         ? pool.find((item) => item._id.toString() !== primary._id.toString())
         : undefined;
+      const primaryUrl = publicMediaUrl(
+        primary?.thumbnailUrl ?? primary?.url ?? listingVariant?.thumbnailUrl,
+      );
+      const hoverUrl = publicMediaUrl(hover?.thumbnailUrl ?? hover?.url);
       return {
-        thumbnailUrl:
-          primary?.thumbnailUrl ?? primary?.url ?? listingVariant?.thumbnailUrl ?? undefined,
-        hoverImageUrl: hover?.url ?? hover?.thumbnailUrl ?? undefined,
+        thumbnailUrl: primaryUrl,
+        hoverImageUrl: hoverUrl && hoverUrl !== primaryUrl ? hoverUrl : undefined,
       };
     };
 
@@ -481,8 +524,24 @@ export class ProductService {
 
     const brandName = brand?.name ? String(brand.name) : undefined;
 
+    const listingVariant =
+      resolvedVariants.find((v) => String(v._id) === String(plain.defaultVariantId ?? '')) ??
+      resolvedVariants.find((v) => v.isDefault) ??
+      resolvedVariants[0];
+    const listingPricing = resolveListingPricing(
+      plain as { pricing?: Record<string, unknown> | null },
+      listingVariant
+        ? {
+            price: listingVariant.price,
+            salePrice: listingVariant.salePrice,
+            compareAtPrice: listingVariant.compareAtPrice,
+            currency: listingVariant.currency,
+          }
+        : null,
+    );
+
     return {
-      ...withComputedPricing(plain),
+      ...withComputedPricing({ ...plain, pricing: listingPricing }),
       brandName,
       variants: resolvedVariants,
       media,

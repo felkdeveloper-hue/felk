@@ -51,7 +51,7 @@ export function SelectOptionsSheet({ product, open, onOpenChange }: SelectOption
   const navigate = useNavigate();
   const addMutation = useAddToCartMutation();
   const detailQuery = useProductById(open ? product.id : '');
-  const { sizes, colors } = useCatalogFilterFacets();
+  const { sizes, colors } = useCatalogFilterFacets({ enabled: open });
 
   const detail = detailQuery.data ?? product;
   const variants = detail.variants ?? [];

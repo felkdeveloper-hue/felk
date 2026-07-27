@@ -237,6 +237,8 @@ export function CatalogFilterSheet(props: CatalogFilterSidebarProps) {
 export interface CatalogFilterAndSortSheetProps extends CatalogFilterSidebarProps {
   onSortChange?: (sortBy: string, sortOrder: 'asc' | 'desc') => void;
   total?: number;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 type SectionKey = CatalogFacetKey;
@@ -266,8 +268,18 @@ export function CatalogFilterAndSortSheet({
   priceBounds,
   facetKeys,
   products = [],
+  open,
+  onOpenChange,
 }: CatalogFilterAndSortSheetProps) {
-  const facets = useCatalogFilterFacets();
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const sheetOpen = open ?? uncontrolledOpen;
+  const setSheetOpen = onOpenChange ?? setUncontrolledOpen;
+  // Facets load only while the sheet is open (parent may also enable for chip labels).
+  const facets = useCatalogFilterFacets({
+    enabled: sheetOpen,
+    includeBrands: true,
+    includeCollections: false,
+  });
   const bounds = priceBounds ?? { min: 0, max: 50_000 };
 
   const categories = useMemo(
@@ -348,7 +360,7 @@ export function CatalogFilterAndSortSheet({
       : [];
 
   return (
-    <Sheet>
+    <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
       <SheetTrigger asChild>
         <button
           type="button"

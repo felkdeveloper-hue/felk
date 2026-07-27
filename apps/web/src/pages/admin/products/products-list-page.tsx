@@ -87,6 +87,7 @@ export function ProductsListPage() {
     mutationFn: (ids: string[]) => productsApi.bulkDelete(ids),
     onSuccess: () => {
       setSelectedIds([]);
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'products'] });
       void queryClient.invalidateQueries({ queryKey: ['products'] });
     },
   });
@@ -95,13 +96,17 @@ export function ProductsListPage() {
     mutationFn: (ids: string[]) => productsApi.bulkStatus(ids, 'archived'),
     onSuccess: () => {
       setSelectedIds([]);
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'products'] });
       void queryClient.invalidateQueries({ queryKey: ['products'] });
     },
   });
 
   const removeOneMutation = useMutation({
     mutationFn: (id: string) => productsApi.remove(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['products'] }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'products'] });
+      void queryClient.invalidateQueries({ queryKey: ['products'] });
+    },
   });
 
   const toggleRow = (id: string) => {

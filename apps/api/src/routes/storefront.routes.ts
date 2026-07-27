@@ -150,33 +150,22 @@ storefrontRouter.get(
   asyncHandler(async (req, res) => {
     const { status: _status, visibility: _visibility, ...query } = req.query;
     const cacheKey = `storefront:products:${JSON.stringify(query)}`;
-    const skipCache = process.env.NODE_ENV !== 'production';
-
-    if (!skipCache) {
-      const cached = getCached<{ data: unknown; meta: unknown }>(cacheKey);
-      if (cached) {
-        setPublicCache(res, 120);
-        return ApiResponse.success(res, cached.data, 'OK', 200, cached.meta as never);
-      }
+    // Always cache briefly — Render cold starts hurt without it, and list payloads are public.
+    const cached = getCached<{ data: unknown; meta: unknown }>(cacheKey);
+    if (cached) {
+      setPublicCache(res, 120);
+      return ApiResponse.success(res, cached.data, 'OK', 200, cached.meta as never);
     }
 
     const result = await productService.list({
       ...query,
       includeDeleted: false,
-      excludeStatuses: [
-        PRODUCT_STATUS.DRAFT,
-        PRODUCT_STATUS.ARCHIVED,
-        PRODUCT_STATUS.DISCONTINUED,
-        PRODUCT_STATUS.HIDDEN,
-        PRODUCT_STATUS.SCHEDULED,
-      ],
+      // Exact status matches the gender+status compound index (faster than $nin).
+      status: PRODUCT_STATUS.ACTIVE,
       excludeVisibility: [PRODUCT_VISIBILITY.HIDDEN],
     } as never);
 
-    if (!skipCache) {
-      setCache(cacheKey, { data: result.data, meta: result.meta }, 60_000);
-    }
-
+    setCache(cacheKey, { data: result.data, meta: result.meta }, 60_000);
     setPublicCache(res, 120);
     ApiResponse.success(res, result.data, 'OK', 200, result.meta);
   }),

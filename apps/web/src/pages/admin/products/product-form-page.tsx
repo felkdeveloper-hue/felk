@@ -1277,6 +1277,7 @@ export function ProductFormPage({ productId }: { productId?: string }) {
     mutationFn: () => productsApi.remove(productId!),
     onSuccess: async () => {
       toast.success('Product deleted');
+      await queryClient.invalidateQueries({ queryKey: ['admin', 'products'] });
       await queryClient.invalidateQueries({ queryKey: ['products'] });
       navigate({ to: ADMIN_ROUTES.products });
     },

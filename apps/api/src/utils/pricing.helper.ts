@@ -36,7 +36,8 @@ export function isSaleActive(
   saleEndsAt?: Date | string | null,
   now = new Date(),
 ): boolean {
-  if (salePrice == null || salePrice < 0) return false;
+  // Treat 0 / negative as "no sale" — product forms often persist salePrice: 0.
+  if (salePrice == null || salePrice <= 0) return false;
   const start = toDate(saleStartsAt);
   const end = toDate(saleEndsAt);
   if (start && now < start) return false;

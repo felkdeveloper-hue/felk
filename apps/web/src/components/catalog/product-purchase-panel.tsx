@@ -118,6 +118,15 @@ export function ProductPurchasePanel({
   const dealPrice = resolveDealPrice(product);
   const compareAt = selectedVariant?.compareAtPrice ?? product.compareAtPrice;
   const displayName = resolveColorDisplayName(variants, selectedColorId, product.name);
+  const liveSalePrice =
+    (selectedVariant?.salePrice && selectedVariant.salePrice.amount > 0
+      ? selectedVariant.salePrice
+      : undefined) ??
+    (product.salePrice && product.salePrice.amount > 0 ? product.salePrice : undefined);
+  const livePrice =
+    (selectedVariant?.price && selectedVariant.price.amount > 0
+      ? selectedVariant.price
+      : undefined) ?? product.price;
 
   const colors = [...new Set(variants.map((v) => v.colorId).filter(Boolean))] as string[];
   const hasSeparateSizeSelector = variants.some((v) => v.sizeId);
@@ -128,8 +137,17 @@ export function ProductPurchasePanel({
   if (product.returnsAvailable) availabilityChips.push({ label: 'Returns & refunds available' });
 
   const handleColorSelect = (colorId: string) => {
-    onColorChange(colorId);
-    const match = findVariant(variants, colorId, selectedSizeId);
+    const normalized = colorId || undefined;
+    onColorChange(normalized ?? '');
+    if (!normalized) {
+      const uncolored =
+        variants.find((v) => !v.colorId && v.isDefault) ??
+        variants.find((v) => !v.colorId && v.id === product.defaultVariantId) ??
+        variants.find((v) => !v.colorId);
+      if (uncolored) onVariantChange(uncolored.id);
+      return;
+    }
+    const match = findVariant(variants, normalized, selectedSizeId);
     if (match) onVariantChange(match.id);
   };
 
@@ -202,10 +220,10 @@ export function ProductPurchasePanel({
           <PriceDisplay
             premium
             size="md"
-            price={selectedVariant?.price ?? product.price}
-            salePrice={selectedVariant?.salePrice ?? product.salePrice ?? product.effectivePrice}
+            price={livePrice}
+            salePrice={liveSalePrice}
             compareAtPrice={compareAt}
-            discountPercent={product.discountPercent}
+            discountPercent={product.isOnSale ? product.discountPercent : undefined}
           />
           <p className="text-muted-foreground text-xs">Inclusive of all taxes</p>
         </div>
@@ -267,6 +285,7 @@ export function ProductPurchasePanel({
           onColorSelect={handleColorSelect}
           colorLabels={colorLabels}
           productName={product.name}
+          fallbackImageUrl={product.thumbnailUrl}
         />
       ) : null}
 

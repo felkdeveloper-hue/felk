@@ -1,6 +1,5 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import { appConfig } from '@/config/app.config';
 import { env } from '@/config/env';
 import type {
   StorageObject,
@@ -23,7 +22,12 @@ export class LocalStorageService implements StorageService {
     await this.ensureDir(path.dirname(fullPath));
     await fs.writeFile(fullPath, input.body);
 
-    const base = env.CDN_BASE_URL || `http://localhost:${appConfig.server.port}/uploads`;
+    const base =
+      env.CDN_BASE_URL ||
+      (env.API_PUBLIC_URL && !/localhost|127\.0\.0\.1/i.test(env.API_PUBLIC_URL)
+        ? `${env.API_PUBLIC_URL.replace(/\/api\/v1\/?$/, '').replace(/\/$/, '')}/uploads`
+        : null) ||
+      `/uploads`;
 
     return {
       key: input.key,
@@ -43,7 +47,12 @@ export class LocalStorageService implements StorageService {
   }
 
   async getSignedUrl(key: string, _expiresInSeconds = 3600): Promise<string> {
-    const base = env.CDN_BASE_URL || `http://localhost:${appConfig.server.port}/uploads`;
+    const base =
+      env.CDN_BASE_URL ||
+      (env.API_PUBLIC_URL && !/localhost|127\.0\.0\.1/i.test(env.API_PUBLIC_URL)
+        ? `${env.API_PUBLIC_URL.replace(/\/api\/v1\/?$/, '').replace(/\/$/, '')}/uploads`
+        : null) ||
+      `/uploads`;
     return `${base.replace(/\/$/, '')}/${key.replace(/\\/g, '/')}`;
   }
 

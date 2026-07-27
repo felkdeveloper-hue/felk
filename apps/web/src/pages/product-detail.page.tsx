@@ -151,7 +151,8 @@ export function ProductDetailPage() {
       product.variants[0];
     if (!defaultVariant) return;
     setSelectedVariantId(defaultVariant.id);
-    // Find the correct color: prefer the variant's own colorId, then the first color across all variants
+    // Keep the listing's color (including "no color" for default SKUs).
+    // Do NOT fall back to the first colored variant — that swaps the opened product.
     const allColorIds = [
       ...new Set(product.variants.map((v) => v.colorId).filter(Boolean)),
     ] as string[];
@@ -160,13 +161,8 @@ export function ProductDetailPage() {
         ? hintColorId
         : defaultVariant.colorId && allColorIds.includes(defaultVariant.colorId)
           ? defaultVariant.colorId
-          : allColorIds[0];
+          : undefined;
     setSelectedColorId(colorId);
-    // If the resolved default variant had no colorId but we chose one, sync the variant
-    if (colorId && !defaultVariant.colorId) {
-      const cv = product.variants.find((v) => v.colorId === colorId);
-      if (cv) setSelectedVariantId(cv.id);
-    }
     // Do NOT auto-select size — the user must pick one explicitly
     setSelectedSizeId(undefined);
   }, [product?.defaultVariantId, product?.variants, hintVariantId, hintColorId]);
@@ -230,8 +226,9 @@ export function ProductDetailPage() {
   }, [product]);
 
   const galleryMedia = useMemo(
-    () => resolveProductGalleryMedia(allMedia, product?.variants, selectedColorId),
-    [allMedia, product?.variants, selectedColorId],
+    () =>
+      resolveProductGalleryMedia(allMedia, product?.variants, selectedColorId, selectedVariantId),
+    [allMedia, product?.variants, selectedColorId, selectedVariantId],
   );
 
   if (query.isLoading) {
@@ -324,7 +321,7 @@ export function ProductDetailPage() {
               selectedColorId={selectedColorId}
               selectedSizeId={selectedSizeId}
               onVariantChange={setSelectedVariantId}
-              onColorChange={setSelectedColorId}
+              onColorChange={(id) => setSelectedColorId(id || undefined)}
               onSizeChange={setSelectedSizeId}
               sizeLabels={sizeLabels}
               colorLabels={colorLabels}

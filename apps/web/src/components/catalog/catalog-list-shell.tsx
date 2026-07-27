@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Container } from '@/components/layout/container';
 import { useCatalogFilterFacets } from '@/hooks/catalog';
 import { CATALOG_BATCH_SIZE, CATALOG_MAX_PRODUCTS, type CatalogSearchState } from '@/utils/catalog';
@@ -47,7 +47,23 @@ export function CatalogListShell({
   onClearFilters,
   facetKeys,
 }: CatalogListShellProps) {
-  const facets = useCatalogFilterFacets();
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  // Defer facet API fan-out until filters open (or chips need labels).
+  // Otherwise 6–7 facet calls queue ahead of the products LIST in the browser.
+  const needsFacetLabels = Boolean(
+    state.categoryId ||
+    state.brandId ||
+    state.colorId ||
+    state.sizeId ||
+    state.materialId ||
+    state.occasionId ||
+    state.collectionId,
+  );
+  const facets = useCatalogFilterFacets({
+    enabled: filtersOpen || needsFacetLabels,
+    includeBrands: Boolean(state.brandId) || filtersOpen,
+    includeCollections: Boolean(state.collectionId),
+  });
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
   const chips = useMemo(() => {
@@ -98,7 +114,9 @@ export function CatalogListShell({
   ]);
 
   useEffect(() => {
-    if (!onLoadMore || !hasNextPage || isFetchingNextPage || isLoading) return;
+    if (!onLoadMore || !hasNextPage || isFetchingNextPage || isLoading || !products.length) {
+      return;
+    }
 
     const node = loadMoreRef.current;
     if (!node) return;
@@ -109,7 +127,8 @@ export function CatalogListShell({
           onLoadMore();
         }
       },
-      { rootMargin: '320px 0px' },
+      // Keep page-2 prefetch from competing with the cold first LIST request.
+      { rootMargin: '120px 0px' },
     );
 
     observer.observe(node);
@@ -152,6 +171,8 @@ export function CatalogListShell({
               products={products}
               facetKeys={facetKeys}
               onSortChange={(sortBy, sortOrder) => onSearchChange({ sortBy, sortOrder, page: 1 })}
+              open={filtersOpen}
+              onOpenChange={setFiltersOpen}
             />
             {chips.length > 0 ? (
               <AppliedFilterChips
