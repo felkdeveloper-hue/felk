@@ -357,12 +357,12 @@ function ProductCardComponent({
             ) : null}
           </div>
 
-          {/* Mobile wishlist — always visible, 44px target */}
-          <div className="absolute right-1.5 top-1.5 z-[2] lg:hidden">
+          {/* Mobile wishlist — icon only, no box */}
+          <div className="absolute right-1 top-1 z-[2] lg:hidden">
             <WishlistButton
               product={product}
               variant="ghost"
-              className="bg-background/80 text-foreground size-11 rounded-full shadow-sm backdrop-blur-sm"
+              className="size-10 rounded-none border-0 bg-transparent text-white shadow-none hover:bg-transparent hover:text-white aria-pressed:text-red-500 aria-pressed:hover:text-red-500 [&_svg]:size-[1.15rem] [&_svg]:drop-shadow-[0_1px_3px_rgba(0,0,0,0.65)]"
             />
           </div>
 
@@ -411,15 +411,15 @@ function ProductCardComponent({
             </div>
           )}
 
-          {/* Mobile quick-add FAB */}
+          {/* Mobile quick-add — icon only, no box */}
           {!isList ? (
             <button
               type="button"
               aria-label={`Quick add ${product.name}`}
               onClick={openQuickAdd}
-              className="bg-background text-foreground border-border absolute bottom-2 right-2 z-[3] flex size-11 items-center justify-center rounded-full border shadow-sm transition-transform duration-150 active:scale-95 lg:hidden"
+              className="absolute bottom-1.5 right-1 z-[3] flex size-10 items-center justify-center bg-transparent text-white transition-transform duration-150 active:scale-90 lg:hidden"
             >
-              <Plus className="size-5" strokeWidth={1.75} />
+              <Plus className="size-5 drop-shadow-[0_1px_3px_rgba(0,0,0,0.65)]" strokeWidth={2} />
             </button>
           ) : null}
         </div>

@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Outlet, useLocation } from '@tanstack/react-router';
 import { OfflineBanner } from '@/components/feedback/offline-banner';
 import { AnnouncementBar } from '@/components/storefront/announcement-bar';
+import { ForceLightTheme } from '@/components/common/force-light-theme';
 import { StorefrontFooter, StorefrontHeader } from '@/components/layout';
 import { FloatingSearch } from '@/components/layout/floating-search';
 import { MobileBottomNav } from '@/components/navigation/mobile-bottom-nav';
@@ -37,6 +38,7 @@ export function PublicLayout() {
 
   return (
     <div className="bg-background text-foreground flex min-h-screen flex-col">
+      <ForceLightTheme />
       <CartBootstrap />
       <LiveRegion />
       <SkipToContent />

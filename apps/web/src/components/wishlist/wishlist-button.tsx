@@ -26,6 +26,7 @@ export function WishlistButton({
   variantId,
   iconOnly = true,
   className,
+  variant,
   ...props
 }: WishlistButtonProps) {
   const navigate = useNavigate();
@@ -77,7 +78,7 @@ export function WishlistButton({
     <motion.div whileTap={{ scale: 0.94 }}>
       <Button
         type="button"
-        variant={active ? 'default' : 'secondary'}
+        variant={variant ?? (active ? 'default' : 'secondary')}
         size={iconOnly ? 'icon' : 'default'}
         aria-label={active ? 'Remove from wishlist' : 'Add to wishlist'}
         aria-pressed={active}

@@ -2,6 +2,7 @@ import { Outlet, useRouterState } from '@tanstack/react-router';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckoutStepIndicator } from '@/components/checkout/checkout-step-indicator';
 import { PaymentRedirectOverlay } from '@/components/checkout/payment-redirect-overlay';
+import { ForceLightTheme } from '@/components/common/force-light-theme';
 import { StorefrontFooter, StorefrontHeader } from '@/components/layout';
 import { FloatingSearch } from '@/components/layout/floating-search';
 import { CHECKOUT_STEPS, type CheckoutStepId } from '@/constants/checkout.constants';
@@ -25,6 +26,7 @@ export function CheckoutLayout() {
 
   return (
     <div className="bg-background flex min-h-screen flex-col">
+      <ForceLightTheme />
       <StorefrontHeader />
       <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 lg:px-10 xl:max-w-none xl:px-14 2xl:px-20">
         {!isTerminal && stepId ? (

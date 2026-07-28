@@ -1,7 +1,6 @@
 import { useForm, type Control } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useEffect } from 'react';
-import { useTheme } from 'next-themes';
 import { useCustomerPreferencesQuery, useUpdatePreferencesMutation } from '@/hooks/account';
 import { preferencesSchema, type PreferencesFormValues } from '@/schemas';
 import { AccountPageHeader } from '@/components/account/account-page-header';
@@ -20,16 +19,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 
 export function PreferencesPanel() {
-  const { setTheme, theme } = useTheme();
   const { data, isLoading, error, refetch } = useCustomerPreferencesQuery();
   const updateMutation = useUpdatePreferencesMutation();
 
@@ -125,26 +116,6 @@ export function PreferencesPanel() {
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="max-w-xl space-y-8" noValidate>
-          <section className="space-y-4">
-            <h2 className="text-sm font-medium">Appearance</h2>
-            <div className="space-y-2">
-              <FormLabel>Theme</FormLabel>
-              <Select
-                value={theme === 'light' ? 'light' : 'dark'}
-                onValueChange={(value) => setTheme(value)}
-              >
-                <SelectTrigger className="w-full sm:w-64">
-                  <SelectValue placeholder="Select theme" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="light">Light</SelectItem>
-                  <SelectItem value="dark">Dark</SelectItem>
-                </SelectContent>
-              </Select>
-              <FormDescription>Choose light or dark for the storefront.</FormDescription>
-            </div>
-          </section>
-
           <section className="space-y-4">
             <h2 className="text-sm font-medium">Regional</h2>
             <FormField

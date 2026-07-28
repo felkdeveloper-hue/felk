@@ -6,7 +6,8 @@ export {
   AdminStatCard,
 } from './admin-page-header';
 export { AdminBreadcrumbs } from './admin-breadcrumbs';
-export { AdminSidebar } from './admin-sidebar';
+export { AdminSidebar, AdminNavLinks } from './admin-sidebar';
+export { AdminMobileNav } from './admin-mobile-nav';
 export { AdminTopbar } from './admin-topbar';
 export { DataTable } from './data-table';
 export type { DataTableColumn } from './data-table';

@@ -577,8 +577,8 @@ export function ProductCommercePanels({
 
                 return (
                   <>
-                    <div className="overflow-x-auto border border-[var(--admin-line)]">
-                      <table className="w-full min-w-[32rem] text-left text-sm">
+                    <div className="-mx-1 overflow-x-auto border border-[var(--admin-line)] sm:mx-0">
+                      <table className="w-full min-w-[28rem] text-left text-sm sm:min-w-[32rem]">
                         <thead className="bg-[var(--admin-panel-soft)] text-[11px] font-bold uppercase tracking-[0.1em] text-neutral-500">
                           <tr>
                             <th className="px-3 py-2.5">Color</th>

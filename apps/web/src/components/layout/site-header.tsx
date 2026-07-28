@@ -1,7 +1,6 @@
 import { Search, ShoppingBag, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { ThemeToggle } from '@/components/common/theme-toggle';
 import { MainNav, type NavItem } from '@/components/navigation/main-nav';
 import { MobileNav } from '@/components/navigation/mobile-nav';
 import { Container } from '@/components/layout/container';
@@ -70,7 +69,6 @@ export function SiteHeader({
               </span>
             ) : null}
           </Button>
-          <ThemeToggle />
         </div>
       </Container>
     </header>

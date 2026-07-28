@@ -20,7 +20,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ThemeToggle } from '@/components/common/theme-toggle';
 import { Container } from '@/components/layout/container';
 import { MainNav, type NavItem } from '@/components/navigation/main-nav';
 import { MobileNav } from '@/components/navigation/mobile-nav';
@@ -248,18 +247,6 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
                 ) : null}
               </Link>
             </Button>
-
-            <span
-              aria-hidden
-              className={cn(
-                'mx-0.5 hidden h-4 w-px lg:block',
-                lightChrome ? 'bg-white/25' : 'bg-border',
-              )}
-            />
-
-            <div className="hidden lg:block">
-              <ThemeToggle className={iconBtn} />
-            </div>
           </div>
         </div>
       </Container>

@@ -9,7 +9,7 @@ import type { FieldError, UseFormRegisterReturn } from 'react-hook-form';
 import { cn } from '@/lib/utils';
 
 const fieldClassName =
-  'w-full rounded-lg border border-[var(--admin-line)] bg-[var(--admin-panel-soft)] px-3 py-2 text-sm text-[var(--admin-ink)] outline-none transition-colors focus:border-[var(--admin-accent)]/50';
+  'w-full min-h-11 rounded-xl border border-[var(--admin-line)] bg-[var(--admin-panel-soft)] px-3.5 py-2.5 text-base text-[var(--admin-ink)] outline-none transition-colors focus:border-[var(--admin-accent)]/50 sm:min-h-10 sm:rounded-lg sm:px-3 sm:py-2 sm:text-sm';
 
 export function AdminField({
   label,

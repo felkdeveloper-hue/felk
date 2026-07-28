@@ -189,7 +189,7 @@ export function ProductsListPage() {
         }}
       />
 
-      <div className="mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-4 grid gap-3 sm:mb-5 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
         <AdminStatCard title="Total products" value={totalProducts} hint="All catalog items" />
         <AdminStatCard title="Active" value={activeProducts} hint="Active + published" />
         <AdminStatCard title="Draft" value={draftProducts} hint="Not ready to sell" />

@@ -400,8 +400,8 @@ function ColorVariantCard({
         </div>
 
         {/* Sizes table */}
-        <div className="min-w-0 flex-1">
-          <table className="w-full text-xs">
+        <div className="min-w-0 flex-1 overflow-x-auto">
+          <table className="w-full min-w-[18rem] text-xs">
             <thead>
               <tr className="border-b border-[var(--admin-line)]">
                 <th className="pb-2 text-left font-semibold uppercase tracking-wider text-[var(--admin-ink-muted)]">

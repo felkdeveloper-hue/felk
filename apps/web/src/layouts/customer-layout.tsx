@@ -1,4 +1,5 @@
 import { Navigate, Outlet } from '@tanstack/react-router';
+import { ForceLightTheme } from '@/components/common/force-light-theme';
 import { StorefrontFooter, StorefrontHeader } from '@/components/layout';
 import { FloatingSearch } from '@/components/layout/floating-search';
 import { MobileBottomNav } from '@/components/navigation/mobile-bottom-nav';
@@ -17,6 +18,7 @@ export function CustomerLayout() {
 
   return (
     <div className="bg-background flex min-h-screen flex-col">
+      <ForceLightTheme />
       <StorefrontHeader />
       <div className="safe-mobile-chrome mx-auto flex w-full max-w-none flex-1 flex-col gap-8 px-4 py-8 sm:px-6 md:px-8 lg:flex-row lg:gap-10 lg:px-10 lg:pb-10 xl:px-14 2xl:px-20">
         <aside className="lg:w-56 lg:shrink-0">

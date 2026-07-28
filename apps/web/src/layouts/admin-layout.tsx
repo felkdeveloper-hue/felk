@@ -1,6 +1,7 @@
 import { Suspense, useEffect } from 'react';
 import { Outlet } from '@tanstack/react-router';
 import { AdminBreadcrumbs, AdminSidebar, AdminTopbar } from '@/components/admin';
+import { AdminMobileNav } from '@/components/admin/admin-mobile-nav';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAdminUiStore } from '@/store';
 
@@ -24,7 +25,7 @@ export function AdminLayout() {
   }, [theme]);
 
   return (
-    <div className="flex min-h-screen bg-[var(--admin-surface)] text-[var(--admin-ink)]">
+    <div className="admin-shell flex min-h-dvh bg-[var(--admin-surface)] text-[var(--admin-ink)]">
       <a
         href="#admin-main"
         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-[var(--admin-ink)] focus:px-4 focus:py-2 focus:text-[var(--admin-surface)]"
@@ -32,9 +33,13 @@ export function AdminLayout() {
         Skip to main content
       </a>
       <AdminSidebar />
+      <AdminMobileNav />
       <div className="flex min-w-0 flex-1 flex-col">
         <AdminTopbar />
-        <main id="admin-main" className="flex-1 overflow-y-auto px-5 py-5 lg:px-8 lg:py-6">
+        <main
+          id="admin-main"
+          className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-4 sm:px-5 sm:py-5 lg:px-8 lg:py-6"
+        >
           <AdminBreadcrumbs />
           <Suspense fallback={<AdminPageFallback />}>
             <Outlet />

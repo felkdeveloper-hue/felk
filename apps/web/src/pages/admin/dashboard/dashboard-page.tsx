@@ -35,18 +35,21 @@ export function DashboardPage() {
           <>
             <Link
               to={ADMIN_ROUTES.productNew}
-              className="inline-flex h-9 items-center rounded-lg border border-[var(--admin-line)] bg-[var(--admin-panel)] px-3.5 text-sm font-medium transition hover:bg-white dark:hover:bg-white/10"
+              className="admin-btn admin-btn-secondary inline-flex flex-1 items-center justify-center sm:flex-none"
             >
               Add product
             </Link>
-            <Link to={ADMIN_ROUTES.orders} className="admin-btn admin-btn-primary admin-btn-lg">
+            <Link
+              to={ADMIN_ROUTES.orders}
+              className="admin-btn admin-btn-primary admin-btn-lg inline-flex flex-1 items-center justify-center sm:flex-none"
+            >
               View orders
             </Link>
           </>
         }
       />
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
         <AdminStatCard
           title="Revenue"
           value={formatCurrency(data?.revenue ?? 0)}
@@ -66,7 +69,7 @@ export function DashboardPage() {
         />
       </div>
 
-      <div className="mt-4 grid gap-4 md:grid-cols-3">
+      <div className="mt-3 grid gap-3 sm:mt-4 sm:grid-cols-2 sm:gap-4 md:grid-cols-3">
         <AdminStatCard
           title="Low stock"
           value={data?.lowStock ?? 0}

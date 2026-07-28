@@ -7,14 +7,13 @@ interface ThemeProviderProps {
 }
 
 /**
- * Wraps `next-themes` for light/dark only (no system).
- * Dark is the default storefront theme.
+ * Storefront defaults to light. Dark mode is admin-only (AdminLayout toggles `.dark`).
  */
 export function ThemeProvider({ children }: ThemeProviderProps) {
   return (
     <NextThemesProvider
       attribute="class"
-      defaultTheme="dark"
+      defaultTheme="light"
       enableSystem={false}
       disableTransitionOnChange
       storageKey={STORAGE_KEYS.theme}

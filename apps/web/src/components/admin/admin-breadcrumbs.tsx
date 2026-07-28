@@ -39,14 +39,14 @@ export function AdminBreadcrumbs() {
   return (
     <nav
       aria-label="Breadcrumb"
-      className="mb-5 flex flex-wrap items-center gap-1 text-xs text-neutral-500 dark:text-neutral-400"
+      className="mb-4 flex max-w-full items-center gap-1 overflow-x-auto whitespace-nowrap text-xs text-neutral-500 [-ms-overflow-style:none] [scrollbar-width:none] sm:mb-5 sm:flex-wrap sm:overflow-visible sm:whitespace-normal dark:text-neutral-400 [&::-webkit-scrollbar]:hidden"
     >
       <Link to={ADMIN_ROUTES.dashboard} className="transition hover:text-[var(--admin-ink)]">
         Dashboard
       </Link>
       {crumbs.slice(1).map((crumb) => (
         <span key={crumb.href} className="inline-flex items-center gap-1">
-          <ChevronRight className="size-3.5 opacity-50" aria-hidden />
+          <ChevronRight className="size-3.5 shrink-0 opacity-50" aria-hidden />
           {crumb.isLast ? (
             <span className="font-medium text-[var(--admin-ink)]">{crumb.label}</span>
           ) : (

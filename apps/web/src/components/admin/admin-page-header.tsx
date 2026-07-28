@@ -12,12 +12,12 @@ export function AdminPageHeader({
   actions?: ReactNode;
 }) {
   return (
-    <div className="mb-7 flex flex-wrap items-end justify-between gap-4 border-b border-[var(--admin-line)] pb-5">
-      <div>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--admin-accent)]">
+    <div className="mb-5 flex flex-col gap-4 border-b border-[var(--admin-line)] pb-4 sm:mb-7 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between sm:pb-5">
+      <div className="min-w-0">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--admin-accent)] sm:text-[11px]">
           FE Admin
         </p>
-        <h1 className="mt-1 font-serif text-3xl tracking-tight text-[var(--admin-ink)] sm:text-4xl">
+        <h1 className="mt-1 font-serif text-[1.75rem] leading-tight tracking-tight text-[var(--admin-ink)] sm:text-4xl">
           {title}
         </h1>
         {description ? (
@@ -26,7 +26,11 @@ export function AdminPageHeader({
           </p>
         ) : null}
       </div>
-      {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
+      {actions ? (
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end [&_.admin-btn]:min-h-11 [&_.admin-btn]:px-3 sm:[&_.admin-btn]:min-h-8">
+          {actions}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -47,18 +51,21 @@ export function AdminStatCard({
   const card = (
     <article
       className={cn(
-        'rounded-2xl border border-[var(--admin-line)] bg-[var(--admin-panel)] p-5 shadow-[var(--admin-shadow)] transition-colors',
-        to && 'hover:border-[var(--admin-accent)]/40 hover:bg-[var(--admin-surface)]',
+        'rounded-2xl border border-[var(--admin-line)] bg-[var(--admin-panel)] p-4 shadow-[var(--admin-shadow)] transition-colors sm:p-5',
+        to &&
+          'hover:border-[var(--admin-accent)]/40 hover:bg-[var(--admin-surface)] active:scale-[0.99]',
         className,
       )}
     >
-      <p className="text-xs font-medium uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+      <p className="text-[11px] font-medium uppercase tracking-wide text-neutral-500 sm:text-xs dark:text-neutral-400">
         {title}
       </p>
-      <p className="mt-3 font-serif text-3xl tabular-nums tracking-tight text-[var(--admin-ink)]">
+      <p className="mt-2 font-serif text-2xl tabular-nums tracking-tight text-[var(--admin-ink)] sm:mt-3 sm:text-3xl">
         {value}
       </p>
-      {hint ? <p className="mt-2 text-xs text-neutral-500 dark:text-neutral-400">{hint}</p> : null}
+      {hint ? (
+        <p className="mt-1.5 text-xs text-neutral-500 sm:mt-2 dark:text-neutral-400">{hint}</p>
+      ) : null}
     </article>
   );
 
@@ -80,11 +87,11 @@ export function AdminPanel({ title, children }: { title?: string; children: Reac
   return (
     <section className="rounded-none border border-[var(--admin-line)] bg-[var(--admin-panel)] shadow-[var(--admin-shadow)] transition-colors">
       {title ? (
-        <header className="flex items-center justify-between border-b border-[var(--admin-line)] px-5 py-4">
+        <header className="flex items-center justify-between border-b border-[var(--admin-line)] px-4 py-3.5 sm:px-5 sm:py-4">
           <h2 className="text-sm font-semibold tracking-tight text-[var(--admin-ink)]">{title}</h2>
         </header>
       ) : null}
-      <div className="p-5">{children}</div>
+      <div className="p-4 sm:p-5">{children}</div>
     </section>
   );
 }
