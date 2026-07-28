@@ -320,26 +320,97 @@ export class CartService {
     };
   }
 
+  private mediaUrl(doc: { url?: string | null; thumbnailUrl?: string | null } | null | undefined) {
+    if (!doc) return null;
+    // Prefer full image so cart thumbs aren't soft/cropped CDN thumbs that fail to paint.
+    if (doc.url) return String(doc.url);
+    if (doc.thumbnailUrl) return String(doc.thumbnailUrl);
+    return null;
+  }
+
+  /**
+   * Resolve cart line image for the selected SKU's color — never steal the default
+   * listing color's photo when this color has its own media.
+   */
   private async resolveVariantThumbnail(
-    variant: { thumbnailUrl?: string | null; primaryImageId?: Types.ObjectId | null },
+    variant: {
+      _id?: Types.ObjectId;
+      thumbnailUrl?: string | null;
+      primaryImageId?: Types.ObjectId | null;
+      colorId?: Types.ObjectId | null;
+    },
     productId: Types.ObjectId | string,
   ): Promise<string | null> {
-    if (variant.thumbnailUrl) return variant.thumbnailUrl;
+    const variantId = variant._id;
+
+    if (variantId) {
+      const forVariant = await ProductMediaModel.findOne({
+        productId,
+        variantId,
+        isDeleted: false,
+      })
+        .sort({ isPrimary: -1, priority: 1, createdAt: 1 })
+        .select('url thumbnailUrl')
+        .lean();
+      const fromVariant = this.mediaUrl(forVariant);
+      if (fromVariant) return fromVariant;
+    }
+
+    // Photos are often attached to one size under the same color — reuse those.
+    if (variant.colorId) {
+      const siblings = await ProductVariantModel.find({
+        productId,
+        colorId: variant.colorId,
+        isDeleted: false,
+      })
+        .select('_id')
+        .lean();
+      const siblingIds = siblings.map((row) => row._id);
+      if (siblingIds.length) {
+        const forColor = await ProductMediaModel.findOne({
+          productId,
+          variantId: { $in: siblingIds },
+          isDeleted: false,
+        })
+          .sort({ isPrimary: -1, priority: 1, createdAt: 1 })
+          .select('url thumbnailUrl')
+          .lean();
+        const fromColor = this.mediaUrl(forColor);
+        if (fromColor) return fromColor;
+      }
+    }
 
     if (variant.primaryImageId) {
-      const primary = await ProductMediaModel.findById(variant.primaryImageId).select('url').lean();
-      if (primary?.url) return String(primary.url);
+      const primary = await ProductMediaModel.findById(variant.primaryImageId)
+        .select('url thumbnailUrl')
+        .lean();
+      const fromPrimary = this.mediaUrl(primary);
+      if (fromPrimary) return fromPrimary;
     }
+
+    if (variant.thumbnailUrl) return variant.thumbnailUrl;
+
+    // Shared product-level images only (not another color's variant media).
+    const productLevel = await ProductMediaModel.findOne({
+      productId,
+      $or: [{ variantId: null }, { variantId: { $exists: false } }],
+      isDeleted: false,
+    })
+      .sort({ priority: 1, createdAt: 1 })
+      .select('url thumbnailUrl')
+      .lean();
+    const fromProduct = this.mediaUrl(productLevel);
+    if (fromProduct) return fromProduct;
 
     const fallback = await ProductMediaModel.findOne({
       productId,
       isDeleted: false,
     })
       .sort({ priority: 1 })
-      .select('url')
+      .select('url thumbnailUrl')
       .lean();
 
-    return fallback?.url ? String(fallback.url) : null;
+    return this.mediaUrl(fallback);
   }
 
   private async refreshItemPricing(item: CartItemDocument) {

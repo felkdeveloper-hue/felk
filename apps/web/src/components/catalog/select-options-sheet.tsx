@@ -25,7 +25,7 @@ import type { Product, ProductVariant } from '@/services/sdk';
 import { PriceDisplay } from './price-display';
 import { ProductColorSelector } from './product-color-selector';
 import { ProductOffersSection } from './product-offers-section';
-import { ProductSizeSelector } from './product-size-selector';
+import { ProductSizeSelector, isSizeOutOfStock } from './product-size-selector';
 import { VariantSelector } from './variant-selector';
 
 function useIsMobileSheet(breakpoint = 1024) {
@@ -176,7 +176,21 @@ export function SelectOptionsSheet({ product, open, onOpenChange }: SelectOption
   const resolvedForSelection = findVariant(variants, selectedColorId, effectiveSizeId);
   const sizeReady = !hasSeparateSizeSelector || Boolean(effectiveSizeId && resolvedForSelection);
   const cartVariantId = resolvedForSelection?.id ?? selectedVariantId;
-  const canAdd = sizeReady && Boolean(resolveVariantId(cartVariantId, detail));
+  const selectedSizeOutOfStock =
+    Boolean(effectiveSizeId) &&
+    isSizeOutOfStock(variants, effectiveSizeId as string, selectedColorId);
+  const selectedVariantOutOfStock = (() => {
+    const target = resolvedForSelection ?? selectedVariant;
+    if (!target) return detail.inStock === false || detail.status === 'out_of_stock';
+    if (target.status === 'out_of_stock') return true;
+    if (typeof target.stock === 'number') return target.stock <= 0;
+    return false;
+  })();
+  const isSelectionOutOfStock = hasSeparateSizeSelector
+    ? selectedSizeOutOfStock
+    : selectedVariantOutOfStock;
+  const canAdd =
+    sizeReady && !isSelectionOutOfStock && Boolean(resolveVariantId(cartVariantId, detail));
 
   const handleColorSelect = (colorId: string) => {
     setSelectedColorId(colorId || undefined);
@@ -219,6 +233,10 @@ export function SelectOptionsSheet({ product, open, onOpenChange }: SelectOption
           ? 'This size is not available in the selected color'
           : 'Please select a size',
       );
+      return;
+    }
+    if (isSelectionOutOfStock) {
+      toast.error('This size is out of stock');
       return;
     }
     const resolved = resolvedForSelection?.id ?? resolveVariantId(selectedVariantId, detail);
@@ -447,6 +465,14 @@ export function SelectOptionsSheet({ product, open, onOpenChange }: SelectOption
                         onAdded={() => onOpenChange(false)}
                         skipOptionGate
                       />
+                    ) : isSelectionOutOfStock && sizeReady ? (
+                      <button
+                        type="button"
+                        disabled
+                        className="border-border text-muted-foreground bg-muted/40 h-12 min-w-0 flex-1 cursor-not-allowed border text-sm font-bold uppercase tracking-[0.12em]"
+                      >
+                        Out of stock
+                      </button>
                     ) : (
                       <button
                         type="button"
@@ -458,18 +484,21 @@ export function SelectOptionsSheet({ product, open, onOpenChange }: SelectOption
                     )}
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={handleBuyNow}
-                    disabled={
-                      addMutation.isPending ||
-                      detail.inStock === false ||
-                      detail.status === 'out_of_stock'
-                    }
-                    className="bg-foreground text-background hover:bg-foreground/90 inline-flex h-12 w-full items-center justify-center rounded-none text-sm font-bold uppercase tracking-[0.14em] transition-colors disabled:opacity-50"
-                  >
-                    {addMutation.isPending ? 'Please wait…' : 'Buy it now'}
-                  </button>
+                  {!isSelectionOutOfStock || !sizeReady ? (
+                    <button
+                      type="button"
+                      onClick={handleBuyNow}
+                      disabled={
+                        addMutation.isPending ||
+                        detail.inStock === false ||
+                        detail.status === 'out_of_stock' ||
+                        isSelectionOutOfStock
+                      }
+                      className="bg-foreground text-background hover:bg-foreground/90 inline-flex h-12 w-full items-center justify-center rounded-none text-sm font-bold uppercase tracking-[0.14em] transition-colors disabled:opacity-50"
+                    >
+                      {addMutation.isPending ? 'Please wait…' : 'Buy it now'}
+                    </button>
+                  ) : null}
                 </div>
 
                 <ProductOffersSection />

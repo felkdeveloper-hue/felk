@@ -22,7 +22,12 @@ function sizesForColor(variants: ProductVariant[], colorId?: string): string[] {
   return [...new Set(pool.map((variant) => variant.sizeId).filter(Boolean))] as string[];
 }
 
-function isSizeOutOfStock(variants: ProductVariant[], sizeId: string, colorId?: string): boolean {
+/** True when every SKU for this size (+ optional color) is at zero stock. */
+export function isSizeOutOfStock(
+  variants: ProductVariant[],
+  sizeId: string,
+  colorId?: string,
+): boolean {
   const matching = variants.filter((v) => v.sizeId === sizeId);
   const relevant = colorId ? matching.filter((v) => v.colorId === colorId) : matching;
   if (!relevant.length) return true;
@@ -101,13 +106,15 @@ export function ProductSizeSelector({
             <button
               key={sizeId}
               type="button"
-              disabled={oos}
               aria-pressed={active}
-              onClick={() => !oos && onSizeSelect(sizeId)}
+              aria-disabled={oos}
+              onClick={() => onSizeSelect(sizeId)}
               className={cn(
                 'relative min-w-[3.25rem] rounded-none border px-3.5 py-2.5 text-sm font-semibold uppercase tracking-wide transition-colors',
                 oos
-                  ? 'text-muted-foreground/50 border-border bg-muted/30 cursor-not-allowed'
+                  ? active
+                    ? 'text-muted-foreground border-foreground bg-muted/30 border-2'
+                    : 'text-muted-foreground/50 border-border bg-muted/30 hover:border-foreground/40'
                   : active
                     ? 'border-foreground text-foreground border-2'
                     : 'border-border hover:border-foreground/50',

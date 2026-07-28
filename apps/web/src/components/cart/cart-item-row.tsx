@@ -36,14 +36,19 @@ export function CartItemRow({ item, compact, validationMessage, className }: Car
         to="/products/$slug"
         params={{ slug: String(item.productSlug ?? item.productId) }}
         search={{ variant: undefined }}
-        className="bg-muted block shrink-0 overflow-hidden rounded-lg"
+        className={cn(
+          'bg-muted block shrink-0 overflow-hidden rounded-lg',
+          compact ? 'size-16' : 'size-24 sm:size-28',
+        )}
         aria-label={`View ${item.name}`}
       >
         <Image
           src={item.imageUrl}
           alt={item.name}
           aspectRatio="1/1"
-          className={cn(compact ? 'size-16' : 'size-24 sm:size-28')}
+          containerClassName="size-full"
+          className="size-full object-cover"
+          loading="eager"
         />
       </Link>
 
