@@ -262,25 +262,29 @@ export function ProductPurchasePanel({
   return (
     <div
       className={cn(
-        'border-border bg-card text-card-foreground space-y-6 rounded-none border p-5 shadow-[0_1px_0_hsl(var(--foreground)/0.04),0_18px_40px_-28px_hsl(var(--foreground)/0.35)] sm:p-7',
-        'before:bg-foreground relative before:absolute before:inset-y-0 before:left-0 before:w-0.5',
+        // Mobile: dense Bonkers-like rhythm (no desktop card chrome)
+        'text-card-foreground space-y-4 bg-transparent p-0',
+        // Desktop: keep existing premium card
+        'lg:border-border lg:bg-card lg:relative lg:space-y-6 lg:rounded-none lg:border lg:p-7 lg:shadow-[0_1px_0_hsl(var(--foreground)/0.04),0_18px_40px_-28px_hsl(var(--foreground)/0.35)]',
+        'lg:before:bg-foreground lg:before:absolute lg:before:inset-y-0 lg:before:left-0 lg:before:w-0.5',
       )}
     >
-      <div className="space-y-3">
-        {badgeLabel ? (
-          <span className="text-muted-foreground text-[11px] font-semibold uppercase tracking-[0.18em]">
-            {badgeLabel}
-          </span>
-        ) : null}
+      <div className="space-y-2 lg:space-y-3">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          {badgeLabel ? (
+            <span className="text-muted-foreground text-[10px] font-semibold uppercase tracking-[0.22em] lg:text-[11px] lg:tracking-[0.18em]">
+              {badgeLabel}
+            </span>
+          ) : null}
+          {product.brandName ? (
+            <p className="text-muted-foreground text-[10px] font-semibold uppercase tracking-[0.2em] lg:text-xs lg:tracking-[0.16em]">
+              {product.brandName}
+            </p>
+          ) : null}
+        </div>
 
-        {product.brandName ? (
-          <p className="text-muted-foreground text-xs font-semibold uppercase tracking-[0.16em]">
-            {product.brandName}
-          </p>
-        ) : null}
-
-        <div className="flex items-start justify-between gap-4">
-          <h1 className="font-display text-foreground text-xl font-bold uppercase leading-tight tracking-[0.04em] sm:text-2xl">
+        <div className="flex items-start justify-between gap-3">
+          <h1 className="font-display text-foreground text-[1.35rem] font-semibold uppercase leading-[1.15] tracking-[-0.02em] lg:text-2xl lg:font-bold lg:tracking-[0.04em]">
             {displayName}
           </h1>
           <WishlistButton
@@ -289,11 +293,11 @@ export function ProductPurchasePanel({
             iconOnly
             variant="ghost"
             size="icon"
-            className="text-muted-foreground hover:text-foreground -mr-1 mt-0.5 size-10 shrink-0"
+            className="text-foreground lg:text-muted-foreground lg:hover:text-foreground -mr-1.5 mt-0 size-11 shrink-0 hover:bg-transparent lg:mt-0.5 lg:size-10"
           />
         </div>
 
-        <div className="space-y-1.5">
+        <div className="space-y-1">
           <PriceDisplay
             premium
             size="md"
@@ -301,8 +305,11 @@ export function ProductPurchasePanel({
             salePrice={liveSalePrice}
             compareAtPrice={compareAt}
             discountPercent={product.isOnSale ? product.discountPercent : undefined}
+            className="[&_span.font-bold]:text-xl lg:[&_span.font-bold]:text-2xl [&_span]:tracking-tight"
           />
-          <p className="text-muted-foreground text-xs">Inclusive of all taxes</p>
+          <p className="text-muted-foreground text-[11px] tracking-wide lg:text-xs">
+            Inclusive of all taxes
+          </p>
         </div>
 
         {dealPrice ? (
@@ -312,23 +319,23 @@ export function ProductPurchasePanel({
         ) : null}
 
         {materialLabel ? (
-          <span className="bg-muted text-muted-foreground inline-block rounded-none px-2.5 py-1 text-xs font-medium uppercase tracking-wide">
+          <span className="text-muted-foreground lg:bg-muted inline-block text-[11px] font-medium uppercase tracking-[0.16em] lg:rounded-none lg:px-2.5 lg:py-1 lg:text-xs lg:tracking-wide">
             {materialLabel}
           </span>
         ) : null}
       </div>
 
       {availabilityChips.length ? (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-col gap-2 lg:flex-row lg:flex-wrap">
           {availabilityChips.map((chip) => {
             const isWarranty = /warranty/i.test(chip.label);
             const Icon = isWarranty ? ShieldCheck : RefreshCcw;
             return (
               <span
                 key={chip.label}
-                className="inline-flex items-center gap-1.5 rounded-none border border-emerald-500/30 bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-900 dark:border-emerald-500/35 dark:bg-emerald-950/40 dark:text-emerald-100"
+                className="text-foreground/80 inline-flex items-center gap-2 text-[12px] font-medium tracking-wide lg:rounded-none lg:border lg:border-emerald-500/30 lg:bg-emerald-50 lg:px-2.5 lg:py-1.5 lg:text-xs lg:font-semibold lg:text-emerald-900 dark:lg:border-emerald-500/35 dark:lg:bg-emerald-950/40 dark:lg:text-emerald-100"
               >
-                <Icon className="size-3.5 shrink-0" aria-hidden />
+                <Icon className="size-3.5 shrink-0 opacity-70 lg:opacity-100" aria-hidden />
                 {chip.label}
               </span>
             );
@@ -336,58 +343,60 @@ export function ProductPurchasePanel({
         </div>
       ) : null}
 
-      {/* Color first, then sizes for that color only */}
-      {hasColorSelector ? (
-        <ProductColorSelector
-          variants={variants}
-          media={media}
-          selectedColorId={selectedColorId}
-          onColorSelect={handleColorSelect}
-          colorLabels={colorLabels}
-          productName={product.name}
-          fallbackImageUrl={product.thumbnailUrl}
-        />
-      ) : null}
-
-      {hasSeparateSizeSelector ? (
-        <div
-          data-size-selector
-          className={sizeError ? 'rounded-none p-3 ring-2 ring-red-500' : undefined}
-        >
-          {sizeError ? (
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-red-600">
-              {selectedSizeId && !sizeMatchesColor
-                ? 'This size is not available in the selected color'
-                : 'Please select a size'}
-            </p>
-          ) : null}
-          <ProductSizeSelector
+      <div className="border-border/60 space-y-4 border-t pt-4 lg:space-y-0 lg:border-0 lg:pt-0">
+        {/* Color first, then sizes for that color only */}
+        {hasColorSelector ? (
+          <ProductColorSelector
             variants={variants}
+            media={media}
             selectedColorId={selectedColorId}
-            selectedSizeId={effectiveSizeId}
-            onSizeSelect={handleSizeSelect}
+            onColorSelect={handleColorSelect}
+            colorLabels={colorLabels}
+            productName={product.name}
+            fallbackImageUrl={product.thumbnailUrl}
+          />
+        ) : null}
+
+        {hasSeparateSizeSelector ? (
+          <div
+            data-size-selector
+            className={sizeError ? 'rounded-none p-3 ring-2 ring-red-500' : undefined}
+          >
+            {sizeError ? (
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-red-600">
+                {selectedSizeId && !sizeMatchesColor
+                  ? 'This size is not available in the selected color'
+                  : 'Please select a size'}
+              </p>
+            ) : null}
+            <ProductSizeSelector
+              variants={variants}
+              selectedColorId={selectedColorId}
+              selectedSizeId={effectiveSizeId}
+              onSizeSelect={handleSizeSelect}
+              sizeLabels={sizeLabels}
+            />
+          </div>
+        ) : null}
+
+        {!hasSeparateSizeSelector && !hasColorSelector && variants.length > 1 ? (
+          <VariantSelector
+            variants={variants}
+            selectedId={selectedVariantId}
+            onSelect={onVariantChange}
+            colorLabels={colorLabels}
             sizeLabels={sizeLabels}
           />
-        </div>
-      ) : null}
+        ) : null}
+      </div>
 
-      {!hasSeparateSizeSelector && !hasColorSelector && variants.length > 1 ? (
-        <VariantSelector
-          variants={variants}
-          selectedId={selectedVariantId}
-          onSelect={onVariantChange}
-          colorLabels={colorLabels}
-          sizeLabels={sizeLabels}
-        />
-      ) : null}
-
-      <div className="space-y-3 pt-1">
-        <div className="flex flex-wrap items-stretch gap-3">
-          <div className="border-border inline-flex h-12 items-center rounded-none border">
+      <div className="border-border/60 space-y-2.5 border-t pt-4 lg:space-y-3 lg:border-0 lg:pt-1">
+        <div className="flex items-stretch gap-2.5 lg:gap-3">
+          <div className="border-border inline-flex h-12 items-center rounded-none border lg:h-12">
             <button
               type="button"
               aria-label="Decrease quantity"
-              className="text-foreground hover:bg-muted flex h-full w-11 items-center justify-center transition-colors disabled:opacity-40"
+              className="text-foreground active:bg-muted lg:hover:bg-muted flex h-full w-11 items-center justify-center transition-colors disabled:opacity-40"
               disabled={quantity <= 1}
               onClick={() => setQuantity((q) => Math.max(1, q - 1))}
             >
@@ -399,7 +408,7 @@ export function ProductPurchasePanel({
             <button
               type="button"
               aria-label="Increase quantity"
-              className="text-foreground hover:bg-muted flex h-full w-11 items-center justify-center transition-colors"
+              className="text-foreground active:bg-muted lg:hover:bg-muted flex h-full w-11 items-center justify-center transition-colors"
               onClick={() => setQuantity((q) => Math.min(20, q + 1))}
             >
               <Plus className="size-3.5" />
@@ -410,7 +419,7 @@ export function ProductPurchasePanel({
             <Link
               to={ROUTES.cart}
               className={cn(
-                'border-foreground text-foreground hover:bg-foreground hover:text-background inline-flex h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-none border bg-transparent px-6 text-sm font-bold uppercase tracking-[0.12em] transition-colors',
+                'border-foreground text-foreground lg:hover:bg-foreground lg:hover:text-background inline-flex h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-none border bg-transparent px-4 text-[11px] font-bold uppercase tracking-[0.16em] transition-opacity active:opacity-80 lg:px-6 lg:text-sm lg:tracking-[0.12em]',
               )}
             >
               <ShoppingBag className="size-4" />
@@ -420,7 +429,7 @@ export function ProductPurchasePanel({
             <button
               type="button"
               disabled
-              className="border-border text-muted-foreground bg-muted/40 h-12 min-w-0 flex-1 cursor-not-allowed rounded-none border text-sm font-bold uppercase tracking-[0.12em]"
+              className="border-border text-muted-foreground bg-muted/40 h-12 min-w-0 flex-1 cursor-not-allowed rounded-none border text-[11px] font-bold uppercase tracking-[0.16em] lg:text-sm lg:tracking-[0.12em]"
             >
               Out of stock
             </button>
@@ -435,7 +444,7 @@ export function ProductPurchasePanel({
                     : 'Please select a size to continue',
                 );
               }}
-              className="border-foreground text-foreground hover:bg-foreground hover:text-background h-12 min-w-0 flex-1 rounded-none border bg-transparent text-sm font-bold uppercase tracking-[0.12em] transition-colors"
+              className="border-foreground text-foreground lg:hover:bg-foreground lg:hover:text-background h-12 min-w-0 flex-1 rounded-none border bg-transparent text-[11px] font-bold uppercase tracking-[0.16em] transition-opacity active:opacity-80 lg:text-sm lg:tracking-[0.12em]"
             >
               Add to cart
             </button>
@@ -447,7 +456,7 @@ export function ProductPurchasePanel({
               size="lg"
               variant="outline"
               skipOptionGate
-              className="border-foreground text-foreground hover:bg-foreground hover:text-background h-12 min-w-0 flex-1 rounded-none border bg-transparent font-bold uppercase tracking-[0.12em]"
+              className="border-foreground text-foreground lg:hover:bg-foreground lg:hover:text-background h-12 min-w-0 flex-1 rounded-none border bg-transparent text-[11px] font-bold uppercase tracking-[0.16em] lg:text-sm lg:tracking-[0.12em]"
               label="Add to cart"
             />
           )}
@@ -463,15 +472,17 @@ export function ProductPurchasePanel({
               product.status === 'out_of_stock' ||
               isSelectionOutOfStock
             }
-            className="bg-foreground text-background hover:bg-foreground/90 inline-flex h-12 w-full items-center justify-center rounded-none text-sm font-bold uppercase tracking-[0.14em] transition-colors disabled:opacity-50"
+            className="bg-foreground text-background lg:hover:bg-foreground/90 inline-flex h-12 w-full items-center justify-center rounded-none text-[11px] font-bold uppercase tracking-[0.18em] transition-opacity active:opacity-85 disabled:opacity-50 lg:text-sm lg:tracking-[0.14em]"
           >
             {addMutation.isPending ? 'Please wait…' : 'Buy it now'}
           </button>
         ) : null}
       </div>
 
-      <ProductOffersSection />
-      <ProductDeliveryCheck paymentOption={product.paymentOption} />
+      <div className="border-border/60 space-y-4 border-t pt-4 lg:space-y-6 lg:border-0 lg:pt-0">
+        <ProductOffersSection />
+        <ProductDeliveryCheck paymentOption={product.paymentOption} />
+      </div>
     </div>
   );
 }

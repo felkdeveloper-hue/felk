@@ -22,7 +22,7 @@ export function RelatedProducts({ productId, title = 'You May Also Like' }: Rela
   if (query.isError || (!query.isLoading && !products.length)) return null;
 
   return (
-    <Section spacing="default" title={title}>
+    <Section spacing="sm" title={title} className="lg:py-6">
       <Container>
         {query.isLoading ? (
           <ProductGridSkeleton count={4} />

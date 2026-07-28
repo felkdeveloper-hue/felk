@@ -91,17 +91,21 @@ export function ProductColorSelector({
   const activeLabel = activeKey ? resolveColorLabel(activeKey, variants, colorLabels) : undefined;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2.5 lg:space-y-3">
       <div className="flex items-baseline gap-2">
-        <span className="text-sm font-semibold uppercase tracking-[0.08em]">Color</span>
+        <span className="text-[10px] font-semibold uppercase tracking-[0.16em] lg:text-sm lg:tracking-[0.08em]">
+          Color
+        </span>
         {activeLabel ? (
-          <span className="text-muted-foreground text-sm font-medium">: {activeLabel}</span>
+          <span className="text-muted-foreground text-xs font-medium lg:text-sm">
+            : {activeLabel}
+          </span>
         ) : (
           <span className="text-muted-foreground text-sm">:</span>
         )}
       </div>
 
-      <div className="grid grid-cols-5 gap-2 sm:grid-cols-6 md:grid-cols-7">
+      <div className="grid grid-cols-5 gap-2 sm:grid-cols-5 sm:gap-2 md:grid-cols-7">
         {colors.map((colorId) => {
           const active = activeKey === colorId;
           const label = resolveColorLabel(colorId, variants, colorLabels);
@@ -116,7 +120,7 @@ export function ProductColorSelector({
               title={label}
               onClick={() => onColorSelect(colorId === '__no_color__' ? '' : colorId)}
               className={cn(
-                'bg-muted relative aspect-[3/4] overflow-hidden rounded-none border transition-all',
+                'bg-muted relative aspect-[3/4] overflow-hidden rounded-none border transition-all active:opacity-90',
                 active
                   ? 'border-foreground border-2'
                   : 'border-border/80 hover:border-foreground/40',

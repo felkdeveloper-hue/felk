@@ -26,18 +26,21 @@ export function ProductOffersSection() {
 
   return (
     <section aria-labelledby="product-offers" className="space-y-3">
-      <h2 id="product-offers" className="text-sm font-semibold">
+      <h2
+        id="product-offers"
+        className="text-[11px] font-semibold uppercase tracking-[0.16em] lg:text-sm lg:normal-case lg:tracking-normal"
+      >
         Save extra with these offers
       </h2>
       <div className="space-y-3">
         {DEFAULT_OFFERS.map((offer) => (
           <div
             key={offer.id}
-            className="rounded-xl border border-violet-200/80 bg-violet-50/60 p-4"
+            className="border-border/70 bg-muted/40 rounded-none border p-4 lg:rounded-xl lg:border-violet-200/80 lg:bg-violet-50/60"
           >
             <div className="flex items-start gap-2">
-              <Tag className="mt-0.5 size-4 shrink-0 text-violet-600" />
-              <p className="text-sm leading-snug">{offer.title}</p>
+              <Tag className="text-muted-foreground mt-0.5 size-4 shrink-0 lg:text-violet-600" />
+              <p className="text-[13px] leading-snug lg:text-sm">{offer.title}</p>
             </div>
             <div className="mt-3 flex items-center gap-2">
               <span className="border-border bg-background rounded-lg border px-3 py-1.5 font-mono text-sm font-semibold tracking-wide">

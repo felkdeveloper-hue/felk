@@ -78,25 +78,29 @@ export function ProductSizeSelector({
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2.5 lg:space-y-3">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-baseline gap-2">
-          <span className="text-sm font-semibold uppercase tracking-[0.08em]">Size</span>
+          <span className="text-[10px] font-semibold uppercase tracking-[0.16em] lg:text-sm lg:tracking-[0.08em]">
+            Size
+          </span>
           {activeLabel ? (
-            <span className="text-muted-foreground text-sm font-medium">: {activeLabel}</span>
+            <span className="text-muted-foreground text-xs font-medium lg:text-sm">
+              : {activeLabel}
+            </span>
           ) : null}
         </div>
         <button
           type="button"
           onClick={() => openModal('size-guide')}
-          className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm font-medium transition-colors"
+          className="text-muted-foreground active:text-foreground lg:hover:text-foreground inline-flex min-h-9 items-center gap-1.5 text-[11px] font-medium tracking-wide transition-colors lg:min-h-0 lg:text-sm"
         >
           <Ruler className="size-3.5" aria-hidden />
           Sizing guide
         </button>
       </div>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-1.5 lg:gap-2">
         {sizes.map((sizeId) => {
           const oos = isSizeOutOfStock(variants, sizeId, selectedColorId);
           const active = selectedSizeId === sizeId;
@@ -110,7 +114,7 @@ export function ProductSizeSelector({
               aria-disabled={oos}
               onClick={() => onSizeSelect(sizeId)}
               className={cn(
-                'relative min-w-[3.25rem] rounded-none border px-3.5 py-2.5 text-sm font-semibold uppercase tracking-wide transition-colors',
+                'relative min-h-9 min-w-[2.85rem] rounded-none border px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-wide transition-colors active:opacity-90 lg:min-h-0 lg:min-w-[3.25rem] lg:px-3.5 lg:py-2.5 lg:text-sm',
                 oos
                   ? active
                     ? 'text-muted-foreground border-foreground bg-muted/30 border-2'
@@ -139,7 +143,7 @@ export function ProductSizeSelector({
       <button
         type="button"
         onClick={handleNotify}
-        className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm transition-colors"
+        className="text-muted-foreground active:text-foreground lg:hover:text-foreground inline-flex min-h-9 items-center gap-1.5 text-[11px] transition-colors lg:min-h-0 lg:text-sm"
       >
         <span>Size not available?</span>
         <Bell className="size-3.5" />

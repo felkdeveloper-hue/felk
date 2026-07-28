@@ -318,7 +318,7 @@ export function ProductDetailPage() {
           <ProductBreadcrumb className="min-w-0 flex-1 pt-2.5" items={breadcrumbItems} />
         </div>
 
-        <div className="grid gap-8 lg:grid-cols-2 lg:gap-10 xl:gap-14">
+        <div className="grid gap-5 lg:grid-cols-2 lg:gap-10 xl:gap-14">
           <ProductGallery
             key={`${selectedColorId ?? 'all'}-${galleryMedia.map((m) => m.id).join('-')}`}
             media={galleryMedia}
@@ -330,7 +330,7 @@ export function ProductDetailPage() {
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-            className="space-y-6 lg:sticky lg:top-24 lg:self-start"
+            className="space-y-4 lg:sticky lg:top-24 lg:space-y-6 lg:self-start"
           >
             <ProductPurchasePanel
               product={product}
@@ -347,7 +347,7 @@ export function ProductDetailPage() {
               badgeLabel={badgeLabel}
             />
 
-            <div className="border-border bg-card/70 space-y-6 rounded-none border border-dashed p-5 sm:p-6">
+            <div className="border-border/60 lg:border-border lg:bg-card/70 space-y-4 border-t pt-4 lg:space-y-6 lg:rounded-none lg:border lg:border-dashed lg:p-6 lg:pt-6">
               <ProductHighlights specifications={highlightSpecs} />
               <ProductSpecsGrid specifications={gridSpecs} />
               <ProductInfoAccordions
@@ -380,7 +380,7 @@ export function ProductDetailPage() {
         />
         <ProductReviewsSection productId={product.id} />
 
-        <div className="mt-12 space-y-8">
+        <div className="mt-8 space-y-6 lg:mt-12 lg:space-y-8">
           <ProductCategoryLinks product={product} />
         </div>
       </Container>

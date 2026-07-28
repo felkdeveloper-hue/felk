@@ -53,9 +53,9 @@ export function Section({
             ) : null}
           </div>
         ) : (
-          <div className="mx-auto mb-4 flex w-full flex-col gap-2 px-4 sm:mb-4 sm:flex-row sm:items-end sm:justify-between sm:gap-3 sm:px-5 lg:px-6">
+          <div className="mx-auto mb-3 flex w-full flex-col gap-2 px-4 sm:mb-4 sm:flex-row sm:items-end sm:justify-between sm:gap-3 sm:px-5 lg:px-6">
             {title ? (
-              <h2 className="font-display text-foreground max-w-3xl text-[1.85rem] font-bold uppercase leading-none tracking-tight sm:text-5xl lg:text-6xl">
+              <h2 className="font-display text-foreground max-w-3xl text-xl font-bold uppercase leading-none tracking-tight sm:text-5xl lg:text-6xl">
                 {title}
               </h2>
             ) : (

@@ -133,7 +133,8 @@ export function HorizontalCarousel({
         <div className="w-4 shrink-0 sm:w-5 lg:w-6" aria-hidden />
       </div>
 
-      <div className="pointer-events-none absolute inset-y-0 left-2 right-2 flex items-center justify-between sm:left-3 sm:right-3 md:left-4 md:right-4 lg:left-6 lg:right-6">
+      {/* Arrows: desktop only — mobile uses finger swipe */}
+      <div className="pointer-events-none absolute inset-y-0 left-2 right-2 hidden items-center justify-between lg:left-6 lg:right-6 lg:flex">
         <Button
           type="button"
           size="icon"
@@ -141,9 +142,7 @@ export function HorizontalCarousel({
           aria-label="Previous"
           className={cn(
             'border-border/70 bg-card pointer-events-auto size-10 rounded-full border shadow-[var(--shadow-soft)] backdrop-blur transition-opacity sm:size-11',
-            alwaysShowControls
-              ? 'opacity-100'
-              : 'opacity-0 group-hover/carousel:opacity-100 max-md:opacity-100',
+            alwaysShowControls ? 'opacity-100' : 'opacity-0 group-hover/carousel:opacity-100',
           )}
           onClick={() => scrollBy(-1)}
         >
@@ -156,9 +155,7 @@ export function HorizontalCarousel({
           aria-label="Next"
           className={cn(
             'border-border/70 bg-card pointer-events-auto size-10 rounded-full border shadow-[var(--shadow-soft)] backdrop-blur transition-opacity sm:size-11',
-            alwaysShowControls
-              ? 'opacity-100'
-              : 'opacity-0 group-hover/carousel:opacity-100 max-md:opacity-100',
+            alwaysShowControls ? 'opacity-100' : 'opacity-0 group-hover/carousel:opacity-100',
           )}
           onClick={() => scrollBy(1)}
         >

@@ -25,8 +25,11 @@ export function ProductDeliveryCheck({
   const codAvailable = paymentOption === 'cod' || paymentOption === 'both';
 
   return (
-    <section aria-labelledby="delivery-check" className="space-y-3">
-      <h2 id="delivery-check" className="text-sm font-semibold">
+    <section aria-labelledby="delivery-check" className="space-y-3.5 lg:space-y-3">
+      <h2
+        id="delivery-check"
+        className="text-[11px] font-semibold uppercase tracking-[0.16em] lg:text-sm lg:normal-case lg:tracking-normal"
+      >
         Check for Delivery Details
       </h2>
       <div className="relative">
@@ -40,7 +43,7 @@ export function ProductDeliveryCheck({
             setResult('idle');
           }}
           onKeyDown={(e) => e.key === 'Enter' && handleCheck()}
-          className="pr-20"
+          className="h-12 rounded-none pr-20 text-base lg:h-10 lg:rounded-md lg:text-sm"
           maxLength={6}
         />
         <Button
@@ -48,7 +51,7 @@ export function ProductDeliveryCheck({
           variant="ghost"
           size="sm"
           onClick={handleCheck}
-          className="absolute right-1 top-1/2 -translate-y-1/2 font-semibold text-teal-600 hover:text-teal-700"
+          className="absolute right-1 top-1/2 h-10 -translate-y-1/2 font-semibold tracking-wide text-teal-600 hover:text-teal-700"
         >
           Check
         </Button>
@@ -67,25 +70,25 @@ export function ProductDeliveryCheck({
 
       <div
         className={cn(
-          'flex items-center gap-2.5 rounded-lg bg-sky-50 px-4 py-3 text-sm font-medium text-sky-950 dark:bg-sky-950/40 dark:text-sky-100',
+          'flex items-center gap-2.5 px-0 py-1 text-[13px] font-medium lg:rounded-lg lg:bg-sky-50 lg:px-4 lg:py-3 lg:text-sm lg:text-sky-950 dark:lg:bg-sky-950/40 dark:lg:text-sky-100',
         )}
       >
-        <Truck className="size-5 shrink-0 text-sky-600 dark:text-sky-300" />
+        <Truck className="text-muted-foreground size-4 shrink-0 lg:size-5 lg:text-sky-600 dark:lg:text-sky-300" />
         This product is eligible for FREE SHIPPING
       </div>
 
       <div
         className={cn(
-          'flex items-center gap-2.5 rounded-lg px-4 py-3 text-sm font-medium',
+          'flex items-center gap-2.5 px-0 py-1 text-[13px] font-medium lg:rounded-lg lg:px-4 lg:py-3 lg:text-sm',
           codAvailable
-            ? 'bg-emerald-50 text-emerald-950 dark:bg-emerald-950/40 dark:text-emerald-100'
-            : 'bg-amber-50 text-amber-950 dark:bg-amber-950/40 dark:text-amber-100',
+            ? 'lg:bg-emerald-50 lg:text-emerald-950 dark:lg:bg-emerald-950/40 dark:lg:text-emerald-100'
+            : 'lg:bg-amber-50 lg:text-amber-950 dark:lg:bg-amber-950/40 dark:lg:text-amber-100',
         )}
       >
         {codAvailable ? (
-          <Banknote className="size-5 shrink-0 text-emerald-600 dark:text-emerald-300" />
+          <Banknote className="text-muted-foreground size-4 shrink-0 lg:size-5 lg:text-emerald-600 dark:lg:text-emerald-300" />
         ) : (
-          <CreditCard className="size-5 shrink-0 text-amber-600 dark:text-amber-300" />
+          <CreditCard className="text-muted-foreground size-4 shrink-0 lg:size-5 lg:text-amber-600 dark:lg:text-amber-300" />
         )}
         {codAvailable
           ? paymentOption === 'cod'

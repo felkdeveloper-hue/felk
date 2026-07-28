@@ -19,7 +19,7 @@ export function RecentlyViewedSection({
   if (!productIds.length) return null;
 
   return (
-    <Section spacing="default" title="Recently Viewed">
+    <Section spacing="sm" title="Recently Viewed" className="lg:py-6">
       <Container>
         {isLoading ? (
           <ProductGridSkeleton count={2} />
