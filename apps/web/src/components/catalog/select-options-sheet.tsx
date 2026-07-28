@@ -28,6 +28,19 @@ import { ProductOffersSection } from './product-offers-section';
 import { ProductSizeSelector } from './product-size-selector';
 import { VariantSelector } from './variant-selector';
 
+function useIsMobileSheet(breakpoint = 1024) {
+  const [mobile, setMobile] = useState(false);
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+    const mq = window.matchMedia(`(max-width: ${breakpoint - 1}px)`);
+    const sync = () => setMobile(mq.matches);
+    sync();
+    mq.addEventListener('change', sync);
+    return () => mq.removeEventListener('change', sync);
+  }, [breakpoint]);
+  return mobile;
+}
+
 function findVariant(
   variants: ProductVariant[],
   colorId?: string,
@@ -36,9 +49,29 @@ function findVariant(
   if (colorId && sizeId) {
     return variants.find((v) => v.colorId === colorId && v.sizeId === sizeId);
   }
-  if (sizeId) return variants.find((v) => v.sizeId === sizeId);
-  if (colorId) return variants.find((v) => v.colorId === colorId);
+  if (colorId && !sizeId) {
+    return (
+      variants.find((v) => v.colorId === colorId && v.isDefault) ??
+      variants.find((v) => v.colorId === colorId)
+    );
+  }
+  if (sizeId) {
+    return (
+      variants.find((v) => v.sizeId === sizeId && !v.colorId) ??
+      variants.find((v) => v.sizeId === sizeId)
+    );
+  }
   return variants[0];
+}
+
+function sizeAvailableForColor(
+  variants: ProductVariant[],
+  colorId: string | undefined,
+  sizeId: string | undefined,
+): boolean {
+  if (!sizeId) return false;
+  if (!colorId) return variants.some((v) => v.sizeId === sizeId);
+  return variants.some((v) => v.colorId === colorId && v.sizeId === sizeId);
 }
 
 export interface SelectOptionsSheetProps {
@@ -52,6 +85,7 @@ export function SelectOptionsSheet({ product, open, onOpenChange }: SelectOption
   const addMutation = useAddToCartMutation();
   const detailQuery = useProductById(open ? product.id : '');
   const { sizes, colors } = useCatalogFilterFacets({ enabled: open });
+  const isMobile = useIsMobileSheet();
 
   const detail = detailQuery.data ?? product;
   const variants = detail.variants ?? [];
@@ -137,13 +171,26 @@ export function SelectOptionsSheet({ product, open, onOpenChange }: SelectOption
   const colorIds = [...new Set(variants.map((v) => v.colorId).filter(Boolean))] as string[];
   const hasSeparateSizeSelector = variants.some((v) => v.sizeId);
   const hasColorSelector = colorIds.length > 0;
-  const sizeReady = !hasSeparateSizeSelector || Boolean(selectedSizeId);
-  const canAdd = sizeReady && Boolean(resolveVariantId(selectedVariantId, detail));
+  const sizeMatchesColor = sizeAvailableForColor(variants, selectedColorId, selectedSizeId);
+  const effectiveSizeId = sizeMatchesColor ? selectedSizeId : undefined;
+  const resolvedForSelection = findVariant(variants, selectedColorId, effectiveSizeId);
+  const sizeReady = !hasSeparateSizeSelector || Boolean(effectiveSizeId && resolvedForSelection);
+  const cartVariantId = resolvedForSelection?.id ?? selectedVariantId;
+  const canAdd = sizeReady && Boolean(resolveVariantId(cartVariantId, detail));
 
   const handleColorSelect = (colorId: string) => {
-    setSelectedColorId(colorId);
-    const match = findVariant(variants, colorId, selectedSizeId);
-    if (match) setSelectedVariantId(match.id);
+    setSelectedColorId(colorId || undefined);
+    const matchWithSize = selectedSizeId
+      ? findVariant(variants, colorId, selectedSizeId)
+      : undefined;
+    if (matchWithSize) {
+      setSelectedVariantId(matchWithSize.id);
+      return;
+    }
+    setSelectedSizeId(undefined);
+    setSizePromptVisible(true);
+    const colorFirst = findVariant(variants, colorId);
+    if (colorFirst) setSelectedVariantId(colorFirst.id);
   };
 
   const handleSizeSelect = (sizeId: string) => {
@@ -154,21 +201,36 @@ export function SelectOptionsSheet({ product, open, onOpenChange }: SelectOption
   };
 
   const handleBlockedAdd = () => {
-    if (hasSeparateSizeSelector && !selectedSizeId) {
+    if (hasSeparateSizeSelector && !effectiveSizeId) {
       setSizePromptVisible(true);
-      toast.error('Please select a size');
+      toast.error(
+        selectedSizeId && !sizeMatchesColor
+          ? 'This size is not available in the selected color'
+          : 'Please select a size',
+      );
     }
   };
 
   const handleBuyNow = () => {
-    if (hasSeparateSizeSelector && !selectedSizeId) {
+    if (hasSeparateSizeSelector && !effectiveSizeId) {
       setSizePromptVisible(true);
-      toast.error('Please select a size');
+      toast.error(
+        selectedSizeId && !sizeMatchesColor
+          ? 'This size is not available in the selected color'
+          : 'Please select a size',
+      );
       return;
     }
-    const resolved = resolveVariantId(selectedVariantId, detail);
+    const resolved = resolvedForSelection?.id ?? resolveVariantId(selectedVariantId, detail);
     if (!resolved) {
       toast.error('Please select an available option');
+      return;
+    }
+    if (
+      selectedColorId &&
+      !variants.some((v) => v.id === resolved && v.colorId === selectedColorId)
+    ) {
+      toast.error('Please select a size for this color');
       return;
     }
     addMutation.mutate(
@@ -191,9 +253,13 @@ export function SelectOptionsSheet({ product, open, onOpenChange }: SelectOption
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
-        side="right"
+        side={isMobile ? 'bottom' : 'right'}
         showClose={false}
-        className="w-full gap-0 overflow-y-auto p-0 sm:!max-w-3xl lg:!max-w-4xl"
+        className={cn(
+          'w-full gap-0 overflow-y-auto p-0 sm:!max-w-3xl lg:!max-w-4xl',
+          isMobile &&
+            'h-[min(92dvh,920px)] max-h-[92dvh] !max-w-none rounded-t-2xl border-t pb-[env(safe-area-inset-bottom)]',
+        )}
         aria-describedby={undefined}
       >
         <SheetHeader className="border-border bg-card sticky top-0 z-20 flex flex-row items-center justify-between gap-4 border-b px-5 py-3.5">
@@ -295,7 +361,7 @@ export function SelectOptionsSheet({ product, open, onOpenChange }: SelectOption
                   <p className="text-muted-foreground text-xs">Shipping calculated at checkout.</p>
                 </div>
 
-                {hasSeparateSizeSelector && sizePromptVisible && !selectedSizeId ? (
+                {hasSeparateSizeSelector && sizePromptVisible && !effectiveSizeId ? (
                   <p
                     role="status"
                     className="border-foreground/20 bg-muted text-foreground border px-3 py-2.5 text-sm font-semibold"
@@ -306,16 +372,6 @@ export function SelectOptionsSheet({ product, open, onOpenChange }: SelectOption
 
                 {stillNeedsOptions ? (
                   <>
-                    {hasSeparateSizeSelector ? (
-                      <ProductSizeSelector
-                        variants={variants}
-                        selectedColorId={selectedColorId}
-                        selectedSizeId={selectedSizeId}
-                        onSizeSelect={handleSizeSelect}
-                        sizeLabels={sizeLabels}
-                      />
-                    ) : null}
-
                     {hasColorSelector ? (
                       <ProductColorSelector
                         variants={variants}
@@ -325,6 +381,16 @@ export function SelectOptionsSheet({ product, open, onOpenChange }: SelectOption
                         colorLabels={colorLabels}
                         productName={detail.name}
                         fallbackImageUrl={detail.thumbnailUrl ?? product.thumbnailUrl}
+                      />
+                    ) : null}
+
+                    {hasSeparateSizeSelector ? (
+                      <ProductSizeSelector
+                        variants={variants}
+                        selectedColorId={selectedColorId}
+                        selectedSizeId={effectiveSizeId}
+                        onSizeSelect={handleSizeSelect}
+                        sizeLabels={sizeLabels}
                       />
                     ) : null}
 
@@ -372,7 +438,7 @@ export function SelectOptionsSheet({ product, open, onOpenChange }: SelectOption
                     {canAdd ? (
                       <AddToCartButton
                         product={detail}
-                        variantId={selectedVariantId}
+                        variantId={cartVariantId}
                         quantity={quantity}
                         size="lg"
                         variant="outline"

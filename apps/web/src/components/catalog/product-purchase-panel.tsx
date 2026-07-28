@@ -4,6 +4,7 @@ import { Minus, Plus, RefreshCcw, ShieldCheck, ShoppingBag } from 'lucide-react'
 import { toast } from 'sonner';
 import { AddToCartButton } from '@/components/cart/add-to-cart-button';
 import { WishlistButton } from '@/components/wishlist/wishlist-button';
+import { Button } from '@/components/ui/button';
 import { useAddToCartMutation } from '@/hooks/cart';
 import { useCartStore } from '@/store/cart-store';
 import { resolveVariantId } from '@/utils/cart';
@@ -61,9 +62,29 @@ function findVariant(
   if (colorId && sizeId) {
     return variants.find((v) => v.colorId === colorId && v.sizeId === sizeId);
   }
-  if (sizeId) return variants.find((v) => v.sizeId === sizeId);
-  if (colorId) return variants.find((v) => v.colorId === colorId);
+  if (colorId && !sizeId) {
+    return (
+      variants.find((v) => v.colorId === colorId && v.isDefault) ??
+      variants.find((v) => v.colorId === colorId)
+    );
+  }
+  if (sizeId)
+    return (
+      variants.find((v) => v.sizeId === sizeId && !v.colorId) ??
+      variants.find((v) => v.sizeId === sizeId)
+    );
   return variants[0];
+}
+
+/** True when the size exists for the selected color (or there is no color constraint). */
+function sizeAvailableForColor(
+  variants: ProductVariant[],
+  colorId: string | undefined,
+  sizeId: string | undefined,
+): boolean {
+  if (!sizeId) return false;
+  if (!colorId) return variants.some((v) => v.sizeId === sizeId);
+  return variants.some((v) => v.colorId === colorId && v.sizeId === sizeId);
 }
 
 export interface ProductPurchasePanelProps {
@@ -107,14 +128,6 @@ export function ProductPurchasePanel({
     [variants, selectedVariantId],
   );
 
-  const isInCart = useMemo(
-    () =>
-      Boolean(
-        selectedVariantId && cart?.items?.some((item) => item.variantId === selectedVariantId),
-      ),
-    [cart?.items, selectedVariantId],
-  );
-
   const dealPrice = resolveDealPrice(product);
   const compareAt = selectedVariant?.compareAtPrice ?? product.compareAtPrice;
   const displayName = resolveColorDisplayName(variants, selectedColorId, product.name);
@@ -131,6 +144,17 @@ export function ProductPurchasePanel({
   const colors = [...new Set(variants.map((v) => v.colorId).filter(Boolean))] as string[];
   const hasSeparateSizeSelector = variants.some((v) => v.sizeId);
   const hasColorSelector = colors.length > 0;
+  const sizeMatchesColor = sizeAvailableForColor(variants, selectedColorId, selectedSizeId);
+  const effectiveSizeId = sizeMatchesColor ? selectedSizeId : undefined;
+  const resolvedForSelection = findVariant(variants, selectedColorId, effectiveSizeId);
+  const cartVariantId = resolvedForSelection?.id ?? selectedVariantId;
+  const selectionReady =
+    !hasSeparateSizeSelector || Boolean(effectiveSizeId && resolvedForSelection);
+
+  const isInCart = useMemo(
+    () => Boolean(cartVariantId && cart?.items?.some((item) => item.variantId === cartVariantId)),
+    [cart?.items, cartVariantId],
+  );
 
   const availabilityChips: { label: string }[] = [];
   if (product.warrantyAvailable) availabilityChips.push({ label: 'Warranty available' });
@@ -139,16 +163,36 @@ export function ProductPurchasePanel({
   const handleColorSelect = (colorId: string) => {
     const normalized = colorId || undefined;
     onColorChange(normalized ?? '');
+    setSizeError(false);
+
     if (!normalized) {
       const uncolored =
         variants.find((v) => !v.colorId && v.isDefault) ??
         variants.find((v) => !v.colorId && v.id === product.defaultVariantId) ??
         variants.find((v) => !v.colorId);
       if (uncolored) onVariantChange(uncolored.id);
+      if (selectedSizeId && !sizeAvailableForColor(variants, undefined, selectedSizeId)) {
+        onSizeChange('');
+      }
       return;
     }
-    const match = findVariant(variants, normalized, selectedSizeId);
-    if (match) onVariantChange(match.id);
+
+    const matchWithSize = selectedSizeId
+      ? findVariant(variants, normalized, selectedSizeId)
+      : undefined;
+
+    if (matchWithSize) {
+      onVariantChange(matchWithSize.id);
+      return;
+    }
+
+    // Previous size isn't sold in this color — clear it so we never add the old color's SKU.
+    onSizeChange('');
+    const colorFirst = findVariant(variants, normalized);
+    if (colorFirst) onVariantChange(colorFirst.id);
+    if (selectedSizeId) {
+      toast.message('Select a size for this color');
+    }
   };
 
   const handleSizeSelect = (sizeId: string) => {
@@ -159,14 +203,27 @@ export function ProductPurchasePanel({
   };
 
   const handleBuyNow = () => {
-    if (hasSeparateSizeSelector && !selectedSizeId) {
+    if (hasSeparateSizeSelector && !effectiveSizeId) {
       setSizeError(true);
-      toast.error('Please select a size to continue');
+      toast.error(
+        selectedSizeId && !sizeMatchesColor
+          ? 'This size is not available in the selected color'
+          : 'Please select a size to continue',
+      );
       return;
     }
-    const resolved = resolveVariantId(selectedVariantId, product);
+    const resolved = resolvedForSelection?.id ?? resolveVariantId(selectedVariantId, product);
     if (!resolved) {
       toast.error('Please select an available option');
+      return;
+    }
+    // Never checkout a SKU that doesn't match the visible color/size.
+    if (
+      selectedColorId &&
+      !variants.some((v) => v.id === resolved && v.colorId === selectedColorId)
+    ) {
+      toast.error('Please select a size for this color');
+      setSizeError(true);
       return;
     }
     addMutation.mutate(
@@ -259,24 +316,7 @@ export function ProductPurchasePanel({
         </div>
       ) : null}
 
-      {/* Size + color must sit above the cart CTAs */}
-      {hasSeparateSizeSelector ? (
-        <div className={sizeError ? 'rounded-none p-3 ring-2 ring-red-500' : undefined}>
-          {sizeError ? (
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-red-600">
-              Please select a size
-            </p>
-          ) : null}
-          <ProductSizeSelector
-            variants={variants}
-            selectedColorId={selectedColorId}
-            selectedSizeId={selectedSizeId}
-            onSizeSelect={handleSizeSelect}
-            sizeLabels={sizeLabels}
-          />
-        </div>
-      ) : null}
-
+      {/* Color first, then sizes for that color only */}
       {hasColorSelector ? (
         <ProductColorSelector
           variants={variants}
@@ -289,6 +329,28 @@ export function ProductPurchasePanel({
         />
       ) : null}
 
+      {hasSeparateSizeSelector ? (
+        <div
+          data-size-selector
+          className={sizeError ? 'rounded-none p-3 ring-2 ring-red-500' : undefined}
+        >
+          {sizeError ? (
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-red-600">
+              {selectedSizeId && !sizeMatchesColor
+                ? 'This size is not available in the selected color'
+                : 'Please select a size'}
+            </p>
+          ) : null}
+          <ProductSizeSelector
+            variants={variants}
+            selectedColorId={selectedColorId}
+            selectedSizeId={effectiveSizeId}
+            onSizeSelect={handleSizeSelect}
+            sizeLabels={sizeLabels}
+          />
+        </div>
+      ) : null}
+
       {!hasSeparateSizeSelector && !hasColorSelector && variants.length > 1 ? (
         <VariantSelector
           variants={variants}
@@ -299,7 +361,7 @@ export function ProductPurchasePanel({
         />
       ) : null}
 
-      <div className="space-y-3 pt-1">
+      <div className="space-y-3 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-1 lg:pb-0">
         <div className="flex flex-wrap items-stretch gap-3">
           <div className="border-border inline-flex h-12 items-center rounded-none border">
             <button
@@ -334,13 +396,16 @@ export function ProductPurchasePanel({
               <ShoppingBag className="size-4" />
               Go to bag
             </Link>
-          ) : hasSeparateSizeSelector && !selectedSizeId ? (
-            // Size required but not yet selected — show the gate button
+          ) : !selectionReady ? (
             <button
               type="button"
               onClick={() => {
                 setSizeError(true);
-                toast.error('Please select a size to continue');
+                toast.error(
+                  selectedSizeId && !sizeMatchesColor
+                    ? 'This size is not available in the selected color'
+                    : 'Please select a size to continue',
+                );
               }}
               className="border-foreground text-foreground hover:bg-foreground hover:text-background h-12 min-w-0 flex-1 rounded-none border bg-transparent text-sm font-bold uppercase tracking-[0.12em] transition-colors"
             >
@@ -349,7 +414,7 @@ export function ProductPurchasePanel({
           ) : (
             <AddToCartButton
               product={product}
-              variantId={selectedVariantId}
+              variantId={cartVariantId}
               quantity={quantity}
               size="lg"
               variant="outline"
@@ -370,6 +435,70 @@ export function ProductPurchasePanel({
         >
           {addMutation.isPending ? 'Please wait…' : 'Buy it now'}
         </button>
+      </div>
+
+      {/* Sticky mobile CTA bar — above bottom nav */}
+      <div
+        className="border-border/80 bg-background/95 supports-[backdrop-filter]:bg-background/90 fixed inset-x-0 z-[85] border-t px-3 py-2 backdrop-blur-md lg:hidden"
+        style={{ bottom: 'calc(3.5rem + env(safe-area-inset-bottom, 0px))' }}
+      >
+        <div className="mx-auto flex max-w-lg items-center gap-2">
+          <WishlistButton
+            product={product}
+            variantId={selectedVariantId}
+            iconOnly
+            variant="outline"
+            size="icon"
+            className="border-border size-12 shrink-0 rounded-none"
+          />
+          {isInCart ? (
+            <Button
+              asChild
+              className="h-12 min-w-0 flex-1 rounded-none text-xs font-bold uppercase tracking-[0.12em]"
+            >
+              <Link to={ROUTES.cart}>Go to bag</Link>
+            </Button>
+          ) : !selectionReady ? (
+            <button
+              type="button"
+              onClick={() => {
+                setSizeError(true);
+                toast.error(
+                  selectedSizeId && !sizeMatchesColor
+                    ? 'This size is not available in the selected color'
+                    : 'Please select a size to continue',
+                );
+                document
+                  .querySelector('[data-size-selector]')
+                  ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }}
+              className="border-foreground text-foreground h-12 min-w-0 flex-1 border bg-transparent text-xs font-bold uppercase tracking-[0.12em] active:opacity-80"
+            >
+              Select size
+            </button>
+          ) : (
+            <AddToCartButton
+              product={product}
+              variantId={cartVariantId}
+              quantity={quantity}
+              skipOptionGate
+              className="h-12 min-w-0 flex-[1.2] rounded-none text-xs font-bold uppercase tracking-[0.12em]"
+              label="Add"
+            />
+          )}
+          <button
+            type="button"
+            onClick={handleBuyNow}
+            disabled={
+              addMutation.isPending ||
+              product.inStock === false ||
+              product.status === 'out_of_stock'
+            }
+            className="bg-foreground text-background h-12 min-w-0 flex-1 rounded-none text-xs font-bold uppercase tracking-[0.12em] transition-opacity active:opacity-80 disabled:opacity-50"
+          >
+            Buy
+          </button>
+        </div>
       </div>
 
       <ProductOffersSection />

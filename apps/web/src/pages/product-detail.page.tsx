@@ -322,7 +322,7 @@ export function ProductDetailPage() {
               selectedSizeId={selectedSizeId}
               onVariantChange={setSelectedVariantId}
               onColorChange={(id) => setSelectedColorId(id || undefined)}
-              onSizeChange={setSelectedSizeId}
+              onSizeChange={(id) => setSelectedSizeId(id || undefined)}
               sizeLabels={sizeLabels}
               colorLabels={colorLabels}
               materialLabel={materialLabel}

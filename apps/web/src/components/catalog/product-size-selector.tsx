@@ -12,6 +12,16 @@ export interface ProductSizeSelectorProps {
   sizeLabels?: Record<string, string>;
 }
 
+/** Sizes that exist for the selected color only (never show another color's sizes as disabled). */
+function sizesForColor(variants: ProductVariant[], colorId?: string): string[] {
+  const pool = colorId
+    ? variants.filter((variant) => variant.colorId === colorId)
+    : variants.some((variant) => variant.colorId)
+      ? variants.filter((variant) => !variant.colorId)
+      : variants;
+  return [...new Set(pool.map((variant) => variant.sizeId).filter(Boolean))] as string[];
+}
+
 function isSizeOutOfStock(variants: ProductVariant[], sizeId: string, colorId?: string): boolean {
   const matching = variants.filter((v) => v.sizeId === sizeId);
   const relevant = colorId ? matching.filter((v) => v.colorId === colorId) : matching;
@@ -41,13 +51,22 @@ export function ProductSizeSelector({
 }: ProductSizeSelectorProps) {
   const openModal = useUiStore((state) => state.openModal);
 
-  const sizes = [...new Set(variants.map((v) => v.sizeId).filter(Boolean))] as string[];
+  const sizes = sizesForColor(variants, selectedColorId);
 
-  if (!sizes.length) return null;
+  if (!sizes.length) {
+    if (!selectedColorId) return null;
+    return (
+      <div className="space-y-2">
+        <span className="text-sm font-semibold uppercase tracking-[0.08em]">Size</span>
+        <p className="text-sm font-semibold text-red-600">Out of stock for this color</p>
+      </div>
+    );
+  }
 
-  const activeLabel = selectedSizeId
-    ? resolveSizeLabel(selectedSizeId, variants, sizeLabels)
-    : undefined;
+  const activeLabel =
+    selectedSizeId && sizes.includes(selectedSizeId)
+      ? resolveSizeLabel(selectedSizeId, variants, sizeLabels)
+      : undefined;
 
   const handleNotify = () => {
     toast.success('We will notify you when this size is back in stock.');
