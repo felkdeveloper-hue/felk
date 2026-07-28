@@ -8,12 +8,8 @@ import { Button } from '@/components/ui/button';
 
 const RECENT_KEY = 'felk:recent-searches';
 const TRENDING = ['New arrivals', 'Jeans', 'Hoodies', 'Dresses', 'Oversized'];
-const POPULAR_CATEGORIES = [
-  { label: 'Women', href: `${ROUTES.products}?gender=women` },
-  { label: 'Men', href: `${ROUTES.products}?gender=men` },
-  { label: 'Accessories', href: ROUTES.categories },
-  { label: 'Sale', href: ROUTES.products },
-];
+/** Storefront is women-only — keep search shortcuts aligned with the live catalog. */
+const POPULAR_CATEGORIES = [{ label: 'Women', href: `${ROUTES.products}?gender=women` }];
 
 function readRecent(): string[] {
   try {
