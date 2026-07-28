@@ -20,8 +20,12 @@ export function CategoryDetailPage() {
   const categoriesQuery = useCategoriesList();
 
   const { state, setSearch, clearFilters } = useCatalogSearchParams();
+  // Wait for categoryId before listing — avoids a wasted unfiltered products fetch
+  // that used to race the slug lookup and keep the grid in skeleton longer.
   const mergedState = { ...state, categoryId: category?.id ?? state.categoryId };
-  const query = useInfiniteProducts(mergedState);
+  const query = useInfiniteProducts(mergedState, {
+    enabled: Boolean(category?.id),
+  });
 
   const products = useMemo(
     () => query.data?.pages.flatMap((page) => page.data) ?? [],
@@ -110,7 +114,7 @@ export function CategoryDetailPage() {
         state={mergedState}
         products={products}
         total={total}
-        isLoading={categoryQuery.isLoading || query.isLoading}
+        isLoading={categoryQuery.isPending || query.isPending || query.isLoading}
         isError={query.isError}
         isFetchingNextPage={query.isFetchingNextPage}
         hasNextPage={hasNextPage}

@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useRouterState } from '@tanstack/react-router';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ROUTES } from '@/constants';
 import {
   DEFAULT_MEGA_MENUS,
@@ -11,8 +11,11 @@ import {
   type NavigationMenuKey,
 } from '@/constants/mega-menu-defaults';
 import { Image } from '@/components/media/image';
+import { prefetchInfiniteProducts } from '@/lib/prefetch-catalog';
 import { cn } from '@/lib/utils';
 import { navigationMenusApi } from '@/services/sdk/navigation-menus';
+import type { Category } from '@/services/sdk';
+import { QUERY_KEYS } from '@/constants/query-keys';
 import { resolveMegaMenuLink } from '@/utils/mega-menu-links';
 
 export type { MegaMenuGender, NavigationMenuKey };
@@ -45,7 +48,27 @@ function MegaMenuNavLink({
   onNavigate?: () => void;
   children: ReactNode;
 }) {
+  const queryClient = useQueryClient();
   const target = resolveMegaMenuLink(route, menuKey);
+
+  const prefetchTarget = () => {
+    if (target.kind === 'products') {
+      void prefetchInfiniteProducts(queryClient, {
+        gender: target.search.gender,
+        categoryId: target.search.categoryId,
+      });
+      return;
+    }
+    if (target.kind === 'category') {
+      const cached = queryClient.getQueryData<{ data: Category[] }>(
+        QUERY_KEYS.categories.list({ active: true }),
+      );
+      const category = cached?.data.find((item) => item.slug === target.slug);
+      if (category?.id) {
+        void prefetchInfiniteProducts(queryClient, { categoryId: category.id });
+      }
+    }
+  };
 
   if (target.kind === 'category') {
     return (
@@ -55,6 +78,8 @@ function MegaMenuNavLink({
         preload="intent"
         className={className}
         onClick={onNavigate}
+        onMouseEnter={prefetchTarget}
+        onFocus={prefetchTarget}
       >
         {children}
       </Link>
@@ -69,6 +94,8 @@ function MegaMenuNavLink({
         preload="intent"
         className={className}
         onClick={onNavigate}
+        onMouseEnter={prefetchTarget}
+        onFocus={prefetchTarget}
       >
         {children}
       </Link>
@@ -156,6 +183,7 @@ export function GenderMegaMenu({
   });
   const config = menuQuery.data ?? DEFAULT_MEGA_MENUS[menuKey];
   const panelId = useId();
+  const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const triggerRef = useRef<HTMLDivElement>(null);
@@ -192,6 +220,10 @@ export function GenderMegaMenu({
   const show = () => {
     clearCloseTimer();
     setOpen(true);
+    // Warm the gender PLP as soon as the menu opens — click feels instant.
+    void prefetchInfiniteProducts(queryClient, {
+      gender: config.gender ?? (menuKey === 'men' ? 'men' : 'women'),
+    });
   };
 
   const hide = () => {

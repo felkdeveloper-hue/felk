@@ -2,7 +2,7 @@ import { ProductModel, ProductVariantModel } from '@/models/product.models';
 import { productRepository } from '@/repositories/product.repository';
 import { writeAuditLog, writeActivityLog } from '@/services/audit.service';
 import type { ActorMeta } from '@/services/cms-crud.service';
-import { productService } from '@/services/product.service';
+import { productService, syncProductStockStatus } from '@/services/product.service';
 import {
   allocateUniqueLinkedSku,
   allocateUniqueParentSku,
@@ -11,6 +11,7 @@ import {
 import { ApiError } from '@/utils/errors/api-error';
 import { assertSalePriceValid, computePricing } from '@/utils/pricing.helper';
 import { parseSkuNumeric } from '@/utils/sku.helper';
+import { invalidateStorefrontCatalogCache } from '@/utils/simple-cache';
 import { PRODUCT_AUDIT } from '@/constants/product';
 
 function toPlain(doc: { toObject: () => Record<string, unknown> }) {
@@ -39,6 +40,28 @@ function validateVariantPricing(payload: {
   }
 }
 
+function sameOptionId(a: unknown, b: unknown): boolean {
+  if (a == null && b == null) return true;
+  if (a == null || b == null) return false;
+  return String(a) === String(b);
+}
+
+/** Soft-delete auto-created empty stubs (no color, no size) once real variants exist. */
+async function purgePlaceholderVariants(productId: string, keepId?: string) {
+  await ProductVariantModel.updateMany(
+    {
+      productId,
+      isDeleted: false,
+      ...(keepId ? { _id: { $ne: keepId } } : {}),
+      $and: [
+        { $or: [{ colorId: null }, { colorId: { $exists: false } }] },
+        { $or: [{ sizeId: null }, { sizeId: { $exists: false } }] },
+      ],
+    },
+    { $set: { isDeleted: true, deletedAt: new Date(), isDefault: false } },
+  );
+}
+
 export class ProductVariantService {
   async listByProduct(productId: string) {
     const product = await productRepository.findById(productId);
@@ -48,6 +71,28 @@ export class ProductVariantService {
       productId,
       isDeleted: false,
     }).sort({ displayOrder: 1 });
+
+    const hasRealOptions = variants.some((v) => v.colorId || v.sizeId);
+    const hasPlaceholders = variants.some((v) => !v.colorId && !v.sizeId);
+    if (hasRealOptions && hasPlaceholders) {
+      await purgePlaceholderVariants(productId);
+      const cleaned = await ProductVariantModel.find({
+        productId,
+        isDeleted: false,
+      }).sort({ displayOrder: 1 });
+      await productService.refreshVariantCount(productId);
+      return cleaned.map((v) => ({
+        ...toPlain(v),
+        pricingInsights: computePricing({
+          price: v.price,
+          salePrice: v.salePrice,
+          compareAtPrice: v.compareAtPrice,
+          costPrice: v.costPrice,
+          saleStartsAt: v.saleStartsAt,
+          saleEndsAt: v.saleEndsAt,
+        }),
+      }));
+    }
 
     return variants.map((v) => ({
       ...toPlain(v),
@@ -102,13 +147,107 @@ export class ProductVariantService {
     const product = await productRepository.findById(productId);
     if (!product) throw ApiError.notFound('Product not found');
 
+    const colorId = payload.colorId ?? null;
+    const sizeId = payload.sizeId ?? null;
+    const hasOptions = Boolean(colorId || sizeId);
+
+    // Active duplicate color+size → clear 409 instead of Mongo race / confusing 500.
+    const activeDuplicate = await ProductVariantModel.findOne({
+      productId,
+      isDeleted: false,
+      ...(colorId ? { colorId } : { $or: [{ colorId: null }, { colorId: { $exists: false } }] }),
+      ...(sizeId ? { sizeId } : { $or: [{ sizeId: null }, { sizeId: { $exists: false } }] }),
+    });
+    if (activeDuplicate && hasOptions) {
+      throw ApiError.conflict(
+        'This color and size combination already exists',
+        undefined,
+        'VARIANT_EXISTS',
+      );
+    }
+
+    // Revive a soft-deleted matching variant instead of colliding on unique SKU.
+    const deletedMatch = hasOptions
+      ? await ProductVariantModel.findOne({
+          productId,
+          isDeleted: true,
+          ...(colorId
+            ? { colorId }
+            : { $or: [{ colorId: null }, { colorId: { $exists: false } }] }),
+          ...(sizeId ? { sizeId } : { $or: [{ sizeId: null }, { sizeId: { $exists: false } }] }),
+        }).sort({ deletedAt: -1 })
+      : null;
+
+    if (deletedMatch) {
+      const price = Number(payload.price ?? product.pricing?.price ?? deletedMatch.price ?? 0);
+      validateVariantPricing({
+        price,
+        salePrice: payload.salePrice as number | null | undefined,
+        saleStartsAt: payload.saleStartsAt as string | null | undefined,
+        saleEndsAt: payload.saleEndsAt as string | null | undefined,
+      });
+
+      const revived = await ProductVariantModel.findOneAndUpdate(
+        { _id: deletedMatch._id },
+        {
+          $set: {
+            isDeleted: false,
+            deletedAt: null,
+            title: payload.title ?? deletedMatch.title,
+            price,
+            salePrice: payload.salePrice ?? deletedMatch.salePrice ?? null,
+            compareAtPrice: payload.compareAtPrice ?? deletedMatch.compareAtPrice ?? null,
+            currency:
+              payload.currency ?? deletedMatch.currency ?? product.pricing?.currency ?? 'LKR',
+            status: payload.status ?? 'active',
+            isDefault: Boolean(payload.isDefault),
+            listSeparately: Boolean(payload.listSeparately ?? deletedMatch.listSeparately),
+            colorId,
+            sizeId,
+          },
+        },
+        { new: true },
+      );
+      if (!revived) throw ApiError.internal('Unable to restore variant');
+
+      if (hasOptions) await purgePlaceholderVariants(productId, revived._id.toString());
+      if (revived.isDefault) {
+        await ProductVariantModel.updateMany(
+          { productId, _id: { $ne: revived._id } },
+          { $set: { isDefault: false } },
+        );
+        await ProductModel.updateOne(
+          { _id: productId },
+          { $set: { defaultVariantId: revived._id } },
+        );
+      }
+
+      await productService.refreshVariantCount(productId);
+      invalidateStorefrontCatalogCache();
+      void syncProductStockStatus(productId);
+
+      await writeAuditLog({
+        action: PRODUCT_AUDIT.VARIANT_ADDED,
+        resourceType: 'product_variants',
+        resourceId: revived._id.toString(),
+        actorUserId: actor.userId,
+        ip: actor.ip,
+        requestId: actor.requestId,
+        after: toPlain(revived),
+        metadata: { productId, revived: true },
+      });
+
+      return revived;
+    }
+
     let parentSku = product.sku ? String(product.sku).toUpperCase() : null;
     if (!parentSku || parseSkuNumeric(parentSku) == null) {
       parentSku = await allocateUniqueParentSku();
       await ProductModel.updateOne({ _id: productId }, { $set: { sku: parentSku } });
     }
 
-    const siblings = await ProductVariantModel.find({ productId, isDeleted: false }).select('sku');
+    // Include soft-deleted sibling SKUs so we never collide with unique indexes.
+    const siblings = await ProductVariantModel.find({ productId }).select('sku');
     const siblingSkus = siblings.map((row) => String(row.sku));
 
     const sku = payload.sku
@@ -127,31 +266,45 @@ export class ProductVariantService {
       saleEndsAt: payload.saleEndsAt as string | null | undefined,
     });
 
-    const variant = await ProductVariantModel.create({
-      productId,
-      sku,
-      ...(barcode ? { barcode } : {}),
-      title: payload.title ?? `${product.name} - ${sku}`,
-      colorId: payload.colorId ?? null,
-      sizeId: payload.sizeId ?? null,
-      optionValues: payload.optionValues ?? {},
-      weightGrams: payload.weightGrams ?? null,
-      dimensions: payload.dimensions ?? null,
-      price,
-      salePrice: payload.salePrice ?? null,
-      costPrice: payload.costPrice ?? null,
-      compareAtPrice: payload.compareAtPrice ?? null,
-      taxClass: payload.taxClass ?? null,
-      currency: payload.currency ?? product.pricing?.currency ?? 'LKR',
-      saleStartsAt: payload.saleStartsAt ?? null,
-      saleEndsAt: payload.saleEndsAt ?? null,
-      status: payload.status ?? 'active',
-      primaryImageId: payload.primaryImageId ?? null,
-      thumbnailUrl: payload.thumbnailUrl ?? null,
-      displayOrder: payload.displayOrder ?? 0,
-      isDefault: Boolean(payload.isDefault),
-      listSeparately: Boolean(payload.listSeparately),
-    });
+    let variant;
+    try {
+      variant = await ProductVariantModel.create({
+        productId,
+        sku,
+        ...(barcode ? { barcode } : {}),
+        title: payload.title ?? `${product.name} - ${sku}`,
+        colorId,
+        sizeId,
+        optionValues: payload.optionValues ?? {},
+        weightGrams: payload.weightGrams ?? null,
+        dimensions: payload.dimensions ?? null,
+        price,
+        salePrice: payload.salePrice ?? null,
+        costPrice: payload.costPrice ?? null,
+        compareAtPrice: payload.compareAtPrice ?? null,
+        taxClass: payload.taxClass ?? null,
+        currency: payload.currency ?? product.pricing?.currency ?? 'LKR',
+        saleStartsAt: payload.saleStartsAt ?? null,
+        saleEndsAt: payload.saleEndsAt ?? null,
+        status: payload.status ?? 'active',
+        primaryImageId: payload.primaryImageId ?? null,
+        thumbnailUrl: payload.thumbnailUrl ?? null,
+        displayOrder: payload.displayOrder ?? 0,
+        isDefault: Boolean(payload.isDefault),
+        listSeparately: Boolean(payload.listSeparately),
+      });
+    } catch (err) {
+      const code =
+        err && typeof err === 'object' && 'code' in err
+          ? Number((err as { code?: unknown }).code)
+          : NaN;
+      if (code === 11000 || (err instanceof Error && /E11000|duplicate key/i.test(err.message))) {
+        throw ApiError.conflict('A variant with this SKU already exists', undefined, 'SKU_EXISTS');
+      }
+      throw err;
+    }
+
+    if (hasOptions) await purgePlaceholderVariants(productId, variant._id.toString());
 
     if (variant.isDefault) {
       await ProductVariantModel.updateMany(
@@ -162,6 +315,7 @@ export class ProductVariantService {
     }
 
     await productService.refreshVariantCount(productId);
+    invalidateStorefrontCatalogCache();
 
     await writeAuditLog({
       action: PRODUCT_AUDIT.VARIANT_ADDED,
@@ -199,6 +353,29 @@ export class ProductVariantService {
       );
     }
 
+    const nextColorId = payload.colorId !== undefined ? payload.colorId : before.colorId;
+    const nextSizeId = payload.sizeId !== undefined ? payload.sizeId : before.sizeId;
+    if (payload.colorId !== undefined || payload.sizeId !== undefined) {
+      const conflict = await ProductVariantModel.findOne({
+        productId: before.productId,
+        isDeleted: false,
+        _id: { $ne: variantId },
+        ...(nextColorId
+          ? { colorId: nextColorId }
+          : { $or: [{ colorId: null }, { colorId: { $exists: false } }] }),
+        ...(nextSizeId
+          ? { sizeId: nextSizeId }
+          : { $or: [{ sizeId: null }, { sizeId: { $exists: false } }] }),
+      });
+      if (conflict) {
+        throw ApiError.conflict(
+          'This color and size combination already exists',
+          undefined,
+          'VARIANT_EXISTS',
+        );
+      }
+    }
+
     const nextPrice = Number(payload.price ?? before.price);
     validateVariantPricing({
       price: nextPrice,
@@ -214,12 +391,45 @@ export class ProductVariantService {
       (payload.price !== undefined && payload.price !== before.price) ||
       (payload.salePrice !== undefined && payload.salePrice !== before.salePrice);
 
-    const variant = await ProductVariantModel.findOneAndUpdate(
-      { _id: variantId, isDeleted: false },
-      { $set: payload },
-      { new: true },
-    );
+    // When changing color on one size row, optionally cascade color to siblings.
+    const cascadeColor =
+      payload.cascadeColorToSiblings === true &&
+      payload.colorId !== undefined &&
+      before.colorId &&
+      !sameOptionId(payload.colorId, before.colorId);
+
+    const { cascadeColorToSiblings: _cascade, ...updatePayload } = payload;
+
+    let variant;
+    try {
+      variant = await ProductVariantModel.findOneAndUpdate(
+        { _id: variantId, isDeleted: false },
+        { $set: updatePayload },
+        { new: true },
+      );
+    } catch (err) {
+      const code =
+        err && typeof err === 'object' && 'code' in err
+          ? Number((err as { code?: unknown }).code)
+          : NaN;
+      if (code === 11000 || (err instanceof Error && /E11000|duplicate key/i.test(err.message))) {
+        throw ApiError.conflict('SKU already exists', undefined, 'SKU_EXISTS');
+      }
+      throw err;
+    }
     if (!variant) throw ApiError.notFound('Variant not found');
+
+    if (cascadeColor) {
+      await ProductVariantModel.updateMany(
+        {
+          productId: before.productId,
+          colorId: before.colorId,
+          isDeleted: false,
+          _id: { $ne: variant._id },
+        },
+        { $set: { colorId: payload.colorId } },
+      );
+    }
 
     if (payload.isDefault === true) {
       await ProductVariantModel.updateMany(
@@ -275,6 +485,7 @@ export class ProductVariantService {
       });
     }
 
+    invalidateStorefrontCatalogCache();
     return variant;
   }
 
@@ -292,6 +503,8 @@ export class ProductVariantService {
     );
 
     await productService.refreshVariantCount(before.productId.toString());
+    invalidateStorefrontCatalogCache();
+    void syncProductStockStatus(before.productId.toString());
 
     await writeAuditLog({
       action: PRODUCT_AUDIT.VARIANT_REMOVED,

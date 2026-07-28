@@ -28,7 +28,7 @@ import { PRODUCT_STATUS, PRODUCT_VISIBILITY } from '@/constants/product';
 import { asyncHandler } from '@/utils/async-handler';
 import { ApiResponse } from '@/utils/response/api-response';
 import { ApiError } from '@/utils/errors/api-error';
-import { getCached, setCache } from '@/utils/simple-cache';
+import { getCached, setCache, storefrontProductsCacheKey } from '@/utils/simple-cache';
 
 export const storefrontRouter = Router();
 
@@ -149,25 +149,59 @@ storefrontRouter.get(
   '/products',
   asyncHandler(async (req, res) => {
     const { status: _status, visibility: _visibility, ...query } = req.query;
-    const cacheKey = `storefront:products:${JSON.stringify(query)}`;
+    const cacheKey = storefrontProductsCacheKey(query as Record<string, unknown>);
     // Always cache briefly — Render cold starts hurt without it, and list payloads are public.
     const cached = getCached<{ data: unknown; meta: unknown }>(cacheKey);
     if (cached) {
-      setPublicCache(res, 120);
+      setPublicCache(res, 300);
       return ApiResponse.success(res, cached.data, 'OK', 200, cached.meta as never);
     }
 
     const result = await productService.list({
       ...query,
       includeDeleted: false,
-      // Exact status matches the gender+status compound index (faster than $nin).
-      status: PRODUCT_STATUS.ACTIVE,
+      // Keep sold-out products visible on the catalog (Sold out badge).
+      excludeStatuses: [
+        PRODUCT_STATUS.DRAFT,
+        PRODUCT_STATUS.ARCHIVED,
+        PRODUCT_STATUS.DISCONTINUED,
+        PRODUCT_STATUS.HIDDEN,
+        PRODUCT_STATUS.SCHEDULED,
+      ],
       excludeVisibility: [PRODUCT_VISIBILITY.HIDDEN],
     } as never);
 
-    setCache(cacheKey, { data: result.data, meta: result.meta }, 60_000);
-    setPublicCache(res, 120);
+    setCache(cacheKey, { data: result.data, meta: result.meta }, 300_000);
+    setPublicCache(res, 300);
     ApiResponse.success(res, result.data, 'OK', 200, result.meta);
+  }),
+);
+
+/** Lightweight keep-warm for hosting platforms that sleep idle dynos (e.g. Render). */
+storefrontRouter.get(
+  '/warmup',
+  asyncHandler(async (_req, res) => {
+    const warmQueries = [
+      { gender: 'women', page: 1, limit: 12, sortBy: 'createdAt', sortOrder: 'desc' },
+      { page: 1, limit: 12, sortBy: 'createdAt', sortOrder: 'desc' },
+    ] as const;
+
+    await Promise.all(
+      warmQueries.map(async (query) => {
+        const cacheKey = storefrontProductsCacheKey(query as unknown as Record<string, unknown>);
+        if (getCached(cacheKey)) return;
+        const result = await productService.list({
+          ...query,
+          includeDeleted: false,
+          status: [PRODUCT_STATUS.ACTIVE, PRODUCT_STATUS.OUT_OF_STOCK],
+          excludeVisibility: [PRODUCT_VISIBILITY.HIDDEN],
+        } as never);
+        setCache(cacheKey, { data: result.data, meta: result.meta }, 300_000);
+      }),
+    );
+
+    res.set('Cache-Control', 'no-store');
+    ApiResponse.success(res, { ok: true });
   }),
 );
 
@@ -223,7 +257,29 @@ storefrontRouter.get(
     })
       .sort({ displayOrder: 1 })
       .lean();
-    ApiResponse.success(res, rows);
+
+    const { InventoryItemModel } = await import('@/models/inventory.models');
+    const items = rows.length
+      ? await InventoryItemModel.find({
+          variantId: { $in: rows.map((r) => r._id) },
+          isDeleted: false,
+        })
+          .select('variantId available')
+          .lean()
+      : [];
+    const stockMap = new Map<string, number>();
+    for (const item of items) {
+      const vid = String(item.variantId);
+      stockMap.set(vid, (stockMap.get(vid) ?? 0) + Number(item.available ?? 0));
+    }
+
+    const withStock = rows.map((row) => {
+      const id = String(row._id);
+      if (!stockMap.has(id)) return row;
+      return { ...row, stock: stockMap.get(id) ?? 0 };
+    });
+
+    ApiResponse.success(res, withStock);
   }),
 );
 

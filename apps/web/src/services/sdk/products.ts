@@ -66,6 +66,8 @@ export interface Product {
   /** All color ids available on the product's variants. */
   colorIds?: string[];
   sizeIds?: string[];
+  /** False when every tracked variant has 0 stock (or status is out_of_stock). */
+  inStock?: boolean;
   thumbnailUrl?: string;
   hoverImageUrl?: string;
   media?: ProductMedia[];

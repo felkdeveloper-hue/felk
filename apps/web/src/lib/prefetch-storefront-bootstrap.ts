@@ -1,5 +1,6 @@
 import type { QueryClient } from '@tanstack/react-query';
 import { QUERY_KEYS } from '@/constants/query-keys';
+import { prefetchDefaultCatalogLists } from '@/lib/prefetch-catalog';
 import { storefrontApi, type StorefrontBootstrapPayload } from '@/services/sdk/storefront';
 import { normalizeCategory } from '@/utils/catalog/normalize';
 import {
@@ -49,10 +50,11 @@ async function runPrefetch(queryClient: QueryClient): Promise<void> {
       normalizePublicSettings(payload.settings),
       { updatedAt: now },
     );
+    const categories = mapList(payload.categories, normalizeCategory);
     queryClient.setQueryData(
       QUERY_KEYS.categories.list({ active: true }),
       {
-        data: mapList(payload.categories, normalizeCategory),
+        data: categories,
         meta: {
           page: 1,
           limit: 100,
@@ -64,6 +66,14 @@ async function runPrefetch(queryClient: QueryClient): Promise<void> {
       },
       { updatedAt: now },
     );
+    // Seed slug lookups so category PLPs can resolve id synchronously and start
+    // the product list without a categories waterfall.
+    for (const category of categories) {
+      if (!category.slug) continue;
+      queryClient.setQueryData(QUERY_KEYS.categories.detail(category.slug), category, {
+        updatedAt: now,
+      });
+    }
     queryClient.setQueryData(
       QUERY_KEYS.cms.heroBanners({ active: true }),
       { data: sortByPriority(activeOnly(mapList(payload.heroBanners, normalizeHeroBanner))) },
@@ -98,6 +108,9 @@ async function runPrefetch(queryClient: QueryClient): Promise<void> {
       { data: mapList(payload.pages, normalizeCmsPage) },
       { updatedAt: now },
     );
+
+    // Warm the default Women PLP while the user is still on home / layout chrome.
+    prefetchDefaultCatalogLists(queryClient);
   } catch {
     // Individual hooks fall back to their own requests.
   }

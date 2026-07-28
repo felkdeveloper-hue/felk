@@ -2,22 +2,37 @@ import { ProductModel, ProductVariantModel } from '@/models/product.models';
 import { ApiError } from '@/utils/errors/api-error';
 import { generateParentSku, nextLinkedSku, nextSkuAfter } from '@/utils/sku.helper';
 
+/**
+ * SKU uniqueness must include soft-deleted rows — Mongo unique indexes on sku
+ * still apply to them, so allocation that ignores deleted docs causes E11000 → 500.
+ */
 export async function isSkuTaken(
   sku: string,
-  options?: { excludeProductId?: string; excludeVariantId?: string },
+  options?: {
+    excludeProductId?: string;
+    excludeVariantId?: string;
+    /** Default true: match unique indexes that cover soft-deleted rows. */
+    includeDeleted?: boolean;
+  },
 ): Promise<boolean> {
   const upper = sku.toUpperCase();
+  const includeDeleted = options?.includeDeleted !== false;
+  const productFilter: Record<string, unknown> = {
+    sku: upper,
+    ...(options?.excludeProductId ? { _id: { $ne: options.excludeProductId } } : {}),
+  };
+  const variantFilter: Record<string, unknown> = {
+    sku: upper,
+    ...(options?.excludeVariantId ? { _id: { $ne: options.excludeVariantId } } : {}),
+  };
+  if (!includeDeleted) {
+    productFilter.isDeleted = false;
+    variantFilter.isDeleted = false;
+  }
+
   const [productHit, variantHit] = await Promise.all([
-    ProductModel.findOne({
-      sku: upper,
-      isDeleted: false,
-      ...(options?.excludeProductId ? { _id: { $ne: options.excludeProductId } } : {}),
-    }).select('_id'),
-    ProductVariantModel.findOne({
-      sku: upper,
-      isDeleted: false,
-      ...(options?.excludeVariantId ? { _id: { $ne: options.excludeVariantId } } : {}),
-    }).select('_id'),
+    ProductModel.findOne(productFilter).select('_id'),
+    ProductVariantModel.findOne(variantFilter).select('_id'),
   ]);
   return Boolean(productHit || variantHit);
 }

@@ -55,6 +55,8 @@ export function ProductsListPage() {
   const query = useQuery({
     queryKey: QUERY_KEYS.adminProducts.list(params),
     queryFn: () => productsApi.list(params),
+    staleTime: 15_000,
+    placeholderData: (prev) => prev,
   });
 
   const summaryQueries = useQueries({

@@ -1,5 +1,6 @@
 import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
 import { QUERY_KEYS } from '@/constants/query-keys';
+import { PRODUCT_LIST_STALE_MS } from '@/lib/prefetch-catalog';
 import { productsApi } from '@/services/sdk';
 import {
   applyClientCatalogFilters,
@@ -9,7 +10,7 @@ import {
   type CatalogSearchState,
 } from '@/utils/catalog';
 
-export function useProductsList(state: CatalogSearchState) {
+export function useProductsList(state: CatalogSearchState, options?: { enabled?: boolean }) {
   const apiParams = catalogSearchToProductParams(state);
 
   return useQuery({
@@ -21,12 +22,14 @@ export function useProductsList(state: CatalogSearchState) {
         data: applyClientCatalogFilters(result.data, state),
       };
     },
-    staleTime: 1000 * 60 * 2,
+    enabled: options?.enabled ?? true,
+    staleTime: PRODUCT_LIST_STALE_MS,
+    gcTime: 1000 * 60 * 30,
     placeholderData: (previous) => previous,
   });
 }
 
-export function useInfiniteProducts(state: CatalogSearchState) {
+export function useInfiniteProducts(state: CatalogSearchState, options?: { enabled?: boolean }) {
   const baseParams = catalogSearchToProductParams({
     ...state,
     page: undefined,
@@ -54,7 +57,10 @@ export function useInfiniteProducts(state: CatalogSearchState) {
       if (!lastPage.meta.hasNextPage) return undefined;
       return lastPage.meta.page + 1;
     },
-    staleTime: 1000 * 60 * 2,
+    enabled: options?.enabled ?? true,
+    staleTime: PRODUCT_LIST_STALE_MS,
+    gcTime: 1000 * 60 * 30,
+    placeholderData: (previous) => previous,
   });
 }
 

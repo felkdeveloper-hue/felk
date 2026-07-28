@@ -7,6 +7,7 @@ import {
   type ProductDocument,
 } from '@/models/product.models';
 import { BrandModel } from '@/models/master-data.models';
+import { InventoryItemModel } from '@/models/inventory.models';
 import { productRepository, type ProductListFilters } from '@/repositories/product.repository';
 import { writeActivityLog, writeAuditLog } from '@/services/audit.service';
 import type { ActorMeta } from '@/services/cms-crud.service';
@@ -14,6 +15,7 @@ import { ApiError } from '@/utils/errors/api-error';
 import { slugify } from '@/utils/slug.helper';
 import { sanitizeRichText } from '@/utils/sanitize-html';
 import { assertSalePriceValid, buildProductJsonLd, computePricing } from '@/utils/pricing.helper';
+import { invalidateStorefrontCatalogCache } from '@/utils/simple-cache';
 import {
   OFFICIAL_BRAND_NAME,
   OFFICIAL_BRAND_SLUG,
@@ -44,6 +46,94 @@ function toPlain(doc: { toObject?: () => Record<string, unknown> } | Record<stri
     return (doc as { toObject: () => Record<string, unknown> }).toObject();
   }
   return doc as Record<string, unknown>;
+}
+
+/** Sum available stock per variant. Variants with no inventory rows get `stock: undefined`. */
+async function attachVariantStock<T extends { _id?: unknown }>(
+  variants: T[],
+): Promise<Array<T & { stock?: number }>> {
+  if (!variants.length) return variants;
+  const ids = variants.map((v) => v._id).filter(Boolean);
+  const items = await InventoryItemModel.find({
+    variantId: { $in: ids },
+    isDeleted: false,
+  })
+    .select('variantId available onHand')
+    .lean();
+
+  const stockMap = new Map<string, number>();
+  for (const item of items) {
+    const vid = String(item.variantId);
+    const qty = Number(item.available ?? item.onHand ?? 0);
+    stockMap.set(vid, (stockMap.get(vid) ?? 0) + qty);
+  }
+
+  return variants.map((v) => {
+    const id = String(v._id);
+    if (!stockMap.has(id)) return { ...v };
+    return { ...v, stock: stockMap.get(id) ?? 0 };
+  });
+}
+
+/**
+ * When every tracked variant has 0 available units, mark the product out_of_stock.
+ * Restores `active` when stock returns (only if currently out_of_stock).
+ */
+export async function syncProductStockStatus(productId: string): Promise<void> {
+  const product = await ProductModel.findOne({ _id: productId, isDeleted: false })
+    .select('status')
+    .lean();
+  if (!product) return;
+
+  const status = String(product.status ?? '');
+  if (
+    status !== PRODUCT_STATUS.ACTIVE &&
+    status !== PRODUCT_STATUS.OUT_OF_STOCK &&
+    status !== PRODUCT_STATUS.SCHEDULED
+  ) {
+    return;
+  }
+
+  const variants = await ProductVariantModel.find({
+    productId,
+    isDeleted: false,
+    status: 'active',
+  })
+    .select('_id')
+    .lean();
+  if (!variants.length) return;
+
+  const items = await InventoryItemModel.find({
+    variantId: { $in: variants.map((v) => v._id) },
+    isDeleted: false,
+  })
+    .select('variantId available')
+    .lean();
+
+  // No inventory rows yet → stock not tracked; leave catalog status alone.
+  if (!items.length) return;
+
+  const stockByVariant = new Map<string, number>();
+  for (const item of items) {
+    const vid = String(item.variantId);
+    stockByVariant.set(vid, (stockByVariant.get(vid) ?? 0) + Number(item.available ?? 0));
+  }
+
+  // Only consider variants that have inventory rows.
+  const tracked = [...stockByVariant.values()];
+  if (!tracked.length) return;
+
+  const anyInStock = tracked.some((qty) => qty > 0);
+  if (!anyInStock && status !== PRODUCT_STATUS.OUT_OF_STOCK) {
+    await ProductModel.updateOne(
+      { _id: productId },
+      { $set: { status: PRODUCT_STATUS.OUT_OF_STOCK } },
+    );
+    invalidateStorefrontCatalogCache();
+  } else if (anyInStock && status === PRODUCT_STATUS.OUT_OF_STOCK) {
+    await ProductModel.updateOne({ _id: productId }, { $set: { status: PRODUCT_STATUS.ACTIVE } });
+    invalidateStorefrontCatalogCache();
+  }
 }
 
 function validatePricing(pricing: {
@@ -239,17 +329,67 @@ export class ProductService {
         )
         .sort({ isDefault: -1, displayOrder: 1, createdAt: 1 })
         .lean(),
-      ProductMediaModel.find({
-        productId: { $in: productIds },
-        isDeleted: false,
-      })
-        .select('productId variantId url thumbnailUrl isPrimary priority')
-        .sort({ priority: 1 })
-        .lean(),
+      // Cap at primary + hover per color/variant group in Mongo (cards never need more).
+      ProductMediaModel.aggregate<{
+        _id: Types.ObjectId;
+        productId: Types.ObjectId;
+        variantId?: Types.ObjectId | null;
+        url?: string;
+        thumbnailUrl?: string;
+        isPrimary?: boolean;
+        priority?: number;
+      }>([
+        {
+          $match: {
+            productId: { $in: productIds },
+            isDeleted: false,
+          },
+        },
+        { $sort: { isPrimary: -1, priority: 1 } },
+        {
+          $group: {
+            _id: {
+              productId: '$productId',
+              variantId: { $ifNull: ['$variantId', null] },
+            },
+            items: {
+              $push: {
+                _id: '$_id',
+                productId: '$productId',
+                variantId: '$variantId',
+                url: '$url',
+                thumbnailUrl: '$thumbnailUrl',
+                isPrimary: '$isPrimary',
+                priority: '$priority',
+              },
+            },
+          },
+        },
+        { $project: { items: { $slice: ['$items', 2] } } },
+        { $unwind: '$items' },
+        { $replaceRoot: { newRoot: '$items' } },
+      ]),
       BrandModel.find({ _id: { $in: brandIds }, isDeleted: false })
         .select('name')
         .lean(),
     ]);
+
+    const variantIds = variants.map((v) => v._id);
+    const inventoryRows =
+      variantIds.length > 0
+        ? await InventoryItemModel.find({
+            variantId: { $in: variantIds },
+            isDeleted: false,
+          })
+            .select('variantId available')
+            .lean()
+        : [];
+    const stockByVariantId = new Map<string, number>();
+    for (const row of inventoryRows) {
+      const vid = String(row.variantId);
+      stockByVariantId.set(vid, (stockByVariantId.get(vid) ?? 0) + Number(row.available ?? 0));
+    }
+    const trackedVariantIds = new Set(stockByVariantId.keys());
 
     const listingVariantByProduct = pickListingVariant(variants);
     const variantsByProduct = new Map<string, typeof variants>();
@@ -259,16 +399,9 @@ export class ProductService {
       if (bucket) bucket.push(variant);
       else variantsByProduct.set(key, [variant]);
     }
-    // Cards only need primary + hover per color/variant group.
     const mediaByProduct = new Map<string, typeof media>();
-    const mediaGroupCounts = new Map<string, number>();
     for (const item of media) {
       const productKey = item.productId.toString();
-      const variantKey = item.variantId ? item.variantId.toString() : '__product__';
-      const groupKey = `${productKey}:${variantKey}`;
-      const count = mediaGroupCounts.get(groupKey) ?? 0;
-      if (count >= 2) continue;
-      mediaGroupCounts.set(groupKey, count + 1);
       const bucket = mediaByProduct.get(productKey);
       if (bucket) bucket.push(item);
       else mediaByProduct.set(productKey, [item]);
@@ -346,6 +479,25 @@ export class ProductService {
               ? String((product as { materialId: Types.ObjectId }).materialId)
               : undefined;
 
+            // Product is out of stock when every variant that has inventory is at 0,
+            // or the persisted status is already out_of_stock.
+            const stockScope =
+              cardListingVariant?.listSeparately && cardListingVariant.colorId
+                ? productVariants.filter(
+                    (v) => v.colorId && String(v.colorId) === String(cardListingVariant.colorId),
+                  )
+                : productVariants;
+            const trackedStocks = stockScope
+              .map((v) => String(v._id))
+              .filter((vid) => trackedVariantIds.has(vid))
+              .map((vid) => stockByVariantId.get(vid) ?? 0);
+            const stockInStock =
+              trackedStocks.length === 0 ? true : trackedStocks.some((qty) => qty > 0);
+            const inStock =
+              !cardListingVariant?.listSeparately && product.status === PRODUCT_STATUS.OUT_OF_STOCK
+                ? false
+                : stockInStock;
+
             return {
               _id: product._id,
               id,
@@ -353,7 +505,8 @@ export class ProductService {
               name: displayName?.trim() || product.name,
               slug: product.slug,
               shortDescription: product.shortDescription,
-              status: product.status,
+              status: inStock ? product.status : PRODUCT_STATUS.OUT_OF_STOCK,
+              inStock,
               visibility: product.visibility,
               pricing: cardComputed.pricing,
               pricingInsights: cardComputed.pricingInsights,
@@ -501,20 +654,10 @@ export class ProductService {
       brandId ? BrandModel.findById(brandId).select('name').lean() : Promise.resolve(null),
     ]);
 
-    let resolvedVariants = variants;
-    if (!variants.length) {
-      const created = await this.ensureDefaultVariant(id, {}, doc);
-      if (created) {
-        const lean =
-          typeof (created as { toObject?: () => unknown }).toObject === 'function'
-            ? (created as { toObject: () => unknown }).toObject()
-            : created;
-        resolvedVariants = [lean as (typeof variants)[number]];
-        if (!plain.defaultVariantId) {
-          plain.defaultVariantId = (created as { _id?: unknown })._id;
-        }
-      }
-    } else if (!plain.defaultVariantId) {
+    // Do not auto-create empty "No color" variants on read — that pollutes the
+    // admin editor right after "Create product". Default variants are created
+    // only on publish when the product still has none (cart needs a SKU).
+    if (!plain.defaultVariantId && variants.length) {
       plain.defaultVariantId = variants[0]?._id;
       void ProductModel.updateOne(
         { _id: id },
@@ -525,9 +668,9 @@ export class ProductService {
     const brandName = brand?.name ? String(brand.name) : undefined;
 
     const listingVariant =
-      resolvedVariants.find((v) => String(v._id) === String(plain.defaultVariantId ?? '')) ??
-      resolvedVariants.find((v) => v.isDefault) ??
-      resolvedVariants[0];
+      variants.find((v) => String(v._id) === String(plain.defaultVariantId ?? '')) ??
+      variants.find((v) => v.isDefault) ??
+      variants[0];
     const listingPricing = resolveListingPricing(
       plain as { pricing?: Record<string, unknown> | null },
       listingVariant
@@ -540,10 +683,18 @@ export class ProductService {
         : null,
     );
 
+    const variantsWithStock = await attachVariantStock(variants);
+
+    const trackedStocks = variantsWithStock
+      .map((v) => v.stock)
+      .filter((s): s is number => typeof s === 'number');
+    const inStock = trackedStocks.length === 0 ? true : trackedStocks.some((s) => s > 0);
+
     return {
       ...withComputedPricing({ ...plain, pricing: listingPricing }),
       brandName,
-      variants: resolvedVariants,
+      inStock,
+      variants: variantsWithStock,
       media,
       relationships,
     };
@@ -725,6 +876,7 @@ export class ProductService {
       metadata: { id: doc._id.toString() },
     });
 
+    invalidateStorefrontCatalogCache();
     return doc;
   }
 
@@ -776,20 +928,9 @@ export class ProductService {
       $set: { ...payload, version: (before.version ?? 1) + 1 },
     });
 
-    const nextStatus = String((doc as { status?: string } | null)?.status ?? before.status);
-    const nextPrice = Number(
-      ((doc as { pricing?: { price?: number } } | null)?.pricing?.price ??
-        before.pricing?.price ??
-        0) as number,
-    );
-    if (
-      nextPrice > 0 &&
-      (nextStatus === PRODUCT_STATUS.ACTIVE ||
-        nextStatus === PRODUCT_STATUS.SCHEDULED ||
-        Boolean(payload.pricing))
-    ) {
-      await this.ensureDefaultVariant(id, actor);
-    }
+    // Intentionally do NOT auto-create a default variant on save — that left
+    // empty "No color / —" stubs in the admin editor. Publish still ensures one
+    // when the product has no variants at all.
 
     await writeAuditLog({
       action: PRODUCT_AUDIT.UPDATED,
@@ -857,6 +998,7 @@ export class ProductService {
       metadata: { id },
     });
 
+    invalidateStorefrontCatalogCache();
     return doc;
   }
 
@@ -888,6 +1030,7 @@ export class ProductService {
       after: toPlain(doc),
     });
 
+    invalidateStorefrontCatalogCache();
     return doc;
   }
 
@@ -906,6 +1049,7 @@ export class ProductService {
       before: toPlain(before),
     });
 
+    invalidateStorefrontCatalogCache();
     return doc;
   }
 

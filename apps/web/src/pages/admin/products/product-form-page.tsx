@@ -181,6 +181,7 @@ function PlacementToggle({
 // ─────────────────────────────────────────────────────────────────────────────
 
 function ColorVariantCard({
+  colorKey,
   colorLabel,
   colorVariants,
   colorImages,
@@ -188,6 +189,7 @@ function ColorVariantCard({
   isDefault,
   isOwnListing,
   sizes,
+  colors,
   stockByVariant,
   stockReady,
   canCreate,
@@ -204,8 +206,12 @@ function ColorVariantCard({
   onUpdateTitle,
   onSetStock,
   onUpdatePrice,
+  onUpdateSize,
+  onChangeColor,
+  onAddSizes,
   onDelete,
 }: {
+  colorKey: string;
   colorLabel: string;
   colorVariants: AdminVariant[];
   colorImages: Array<{ id: string; url: string; thumbnailUrl?: string | null }>;
@@ -213,6 +219,7 @@ function ColorVariantCard({
   isDefault: boolean;
   isOwnListing: boolean;
   sizes: Array<{ id: string; name: string }>;
+  colors: Array<{ id: string; name: string }>;
   stockByVariant: Map<string, number>;
   stockReady: boolean;
   canCreate: boolean;
@@ -229,11 +236,20 @@ function ColorVariantCard({
   onUpdateTitle: (id: string, title: string) => void;
   onSetStock: (variantId: string, quantity: number) => void;
   onUpdatePrice: (id: string, price: number, salePrice: number | null) => void;
+  onUpdateSize: (id: string, sizeId: string | null) => void;
+  onChangeColor: (colorId: string) => void;
+  onAddSizes: (sizeIds: string[], stockMap: Record<string, string>) => void;
   onDelete: (id: string) => void;
 }) {
   const [imgIdx, setImgIdx] = useState(0);
+  const [addingSizes, setAddingSizes] = useState(false);
+  const [extraSizeIds, setExtraSizeIds] = useState<string[]>([]);
+  const [extraStockMap, setExtraStockMap] = useState<Record<string, string>>({});
   const currentImg = colorImages[imgIdx] ?? colorImages[0];
   const hasMultiple = colorImages.length > 1;
+
+  const usedSizeIds = new Set(colorVariants.map((v) => v.sizeId).filter(Boolean) as string[]);
+  const availableSizes = sizes.filter((s) => !usedSizeIds.has(s.id));
 
   useEffect(() => {
     if (imgIdx >= colorImages.length) setImgIdx(Math.max(0, colorImages.length - 1));
@@ -258,7 +274,27 @@ function ColorVariantCard({
               <ExternalLink className="size-3" /> Own Listing Active
             </span>
           ) : null}
-          <span className="text-sm font-bold text-[var(--admin-ink)]">{colorLabel}</span>
+          {canUpdate ? (
+            <select
+              value={colorKey === '__no_color__' ? '' : colorKey}
+              onChange={(e) => {
+                const next = e.target.value;
+                if (!next || next === colorKey) return;
+                onChangeColor(next);
+              }}
+              className="rounded-none border border-[var(--admin-line)] bg-white px-2 py-1 text-sm font-bold text-[var(--admin-ink)] outline-none focus:border-[var(--admin-accent)]"
+              title="Change color for all sizes in this group"
+            >
+              {colorKey === '__no_color__' ? <option value="">No color</option> : null}
+              {colors.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <span className="text-sm font-bold text-[var(--admin-ink)]">{colorLabel}</span>
+          )}
           <span className="text-xs text-[var(--admin-ink-muted)]">
             {colorVariants.length} size{colorVariants.length !== 1 ? 's' : ''}
             {colorImages.length > 0
@@ -385,9 +421,6 @@ function ColorVariantCard({
             </thead>
             <tbody>
               {colorVariants.map((variant) => {
-                const sizeName = variant.sizeId
-                  ? (sizes.find((s) => s.id === variant.sizeId)?.name ?? variant.sizeId)
-                  : '—';
                 const stock = stockByVariant.get(variant.id) ?? 0;
                 const isEditing = editingVariantId === variant.id;
                 return (
@@ -395,7 +428,28 @@ function ColorVariantCard({
                     key={variant.id}
                     className="border-[var(--admin-line)]/50 border-b last:border-0"
                   >
-                    <td className="py-2 pr-2 font-medium text-[var(--admin-ink)]">{sizeName}</td>
+                    <td className="py-2 pr-2 font-medium text-[var(--admin-ink)]">
+                      {canUpdate ? (
+                        <select
+                          value={variant.sizeId ?? ''}
+                          onChange={(e) => onUpdateSize(variant.id, e.target.value || null)}
+                          className="rounded-none border border-[var(--admin-line)] bg-white px-2 py-1 text-xs outline-none focus:border-[var(--admin-accent)]"
+                        >
+                          <option value="">—</option>
+                          {sizes.map((s) => (
+                            <option
+                              key={s.id}
+                              value={s.id}
+                              disabled={usedSizeIds.has(s.id) && s.id !== variant.sizeId}
+                            >
+                              {s.name}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        (sizes.find((s) => s.id === variant.sizeId)?.name ?? '—')
+                      )}
+                    </td>
                     <td className="py-2 pr-2">
                       {isEditing ? (
                         <div className="flex items-center gap-1">
@@ -461,7 +515,6 @@ function ColorVariantCard({
                           if (!Number.isFinite(next) || next < 0) return;
                           const current = variant.salePrice ?? variant.price;
                           if (next === current) return;
-                          // If product has a sale price set, update salePrice; else update base price
                           if (variant.salePrice != null && variant.salePrice > 0) {
                             onUpdatePrice(variant.id, variant.price || next, next);
                           } else {
@@ -486,6 +539,96 @@ function ColorVariantCard({
               })}
             </tbody>
           </table>
+
+          {canCreate && colorKey !== '__no_color__' ? (
+            <div className="mt-3 border-t border-[var(--admin-line)] pt-3">
+              {addingSizes ? (
+                <div className="space-y-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--admin-ink-muted)]">
+                    Add more sizes
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {availableSizes.map((size) => {
+                      const selected = extraSizeIds.includes(size.id);
+                      return (
+                        <div key={size.id} className="flex flex-col items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setExtraSizeIds((prev) =>
+                                prev.includes(size.id)
+                                  ? prev.filter((id) => id !== size.id)
+                                  : [...prev, size.id],
+                              )
+                            }
+                            className={cn(
+                              'rounded-none border px-3 py-1.5 text-xs font-semibold transition-colors',
+                              selected
+                                ? 'border-[var(--admin-accent)] bg-[var(--admin-accent)] text-white'
+                                : 'hover:border-[var(--admin-accent)]/50 border-[var(--admin-line)] text-[var(--admin-ink)]',
+                            )}
+                          >
+                            {size.name}
+                          </button>
+                          {selected ? (
+                            <input
+                              type="number"
+                              min={0}
+                              placeholder="qty"
+                              value={extraStockMap[size.id] ?? ''}
+                              onChange={(e) =>
+                                setExtraStockMap((m) => ({ ...m, [size.id]: e.target.value }))
+                              }
+                              className="w-14 rounded-none border border-[var(--admin-line)] bg-white px-1.5 py-1 text-center text-xs outline-none focus:border-[var(--admin-accent)]"
+                            />
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                    {!availableSizes.length ? (
+                      <p className="text-xs text-[var(--admin-ink-muted)]">
+                        All configured sizes are already on this color.
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={!extraSizeIds.length}
+                      onClick={() => {
+                        onAddSizes(extraSizeIds, extraStockMap);
+                        setAddingSizes(false);
+                        setExtraSizeIds([]);
+                        setExtraStockMap({});
+                      }}
+                      className="rounded-none bg-[var(--admin-ink)] px-3 py-1.5 text-xs font-semibold text-[var(--admin-surface)] disabled:opacity-50"
+                    >
+                      Add sizes
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAddingSizes(false);
+                        setExtraSizeIds([]);
+                        setExtraStockMap({});
+                      }}
+                      className="text-xs text-[var(--admin-ink-muted)] hover:text-[var(--admin-ink)]"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setAddingSizes(true)}
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--admin-accent)] hover:underline"
+                >
+                  <Plus className="size-3.5" /> Add more sizes
+                </button>
+              )}
+            </div>
+          ) : null}
         </div>
       </div>
     </div>
@@ -515,23 +658,28 @@ function VariantsSection({
   const variantsQuery = useQuery({
     queryKey: [...QUERY_KEYS.products.detail(productId), 'variants'],
     queryFn: () => productsApi.listVariants(productId),
+    staleTime: 0,
   });
   const stockQueryKey = QUERY_KEYS.inventory.items({ productId, scope: 'product-editor' });
   const stockQuery = useQuery({
     queryKey: stockQueryKey,
     queryFn: () => inventoryApi.listAllItems({ productId }),
+    staleTime: 0,
   });
   const mediaQuery = useQuery({
     queryKey: [...QUERY_KEYS.products.detail(productId), 'media'],
     queryFn: () => mediaApi.list(productId),
+    staleTime: 0,
   });
   const sizesQuery = useQuery({
     queryKey: ['cms', 'sizes', 'variant-form'],
     queryFn: () => cmsApi.sizes.list({ limit: 100, status: 'active' }),
+    staleTime: 5 * 60_000,
   });
   const colorsQuery = useQuery({
     queryKey: ['cms', 'colors', 'variant-form'],
     queryFn: () => cmsApi.colors.list({ limit: 100, status: 'active' }),
+    staleTime: 5 * 60_000,
   });
 
   const variants = variantsQuery.data ?? [];
@@ -599,14 +747,21 @@ function VariantsSection({
 
   const invalidate = async () => {
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.products.detail(productId) }),
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.products.detail(productId),
+        refetchType: 'active',
+      }),
       queryClient.invalidateQueries({
         queryKey: [...QUERY_KEYS.products.detail(productId), 'variants'],
+        refetchType: 'active',
       }),
       queryClient.invalidateQueries({
         queryKey: [...QUERY_KEYS.products.detail(productId), 'media'],
+        refetchType: 'active',
       }),
-      queryClient.invalidateQueries({ queryKey: stockQueryKey }),
+      queryClient.invalidateQueries({ queryKey: stockQueryKey, refetchType: 'active' }),
+      queryClient.invalidateQueries({ queryKey: ['admin', 'products'], refetchType: 'active' }),
+      queryClient.invalidateQueries({ queryKey: ['products'], refetchType: 'active' }),
     ]);
   };
 
@@ -637,7 +792,7 @@ function VariantsSection({
           currency: 'LKR',
         });
         const stockQty = Number(newStockMap[sizeId] ?? newStockMap[''] ?? 0);
-        if (stockQty > 0) {
+        if (Number.isFinite(stockQty) && stockQty >= 0) {
           try {
             await inventoryApi.setStock({ variantId: variant.id, quantity: stockQty });
           } catch (err) {
@@ -764,6 +919,122 @@ function VariantsSection({
     onError: (err) => toast.error(err instanceof AppError ? err.message : 'Unable to update price'),
   });
 
+  const updateSizeMutation = useMutation({
+    mutationFn: ({ id, sizeId }: { id: string; sizeId: string | null }) => {
+      const variant = variants.find((v) => v.id === id);
+      const colorName = variant?.colorId
+        ? colors.find((c) => c.id === variant.colorId)?.name
+        : undefined;
+      const sizeName = sizeId ? sizes.find((s) => s.id === sizeId)?.name : undefined;
+      const title = [colorName, sizeName].filter(Boolean).join(' / ') || undefined;
+      return productsApi.updateVariant(id, {
+        sizeId,
+        title,
+        price: variant?.price ?? productPrice,
+      });
+    },
+    onSuccess: async () => {
+      toast.success('Size updated');
+      await invalidate();
+    },
+    onError: (err) => toast.error(err instanceof AppError ? err.message : 'Unable to update size'),
+  });
+
+  const changeColorMutation = useMutation({
+    mutationFn: async ({
+      fromColorId,
+      toColorId,
+      groupVariants,
+    }: {
+      fromColorId: string | null;
+      toColorId: string;
+      groupVariants: AdminVariant[];
+    }) => {
+      if (!groupVariants.length) return;
+      const colorName = colors.find((c) => c.id === toColorId)?.name;
+      const [first, ...rest] = groupVariants;
+      await productsApi.updateVariant(first!.id, {
+        colorId: toColorId,
+        cascadeColorToSiblings: Boolean(fromColorId),
+        title:
+          [colorName, sizes.find((s) => s.id === first!.sizeId)?.name]
+            .filter(Boolean)
+            .join(' / ') || undefined,
+        price: first!.price,
+      });
+      // If cascading from a real color, siblings are updated server-side.
+      // For "No color" groups, update each row individually.
+      if (!fromColorId) {
+        for (const v of rest) {
+          const sizeName = v.sizeId ? sizes.find((s) => s.id === v.sizeId)?.name : undefined;
+          await productsApi.updateVariant(v.id, {
+            colorId: toColorId,
+            title: [colorName, sizeName].filter(Boolean).join(' / ') || undefined,
+            price: v.price,
+          });
+        }
+      } else {
+        for (const v of rest) {
+          const sizeName = v.sizeId ? sizes.find((s) => s.id === v.sizeId)?.name : undefined;
+          await productsApi.updateVariant(v.id, {
+            title: [colorName, sizeName].filter(Boolean).join(' / ') || undefined,
+            price: v.price,
+          });
+        }
+      }
+    },
+    onSuccess: async () => {
+      toast.success('Color updated');
+      await invalidate();
+    },
+    onError: (err) => toast.error(err instanceof AppError ? err.message : 'Unable to change color'),
+  });
+
+  const addSizesToColorMutation = useMutation({
+    mutationFn: async ({
+      colorId,
+      sizeIds,
+      stockMap,
+      basePrice,
+      baseSale,
+    }: {
+      colorId: string;
+      sizeIds: string[];
+      stockMap: Record<string, string>;
+      basePrice: number;
+      baseSale: number | null;
+    }) => {
+      const colorName = colors.find((c) => c.id === colorId)?.name;
+      const existingKeys = new Set(variants.map((v) => `${v.colorId ?? ''}:${v.sizeId ?? ''}`));
+      let created = 0;
+      for (const sizeId of sizeIds) {
+        const key = `${colorId}:${sizeId}`;
+        if (existingKeys.has(key)) continue;
+        const sizeName = sizes.find((s) => s.id === sizeId)?.name;
+        const variant = await productsApi.createVariant(productId, {
+          title: [colorName, sizeName].filter(Boolean).join(' / ') || undefined,
+          colorId,
+          sizeId,
+          price: basePrice,
+          salePrice: baseSale,
+          currency: 'LKR',
+        });
+        const stockQty = Number(stockMap[sizeId] ?? 0);
+        if (Number.isFinite(stockQty) && stockQty >= 0) {
+          await inventoryApi.setStock({ variantId: variant.id, quantity: stockQty });
+        }
+        created++;
+      }
+      if (!created) throw new AppError('Those sizes already exist on this color.');
+      return created;
+    },
+    onSuccess: async (created) => {
+      toast.success(`${created} size${created !== 1 ? 's' : ''} added`);
+      await invalidate();
+    },
+    onError: (err) => toast.error(err instanceof AppError ? err.message : 'Unable to add sizes'),
+  });
+
   const listSeparatelyMutation = useMutation({
     mutationFn: ({ id, listSeparately }: { id: string; listSeparately: boolean }) =>
       productsApi.updateVariant(id, { listSeparately }),
@@ -848,6 +1119,7 @@ function VariantsSection({
         return (
           <ColorVariantCard
             key={colorKey}
+            colorKey={colorKey}
             colorLabel={colorLabel}
             colorVariants={colorVariants}
             colorImages={colorImages}
@@ -855,6 +1127,7 @@ function VariantsSection({
             isDefault={isDefault}
             isOwnListing={isOwnListing}
             sizes={sizes}
+            colors={colors}
             stockByVariant={stockByVariant}
             stockReady={stockQuery.isSuccess}
             canCreate={canCreate}
@@ -875,6 +1148,24 @@ function VariantsSection({
             onUpdatePrice={(id, price, salePrice) =>
               updatePriceMutation.mutate({ id, price, salePrice })
             }
+            onUpdateSize={(id, sizeId) => updateSizeMutation.mutate({ id, sizeId })}
+            onChangeColor={(toColorId) =>
+              changeColorMutation.mutate({
+                fromColorId: colorKey === '__no_color__' ? null : colorKey,
+                toColorId,
+                groupVariants: colorVariants,
+              })
+            }
+            onAddSizes={(sizeIds, stockMap) => {
+              if (!firstVariant || colorKey === '__no_color__') return;
+              addSizesToColorMutation.mutate({
+                colorId: colorKey,
+                sizeIds,
+                stockMap,
+                basePrice: firstVariant.price || productPrice || 0,
+                baseSale: firstVariant.salePrice ?? productSalePrice ?? null,
+              });
+            }}
             onDelete={(id) => {
               if (confirm('Remove this variant?')) deleteMutation.mutate(id);
             }}
@@ -1064,6 +1355,7 @@ export function ProductFormPage({ productId }: { productId?: string }) {
   // Fetch CMS data
   const categoriesQuery = useQuery({
     queryKey: ['cms', 'categories', 'product-form'],
+    staleTime: 5 * 60_000,
     queryFn: async () => {
       // API zod max for list `limit` is 100 — higher values 400 and leave the picker empty.
       const result = await cmsApi.categories.list({
@@ -1079,6 +1371,7 @@ export function ProductFormPage({ productId }: { productId?: string }) {
   });
   const brandsQuery = useQuery({
     queryKey: ['cms', 'brands', 'product-form'],
+    staleTime: 5 * 60_000,
     queryFn: () => cmsApi.brands.list({ limit: 100, status: 'active' }),
   });
   const officialBrandId = useMemo(
@@ -1087,10 +1380,12 @@ export function ProductFormPage({ productId }: { productId?: string }) {
   );
   const occasionsQuery = useQuery({
     queryKey: ['cms', 'occasions', 'product-form'],
+    staleTime: 5 * 60_000,
     queryFn: () => cmsApi.occasions.list({ limit: 100, status: 'active' }),
   });
   const materialsQuery = useQuery({
     queryKey: ['cms', 'materials', 'product-form'],
+    staleTime: 5 * 60_000,
     queryFn: () => cmsApi.materials.list({ limit: 100, status: 'active' }),
   });
 
@@ -1099,6 +1394,7 @@ export function ProductFormPage({ productId }: { productId?: string }) {
     queryKey: QUERY_KEYS.products.detail(productId ?? ''),
     queryFn: () => productsApi.getById(productId!),
     enabled: isEdit,
+    staleTime: 0,
   });
   const product = detailQuery.data;
   const isPublished = isEdit ? isProductLive(product?.status) : false;
@@ -1257,8 +1553,12 @@ export function ProductFormPage({ productId }: { productId?: string }) {
     onSuccess: async () => {
       toast.success('Product saved');
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['products'] }),
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.products.detail(productId!) }),
+        queryClient.invalidateQueries({ queryKey: ['products'], refetchType: 'active' }),
+        queryClient.invalidateQueries({ queryKey: ['admin', 'products'], refetchType: 'active' }),
+        queryClient.invalidateQueries({
+          queryKey: QUERY_KEYS.products.detail(productId!),
+          refetchType: 'active',
+        }),
       ]);
     },
     onError: (err) => toast.error(err instanceof AppError ? err.message : 'Unable to save product'),
@@ -1268,7 +1568,14 @@ export function ProductFormPage({ productId }: { productId?: string }) {
     mutationFn: () => productsApi.publish(productId!),
     onSuccess: async () => {
       toast.success('Product published');
-      await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.products.detail(productId!) });
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: QUERY_KEYS.products.detail(productId!),
+          refetchType: 'active',
+        }),
+        queryClient.invalidateQueries({ queryKey: ['admin', 'products'], refetchType: 'active' }),
+        queryClient.invalidateQueries({ queryKey: ['products'], refetchType: 'active' }),
+      ]);
     },
     onError: (err) => toast.error(err instanceof AppError ? err.message : 'Unable to publish'),
   });

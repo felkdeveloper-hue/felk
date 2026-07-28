@@ -56,6 +56,33 @@ export function errorHandler(err: unknown, req: Request, res: Response, _next: N
     return;
   }
 
+  // Mongo duplicate key (unique slug/SKU/barcode) — surface as 409, not 500.
+  const mongoCode =
+    err && typeof err === 'object' && 'code' in err
+      ? Number((err as { code?: unknown }).code)
+      : NaN;
+  if (mongoCode === 11000 || (err instanceof Error && /E11000|duplicate key/i.test(err.message))) {
+    const keyPattern =
+      err && typeof err === 'object' && 'keyPattern' in err
+        ? (err as { keyPattern?: Record<string, unknown> }).keyPattern
+        : undefined;
+    const field = keyPattern ? Object.keys(keyPattern)[0] : undefined;
+    const label = field === 'slug' ? 'Slug' : field === 'barcode' ? 'Barcode' : 'SKU';
+    logger.warn(
+      { err: { code: 11000, field, message: (err as Error).message }, requestId },
+      'Duplicate key',
+    );
+    ApiResponse.error(
+      res,
+      `${label} already exists`,
+      HTTP_STATUS.CONFLICT,
+      field === 'slug' ? 'SLUG_EXISTS' : field === 'barcode' ? 'BARCODE_EXISTS' : 'SKU_EXISTS',
+      undefined,
+      meta,
+    );
+    return;
+  }
+
   logger.error({ err, requestId, correlationId: meta.correlationId }, 'Unhandled error');
 
   const message = appConfig.app.isProd

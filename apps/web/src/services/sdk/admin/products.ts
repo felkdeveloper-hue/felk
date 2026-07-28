@@ -82,6 +82,7 @@ export interface VariantInput {
   status?: string;
   isDefault?: boolean;
   listSeparately?: boolean;
+  cascadeColorToSiblings?: boolean;
 }
 
 function readMoneyAmount(value: unknown): number | undefined {

@@ -1,5 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Link } from '@tanstack/react-router';
+import { useQueryClient } from '@tanstack/react-query';
 import { ChevronDown } from 'lucide-react';
 import bagsImage from '@/assets/images/Categories/Bags.png';
 import corsetImage from '@/assets/images/Categories/corset-banner-mobile.webp';
@@ -11,6 +12,7 @@ import shoesImage from '@/assets/images/Categories/Shoes.png';
 import jacketImage from '@/assets/images/Categories/WomenJacket.png';
 import { ROUTES } from '@/constants';
 import { useCategoriesList } from '@/hooks/catalog/use-categories';
+import { prefetchInfiniteProducts } from '@/lib/prefetch-catalog';
 import { cn } from '@/lib/utils';
 import type { Category } from '@/services/sdk';
 import { Image } from '@/components/media/image';
@@ -76,12 +78,18 @@ export function MegaMenuPlaceholder({ transparent }: MegaMenuPlaceholderProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [open, setOpen] = useState(false);
+  const queryClient = useQueryClient();
 
   const categoriesQuery = useCategoriesList();
   const categories = useMemo(
     () => resolveMegaMenuCategories(categoriesQuery.data?.data),
     [categoriesQuery.data?.data],
   );
+
+  const prefetchCategory = (category: MegaMenuCategory) => {
+    if (!category.id || category.id === category.slug) return;
+    void prefetchInfiniteProducts(queryClient, { categoryId: category.id });
+  };
 
   const clearCloseTimer = () => {
     if (closeTimer.current) {
@@ -200,6 +208,8 @@ export function MegaMenuPlaceholder({ transparent }: MegaMenuPlaceholderProps) {
                     preload="intent"
                     className="group block"
                     onClick={() => setOpen(false)}
+                    onMouseEnter={() => prefetchCategory(category)}
+                    onFocus={() => prefetchCategory(category)}
                   >
                     <div className="bg-muted relative aspect-[3/4] overflow-hidden">
                       <Image

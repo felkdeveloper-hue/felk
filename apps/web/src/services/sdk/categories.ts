@@ -57,7 +57,14 @@ export const categoriesApi = {
   },
 
   async getBySlug(slug: string): Promise<Category | null> {
-    const result = await this.list({ q: slug, limit: 100, status: 'active' });
+    // Prefer the active list (usually already warm from bootstrap) over a
+    // separate `?q=` request that scanned 100 rows on every category PLP.
+    const result = await this.list({
+      status: 'active',
+      limit: 100,
+      sortBy: 'sortOrder',
+      sortOrder: 'asc',
+    });
     return result.data.find((category) => category.slug === slug) ?? null;
   },
 };

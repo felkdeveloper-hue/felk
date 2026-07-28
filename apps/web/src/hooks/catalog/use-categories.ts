@@ -1,6 +1,18 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { QUERY_KEYS } from '@/constants/query-keys';
-import { categoriesApi, cmsApi, catalogFacetsApi } from '@/services/sdk';
+import { categoriesApi, cmsApi, catalogFacetsApi, type Category } from '@/services/sdk';
+
+type CategoriesListCache = { data: Category[] };
+
+function findCategoryInListCache(
+  queryClient: ReturnType<typeof useQueryClient>,
+  slug: string,
+): Category | undefined {
+  const cached = queryClient.getQueryData<CategoriesListCache>(
+    QUERY_KEYS.categories.list({ active: true }),
+  );
+  return cached?.data.find((category) => category.slug === slug);
+}
 
 export function useCategoryTree() {
   return useQuery({
@@ -22,11 +34,22 @@ export function useCategoriesList() {
 }
 
 export function useCategoryBySlug(slug: string) {
+  const queryClient = useQueryClient();
+
   return useQuery({
     queryKey: QUERY_KEYS.categories.detail(slug),
-    queryFn: () => categoriesApi.getBySlug(slug),
+    queryFn: async () => {
+      // Bootstrap already seeds the active categories list — reuse it instead of
+      // a second `?q=slug` round-trip that blocked the product grid.
+      const fromList = findCategoryInListCache(queryClient, slug);
+      if (fromList) return fromList;
+      return categoriesApi.getBySlug(slug);
+    },
     enabled: Boolean(slug),
     staleTime: 1000 * 60 * 10,
+    initialData: () => (slug ? findCategoryInListCache(queryClient, slug) : undefined),
+    initialDataUpdatedAt: () =>
+      queryClient.getQueryState(QUERY_KEYS.categories.list({ active: true }))?.dataUpdatedAt,
   });
 }
 

@@ -30,14 +30,14 @@ export interface CatalogSearchState {
 
 export const DEFAULT_CATALOG_SEARCH: CatalogSearchState = {
   page: 1,
-  limit: 16,
+  limit: 12,
   sortBy: 'createdAt',
   sortOrder: 'desc',
   view: 'grid',
 };
 
 /** Products fetched per scroll batch on shop pages. */
-export const CATALOG_BATCH_SIZE = 16;
+export const CATALOG_BATCH_SIZE = 12;
 /** Soft cap for products shown via infinite scroll on a catalog page. */
 export const CATALOG_MAX_PRODUCTS = 500;
 
@@ -201,7 +201,8 @@ export function applyClientCatalogFilters(products: Product[], state: CatalogSea
   return products.filter((product) => {
     if (state.materialId && product.materialId !== state.materialId) return false;
     if (state.occasionId && !product.occasionIds?.includes(state.occasionId)) return false;
-    if (state.inStock === true && product.status === 'out_of_stock') return false;
+    if (state.inStock === true && (product.inStock === false || product.status === 'out_of_stock'))
+      return false;
     if (state.onSale === true && !product.isOnSale && !product.isClearance) return false;
     if (state.discountBand) {
       const band = DISCOUNT_BANDS[state.discountBand];

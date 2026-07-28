@@ -225,7 +225,10 @@ export const variantCreateSchema = z.object({
   listSeparately: z.boolean().optional(),
 });
 
-export const variantUpdateSchema = variantCreateSchema.partial();
+export const variantUpdateSchema = variantCreateSchema.partial().extend({
+  /** When true and colorId changes, update all sibling sizes that shared the old color. */
+  cascadeColorToSiblings: z.boolean().optional(),
+});
 
 export const mediaRemoteCreateSchema = z.object({
   url: z.string().url(),

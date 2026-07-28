@@ -363,7 +363,9 @@ export function ProductPurchasePanel({
         <button
           type="button"
           onClick={handleBuyNow}
-          disabled={addMutation.isPending || product.status === 'out_of_stock'}
+          disabled={
+            addMutation.isPending || product.inStock === false || product.status === 'out_of_stock'
+          }
           className="bg-foreground text-background hover:bg-foreground/90 inline-flex h-12 w-full items-center justify-center rounded-none text-sm font-bold uppercase tracking-[0.14em] transition-colors disabled:opacity-50"
         >
           {addMutation.isPending ? 'Please wait…' : 'Buy it now'}

@@ -42,7 +42,10 @@ export function AddToCartButton({
   const resolvedVariantId = resolveVariantId(variantId, product);
   const mustPickOptions = !skipOptionGate && !variantId && needsOptionSelection(product);
   const isDisabled =
-    disabled || (!mustPickOptions && !resolvedVariantId) || product.status === 'out_of_stock';
+    disabled ||
+    (!mustPickOptions && !resolvedVariantId) ||
+    product.inStock === false ||
+    product.status === 'out_of_stock';
 
   const handleClick = () => {
     if (mustPickOptions) {

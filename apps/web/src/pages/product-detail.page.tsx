@@ -290,7 +290,7 @@ export function ProductDetailPage() {
           sku: selectedVariant?.sku ?? product.sku,
           price: price?.amount,
           currency: price?.currency,
-          inStock: product.status !== 'out_of_stock',
+          inStock: product.inStock !== false && product.status !== 'out_of_stock',
           url: buildAbsoluteUrl(`/products/${product.slug}`),
         })}
       />

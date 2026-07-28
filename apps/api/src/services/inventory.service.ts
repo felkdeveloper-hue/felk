@@ -13,7 +13,9 @@ import {
 } from '@/repositories/inventory.repository';
 import { writeAuditLog, writeActivityLog } from '@/services/audit.service';
 import type { ActorMeta } from '@/services/cms-crud.service';
+import { syncProductStockStatus } from '@/services/product.service';
 import { ApiError } from '@/utils/errors/api-error';
+import { invalidateStorefrontCatalogCache } from '@/utils/simple-cache';
 import {
   assertNonNegative,
   computeAvailable,
@@ -548,11 +550,17 @@ export class InventoryService {
     const current = item.onHand;
 
     if (targetOnDefault === current) {
+      const productId = String(
+        (await ProductVariantModel.findById(variantId).select('productId').lean())?.productId ?? '',
+      );
+      if (productId) await syncProductStockStatus(productId);
+      invalidateStorefrontCatalogCache();
       return { item, movement: null };
     }
 
+    let result;
     if (targetOnDefault > current) {
-      return this.applyMovement(
+      result = await this.applyMovement(
         {
           warehouseId,
           variantId,
@@ -564,29 +572,38 @@ export class InventoryService {
         },
         actor,
       );
-    }
+    } else {
+      const decreaseBy = current - targetOnDefault;
+      if (item.available < decreaseBy) {
+        throw ApiError.unprocessable(
+          `Cannot set stock to ${quantity}: ${item.reserved} units are reserved`,
+          { onHand: current, reserved: item.reserved, available: item.available },
+          'INSUFFICIENT_AVAILABLE',
+        );
+      }
 
-    const decreaseBy = current - targetOnDefault;
-    if (item.available < decreaseBy) {
-      throw ApiError.unprocessable(
-        `Cannot set stock to ${quantity}: ${item.reserved} units are reserved`,
-        { onHand: current, reserved: item.reserved, available: item.available },
-        'INSUFFICIENT_AVAILABLE',
+      result = await this.applyMovement(
+        {
+          warehouseId,
+          variantId,
+          type: MOVEMENT_TYPE.ADJUSTMENT,
+          quantity: decreaseBy,
+          reason: 'decrease:set-stock',
+          note: 'Set stock quantity',
+          referenceType: 'adjustment',
+        },
+        actor,
       );
     }
 
-    return this.applyMovement(
-      {
-        warehouseId,
-        variantId,
-        type: MOVEMENT_TYPE.ADJUSTMENT,
-        quantity: decreaseBy,
-        reason: 'decrease:set-stock',
-        note: 'Set stock quantity',
-        referenceType: 'adjustment',
-      },
-      actor,
+    const productId = String(
+      (await ProductVariantModel.findById(variantId).select('productId').lean())?.productId ?? '',
     );
+    if (productId) {
+      await syncProductStockStatus(productId);
+    }
+    invalidateStorefrontCatalogCache();
+    return result;
   }
 
   async receive(

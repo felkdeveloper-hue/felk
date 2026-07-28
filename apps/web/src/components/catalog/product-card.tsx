@@ -158,7 +158,7 @@ export function ProductCard({
                 Save {discountPct}%
               </Badge>
             ) : null}
-            {product.status === 'out_of_stock' ? (
+            {product.inStock === false || product.status === 'out_of_stock' ? (
               <Badge variant="outline" className="bg-card/90 rounded-none text-[10px]">
                 Sold out
               </Badge>

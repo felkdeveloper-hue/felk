@@ -16,7 +16,10 @@ function isSizeOutOfStock(variants: ProductVariant[], sizeId: string, colorId?: 
   const matching = variants.filter((v) => v.sizeId === sizeId);
   const relevant = colorId ? matching.filter((v) => v.colorId === colorId) : matching;
   if (!relevant.length) return true;
-  return relevant.every((v) => (v.stock ?? 1) <= 0 || v.status === 'out_of_stock');
+  const tracked = relevant.filter((v) => typeof v.stock === 'number');
+  // No inventory rows yet → stock not tracked; keep size selectable.
+  if (!tracked.length) return false;
+  return tracked.every((v) => (v.stock ?? 0) <= 0 || v.status === 'out_of_stock');
 }
 
 function resolveSizeLabel(
