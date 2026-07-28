@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { SlidersHorizontal } from 'lucide-react';
 import { Container } from '@/components/layout/container';
 import { useCatalogFilterFacets } from '@/hooks/catalog';
 import { CATALOG_BATCH_SIZE, CATALOG_MAX_PRODUCTS, type CatalogSearchState } from '@/utils/catalog';
@@ -141,28 +142,28 @@ export function CatalogListShell({
     catalogTotal != null ? Math.min(catalogTotal, CATALOG_MAX_PRODUCTS) : CATALOG_MAX_PRODUCTS;
 
   return (
-    <div className="pb-12 sm:pb-16">
-      <Container className="space-y-5 pt-5 sm:pt-6">
+    <div className="pb-24 sm:pb-16 lg:pb-16">
+      <Container className="space-y-4 pt-4 sm:space-y-5 sm:pt-6">
         {banner}
 
         {/* Inline title — only rendered when explicitly passed (e.g. search page) */}
         {title && !banner ? (
-          <header className="border-border/50 space-y-1 border-b pb-5">
+          <header className="border-border/50 space-y-1 border-b pb-4 sm:pb-5">
             {eyebrow ? (
               <p className="text-muted-foreground text-[10px] font-semibold uppercase tracking-[0.22em]">
                 {eyebrow}
               </p>
             ) : null}
-            <h1 className="font-display text-foreground text-2xl font-bold uppercase tracking-tight">
+            <h1 className="font-display text-foreground text-xl font-bold uppercase tracking-tight sm:text-2xl">
               {title}
             </h1>
             {description ? <p className="text-muted-foreground text-sm">{description}</p> : null}
           </header>
         ) : null}
 
-        {/* Toolbar — Filter+Sort sheet | product count */}
-        <div className="border-border/60 flex flex-wrap items-center justify-between gap-3 border-b pb-4">
-          <div className="flex items-center gap-4">
+        {/* Toolbar — desktop filter trigger + chips | product count */}
+        <div className="border-border/60 flex flex-wrap items-center justify-between gap-3 border-b pb-3 sm:pb-4">
+          <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
             <CatalogFilterAndSortSheet
               state={state}
               onChange={onSearchChange}
@@ -183,7 +184,7 @@ export function CatalogListShell({
             ) : null}
           </div>
 
-          <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider">
+          <p className="text-muted-foreground text-[10px] font-medium uppercase tracking-wider sm:text-xs">
             {catalogTotal != null ? `${Math.min(catalogTotal, cappedTotal)} products` : null}
           </p>
         </div>
@@ -220,6 +221,33 @@ export function CatalogListShell({
           </>
         )}
       </Container>
+
+      {/* Floating filter / sort — mobile only (Zara / H&M pattern) */}
+      <div
+        className="pointer-events-none fixed inset-x-0 z-[80] flex justify-center gap-2 px-4 lg:hidden"
+        style={{ bottom: 'calc(3.75rem + env(safe-area-inset-bottom, 0px))' }}
+      >
+        <button
+          type="button"
+          onClick={() => setFiltersOpen(true)}
+          className="border-border/80 bg-background/95 text-foreground pointer-events-auto inline-flex h-11 min-w-[7.5rem] items-center justify-center gap-2 rounded-full border px-4 text-[11px] font-bold uppercase tracking-[0.14em] shadow-[0_8px_28px_-12px_rgba(0,0,0,0.35)] backdrop-blur-md transition-transform duration-150 active:scale-[0.97]"
+        >
+          <SlidersHorizontal className="size-3.5" aria-hidden />
+          Filter
+          {chips.length > 0 ? (
+            <span className="bg-foreground text-background flex size-4 items-center justify-center rounded-full text-[9px]">
+              {chips.length}
+            </span>
+          ) : null}
+        </button>
+        <button
+          type="button"
+          onClick={() => setFiltersOpen(true)}
+          className="border-border/80 bg-background/95 text-foreground pointer-events-auto inline-flex h-11 min-w-[7.5rem] items-center justify-center gap-2 rounded-full border px-4 text-[11px] font-bold uppercase tracking-[0.14em] shadow-[0_8px_28px_-12px_rgba(0,0,0,0.35)] backdrop-blur-md transition-transform duration-150 active:scale-[0.97]"
+        >
+          Sort
+        </button>
+      </div>
     </div>
   );
 }

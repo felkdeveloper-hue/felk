@@ -274,6 +274,15 @@ export function CatalogFilterAndSortSheet({
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
   const sheetOpen = open ?? uncontrolledOpen;
   const setSheetOpen = onOpenChange ?? setUncontrolledOpen;
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+    const mq = window.matchMedia('(max-width: 1023px)');
+    const sync = () => setIsMobile(mq.matches);
+    sync();
+    mq.addEventListener('change', sync);
+    return () => mq.removeEventListener('change', sync);
+  }, []);
   // Facets load only while the sheet is open (parent may also enable for chip labels).
   const facets = useCatalogFilterFacets({
     enabled: sheetOpen,
@@ -364,7 +373,7 @@ export function CatalogFilterAndSortSheet({
       <SheetTrigger asChild>
         <button
           type="button"
-          className="border-foreground hover:bg-foreground hover:text-background inline-flex h-10 items-center gap-2.5 border px-4 text-xs font-bold uppercase tracking-[0.14em] transition-colors"
+          className="border-foreground hover:bg-foreground hover:text-background hidden h-10 items-center gap-2.5 border px-4 text-xs font-bold uppercase tracking-[0.14em] transition-colors lg:inline-flex"
         >
           <SlidersHorizontal className="size-3.5" />
           Filter and Sort
@@ -377,9 +386,14 @@ export function CatalogFilterAndSortSheet({
       </SheetTrigger>
 
       <SheetContent
-        side="left"
+        side={isMobile ? 'bottom' : 'left'}
         showClose={false}
-        className="max-w-130 lg:top-19 top-16 flex h-[calc(100%-4rem)] w-full flex-col gap-0 rounded-none p-0 lg:h-[calc(100%-4.75rem)]"
+        className={cn(
+          'flex w-full flex-col gap-0 rounded-none p-0',
+          isMobile
+            ? 'h-[min(88dvh,860px)] max-h-[88dvh] !max-w-none rounded-t-2xl border-t pb-[env(safe-area-inset-bottom)]'
+            : 'max-w-130 lg:top-19 top-16 h-[calc(100%-4rem)] lg:h-[calc(100%-4.75rem)]',
+        )}
       >
         <SheetHeader className="border-border flex-row items-baseline gap-3 border-b px-6 py-4">
           <SheetTitle className="text-xs font-bold uppercase tracking-[0.16em]">
@@ -620,16 +634,16 @@ export function CatalogFilterAndSortSheet({
             <button
               type="button"
               onClick={onClear}
-              className="border-border hover:border-foreground h-11 flex-1 border text-xs font-bold uppercase tracking-widest transition-colors"
+              className="border-border hover:border-foreground h-12 min-h-11 flex-1 border text-xs font-bold uppercase tracking-widest transition-colors active:opacity-80 lg:h-11"
             >
-              Clear{activeCount > 0 ? ` (${activeCount})` : ''}
+              Reset{activeCount > 0 ? ` (${activeCount})` : ''}
             </button>
             <SheetClose asChild>
               <button
                 type="button"
-                className="bg-foreground text-background h-11 flex-1 text-xs font-bold uppercase tracking-widest transition-opacity hover:opacity-85"
+                className="bg-foreground text-background h-12 min-h-11 flex-1 text-xs font-bold uppercase tracking-widest transition-opacity hover:opacity-85 active:opacity-80 lg:h-11"
               >
-                Done
+                Apply
               </button>
             </SheetClose>
           </div>

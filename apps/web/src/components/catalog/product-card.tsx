@@ -1,13 +1,25 @@
-import { memo, useState } from 'react';
-import { Link } from '@tanstack/react-router';
-import { Eye, Star } from 'lucide-react';
+import { memo, useCallback, useRef, useState, type TouchEvent } from 'react';
+import { Link, useNavigate } from '@tanstack/react-router';
+import { Eye, Heart, Plus, Star } from 'lucide-react';
 import type { Product } from '@/services/sdk';
 import { Image } from '@/components/media/image';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { AddToCartButton } from '@/components/cart/add-to-cart-button';
+import { SelectOptionsSheet } from '@/components/catalog/select-options-sheet';
 import { WishlistButton } from '@/components/wishlist/wishlist-button';
+import {
+  useAddToWishlistMutation,
+  useDefaultWishlistQuery,
+  useIsInWishlist,
+  useRemoveFromWishlistMutation,
+} from '@/hooks/wishlist';
+import { useAuthStore } from '@/store';
+import { useUiStore } from '@/store/ui-store';
+import { ROUTES } from '@/constants';
+import { resolveVariantId } from '@/utils/cart';
+import { needsOptionSelection } from '@/utils/catalog/needs-option-selection';
 import { PriceDisplay } from './price-display';
 import { QuickViewModal } from './quick-view-modal';
 
@@ -34,6 +46,7 @@ function ProductCardComponent({
   priority = false,
   sizes = '(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw',
 }: ProductCardProps) {
+  const navigate = useNavigate();
   const listingVariant = product.variants?.find(
     (variant) => variant.id === product.defaultVariantId,
   );
@@ -53,31 +66,46 @@ function ProductCardComponent({
         [])
       : [];
   const cardMedia = product.defaultVariantId ? listingMedia : productLevelMedia;
-  // Catalog cards: API already picks first upload as thumbnailUrl and second as hoverImageUrl.
   const candidates = [
     product.thumbnailUrl,
     product.hoverImageUrl,
     cardMedia.find((item) => item.isPrimary)?.url,
     cardMedia[0]?.url,
     cardMedia[1]?.url,
+    ...cardMedia.slice(2, 5).map((item) => item.url),
   ].filter((url): url is string => Boolean(url));
 
   const [primaryBroken, setPrimaryBroken] = useState(false);
   const uniqueCandidates = [...new Set(candidates)];
+  const [imageIndex, setImageIndex] = useState(0);
+  const safeIndex = Math.min(imageIndex, Math.max(uniqueCandidates.length - 1, 0));
   const primaryImage = primaryBroken
     ? (uniqueCandidates[1] ?? uniqueCandidates[0])
-    : uniqueCandidates[0];
+    : (uniqueCandidates[safeIndex] ?? uniqueCandidates[0]);
   const hoverImage =
-    uniqueCandidates.find((url) => url && url !== primaryImage) ?? product.hoverImageUrl;
+    uniqueCandidates.find((url) => url && url !== uniqueCandidates[0]) ?? product.hoverImageUrl;
   const isList = layout === 'list';
   const [quickOpen, setQuickOpen] = useState(false);
+  const [optionsOpen, setOptionsOpen] = useState(false);
   const [hoverReady, setHoverReady] = useState(false);
-  /** Only mount hover image after first hover/focus — halves image requests on load. */
   const [wantHover, setWantHover] = useState(false);
+  const [heartBurst, setHeartBurst] = useState(false);
+
+  const touchStartX = useRef<number | null>(null);
+  const lastTap = useRef(0);
+  const longPressTimer = useRef<number | null>(null);
+  const longPressFired = useRef(false);
+
+  const isAuthed = useAuthStore((state) => Boolean(state.accessToken && state.user));
+  const resolvedVariantId = resolveVariantId(undefined, product);
+  const isInWishlist = useIsInWishlist(product.id, resolvedVariantId);
+  const wishlistQuery = useDefaultWishlistQuery();
+  const addWishlist = useAddToWishlistMutation();
+  const removeWishlist = useRemoveFromWishlistMutation();
+  const setCartAnnouncement = useUiStore((state) => state.setCartAnnouncement);
 
   const averageRating = readAverageRating(product);
   const title = product.name;
-  // Compute discount % for image badge — ignore unset salePrice: 0 / bogus 100% offs.
   const liveSale =
     product.salePrice && product.salePrice.amount > 0 ? product.salePrice : undefined;
   const displayPrice = liveSale ?? product.effectivePrice ?? product.price;
@@ -95,13 +123,133 @@ function ProductCardComponent({
         ? Math.round(product.discountPercent)
         : null;
 
+  const productHref = {
+    to: '/products/$slug' as const,
+    params: { slug: product.slug },
+    search: {
+      variant: product.defaultVariantId ? String(product.defaultVariantId) : undefined,
+      color: product.colorId,
+    },
+  };
+
+  const toggleWishlist = useCallback(() => {
+    if (!isAuthed) {
+      void navigate({ to: ROUTES.authLogin, search: { redirect: window.location.pathname } });
+      return;
+    }
+    const wishlistId = wishlistQuery.data?.id;
+    if (!wishlistId) return;
+
+    setHeartBurst(true);
+    window.setTimeout(() => setHeartBurst(false), 220);
+
+    if (isInWishlist) {
+      const item = wishlistQuery.data?.items.find(
+        (entry) =>
+          entry.productId === product.id &&
+          (resolvedVariantId ? entry.variantId === resolvedVariantId : true),
+      );
+      if (!item) return;
+      removeWishlist.mutate(
+        { wishlistId, itemId: item.id },
+        { onSuccess: () => setCartAnnouncement(`${product.name} removed from wishlist`) },
+      );
+      return;
+    }
+
+    addWishlist.mutate(
+      { productId: product.id, variantId: resolvedVariantId, wishlistId },
+      { onSuccess: () => setCartAnnouncement(`${product.name} added to wishlist`) },
+    );
+  }, [
+    addWishlist,
+    isAuthed,
+    isInWishlist,
+    navigate,
+    product.id,
+    product.name,
+    removeWishlist,
+    resolvedVariantId,
+    setCartAnnouncement,
+    wishlistQuery.data?.id,
+    wishlistQuery.data?.items,
+  ]);
+
+  const clearLongPress = () => {
+    if (longPressTimer.current != null) {
+      window.clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
+
+  const onTouchStart = (event: TouchEvent) => {
+    touchStartX.current = event.touches[0]?.clientX ?? null;
+    longPressFired.current = false;
+    clearLongPress();
+    longPressTimer.current = window.setTimeout(() => {
+      longPressFired.current = true;
+      setQuickOpen(true);
+    }, 480);
+  };
+
+  const onTouchMove = (event: TouchEvent) => {
+    const start = touchStartX.current;
+    const x = event.touches[0]?.clientX;
+    if (start != null && x != null && Math.abs(x - start) > 12) {
+      clearLongPress();
+    }
+  };
+
+  const onTouchEnd = (event: TouchEvent) => {
+    clearLongPress();
+    if (longPressFired.current) {
+      event.preventDefault();
+      return;
+    }
+
+    const start = touchStartX.current;
+    const end = event.changedTouches[0]?.clientX;
+    touchStartX.current = null;
+
+    if (start != null && end != null && uniqueCandidates.length > 1) {
+      const delta = end - start;
+      if (Math.abs(delta) > 40) {
+        setImageIndex((prev) => {
+          if (delta < 0) return Math.min(prev + 1, uniqueCandidates.length - 1);
+          return Math.max(prev - 1, 0);
+        });
+        return;
+      }
+    }
+
+    const now = Date.now();
+    if (now - lastTap.current < 280) {
+      lastTap.current = 0;
+      event.preventDefault();
+      toggleWishlist();
+      return;
+    }
+    lastTap.current = now;
+  };
+
+  const openQuickAdd = (event: React.MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (needsOptionSelection(product) || !resolveVariantId(undefined, product)) {
+      setOptionsOpen(true);
+      return;
+    }
+    setOptionsOpen(true);
+  };
+
   return (
     <>
       <article
         className={cn(
-          'group relative transition-transform duration-300 ease-out',
-          !isList && 'hover:-translate-y-1',
-          isList && 'flex gap-4',
+          'group relative',
+          // Desktop hover lift only
+          !isList && 'lg:transition-transform lg:duration-300 lg:ease-out lg:hover:-translate-y-1',
+          isList && 'flex gap-3 sm:gap-4',
           className,
         )}
         onMouseEnter={() => setWantHover(true)}
@@ -110,19 +258,18 @@ function ProductCardComponent({
         <div
           className={cn(
             'bg-muted relative overflow-hidden',
-            isList ? 'w-40 shrink-0 rounded-xl sm:w-48' : 'w-full',
+            isList ? 'w-28 shrink-0 sm:w-40 sm:rounded-xl lg:w-48' : 'w-full',
           )}
         >
           <Link
-            to="/products/$slug"
-            params={{ slug: product.slug }}
-            search={{
-              variant: product.defaultVariantId ? String(product.defaultVariantId) : undefined,
-              color: product.colorId,
-            }}
+            {...productHref}
             preload="intent"
             aria-label={`View ${product.name}`}
-            className="block"
+            className="block touch-pan-y"
+            onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
+            onTouchEnd={onTouchEnd}
+            onContextMenu={(e) => e.preventDefault()}
           >
             <Image
               key={primaryImage}
@@ -131,23 +278,26 @@ function ProductCardComponent({
               sizes={sizes}
               loading={priority ? 'eager' : 'lazy'}
               fetchPriority={priority ? 'high' : 'auto'}
-              containerClassName={isList ? 'aspect-[3/4]' : 'aspect-[4/5] sm:aspect-[3/4]'}
+              containerClassName={isList ? 'aspect-[3/4]' : 'aspect-[3/4]'}
               className={cn(
-                'transition-all duration-700 ease-out group-hover:scale-[1.06]',
-                hoverImage && hoverReady ? 'group-hover:opacity-0' : undefined,
+                'transition-opacity duration-200',
+                // Desktop-only hover zoom / swap
+                'lg:transition-all lg:duration-700 lg:ease-out lg:group-hover:scale-[1.06]',
+                hoverImage && hoverReady ? 'lg:group-hover:opacity-0' : undefined,
               )}
               onError={() => setPrimaryBroken(true)}
             />
-            {wantHover && hoverImage && hoverImage !== primaryImage ? (
+            {/* Hover swap — desktop only */}
+            {wantHover && hoverImage && hoverImage !== uniqueCandidates[0] ? (
               <Image
                 src={hoverImage}
                 alt=""
                 sizes={sizes}
                 loading="lazy"
                 containerClassName={cn(
-                  'absolute inset-0 transition-opacity duration-700 ease-out',
+                  'absolute inset-0 hidden transition-opacity duration-700 ease-out lg:block',
                   hoverReady
-                    ? 'opacity-0 group-hover:opacity-100'
+                    ? 'opacity-0 lg:group-hover:opacity-100'
                     : 'pointer-events-none opacity-0',
                 )}
                 className="transition-transform duration-700 ease-out group-hover:scale-[1.06]"
@@ -155,22 +305,69 @@ function ProductCardComponent({
                 onLoad={() => setHoverReady(true)}
               />
             ) : null}
+
+            {/* Double-tap heart burst */}
+            <span
+              aria-hidden
+              className={cn(
+                'pointer-events-none absolute inset-0 z-[3] flex items-center justify-center lg:hidden',
+                heartBurst ? 'opacity-100' : 'opacity-0',
+              )}
+            >
+              <Heart
+                className={cn(
+                  'size-14 text-white drop-shadow-md transition-transform duration-200',
+                  heartBurst ? 'scale-100 fill-red-500 text-red-500' : 'scale-50',
+                )}
+              />
+            </span>
           </Link>
 
-          <div className="absolute left-2.5 top-2.5 flex flex-col gap-1.5">
+          {/* Swipe dots — mobile */}
+          {uniqueCandidates.length > 1 ? (
+            <div
+              className="absolute inset-x-0 bottom-10 z-[2] flex justify-center gap-1 lg:hidden"
+              aria-hidden
+            >
+              {uniqueCandidates.slice(0, 5).map((url, i) => (
+                <span
+                  key={url}
+                  className={cn(
+                    'size-1 rounded-full transition-colors duration-150',
+                    i === safeIndex ? 'bg-white' : 'bg-white/40',
+                  )}
+                />
+              ))}
+            </div>
+          ) : null}
+
+          <div className="absolute left-2 top-2 flex flex-col gap-1">
             {discountPct ? (
-              <Badge className="rounded-none bg-red-600 px-2 text-[10px] font-bold uppercase tracking-wide text-white">
+              <Badge className="rounded-none bg-red-600 px-1.5 text-[9px] font-bold uppercase tracking-wide text-white sm:px-2 sm:text-[10px]">
                 Save {discountPct}%
               </Badge>
             ) : null}
             {product.inStock === false || product.status === 'out_of_stock' ? (
-              <Badge variant="outline" className="bg-card/90 rounded-none text-[10px]">
+              <Badge
+                variant="outline"
+                className="bg-card/90 rounded-none text-[9px] sm:text-[10px]"
+              >
                 Sold out
               </Badge>
             ) : null}
           </div>
 
-          <div className="absolute right-2.5 top-2.5 opacity-100 transition-opacity sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">
+          {/* Mobile wishlist — always visible, 44px target */}
+          <div className="absolute right-1.5 top-1.5 z-[2] lg:hidden">
+            <WishlistButton
+              product={product}
+              variant="ghost"
+              className="bg-background/80 text-foreground size-11 rounded-full shadow-sm backdrop-blur-sm"
+            />
+          </div>
+
+          {/* Desktop quick view — hover only */}
+          <div className="absolute right-2.5 top-2.5 hidden opacity-0 transition-opacity lg:block lg:group-focus-within:opacity-100 lg:group-hover:opacity-100">
             <Button
               type="button"
               size="icon"
@@ -185,7 +382,7 @@ function ProductCardComponent({
 
           {averageRating != null ? (
             <div
-              className="bg-card absolute bottom-2.5 left-2.5 flex items-center gap-1 rounded-md px-1.5 py-0.5 shadow-[var(--shadow-soft)] transition-opacity group-hover:opacity-0"
+              className="bg-card absolute bottom-2 left-2 flex items-center gap-1 rounded-md px-1.5 py-0.5 shadow-[var(--shadow-soft)] transition-opacity lg:group-hover:opacity-0"
               aria-label={`Rated ${averageRating} out of 5`}
             >
               <Star className="size-3 fill-amber-400 text-amber-400" aria-hidden />
@@ -195,17 +392,17 @@ function ProductCardComponent({
             </div>
           ) : null}
 
-          {/* Bonkers-style add to cart bar — grid cards */}
+          {/* Desktop hover ATC — never on mobile */}
           {!isList ? (
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[2] translate-y-full opacity-0 transition-all duration-300 ease-out group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100 max-sm:pointer-events-auto max-sm:translate-y-0 max-sm:opacity-100">
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[2] hidden translate-y-full opacity-0 transition-all duration-300 ease-out lg:block lg:group-hover:pointer-events-auto lg:group-hover:translate-y-0 lg:group-hover:opacity-100">
               <AddToCartButton
                 product={product}
                 label="Add to cart"
-                className="h-12 w-full rounded-none border-0 bg-zinc-950 text-xs font-semibold uppercase tracking-[0.16em] text-white shadow-none hover:bg-zinc-900 hover:text-white sm:h-11 sm:text-[11px] sm:tracking-[0.18em]"
+                className="h-11 w-full rounded-none border-0 bg-zinc-950 text-[11px] font-semibold uppercase tracking-[0.18em] text-white shadow-none hover:bg-zinc-900 hover:text-white"
               />
             </div>
           ) : (
-            <div className="pointer-events-none absolute inset-x-2 bottom-2 translate-y-1 opacity-0 transition-all duration-300 group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100 max-sm:pointer-events-auto max-sm:translate-y-0 max-sm:opacity-100">
+            <div className="pointer-events-none absolute inset-x-2 bottom-2 hidden translate-y-1 opacity-0 transition-all duration-300 lg:block lg:group-hover:pointer-events-auto lg:group-hover:translate-y-0 lg:group-hover:opacity-100">
               <AddToCartButton
                 product={product}
                 size="sm"
@@ -213,28 +410,36 @@ function ProductCardComponent({
               />
             </div>
           )}
+
+          {/* Mobile quick-add FAB */}
+          {!isList ? (
+            <button
+              type="button"
+              aria-label={`Quick add ${product.name}`}
+              onClick={openQuickAdd}
+              className="bg-background text-foreground border-border absolute bottom-2 right-2 z-[3] flex size-11 items-center justify-center rounded-full border shadow-sm transition-transform duration-150 active:scale-95 lg:hidden"
+            >
+              <Plus className="size-5" strokeWidth={1.75} />
+            </button>
+          ) : null}
         </div>
 
-        <div className={cn('pt-2.5 sm:pt-2', isList && 'flex flex-1 flex-col justify-center py-1')}>
+        <div
+          className={cn(
+            'space-y-1 pt-2 lg:space-y-0 lg:pt-2.5',
+            isList && 'flex flex-1 flex-col justify-center py-0.5',
+          )}
+        >
           <div className="flex items-start justify-between gap-1">
-            <h3 className="text-foreground line-clamp-2 text-[15px] font-medium leading-snug sm:line-clamp-1 sm:text-sm">
-              <Link
-                to="/products/$slug"
-                params={{ slug: product.slug }}
-                search={{
-                  variant: product.defaultVariantId ? String(product.defaultVariantId) : undefined,
-                  color: product.colorId,
-                }}
-                preload="intent"
-                className="hover:underline"
-              >
+            <h3 className="text-foreground line-clamp-2 text-[13px] font-medium leading-snug tracking-wide lg:line-clamp-1 lg:text-sm">
+              <Link {...productHref} preload="intent" className="lg:hover:underline">
                 {title}
               </Link>
             </h3>
             <WishlistButton
               product={product}
               variant="ghost"
-              className="text-muted-foreground hover:text-foreground -mr-1.5 -mt-0.5 size-7 shrink-0 rounded-full"
+              className="text-muted-foreground hover:text-foreground -mr-1.5 -mt-0.5 hidden size-7 shrink-0 rounded-full lg:inline-flex"
             />
           </div>
 
@@ -243,11 +448,13 @@ function ProductCardComponent({
             salePrice={liveSale}
             compareAtPrice={product.compareAtPrice}
             discountPercent={product.isOnSale ? product.discountPercent : undefined}
+            className="[&_*]:text-[13px] lg:[&_*]:text-sm"
           />
         </div>
       </article>
 
       <QuickViewModal product={product} open={quickOpen} onOpenChange={setQuickOpen} />
+      <SelectOptionsSheet product={product} open={optionsOpen} onOpenChange={setOptionsOpen} />
     </>
   );
 }

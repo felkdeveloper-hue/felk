@@ -4,6 +4,7 @@ import { ROUTES } from '@/constants';
 import { useCartQuery } from '@/hooks/cart';
 import { useAuthStore } from '@/store';
 import { AppError } from '@/lib/errors';
+import { formatCurrency } from '@/utils';
 import { CartItemRow } from '@/components/cart/cart-item-row';
 import { CartOrderSummary } from '@/components/cart/cart-order-summary';
 import { CartPromotionsPanel } from '@/components/cart/cart-promotions-panel';
@@ -67,7 +68,7 @@ export function CartPageContent() {
 
   return (
     <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
-      <section aria-labelledby="cart-items-heading" className="space-y-4">
+      <section aria-labelledby="cart-items-heading" className="space-y-4 pb-28 lg:pb-0">
         <h2 id="cart-items-heading" className="sr-only">
           Bag items ({cart.items.length})
         </h2>
@@ -89,24 +90,71 @@ export function CartPageContent() {
       <div className="space-y-4 lg:sticky lg:top-24 lg:self-start">
         <CartPromotionsPanel />
         <CartOrderSummary totals={cart.totals} validation={validation} />
-        {!hasHydrated ? (
-          <Button className="w-full" size="lg" disabled loading>
-            Proceed to checkout
+        <div className="hidden space-y-3 lg:block">
+          {!hasHydrated ? (
+            <Button className="w-full" size="lg" disabled loading>
+              Proceed to checkout
+            </Button>
+          ) : isAuthed ? (
+            <Button asChild className="w-full" size="lg">
+              <Link to={ROUTES.checkout}>Proceed to checkout</Link>
+            </Button>
+          ) : (
+            <Button asChild className="w-full" size="lg">
+              <Link to={ROUTES.authLogin} search={{ redirect: ROUTES.checkout }}>
+                Sign in to checkout
+              </Link>
+            </Button>
+          )}
+          <Button asChild variant="ghost" className="w-full">
+            <Link to={ROUTES.products}>Continue shopping</Link>
           </Button>
-        ) : isAuthed ? (
-          <Button asChild className="w-full" size="lg">
-            <Link to={ROUTES.checkout}>Proceed to checkout</Link>
-          </Button>
-        ) : (
-          <Button asChild className="w-full" size="lg">
-            <Link to={ROUTES.authLogin} search={{ redirect: ROUTES.checkout }}>
-              Sign in to checkout
-            </Link>
-          </Button>
-        )}
-        <Button asChild variant="ghost" className="w-full">
-          <Link to={ROUTES.products}>Continue shopping</Link>
-        </Button>
+        </div>
+      </div>
+
+      {/* Mobile sticky checkout bar */}
+      <div
+        className="border-border/80 bg-background/95 supports-[backdrop-filter]:bg-background/90 fixed inset-x-0 z-[85] border-t px-4 py-3 backdrop-blur-md lg:hidden"
+        style={{ bottom: 'calc(3.5rem + env(safe-area-inset-bottom, 0px))' }}
+      >
+        <div className="mx-auto flex max-w-lg flex-col gap-2">
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="text-muted-foreground text-[10px] font-bold uppercase tracking-[0.16em]">
+              Total
+            </span>
+            <span className="font-display text-foreground text-lg font-bold tabular-nums tracking-tight">
+              {formatCurrency(cart.totals.total, cart.totals.currency ?? 'LKR')}
+            </span>
+          </div>
+          {!hasHydrated ? (
+            <Button
+              className="h-12 w-full rounded-none text-sm font-bold uppercase tracking-[0.14em]"
+              size="lg"
+              disabled
+              loading
+            >
+              Checkout
+            </Button>
+          ) : isAuthed ? (
+            <Button
+              asChild
+              className="h-12 w-full rounded-none text-sm font-bold uppercase tracking-[0.14em]"
+              size="lg"
+            >
+              <Link to={ROUTES.checkout}>Checkout</Link>
+            </Button>
+          ) : (
+            <Button
+              asChild
+              className="h-12 w-full rounded-none text-sm font-bold uppercase tracking-[0.14em]"
+              size="lg"
+            >
+              <Link to={ROUTES.authLogin} search={{ redirect: ROUTES.checkout }}>
+                Sign in to checkout
+              </Link>
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );

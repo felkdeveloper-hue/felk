@@ -4,6 +4,7 @@ import { OfflineBanner } from '@/components/feedback/offline-banner';
 import { AnnouncementBar } from '@/components/storefront/announcement-bar';
 import { StorefrontFooter, StorefrontHeader } from '@/components/layout';
 import { FloatingSearch } from '@/components/layout/floating-search';
+import { MobileBottomNav } from '@/components/navigation/mobile-bottom-nav';
 import { SkipToContent } from '@/components/navigation/skip-to-content';
 import { CartBootstrap } from '@/components/cart';
 import { LiveRegion } from '@/components/commerce/live-region';
@@ -42,10 +43,15 @@ export function PublicLayout() {
       <OfflineBanner />
       <AnnouncementBar />
       <StorefrontHeader />
-      <main id="main-content" className="safe-pb flex-1 focus:outline-none md:pb-0" tabIndex={-1}>
+      <main
+        id="main-content"
+        className="safe-mobile-chrome flex-1 focus:outline-none lg:pb-0"
+        tabIndex={-1}
+      >
         <Outlet />
       </main>
       <StorefrontFooter />
+      <MobileBottomNav />
       <FloatingSearch />
     </div>
   );

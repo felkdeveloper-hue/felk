@@ -40,7 +40,10 @@ export interface StorefrontHeaderProps {
 }
 
 export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderProps) {
-  const isScrolled = useScrollHeader({ threshold: 36 });
+  const { isScrolled, isHidden } = useScrollHeader({
+    threshold: 36,
+    hideOnScrollDown: true,
+  });
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const navigate = useNavigate();
   const isHome = pathname === ROUTES.home;
@@ -55,6 +58,8 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
 
   const cartCount = useCartStore(selectCartItemCount);
   const toggleSearch = useUiStore((state) => state.toggleSearch);
+  const mobileNavOpen = useUiStore((state) => state.isMobileNavOpen);
+  const setMobileNavOpen = useUiStore((state) => state.setMobileNavOpen);
   const isAuthed = useAuthStore((state) => Boolean(state.accessToken && state.user));
   const user = useAuthStore((state) => state.user);
   const logoutMutation = useLogoutMutation();
@@ -63,7 +68,7 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
 
   const accountLabel = user?.firstName ?? user?.email?.split('@')[0] ?? 'Account';
   const iconBtn = cn(
-    'size-10 shrink-0 sm:size-11',
+    'size-11 shrink-0',
     iconStroke,
     lightChrome
       ? 'text-white hover:bg-white/10 hover:text-white'
@@ -81,7 +86,9 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
     <header
       data-slot="storefront-header"
       className={cn(
-        'sticky top-0 z-[100] transition-[background-color,box-shadow,border-color,backdrop-filter,color] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]',
+        'sticky top-0 z-[100] transition-[background-color,box-shadow,border-color,backdrop-filter,color,transform] duration-200 ease-out lg:duration-500 lg:ease-[cubic-bezier(0.22,1,0.36,1)]',
+        // Auto-hide on scroll down — mobile only; desktop never translates.
+        isHidden && '-translate-y-full lg:translate-y-0',
         transparent
           ? 'border-transparent bg-transparent text-white'
           : frosted
@@ -89,14 +96,20 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
             : 'bg-background text-foreground border-border/70 border-b shadow-[0_8px_28px_-20px_rgba(0,0,0,0.28)]',
       )}
     >
-      <Container className="flex h-16 items-center justify-between gap-2 lg:grid lg:h-[4.75rem] lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:justify-normal lg:gap-6">
-        <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
-          <MobileNav items={navItems} activeHref={pathname} transparent={lightChrome} />
+      <Container className="flex h-14 items-center justify-between gap-2 lg:grid lg:h-[4.75rem] lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:justify-normal lg:gap-6">
+        <div className="flex min-w-0 items-center gap-1 sm:gap-2">
+          <MobileNav
+            items={navItems}
+            activeHref={pathname}
+            transparent={lightChrome}
+            open={mobileNavOpen}
+            onOpenChange={setMobileNavOpen}
+          />
           <Link
             to={ROUTES.home}
             preload="intent"
             className={cn(
-              'font-display flex items-center text-2xl font-bold uppercase leading-none tracking-[-0.04em] transition-colors lg:text-[1.85rem]',
+              'font-display flex items-center text-[1.35rem] font-bold uppercase leading-none tracking-[-0.04em] transition-colors lg:text-[1.85rem]',
               lightChrome ? 'text-white' : 'text-foreground',
             )}
           >
@@ -162,7 +175,7 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
               size="icon"
               aria-label={`Wishlist${wishlistCount ? `, ${wishlistCount} items` : ''}`}
               asChild
-              className={cn('relative', iconBtn)}
+              className={cn('relative hidden sm:inline-flex', iconBtn)}
             >
               <Link to={ROUTES.wishlist} preload="intent">
                 <Heart />

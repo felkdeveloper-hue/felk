@@ -1,6 +1,7 @@
 import { Navigate, Outlet } from '@tanstack/react-router';
 import { StorefrontFooter, StorefrontHeader } from '@/components/layout';
 import { FloatingSearch } from '@/components/layout/floating-search';
+import { MobileBottomNav } from '@/components/navigation/mobile-bottom-nav';
 import { AccountNav } from '@/components/account';
 import { ADMIN_ROUTES } from '@/constants';
 import { useAuthStore } from '@/store';
@@ -17,7 +18,7 @@ export function CustomerLayout() {
   return (
     <div className="bg-background flex min-h-screen flex-col">
       <StorefrontHeader />
-      <div className="safe-pb mx-auto flex w-full max-w-none flex-1 flex-col gap-8 px-4 py-8 sm:px-6 md:px-8 md:pb-10 lg:flex-row lg:gap-10 lg:px-10 xl:px-14 2xl:px-20">
+      <div className="safe-mobile-chrome mx-auto flex w-full max-w-none flex-1 flex-col gap-8 px-4 py-8 sm:px-6 md:px-8 lg:flex-row lg:gap-10 lg:px-10 lg:pb-10 xl:px-14 2xl:px-20">
         <aside className="lg:w-56 lg:shrink-0">
           <div className="border-border bg-card sticky top-28 rounded-xl border p-3 sm:p-4">
             <AccountNav />
@@ -28,6 +29,7 @@ export function CustomerLayout() {
         </main>
       </div>
       <StorefrontFooter />
+      <MobileBottomNav />
       <FloatingSearch />
     </div>
   );
