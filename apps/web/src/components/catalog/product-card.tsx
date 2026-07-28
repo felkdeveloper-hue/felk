@@ -77,11 +77,10 @@ function ProductCardComponent({
 
   const [primaryBroken, setPrimaryBroken] = useState(false);
   const uniqueCandidates = [...new Set(candidates)];
-  const [imageIndex, setImageIndex] = useState(0);
-  const safeIndex = Math.min(imageIndex, Math.max(uniqueCandidates.length - 1, 0));
+  // Mobile: single image only — horizontal swipe must scroll the product rail, not cycle photos.
   const primaryImage = primaryBroken
     ? (uniqueCandidates[1] ?? uniqueCandidates[0])
-    : (uniqueCandidates[safeIndex] ?? uniqueCandidates[0]);
+    : uniqueCandidates[0];
   const hoverImage =
     uniqueCandidates.find((url) => url && url !== uniqueCandidates[0]) ?? product.hoverImageUrl;
   const isList = layout === 'list';
@@ -95,6 +94,7 @@ function ProductCardComponent({
   const lastTap = useRef(0);
   const longPressTimer = useRef<number | null>(null);
   const longPressFired = useRef(false);
+  const didSwipe = useRef(false);
 
   const isAuthed = useAuthStore((state) => Boolean(state.accessToken && state.user));
   const resolvedVariantId = resolveVariantId(undefined, product);
@@ -185,6 +185,7 @@ function ProductCardComponent({
   const onTouchStart = (event: TouchEvent) => {
     touchStartX.current = event.touches[0]?.clientX ?? null;
     longPressFired.current = false;
+    didSwipe.current = false;
     clearLongPress();
     longPressTimer.current = window.setTimeout(() => {
       longPressFired.current = true;
@@ -196,30 +197,23 @@ function ProductCardComponent({
     const start = touchStartX.current;
     const x = event.touches[0]?.clientX;
     if (start != null && x != null && Math.abs(x - start) > 12) {
+      didSwipe.current = true;
       clearLongPress();
     }
   };
 
   const onTouchEnd = (event: TouchEvent) => {
     clearLongPress();
+    touchStartX.current = null;
     if (longPressFired.current) {
       event.preventDefault();
       return;
     }
-
-    const start = touchStartX.current;
-    const end = event.changedTouches[0]?.clientX;
-    touchStartX.current = null;
-
-    if (start != null && end != null && uniqueCandidates.length > 1) {
-      const delta = end - start;
-      if (Math.abs(delta) > 40) {
-        setImageIndex((prev) => {
-          if (delta < 0) return Math.min(prev + 1, uniqueCandidates.length - 1);
-          return Math.max(prev - 1, 0);
-        });
-        return;
-      }
+    // Horizontal rail scroll — don't steal the gesture for image cycling or double-tap.
+    if (didSwipe.current) {
+      didSwipe.current = false;
+      lastTap.current = 0;
+      return;
     }
 
     const now = Date.now();
@@ -265,7 +259,7 @@ function ProductCardComponent({
             {...productHref}
             preload="intent"
             aria-label={`View ${product.name}`}
-            className="block touch-pan-y"
+            className="block touch-manipulation"
             onTouchStart={onTouchStart}
             onTouchMove={onTouchMove}
             onTouchEnd={onTouchEnd}
@@ -322,24 +316,6 @@ function ProductCardComponent({
               />
             </span>
           </Link>
-
-          {/* Swipe dots — mobile */}
-          {uniqueCandidates.length > 1 ? (
-            <div
-              className="absolute inset-x-0 bottom-10 z-[2] flex justify-center gap-1 lg:hidden"
-              aria-hidden
-            >
-              {uniqueCandidates.slice(0, 5).map((url, i) => (
-                <span
-                  key={url}
-                  className={cn(
-                    'size-1 rounded-full transition-colors duration-150',
-                    i === safeIndex ? 'bg-white' : 'bg-white/40',
-                  )}
-                />
-              ))}
-            </div>
-          ) : null}
 
           <div className="absolute left-2 top-2 flex flex-col gap-1">
             {discountPct ? (
