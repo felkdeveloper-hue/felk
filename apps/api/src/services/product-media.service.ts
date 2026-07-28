@@ -6,6 +6,7 @@ import { writeAuditLog } from '@/services/audit.service';
 import type { ActorMeta } from '@/services/cms-crud.service';
 import { ApiError } from '@/utils/errors/api-error';
 import { getImageMetadata, processImage } from '@/utils/image.helper';
+import { invalidateStorefrontCatalogCache } from '@/utils/simple-cache';
 import { MEDIA_TYPES, PRODUCT_AUDIT } from '@/constants/product';
 
 export class ProductMediaService {
@@ -136,6 +137,7 @@ export class ProductMediaService {
       metadata: { productId },
     });
 
+    invalidateStorefrontCatalogCache();
     return media;
   }
 
@@ -180,6 +182,7 @@ export class ProductMediaService {
       metadata: { productId, remote: true },
     });
 
+    invalidateStorefrontCatalogCache();
     return media;
   }
 
@@ -217,6 +220,7 @@ export class ProductMediaService {
       after: media?.toObject() as Record<string, unknown>,
     });
 
+    invalidateStorefrontCatalogCache();
     return media;
   }
 
@@ -249,6 +253,7 @@ export class ProductMediaService {
       before: before.toObject() as Record<string, unknown>,
     });
 
+    invalidateStorefrontCatalogCache();
     return media;
   }
 }

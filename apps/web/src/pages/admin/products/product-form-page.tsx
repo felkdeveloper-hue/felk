@@ -1113,6 +1113,8 @@ function VariantsSection({
             : (colors.find((c) => c.id === colorKey)?.name ?? colorKey);
         const firstVariant = colorVariants[0] as AdminVariant | undefined;
         const colorImages = colorVariants.flatMap((v) => variantMediaMap.get(v.id) ?? []);
+        // Attach new photos to the default size of this color (else first size).
+        const uploadTargetId = colorVariants.find((v) => v.isDefault)?.id ?? firstVariant?.id;
         const isDefault = colorVariants.some((v) => v.isDefault);
         const isOwnListing = colorVariants.some((v) => v.listSeparately);
 
@@ -1141,7 +1143,12 @@ function VariantsSection({
             onToggleOwnListing={(id, next) =>
               listSeparatelyMutation.mutate({ id, listSeparately: next })
             }
-            onUpload={(variantId, file) => uploadVariantImageMutation.mutate({ variantId, file })}
+            onUpload={(variantId, file) =>
+              uploadVariantImageMutation.mutate({
+                variantId: uploadTargetId ?? variantId,
+                file,
+              })
+            }
             onRemoveImage={(mediaId) => removeMediaMutation.mutate(mediaId)}
             onUpdateTitle={(id, title) => updateTitleMutation.mutate({ id, title })}
             onSetStock={(variantId, quantity) => setStockMutation.mutate({ variantId, quantity })}

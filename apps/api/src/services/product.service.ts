@@ -370,7 +370,9 @@ export class ProductService {
         { $replaceRoot: { newRoot: '$items' } },
       ]),
       brandIds.length
-        ? BrandModel.find({ _id: { $in: brandIds }, isDeleted: false }).select('name').lean()
+        ? BrandModel.find({ _id: { $in: brandIds }, isDeleted: false })
+            .select('name')
+            .lean()
         : Promise.resolve([] as Array<{ _id: Types.ObjectId; name: string }>),
     ]);
 
@@ -411,14 +413,31 @@ export class ProductService {
     const pickThumbnail = (
       productMedia: typeof media,
       listingVariant?: (typeof variants)[number],
+      productVariants: typeof variants = [],
     ) => {
       const listingId = listingVariant?._id?.toString();
+      // Admin attaches color photos to the first size row (e.g. XL), while the
+      // catalog listing variant may be a different size (default / XXL). Match
+      // by color so card thumbs stay in sync with the PDP gallery.
+      const colorKey = listingVariant?.colorId ? String(listingVariant.colorId) : '__none__';
+      const siblingIds = new Set(
+        productVariants
+          .filter((variant) => {
+            const key = variant.colorId ? String(variant.colorId) : '__none__';
+            return key === colorKey;
+          })
+          .map((variant) => String(variant._id)),
+      );
+
       const forVariant = listingId
         ? productMedia.filter((item) => item.variantId?.toString() === listingId)
         : [];
+      const forColor = productMedia.filter(
+        (item) => item.variantId && siblingIds.has(String(item.variantId)),
+      );
       const productLevel = productMedia.filter((item) => !item.variantId);
-      // Prefer listing-variant media, then product-level (never another color).
-      const pool = forVariant.length ? forVariant : productLevel;
+      // Prefer exact listing variant → same color → product-level (never another color).
+      const pool = forVariant.length ? forVariant : forColor.length ? forColor : productLevel;
       const primary = pool.find((item) => item.isPrimary) ?? pool[0];
       const hover = primary
         ? pool.find((item) => item._id.toString() !== primary._id.toString())
@@ -446,7 +465,7 @@ export class ProductService {
             listingVariant,
           );
 
-          const thumbs = pickThumbnail(productMedia, listingVariant);
+          const thumbs = pickThumbnail(productMedia, listingVariant, productVariants);
 
           const buildCard = (
             cardListingVariant: (typeof variants)[number] | undefined,
@@ -561,7 +580,7 @@ export class ProductService {
               product as unknown as { pricing?: Record<string, unknown> | null },
               colorRepresentative,
             );
-            const colorThumbs = pickThumbnail(productMedia, colorRepresentative);
+            const colorThumbs = pickThumbnail(productMedia, colorRepresentative, productVariants);
             const ownListingName = resolveOwnListingDisplayName(colorVariants, product.name);
             return [
               buildCard(
@@ -596,7 +615,7 @@ export class ProductService {
               product as unknown as { pricing?: Record<string, unknown> | null },
               colorRepresentative,
             );
-            const extraThumbs = pickThumbnail(productMedia, colorRepresentative);
+            const extraThumbs = pickThumbnail(productMedia, colorRepresentative, productVariants);
             const ownListingName = resolveOwnListingDisplayName(colorVariants, product.name);
             cards.push(buildCard(colorRepresentative, extraPricing, extraThumbs, ownListingName));
           }
