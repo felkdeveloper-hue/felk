@@ -53,17 +53,22 @@ function ProductCardComponent({
         [])
       : [];
   const cardMedia = product.defaultVariantId ? listingMedia : productLevelMedia;
+  // Catalog cards: API already picks first upload as thumbnailUrl and second as hoverImageUrl.
   const candidates = [
     product.thumbnailUrl,
+    product.hoverImageUrl,
     cardMedia.find((item) => item.isPrimary)?.url,
     cardMedia[0]?.url,
-    product.hoverImageUrl,
     cardMedia[1]?.url,
   ].filter((url): url is string => Boolean(url));
 
   const [primaryBroken, setPrimaryBroken] = useState(false);
-  const primaryImage = primaryBroken ? (candidates[1] ?? candidates[0]) : candidates[0];
-  const hoverImage = candidates.find((url) => url && url !== primaryImage) ?? product.hoverImageUrl;
+  const uniqueCandidates = [...new Set(candidates)];
+  const primaryImage = primaryBroken
+    ? (uniqueCandidates[1] ?? uniqueCandidates[0])
+    : uniqueCandidates[0];
+  const hoverImage =
+    uniqueCandidates.find((url) => url && url !== primaryImage) ?? product.hoverImageUrl;
   const isList = layout === 'list';
   const [quickOpen, setQuickOpen] = useState(false);
   const [hoverReady, setHoverReady] = useState(false);

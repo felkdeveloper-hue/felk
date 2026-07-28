@@ -108,6 +108,27 @@ export class ProductMediaService {
       );
     }
 
+    // Keep catalog card order stable: first photo for a variant = primary + priority 0,
+    // later photos get increasing priority (2nd becomes hover).
+    const siblingFilter: Record<string, unknown> = {
+      productId,
+      isDeleted: false,
+    };
+    if (meta.variantId) siblingFilter.variantId = meta.variantId;
+    else siblingFilter.variantId = null;
+
+    const existingCount = await ProductMediaModel.countDocuments(siblingFilter);
+    const nextPriority = typeof meta.priority === 'number' ? meta.priority : existingCount;
+    const shouldBePrimary =
+      meta.isPrimary === true || (meta.isPrimary !== false && existingCount === 0);
+
+    if (shouldBePrimary) {
+      await ProductMediaModel.updateMany(
+        { productId, isDeleted: false },
+        { $set: { isPrimary: false } },
+      );
+    }
+
     const media = await ProductMediaModel.create({
       productId,
       variantId: meta.variantId ?? null,
@@ -120,9 +141,9 @@ export class ProductMediaService {
       width,
       height,
       sizeBytes,
-      priority: meta.priority ?? 0,
-      isPrimary: Boolean(meta.isPrimary),
-      isThumbnail: Boolean(meta.isThumbnail),
+      priority: nextPriority,
+      isPrimary: shouldBePrimary,
+      isThumbnail: Boolean(meta.isThumbnail) || shouldBePrimary,
       isGallery: meta.isGallery !== false,
     });
 

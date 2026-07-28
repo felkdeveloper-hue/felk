@@ -330,6 +330,7 @@ export class ProductService {
         .sort({ isDefault: -1, displayOrder: 1, createdAt: 1 })
         .lean(),
       // Cap at primary + hover per color/variant group in Mongo (cards never need more).
+      // Oldest first so the first photo uploaded stays the catalog card image.
       ProductMediaModel.aggregate<{
         _id: Types.ObjectId;
         productId: Types.ObjectId;
@@ -338,6 +339,7 @@ export class ProductService {
         thumbnailUrl?: string;
         isPrimary?: boolean;
         priority?: number;
+        createdAt?: Date;
       }>([
         {
           $match: {
@@ -345,7 +347,7 @@ export class ProductService {
             isDeleted: false,
           },
         },
-        { $sort: { isPrimary: -1, priority: 1 } },
+        { $sort: { isPrimary: -1, priority: 1, createdAt: 1, _id: 1 } },
         {
           $group: {
             _id: {
@@ -361,6 +363,7 @@ export class ProductService {
                 thumbnailUrl: '$thumbnailUrl',
                 isPrimary: '$isPrimary',
                 priority: '$priority',
+                createdAt: '$createdAt',
               },
             },
           },
@@ -437,11 +440,20 @@ export class ProductService {
       );
       const productLevel = productMedia.filter((item) => !item.variantId);
       // Prefer exact listing variant → same color → product-level (never another color).
-      const pool = forVariant.length ? forVariant : forColor.length ? forColor : productLevel;
-      const primary = pool.find((item) => item.isPrimary) ?? pool[0];
-      const hover = primary
-        ? pool.find((item) => item._id.toString() !== primary._id.toString())
-        : undefined;
+      const unsorted = forVariant.length ? forVariant : forColor.length ? forColor : productLevel;
+      // First uploaded photo = card; second = hover. isPrimary wins when set.
+      const pool = [...unsorted].sort((a, b) => {
+        const primaryDelta = Number(Boolean(b.isPrimary)) - Number(Boolean(a.isPrimary));
+        if (primaryDelta !== 0) return primaryDelta;
+        const priorityDelta = Number(a.priority ?? 0) - Number(b.priority ?? 0);
+        if (priorityDelta !== 0) return priorityDelta;
+        const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        if (aTime !== bTime) return aTime - bTime;
+        return String(a._id).localeCompare(String(b._id));
+      });
+      const primary = pool[0];
+      const hover = pool[1];
       const primaryUrl = publicMediaUrl(
         primary?.thumbnailUrl ?? primary?.url ?? listingVariant?.thumbnailUrl,
       );
