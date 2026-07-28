@@ -88,7 +88,13 @@ function resolveRefreshWaiters(token: string | null): void {
 
 async function performRefresh(): Promise<string | null> {
   const { refreshToken } = useAuthStore.getState();
-  if (!refreshToken) return null;
+  if (!refreshToken) {
+    // Stale access token with no refresh — drop session so guest retries aren't re-authed.
+    if (useAuthStore.getState().accessToken) {
+      useAuthStore.getState().clearSession();
+    }
+    return null;
+  }
 
   try {
     const response = await axios.post<
@@ -101,6 +107,16 @@ async function performRefresh(): Promise<string | null> {
     useAuthStore.getState().clearSession();
     return null;
   }
+}
+
+function stripAuthorizationHeader(config: AxiosRequestConfig): void {
+  if (!config.headers) return;
+  if (typeof (config.headers as AxiosHeaders).delete === 'function') {
+    (config.headers as AxiosHeaders).delete('Authorization');
+    return;
+  }
+  delete (config.headers as Record<string, unknown>).Authorization;
+  delete (config.headers as Record<string, unknown>).authorization;
 }
 
 httpClient.interceptors.response.use(
@@ -165,8 +181,14 @@ httpClient.interceptors.response.use(
 
       if (isRefreshing) {
         const token = await awaitRefresh();
-        if (!token) return Promise.reject(AppError.fromAxiosError(error));
-        originalRequest.headers = { ...originalRequest.headers, Authorization: `Bearer ${token}` };
+        if (token) {
+          originalRequest.headers = {
+            ...originalRequest.headers,
+            Authorization: `Bearer ${token}`,
+          };
+          return httpClient(originalRequest);
+        }
+        stripAuthorizationHeader(originalRequest);
         return httpClient(originalRequest);
       }
 
@@ -175,9 +197,16 @@ httpClient.interceptors.response.use(
       isRefreshing = false;
       resolveRefreshWaiters(token);
 
-      if (!token) return Promise.reject(AppError.fromAxiosError(error));
+      if (token) {
+        originalRequest.headers = {
+          ...originalRequest.headers,
+          Authorization: `Bearer ${token}`,
+        };
+        return httpClient(originalRequest);
+      }
 
-      originalRequest.headers = { ...originalRequest.headers, Authorization: `Bearer ${token}` };
+      // Session is gone — drop the bad Bearer and retry as guest (guest cart token still sent).
+      stripAuthorizationHeader(originalRequest);
       return httpClient(originalRequest);
     }
 

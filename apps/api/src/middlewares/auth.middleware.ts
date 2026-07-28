@@ -28,21 +28,34 @@ async function attachUser(req: Request, required: boolean): Promise<void> {
     return;
   }
 
-  const payload = verifyAccessToken(token);
+  try {
+    const payload = verifyAccessToken(token);
 
-  if (await isAccessTokenBlacklisted(payload.jti)) {
-    throw ApiError.unauthorized('Token has been revoked', 'TOKEN_REVOKED');
+    if (await isAccessTokenBlacklisted(payload.jti)) {
+      throw ApiError.unauthorized('Token has been revoked', 'TOKEN_REVOKED');
+    }
+
+    const user = await authService.buildAuthenticatedUser({
+      userId: payload.sub,
+      sessionId: payload.sid,
+    });
+
+    req.user = user;
+    req.context.user = user;
+    req.accessTokenJti = payload.jti;
+    req.accessToken = token;
+  } catch (error) {
+    // Optional auth must not block guest-capable routes (cart, catalog, etc.)
+    // when a stale/expired Bearer token is still sitting in the browser.
+    if (!required) {
+      req.user = undefined;
+      if (req.context) req.context.user = undefined;
+      req.accessTokenJti = undefined;
+      req.accessToken = undefined;
+      return;
+    }
+    throw error;
   }
-
-  const user = await authService.buildAuthenticatedUser({
-    userId: payload.sub,
-    sessionId: payload.sid,
-  });
-
-  req.user = user;
-  req.context.user = user;
-  req.accessTokenJti = payload.jti;
-  req.accessToken = token;
 }
 
 /**
