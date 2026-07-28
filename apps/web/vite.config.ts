@@ -48,6 +48,8 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true,
+    // Allow ngrok (and similar) tunnels — free URLs change each session
+    allowedHosts: ['.ngrok-free.dev', '.ngrok-free.app', '.ngrok.app', '.ngrok.io'],
     proxy: {
       '/api': {
         target: 'http://127.0.0.1:4000',
