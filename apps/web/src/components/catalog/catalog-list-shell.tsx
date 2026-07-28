@@ -222,32 +222,34 @@ export function CatalogListShell({
         )}
       </Container>
 
-      {/* Floating filter / sort — mobile only (Zara / H&M pattern) */}
-      <div
-        className="pointer-events-none fixed inset-x-0 z-[80] flex justify-center gap-2 px-4 lg:hidden"
-        style={{ bottom: 'calc(3.75rem + env(safe-area-inset-bottom, 0px))' }}
-      >
-        <button
-          type="button"
-          onClick={() => setFiltersOpen(true)}
-          className="border-border/80 bg-background/95 text-foreground pointer-events-auto inline-flex h-11 min-w-[7.5rem] items-center justify-center gap-2 rounded-full border px-4 text-[11px] font-bold uppercase tracking-[0.14em] shadow-[0_8px_28px_-12px_rgba(0,0,0,0.35)] backdrop-blur-md transition-transform duration-150 active:scale-[0.97]"
+      {/* Floating filter / sort — below sheets so quick-add covers them */}
+      {!filtersOpen ? (
+        <div
+          className="pointer-events-none fixed inset-x-0 z-40 flex justify-center gap-2 px-4 lg:hidden"
+          style={{ bottom: 'calc(3.75rem + env(safe-area-inset-bottom, 0px))' }}
         >
-          <SlidersHorizontal className="size-3.5" aria-hidden />
-          Filter
-          {chips.length > 0 ? (
-            <span className="bg-foreground text-background flex size-4 items-center justify-center rounded-full text-[9px]">
-              {chips.length}
-            </span>
-          ) : null}
-        </button>
-        <button
-          type="button"
-          onClick={() => setFiltersOpen(true)}
-          className="border-border/80 bg-background/95 text-foreground pointer-events-auto inline-flex h-11 min-w-[7.5rem] items-center justify-center gap-2 rounded-full border px-4 text-[11px] font-bold uppercase tracking-[0.14em] shadow-[0_8px_28px_-12px_rgba(0,0,0,0.35)] backdrop-blur-md transition-transform duration-150 active:scale-[0.97]"
-        >
-          Sort
-        </button>
-      </div>
+          <button
+            type="button"
+            onClick={() => setFiltersOpen(true)}
+            className="border-border/80 bg-background/95 text-foreground pointer-events-auto inline-flex h-11 min-w-[7.5rem] items-center justify-center gap-2 rounded-full border px-4 text-[11px] font-bold uppercase tracking-[0.14em] shadow-[0_8px_28px_-12px_rgba(0,0,0,0.35)] backdrop-blur-md transition-transform duration-150 active:scale-[0.97]"
+          >
+            <SlidersHorizontal className="size-3.5" aria-hidden />
+            Filter
+            {chips.length > 0 ? (
+              <span className="bg-foreground text-background flex size-4 items-center justify-center rounded-full text-[9px]">
+                {chips.length}
+              </span>
+            ) : null}
+          </button>
+          <button
+            type="button"
+            onClick={() => setFiltersOpen(true)}
+            className="border-border/80 bg-background/95 text-foreground pointer-events-auto inline-flex h-11 min-w-[7.5rem] items-center justify-center gap-2 rounded-full border px-4 text-[11px] font-bold uppercase tracking-[0.14em] shadow-[0_8px_28px_-12px_rgba(0,0,0,0.35)] backdrop-blur-md transition-transform duration-150 active:scale-[0.97]"
+          >
+            Sort
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

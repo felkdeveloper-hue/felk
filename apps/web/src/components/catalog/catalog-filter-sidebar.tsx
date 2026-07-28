@@ -388,8 +388,9 @@ export function CatalogFilterAndSortSheet({
       <SheetContent
         side={isMobile ? 'bottom' : 'left'}
         showClose={false}
+        overlayClassName="z-[100]"
         className={cn(
-          'flex w-full flex-col gap-0 rounded-none p-0',
+          'z-[100] flex w-full flex-col gap-0 rounded-none p-0',
           isMobile
             ? 'h-[min(88dvh,860px)] max-h-[88dvh] !max-w-none rounded-t-2xl border-t pb-[env(safe-area-inset-bottom)]'
             : 'max-w-130 lg:top-19 top-16 h-[calc(100%-4rem)] lg:h-[calc(100%-4.75rem)]',

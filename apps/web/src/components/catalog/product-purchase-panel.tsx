@@ -4,7 +4,6 @@ import { Minus, Plus, RefreshCcw, ShieldCheck, ShoppingBag } from 'lucide-react'
 import { toast } from 'sonner';
 import { AddToCartButton } from '@/components/cart/add-to-cart-button';
 import { WishlistButton } from '@/components/wishlist/wishlist-button';
-import { Button } from '@/components/ui/button';
 import { useAddToCartMutation } from '@/hooks/cart';
 import { useCartStore } from '@/store/cart-store';
 import { resolveVariantId } from '@/utils/cart';
@@ -382,7 +381,7 @@ export function ProductPurchasePanel({
         />
       ) : null}
 
-      <div className="space-y-3 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-1 lg:pb-0">
+      <div className="space-y-3 pt-1">
         <div className="flex flex-wrap items-stretch gap-3">
           <div className="border-border inline-flex h-12 items-center rounded-none border">
             <button
@@ -469,81 +468,6 @@ export function ProductPurchasePanel({
             {addMutation.isPending ? 'Please wait…' : 'Buy it now'}
           </button>
         ) : null}
-      </div>
-
-      {/* Sticky mobile CTA bar — above bottom nav */}
-      <div
-        className="border-border/80 bg-background/95 supports-[backdrop-filter]:bg-background/90 fixed inset-x-0 z-[85] border-t px-3 py-2 backdrop-blur-md lg:hidden"
-        style={{ bottom: 'calc(3.5rem + env(safe-area-inset-bottom, 0px))' }}
-      >
-        <div className="mx-auto flex max-w-lg items-center gap-2">
-          <WishlistButton
-            product={product}
-            variantId={selectedVariantId}
-            iconOnly
-            variant="outline"
-            size="icon"
-            className="border-border size-12 shrink-0 rounded-none"
-          />
-          {isInCart ? (
-            <Button
-              asChild
-              className="h-12 min-w-0 flex-1 rounded-none text-xs font-bold uppercase tracking-[0.12em]"
-            >
-              <Link to={ROUTES.cart}>Go to bag</Link>
-            </Button>
-          ) : colorHasNoSizes || (isSelectionOutOfStock && selectionReady) ? (
-            <button
-              type="button"
-              disabled
-              className="border-border text-muted-foreground bg-muted/40 h-12 min-w-0 flex-1 cursor-not-allowed border text-xs font-bold uppercase tracking-[0.12em]"
-            >
-              Out of stock
-            </button>
-          ) : !selectionReady ? (
-            <button
-              type="button"
-              onClick={() => {
-                setSizeError(true);
-                toast.error(
-                  selectedSizeId && !sizeMatchesColor
-                    ? 'This size is not available in the selected color'
-                    : 'Please select a size to continue',
-                );
-                document
-                  .querySelector('[data-size-selector]')
-                  ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-              }}
-              className="border-foreground text-foreground h-12 min-w-0 flex-1 border bg-transparent text-xs font-bold uppercase tracking-[0.12em] active:opacity-80"
-            >
-              Select size
-            </button>
-          ) : (
-            <AddToCartButton
-              product={product}
-              variantId={cartVariantId}
-              quantity={quantity}
-              skipOptionGate
-              className="h-12 min-w-0 flex-[1.2] rounded-none text-xs font-bold uppercase tracking-[0.12em]"
-              label="Add"
-            />
-          )}
-          {!colorHasNoSizes && !(isSelectionOutOfStock && selectionReady) ? (
-            <button
-              type="button"
-              onClick={handleBuyNow}
-              disabled={
-                addMutation.isPending ||
-                product.inStock === false ||
-                product.status === 'out_of_stock' ||
-                isSelectionOutOfStock
-              }
-              className="bg-foreground text-background h-12 min-w-0 flex-1 rounded-none text-xs font-bold uppercase tracking-[0.12em] transition-opacity active:opacity-80 disabled:opacity-50"
-            >
-              Buy
-            </button>
-          ) : null}
-        </div>
       </div>
 
       <ProductOffersSection />

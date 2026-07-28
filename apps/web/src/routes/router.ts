@@ -8,6 +8,8 @@ export const router = createRouter({
   context: { queryClient },
   defaultPreload: 'intent',
   defaultNotFoundComponent: NotFoundPage,
+  scrollRestoration: true,
+  getScrollRestorationKey: (location) => location.state.__TSR_key ?? location.href,
 });
 
 declare module '@tanstack/react-router' {

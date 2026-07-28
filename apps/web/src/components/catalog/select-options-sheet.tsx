@@ -273,8 +273,9 @@ export function SelectOptionsSheet({ product, open, onOpenChange }: SelectOption
       <SheetContent
         side={isMobile ? 'bottom' : 'right'}
         showClose={false}
+        overlayClassName="z-[100]"
         className={cn(
-          'w-full gap-0 overflow-y-auto p-0 sm:!max-w-3xl lg:!max-w-4xl',
+          'z-[100] w-full gap-0 overflow-y-auto p-0 sm:!max-w-3xl lg:!max-w-4xl',
           isMobile &&
             'h-[min(92dvh,920px)] max-h-[92dvh] !max-w-none rounded-t-2xl border-t pb-[env(safe-area-inset-bottom)]',
         )}

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams, useSearch } from '@tanstack/react-router';
+import { useNavigate, useParams, useRouter, useSearch } from '@tanstack/react-router';
+import { ArrowLeft } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Seo } from '@/components/common/seo';
 import { Container } from '@/components/layout/container';
@@ -98,6 +99,7 @@ function resolveCareLabel(specifications?: unknown[]): string | undefined {
 export function ProductDetailPage() {
   const { slug } = useParams({ strict: false }) as { slug: string };
   const navigate = useNavigate();
+  const router = useRouter();
   // Product cards pass both hints so an own-listing color remains selected
   // even if variant ordering or cached detail data changes.
   const { variant: hintVariantId, color: hintColorId } = useSearch({ strict: false }) as {
@@ -298,7 +300,23 @@ export function ProductDetailPage() {
       <SizeGuideModal />
 
       <Container className="py-6 sm:py-10">
-        <ProductBreadcrumb className="mb-6" items={breadcrumbItems} />
+        <div className="mb-5 flex items-start gap-2 sm:mb-6 sm:gap-3">
+          <button
+            type="button"
+            aria-label="Go back"
+            onClick={() => {
+              if (typeof window !== 'undefined' && window.history.length > 1) {
+                router.history.back();
+                return;
+              }
+              void navigate({ to: ROUTES.products });
+            }}
+            className="text-foreground -ml-1.5 inline-flex size-11 shrink-0 items-center justify-center transition-opacity active:opacity-70"
+          >
+            <ArrowLeft className="size-5" strokeWidth={1.75} />
+          </button>
+          <ProductBreadcrumb className="min-w-0 flex-1 pt-2.5" items={breadcrumbItems} />
+        </div>
 
         <div className="grid gap-8 lg:grid-cols-2 lg:gap-10 xl:gap-14">
           <ProductGallery
