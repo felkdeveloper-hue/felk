@@ -28,11 +28,19 @@ import { PRODUCT_STATUS, PRODUCT_VISIBILITY } from '@/constants/product';
 import { asyncHandler } from '@/utils/async-handler';
 import { ApiResponse } from '@/utils/response/api-response';
 import { ApiError } from '@/utils/errors/api-error';
-import { getCached, setCache, storefrontProductsCacheKey } from '@/utils/simple-cache';
+import {
+  getCached,
+  setCache,
+  storefrontProductsCacheKey,
+} from '@/utils/simple-cache';
+import { stableQueryKey } from '@/utils/stable-query-key';
 
 export const storefrontRouter = Router();
 
 const PUBLIC_CACHE_MAX_AGE = 300;
+/** Product list cache — long enough to absorb Render multi-hit bursts, short enough for catalog freshness. */
+const PRODUCT_LIST_CACHE_MS = 300_000;
+const BOOTSTRAP_CACHE_MS = 300_000;
 
 function setPublicCache(res: Response, maxAge = PUBLIC_CACHE_MAX_AGE): void {
   if (process.env.NODE_ENV !== 'production') {
@@ -42,16 +50,43 @@ function setPublicCache(res: Response, maxAge = PUBLIC_CACHE_MAX_AGE): void {
   res.set('Cache-Control', `public, max-age=${maxAge}, s-maxage=${maxAge}`);
 }
 
+function appendServerTiming(
+  res: Response,
+  metric: string,
+  durationMs: number,
+  desc?: string,
+): void {
+  const existing = res.getHeader('Server-Timing');
+  const part = desc
+    ? `${metric};dur=${durationMs.toFixed(1)};desc="${desc}"`
+    : `${metric};dur=${durationMs.toFixed(1)}`;
+  if (typeof existing === 'string' && existing.length) {
+    res.setHeader('Server-Timing', `${existing}, ${part}`);
+  } else {
+    res.setHeader('Server-Timing', part);
+  }
+}
+
 function publicList(path: string, resource: string, model: Model<any>, status = 'active') {
   const service = new CmsCrudService(resource, model);
   storefrontRouter.get(
     path,
     asyncHandler(async (req, res) => {
+      const cacheKey = `storefront:list:${resource}:${stableQueryKey(req.query as Record<string, unknown>)}`;
+      const cached = getCached<{ data: unknown; meta: unknown }>(cacheKey);
+      if (cached) {
+        setPublicCache(res);
+        appendServerTiming(res, 'cache', 0, 'hit');
+        return ApiResponse.success(res, cached.data, 'OK', 200, cached.meta as never);
+      }
+      const started = performance.now();
       const result = await service.list({
         ...req.query,
         includeDeleted: false,
         status,
       } as never);
+      appendServerTiming(res, 'db', performance.now() - started);
+      setCache(cacheKey, { data: result.data, meta: result.meta }, 120_000);
       setPublicCache(res);
       ApiResponse.success(res, result.data, 'OK', 200, result.meta);
     }),
@@ -63,13 +98,13 @@ const BOOTSTRAP_CACHE_KEY = 'storefront:bootstrap';
 storefrontRouter.get(
   '/bootstrap',
   asyncHandler(async (_req, res) => {
-    const skipCache = process.env.NODE_ENV !== 'production';
-    if (!skipCache) {
-      const cached = getCached<Record<string, unknown>>(BOOTSTRAP_CACHE_KEY);
-      if (cached) {
-        setPublicCache(res);
-        return ApiResponse.success(res, cached);
-      }
+    const started = performance.now();
+    // Always use a short process cache — multi-instance still benefits per dyno; cold Atlas hurts without it.
+    const cached = getCached<Record<string, unknown>>(BOOTSTRAP_CACHE_KEY);
+    if (cached) {
+      setPublicCache(res);
+      appendServerTiming(res, 'total', performance.now() - started, 'cache-hit');
+      return ApiResponse.success(res, cached);
     }
 
     const categoryService = new CmsCrudService('categories', CategoryModel as Model<any>);
@@ -82,10 +117,18 @@ storefrontRouter.get(
     const socialService = new CmsCrudService('social-links', SocialLinkModel as Model<any>);
     const contactService = new CmsCrudService('contact-infos', ContactInfoModel as Model<any>);
     const pageService = new CmsCrudService('pages', CmsPageModel as Model<any>);
+    const promoService = new CmsCrudService('promo-banners', PromoBannerModel as Model<any>);
+    const brandService = new CmsCrudService('brands', BrandModel as Model<any>);
+    const collectionService = new CmsCrudService('collections', CollectionModel as Model<any>);
+    const colorService = new CmsCrudService('colors', ColorModel as Model<any>);
+    const sizeService = new CmsCrudService('sizes', SizeModel as Model<any>);
+    const materialService = new CmsCrudService('materials', MaterialModel as Model<any>);
+    const occasionService = new CmsCrudService('occasions', OccasionModel as Model<any>);
 
     const listBase = { includeDeleted: false, status: 'active' as const, limit: 100 };
     const pageBase = { includeDeleted: false, status: 'published' as const, limit: 100 };
 
+    const dbStarted = performance.now();
     const [
       settings,
       categories,
@@ -95,6 +138,13 @@ storefrontRouter.get(
       socialLinks,
       contactInfos,
       pages,
+      promoBanners,
+      brands,
+      collections,
+      colors,
+      sizes,
+      materials,
+      occasions,
     ] = await Promise.all([
       settingsService.getPublic(),
       categoryService.list({ ...listBase, sortBy: 'sortOrder', sortOrder: 'asc' } as never),
@@ -124,7 +174,15 @@ storefrontRouter.get(
         sortOrder: 'asc',
       } as never),
       pageService.list(pageBase as never),
+      promoService.list({ ...listBase, limit: 30, sortBy: 'priority', sortOrder: 'desc' } as never),
+      brandService.list({ ...listBase, sortBy: 'name', sortOrder: 'asc' } as never),
+      collectionService.list({ ...listBase, sortBy: 'name', sortOrder: 'asc' } as never),
+      colorService.list({ ...listBase, sortBy: 'sortOrder', sortOrder: 'asc' } as never),
+      sizeService.list({ ...listBase, sortBy: 'sortOrder', sortOrder: 'asc' } as never),
+      materialService.list({ ...listBase, sortBy: 'sortOrder', sortOrder: 'asc' } as never),
+      occasionService.list({ ...listBase, sortBy: 'sortOrder', sortOrder: 'asc' } as never),
     ]);
+    appendServerTiming(res, 'db', performance.now() - dbStarted);
 
     const payload = {
       settings,
@@ -135,12 +193,18 @@ storefrontRouter.get(
       socialLinks: socialLinks.data,
       contactInfos: contactInfos.data,
       pages: pages.data,
+      promoBanners: promoBanners.data,
+      brands: brands.data,
+      collections: collections.data,
+      colors: colors.data,
+      sizes: sizes.data,
+      materials: materials.data,
+      occasions: occasions.data,
     };
 
-    if (!skipCache) {
-      setCache(BOOTSTRAP_CACHE_KEY, payload);
-    }
+    setCache(BOOTSTRAP_CACHE_KEY, payload, BOOTSTRAP_CACHE_MS);
     setPublicCache(res);
+    appendServerTiming(res, 'total', performance.now() - started);
     ApiResponse.success(res, payload);
   }),
 );
@@ -150,13 +214,16 @@ storefrontRouter.get(
   asyncHandler(async (req, res) => {
     const { status: _status, visibility: _visibility, ...query } = req.query;
     const cacheKey = storefrontProductsCacheKey(query as Record<string, unknown>);
+    const started = performance.now();
     // Always cache briefly — Render cold starts hurt without it, and list payloads are public.
     const cached = getCached<{ data: unknown; meta: unknown }>(cacheKey);
     if (cached) {
       setPublicCache(res, 300);
+      appendServerTiming(res, 'total', performance.now() - started, 'cache-hit');
       return ApiResponse.success(res, cached.data, 'OK', 200, cached.meta as never);
     }
 
+    const dbStarted = performance.now();
     const result = await productService.list({
       ...query,
       includeDeleted: false,
@@ -170,9 +237,11 @@ storefrontRouter.get(
       ],
       excludeVisibility: [PRODUCT_VISIBILITY.HIDDEN],
     } as never);
+    appendServerTiming(res, 'svc', performance.now() - dbStarted);
 
-    setCache(cacheKey, { data: result.data, meta: result.meta }, 300_000);
+    setCache(cacheKey, { data: result.data, meta: result.meta }, PRODUCT_LIST_CACHE_MS);
     setPublicCache(res, 300);
+    appendServerTiming(res, 'total', performance.now() - started);
     ApiResponse.success(res, result.data, 'OK', 200, result.meta);
   }),
 );

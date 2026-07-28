@@ -189,8 +189,10 @@ export class ProductRepository extends BaseRepository {
       if (colorId) variantFilter.colorId = colorId;
       if (sizeId) variantFilter.sizeId = sizeId;
 
-      const matching = await ProductVariantModel.find(variantFilter).select('productId').lean();
-      const ids = [...new Set(matching.map((row) => row.productId.toString()))];
+      // distinct avoids loading every matching variant document into memory.
+      const ids = (await ProductVariantModel.distinct('productId', variantFilter)).map((id) =>
+        id.toString(),
+      );
       if (!ids.length) {
         return { data: [], meta: buildPaginationMeta(0, page, limit) };
       }
@@ -227,26 +229,62 @@ export class ProductRepository extends BaseRepository {
 
     if (options.q) {
       const q = options.q.trim();
-      const skuMatch = await ProductVariantModel.find({
-        isDeleted: false,
-        $or: [
-          { sku: new RegExp(escapeRegex(q), 'i') },
-          { barcode: new RegExp(escapeRegex(q), 'i') },
-        ],
-      })
-        .select('productId')
-        .lean();
+      const looksLikeSku = /^[a-z0-9][a-z0-9_-]{2,40}$/i.test(q) && !/\s/.test(q);
 
-      const productIdsFromVariants = skuMatch.map((v) => v.productId);
+      if (looksLikeSku) {
+        // SKU / barcode / exact-ish codes: keep regex path (text index is poor for codes).
+        const skuMatch = await ProductVariantModel.distinct('productId', {
+          isDeleted: false,
+          $or: [
+            { sku: new RegExp(`^${escapeRegex(q)}$`, 'i') },
+            { barcode: new RegExp(`^${escapeRegex(q)}$`, 'i') },
+            { sku: new RegExp(escapeRegex(q), 'i') },
+            { barcode: new RegExp(escapeRegex(q), 'i') },
+          ],
+        });
 
-      filter.$or = [
-        { name: new RegExp(escapeRegex(q), 'i') },
-        { slug: new RegExp(escapeRegex(q), 'i') },
-        { shortDescription: new RegExp(escapeRegex(q), 'i') },
-        { tags: new RegExp(escapeRegex(q), 'i') },
-        { searchKeywords: new RegExp(escapeRegex(q), 'i') },
-        ...(productIdsFromVariants.length ? [{ _id: { $in: productIdsFromVariants } }] : []),
-      ];
+        filter.$or = [
+          { name: new RegExp(escapeRegex(q), 'i') },
+          { slug: new RegExp(escapeRegex(q), 'i') },
+          { shortDescription: new RegExp(escapeRegex(q), 'i') },
+          { tags: new RegExp(escapeRegex(q), 'i') },
+          { searchKeywords: new RegExp(escapeRegex(q), 'i') },
+          ...(skuMatch.length ? [{ _id: { $in: skuMatch } }] : []),
+        ];
+      } else {
+        // Keyword search: use the existing text index (name/shortDescription/tags/searchKeywords).
+        // Also OR in SKU hits via a cheap distinct — $text cannot live inside $or, so we
+        // resolve to an _id union when SKU matches exist; otherwise filter with $text alone.
+        const skuMatch = await ProductVariantModel.distinct('productId', {
+          isDeleted: false,
+          $or: [
+            { sku: new RegExp(escapeRegex(q), 'i') },
+            { barcode: new RegExp(escapeRegex(q), 'i') },
+          ],
+        });
+
+        if (skuMatch.length) {
+          const textHits = await ProductModel.find({
+            ...filter,
+            $text: { $search: q },
+          })
+            .select('_id')
+            .limit(500)
+            .lean();
+          const merged = [
+            ...new Set([
+              ...textHits.map((row) => row._id.toString()),
+              ...skuMatch.map((id) => id.toString()),
+            ]),
+          ].map((id) => new Types.ObjectId(id));
+          if (!merged.length) {
+            return { data: [], meta: buildPaginationMeta(0, page, limit) };
+          }
+          filter._id = { $in: merged };
+        } else {
+          filter.$text = { $search: q };
+        }
+      }
     }
 
     const sort = parseSort(options, this.sortableFields);

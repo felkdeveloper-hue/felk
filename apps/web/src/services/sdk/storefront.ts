@@ -10,6 +10,14 @@ export interface StorefrontBootstrapPayload {
   socialLinks: unknown[];
   contactInfos: unknown[];
   pages: unknown[];
+  /** Optional — older API deploys may omit these; hooks fall back to dedicated endpoints. */
+  promoBanners?: unknown[];
+  brands?: unknown[];
+  collections?: unknown[];
+  colors?: unknown[];
+  sizes?: unknown[];
+  materials?: unknown[];
+  occasions?: unknown[];
 }
 
 /** Single-request bootstrap for the public storefront shell. */

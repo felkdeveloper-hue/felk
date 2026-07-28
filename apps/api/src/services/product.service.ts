@@ -369,9 +369,9 @@ export class ProductService {
         { $unwind: '$items' },
         { $replaceRoot: { newRoot: '$items' } },
       ]),
-      BrandModel.find({ _id: { $in: brandIds }, isDeleted: false })
-        .select('name')
-        .lean(),
+      brandIds.length
+        ? BrandModel.find({ _id: { $in: brandIds }, isDeleted: false }).select('name').lean()
+        : Promise.resolve([] as Array<{ _id: Types.ObjectId; name: string }>),
     ]);
 
     const variantIds = variants.map((v) => v._id);

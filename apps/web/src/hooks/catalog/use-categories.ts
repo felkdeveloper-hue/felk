@@ -67,12 +67,14 @@ export function useCatalogFilterFacets(options?: {
     queryKey: QUERY_KEYS.cms.brands({ active: true }),
     queryFn: () => cmsApi.listBrands({ status: 'active', limit: 100 }),
     staleTime: 1000 * 60 * 10,
+    refetchOnMount: false,
     enabled: enabled && includeBrands,
   });
   const collections = useQuery({
     queryKey: QUERY_KEYS.cms.collections({ active: true }),
     queryFn: () => cmsApi.listCollections({ status: 'active', limit: 100 }),
     staleTime: 1000 * 60 * 10,
+    refetchOnMount: false,
     enabled: enabled && includeCollections,
   });
   const categories = useQuery({
@@ -80,30 +82,35 @@ export function useCatalogFilterFacets(options?: {
     queryFn: () =>
       categoriesApi.list({ status: 'active', limit: 100, sortBy: 'sortOrder', sortOrder: 'asc' }),
     staleTime: 1000 * 60 * 5,
+    refetchOnMount: false,
     enabled,
   });
   const colors = useQuery({
     queryKey: ['catalog', 'facets', 'colors'],
     queryFn: () => catalogFacetsApi.listColors(),
     staleTime: 1000 * 60 * 10,
+    refetchOnMount: false,
     enabled,
   });
   const sizes = useQuery({
     queryKey: ['catalog', 'facets', 'sizes'],
     queryFn: () => catalogFacetsApi.listSizes(),
     staleTime: 1000 * 60 * 10,
+    refetchOnMount: false,
     enabled,
   });
   const materials = useQuery({
     queryKey: ['catalog', 'facets', 'materials'],
     queryFn: () => catalogFacetsApi.listMaterials(),
     staleTime: 1000 * 60 * 10,
+    refetchOnMount: false,
     enabled,
   });
   const occasions = useQuery({
     queryKey: ['catalog', 'facets', 'occasions'],
     queryFn: () => catalogFacetsApi.listOccasions(),
     staleTime: 1000 * 60 * 10,
+    refetchOnMount: false,
     enabled,
   });
 

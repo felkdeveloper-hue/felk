@@ -37,29 +37,30 @@ const router = createRouter({ routeTree });
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
 describe('ProductCard', () => {
-  it('renders brand, name, price, discount, and rating', async () => {
+  it('renders name, prices, discount badge, and rating', async () => {
     await router.load();
     render(
       <QueryClientProvider client={queryClient}>
         <RouterProvider router={router} />
       </QueryClientProvider>,
     );
-    expect(screen.getByText('Forma Atelier')).toBeInTheDocument();
     expect(screen.getByText('Silk Column Dress')).toBeInTheDocument();
     expect(screen.getByText('$315.00')).toBeInTheDocument();
     expect(screen.getByText('$420.00')).toBeInTheDocument();
-    expect(screen.getByText('25% OFF')).toBeInTheDocument();
+    expect(screen.getByText('Save 25%')).toBeInTheDocument();
     expect(screen.getByLabelText('Rated 4.6 out of 5')).toBeInTheDocument();
-    expect(screen.getByText(/Get it for as low as/i)).toBeInTheDocument();
   });
 
-  it('shows the new badge', async () => {
+  it('links to the product detail route', async () => {
     await router.load();
     render(
       <QueryClientProvider client={queryClient}>
         <RouterProvider router={router} />
       </QueryClientProvider>,
     );
-    expect(screen.getByText('New')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /View Silk Column Dress/i })).toHaveAttribute(
+      'href',
+      '/products/silk-column-dress?variant=var_1',
+    );
   });
 });

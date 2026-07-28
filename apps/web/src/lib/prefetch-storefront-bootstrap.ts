@@ -2,15 +2,19 @@ import type { QueryClient } from '@tanstack/react-query';
 import { QUERY_KEYS } from '@/constants/query-keys';
 import { prefetchDefaultCatalogLists } from '@/lib/prefetch-catalog';
 import { storefrontApi, type StorefrontBootstrapPayload } from '@/services/sdk/storefront';
+import type { CatalogFacet } from '@/services/sdk/catalog-facets';
 import { normalizeCategory } from '@/utils/catalog/normalize';
 import {
   activeOnly,
   mapList,
   normalizeAnnouncement,
+  normalizeBrand,
   normalizeCmsPage,
+  normalizeCollection,
   normalizeContactInfo,
   normalizeHeroBanner,
   normalizeHomeSection,
+  normalizePromoBanner,
   normalizePublicSettings,
   normalizeSocialLink,
   sortByPriority,
@@ -22,6 +26,30 @@ import {
  * this guard they would each issue their own duplicate request.
  */
 let inFlight: Promise<void> | null = null;
+
+function facetPage<T>(rows: T[]) {
+  return {
+    data: rows,
+    meta: {
+      page: 1,
+      limit: 100,
+      total: rows.length,
+      totalPages: 1,
+      hasNextPage: false,
+      hasPrevPage: false,
+    },
+  };
+}
+
+function normalizeFacetRow(raw: unknown): CatalogFacet {
+  const record = raw as Record<string, unknown>;
+  return {
+    id: String(record.id ?? record._id ?? ''),
+    name: String(record.name ?? record.label ?? ''),
+    slug: typeof record.slug === 'string' ? record.slug : undefined,
+    sortOrder: typeof record.sortOrder === 'number' ? record.sortOrder : undefined,
+  };
+}
 
 /**
  * Fetches `/storefront/bootstrap` once and seeds individual React Query
@@ -108,6 +136,68 @@ async function runPrefetch(queryClient: QueryClient): Promise<void> {
       { data: mapList(payload.pages, normalizeCmsPage) },
       { updatedAt: now },
     );
+
+    // Promo + facet masters — eliminate home promo fan-out and filter-sheet waterfall.
+    if (payload.promoBanners) {
+      const allPromos = mapList(payload.promoBanners, normalizePromoBanner);
+      queryClient.setQueryData(
+        QUERY_KEYS.cms.promoBanners({}),
+        { data: allPromos },
+        {
+          updatedAt: now,
+        },
+      );
+      for (const placement of ['home_split', 'home_editorial', 'home_before_featured'] as const) {
+        queryClient.setQueryData(
+          QUERY_KEYS.cms.promoBanners({ placement }),
+          { data: allPromos.filter((banner) => banner.placement === placement) },
+          { updatedAt: now },
+        );
+      }
+    }
+
+    if (payload.brands) {
+      queryClient.setQueryData(
+        QUERY_KEYS.cms.brands({ active: true }),
+        facetPage(mapList(payload.brands, normalizeBrand)),
+        { updatedAt: now },
+      );
+    }
+    if (payload.collections) {
+      queryClient.setQueryData(
+        QUERY_KEYS.cms.collections({ active: true }),
+        facetPage(mapList(payload.collections, normalizeCollection)),
+        { updatedAt: now },
+      );
+    }
+    if (payload.colors) {
+      queryClient.setQueryData(
+        ['catalog', 'facets', 'colors'],
+        facetPage(mapList(payload.colors, normalizeFacetRow)),
+        { updatedAt: now },
+      );
+    }
+    if (payload.sizes) {
+      queryClient.setQueryData(
+        ['catalog', 'facets', 'sizes'],
+        facetPage(mapList(payload.sizes, normalizeFacetRow)),
+        { updatedAt: now },
+      );
+    }
+    if (payload.materials) {
+      queryClient.setQueryData(
+        ['catalog', 'facets', 'materials'],
+        facetPage(mapList(payload.materials, normalizeFacetRow)),
+        { updatedAt: now },
+      );
+    }
+    if (payload.occasions) {
+      queryClient.setQueryData(
+        ['catalog', 'facets', 'occasions'],
+        facetPage(mapList(payload.occasions, normalizeFacetRow)),
+        { updatedAt: now },
+      );
+    }
 
     // Warm the default Women PLP while the user is still on home / layout chrome.
     prefetchDefaultCatalogLists(queryClient);

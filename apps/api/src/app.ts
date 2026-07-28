@@ -38,7 +38,19 @@ export function createApp(): Application {
   app.use(globalRateLimiter);
   app.use(csrfProtectionMiddleware);
 
-  app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
+  app.use(
+    '/uploads',
+    express.static(path.resolve(process.cwd(), 'uploads'), {
+      maxAge: '7d',
+      etag: true,
+      lastModified: true,
+      setHeaders(res, filePath) {
+        if (/\.(webp|avif|jpe?g|png|gif|svg)$/i.test(filePath)) {
+          res.setHeader('Cache-Control', 'public, max-age=604800, stale-while-revalidate=86400');
+        }
+      },
+    }),
+  );
 
   setupSwagger(app);
 

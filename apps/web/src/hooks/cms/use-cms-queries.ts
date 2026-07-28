@@ -114,8 +114,10 @@ export function usePromoBanners(
       });
       return { data: result.data };
     },
+    // Bootstrap seeds placement caches — avoid refetch storms on home mount.
     staleTime: CMS_STALE,
     gcTime: CMS_GC,
+    refetchOnMount: false,
     ...options,
   });
 }

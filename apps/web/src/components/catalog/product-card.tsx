@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { Eye, Star } from 'lucide-react';
 import type { Product } from '@/services/sdk';
@@ -27,7 +27,7 @@ function readAverageRating(product: Product): number | undefined {
   return Math.round(value * 10) / 10;
 }
 
-export function ProductCard({
+function ProductCardComponent({
   product,
   className,
   layout = 'grid',
@@ -246,3 +246,5 @@ export function ProductCard({
     </>
   );
 }
+
+export const ProductCard = memo(ProductCardComponent);

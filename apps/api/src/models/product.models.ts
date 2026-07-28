@@ -157,10 +157,10 @@ const productSchema = new Schema<ProductDocument>(
     subcategoryId: { type: Schema.Types.ObjectId, ref: 'Category', default: null, index: true },
     collectionIds: [{ type: Schema.Types.ObjectId, ref: 'Collection', index: true }],
     seasonId: { type: Schema.Types.ObjectId, ref: 'SeasonCollection', default: null },
-    materialId: { type: Schema.Types.ObjectId, ref: 'Material', default: null },
+    materialId: { type: Schema.Types.ObjectId, ref: 'Material', default: null, index: true },
     gender: { type: String, default: null, index: true },
     ageGroup: { type: String, default: null },
-    occasionIds: [{ type: Schema.Types.ObjectId, ref: 'Occasion' }],
+    occasionIds: [{ type: Schema.Types.ObjectId, ref: 'Occasion', index: true }],
     tags: { type: [String], default: [], index: true },
     paymentOption: {
       type: String,
@@ -250,6 +250,9 @@ productSchema.index({
 });
 productSchema.index({ 'pricing.price': 1 });
 productSchema.index({ createdAt: -1 });
+// Facet filters used by storefront catalog.
+productSchema.index({ materialId: 1, isDeleted: 1, status: 1 });
+productSchema.index({ occasionIds: 1, isDeleted: 1, status: 1 });
 
 export const ProductModel: Model<ProductDocument> = model('Product', productSchema);
 

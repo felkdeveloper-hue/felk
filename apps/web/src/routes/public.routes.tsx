@@ -1,5 +1,14 @@
 import { createRoute, redirect } from '@tanstack/react-router';
 import { ROUTES } from '@/constants';
+import { QUERY_KEYS } from '@/constants/query-keys';
+import { productsApi } from '@/services/sdk';
+import {
+  applyClientCatalogFilters,
+  catalogSearchToProductParams,
+  CATALOG_BATCH_SIZE,
+  CATALOG_MAX_PRODUCTS,
+  parseCatalogSearch,
+} from '@/utils/catalog';
 import {
   AboutPage,
   CartPage,
@@ -25,6 +34,33 @@ export const indexRoute = createRoute({
 export const productsRoute = createRoute({
   getParentRoute: () => publicLayoutRoute,
   path: ROUTES.products,
+  validateSearch: (search: Record<string, unknown>) => parseCatalogSearch(search),
+  beforeLoad: ({ context, search }) => {
+    // Kick the first page fetch as early as the route resolves (parallel with layout paint).
+    const state = parseCatalogSearch(search as Record<string, unknown>);
+    const baseParams = catalogSearchToProductParams({
+      ...state,
+      page: undefined,
+      limit: CATALOG_BATCH_SIZE,
+    });
+    void context.queryClient.prefetchInfiniteQuery({
+      queryKey: QUERY_KEYS.products.list({
+        ...baseParams,
+        infinite: true,
+        max: CATALOG_MAX_PRODUCTS,
+        client: state,
+      }),
+      initialPageParam: 1,
+      queryFn: async ({ pageParam }) => {
+        const result = await productsApi.list({ ...baseParams, page: pageParam as number });
+        return {
+          ...result,
+          data: applyClientCatalogFilters(result.data, state),
+        };
+      },
+      staleTime: 1000 * 60 * 2,
+    });
+  },
   component: ProductsPage,
 });
 
