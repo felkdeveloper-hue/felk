@@ -3,10 +3,10 @@
  *
  *   pnpm --filter @fe-platform/api exec tsx src/scripts/ensure-official-brand.ts
  */
-import { connectDatabase, disconnectDatabase } from '@/config';
-import { OFFICIAL_BRAND_NAME, OFFICIAL_BRAND_SLUG } from '@/constants/product';
-import { BrandModel } from '@/models/master-data.models';
-import { ProductModel } from '@/models/product.models';
+import { connectDatabase, disconnectDatabase } from '@/config/index.js';
+import { OFFICIAL_BRAND_NAME, OFFICIAL_BRAND_SLUG } from '@/constants/product.js';
+import { BrandModel } from '@/models/master-data.models.js';
+import { ProductModel } from '@/models/product.models.js';
 
 async function main() {
   await connectDatabase();

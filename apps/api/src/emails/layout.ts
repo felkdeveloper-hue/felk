@@ -14,4 +14,4 @@ export {
   otpBlock,
   totalRow,
   type LayoutOptions,
-} from '@/services/email/templates/layout';
+} from '@/services/email/templates/layout.js';

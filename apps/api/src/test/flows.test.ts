@@ -1,9 +1,9 @@
 import { beforeAll, afterAll, beforeEach, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import type { Application } from 'express';
-import { createApp } from '@/app';
-import { setupTestDatabase, teardownTestDatabase, resetCollections } from '@/test/helpers/db';
-import { registerCustomer, createAdminUser } from '@/test/helpers/auth';
+import { createApp } from '@/app.js';
+import { setupTestDatabase, teardownTestDatabase, resetCollections } from '@/test/helpers/db.js';
+import { registerCustomer, createAdminUser } from '@/test/helpers/auth.js';
 import {
   seedCatalogAndStock,
   addCustomerAddress,
@@ -12,13 +12,13 @@ import {
   createCodPayment,
   completeCodPaymentAndWaitForOrder,
   runPurchaseFlow,
-} from '@/test/helpers/commerce';
-import { OrderTimelineModel } from '@/models/order.models';
-import { InvoiceModel } from '@/models/order.models';
-import { AuditLogModel } from '@/models';
-import { InventoryItemModel } from '@/models/inventory.models';
-import { StockReservationModel } from '@/models/inventory.models';
-import { RESERVATION_STATUS } from '@/constants/inventory';
+} from '@/test/helpers/commerce.js';
+import { OrderTimelineModel } from '@/models/order.models.js';
+import { InvoiceModel } from '@/models/order.models.js';
+import { AuditLogModel } from '@/models/index.js';
+import { InventoryItemModel } from '@/models/inventory.models.js';
+import { StockReservationModel } from '@/models/inventory.models.js';
+import { RESERVATION_STATUS } from '@/constants/inventory.js';
 
 const API = '/api/v1';
 

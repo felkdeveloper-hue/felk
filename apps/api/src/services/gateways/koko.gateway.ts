@@ -1,18 +1,22 @@
 import { createSign, randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { appConfig } from '@/config/app.config';
-import { logger } from '@/config/logger';
-import { PAYMENT_METHOD, PAYMENT_STATUS } from '@/constants/payment-status';
-import { hmacSha256Hex, safeCompare } from '@/utils/crypto.helper';
+import { appConfig } from '@/config/app.config.js';
+import { logger } from '@/config/logger.js';
+import { PAYMENT_METHOD, PAYMENT_STATUS } from '@/constants/payment-status.js';
+import { hmacSha256Hex, safeCompare } from '@/utils/crypto.helper.js';
 import type {
   CreatePaymentSessionInput,
   PaymentGateway,
   PaymentSessionResult,
   WebhookVerificationInput,
-} from '@/services/interfaces/payment-gateway.service';
-import { getHeader, parseWebhookPayload, rawBodyToString } from '@/services/gateways/gateway.utils';
-import { ApiError } from '@/utils/errors/api-error';
+} from '@/services/interfaces/payment-gateway.service.js';
+import {
+  getHeader,
+  parseWebhookPayload,
+  rawBodyToString,
+} from '@/services/gateways/gateway.utils.js';
+import { ApiError } from '@/utils/errors/api-error.js';
 
 const KOKO_STATUS_MAP: Record<string, string> = {
   approved: PAYMENT_STATUS.PAID,

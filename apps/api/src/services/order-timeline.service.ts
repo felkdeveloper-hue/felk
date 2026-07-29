@@ -1,5 +1,5 @@
-import { OrderTimelineModel } from '@/models/order.models';
-import { logger } from '@/config/logger';
+import { OrderTimelineModel } from '@/models/order.models.js';
+import { logger } from '@/config/logger.js';
 
 export async function recordOrderTimeline(input: {
   orderId: string;

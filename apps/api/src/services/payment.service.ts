@@ -6,38 +6,42 @@ import {
   PaymentTransactionModel,
   PaymentWebhookModel,
   type PaymentDocument,
-} from '@/models/payment.models';
-import { CheckoutSessionModel } from '@/models/checkout.models';
-import { OrderModel } from '@/models/order.models';
-import { checkoutService } from '@/services/checkout.service';
-import { customerService } from '@/services/customer.service';
-import { getGateway, isKnownGateway } from '@/services/gateways/registry';
-import { publishPaymentEvent } from '@/services/payment-event-publisher';
-import { writePaymentLog } from '@/services/payment-log.service';
-import { writeAuditLog } from '@/services/audit.service';
-import type { ActorMeta } from '@/services/cms-crud.service';
-import { appConfig } from '@/config/app.config';
-import { ApiError } from '@/utils/errors/api-error';
-import { buildPaginationMeta, getPaginationSkip, parsePagination } from '@/utils/pagination';
+} from '@/models/payment.models.js';
+import { CheckoutSessionModel } from '@/models/checkout.models.js';
+import { OrderModel } from '@/models/order.models.js';
+import { checkoutService } from '@/services/checkout.service.js';
+import { customerService } from '@/services/customer.service.js';
+import { getGateway, isKnownGateway } from '@/services/gateways/registry.js';
+import { publishPaymentEvent } from '@/services/payment-event-publisher.js';
+import { writePaymentLog } from '@/services/payment-log.service.js';
+import { writeAuditLog } from '@/services/audit.service.js';
+import type { ActorMeta } from '@/services/cms-crud.service.js';
+import { appConfig } from '@/config/app.config.js';
+import { ApiError } from '@/utils/errors/api-error.js';
+import { buildPaginationMeta, getPaginationSkip, parsePagination } from '@/utils/pagination.js';
 import {
   PAYMENT_STATUS,
   PAYMENT_TERMINAL_SUCCESS_STATUSES,
   PAYMENT_METHOD,
   type PaymentMethod,
-} from '@/constants/payment-status';
-import { CHECKOUT_STATUS } from '@/constants/checkout';
+} from '@/constants/payment-status.js';
+import { CHECKOUT_STATUS } from '@/constants/checkout.js';
 import {
   PAYMENT_ATTEMPT_STATUS,
   PAYMENT_AUDIT,
   PAYMENT_EVENT_TYPE,
   PAYMENT_MAX_RETRY_ATTEMPTS,
-} from '@/constants/payment';
-import { getHeader, parseWebhookPayload, rawBodyToString } from '@/services/gateways/gateway.utils';
-import type { AuthenticatedUser } from '@/types';
-import { analyticsService } from '@/services/analytics/analytics.service';
-import { emailQueueService } from '@/services/email-queue.service';
-import { paymentSuccessfulEmail, paymentFailedEmail } from '@/emails';
-import { fulfillCodPaymentIfNeeded } from '@/services/order-payment-consumer.service';
+} from '@/constants/payment.js';
+import {
+  getHeader,
+  parseWebhookPayload,
+  rawBodyToString,
+} from '@/services/gateways/gateway.utils.js';
+import type { AuthenticatedUser } from '@/types/index.js';
+import { analyticsService } from '@/services/analytics/analytics.service.js';
+import { emailQueueService } from '@/services/email-queue.service.js';
+import { paymentSuccessfulEmail, paymentFailedEmail } from '@/emails/index.js';
+import { fulfillCodPaymentIfNeeded } from '@/services/order-payment-consumer.service.js';
 
 function toPlain(doc: { toObject: () => Record<string, unknown> }) {
   return doc.toObject();

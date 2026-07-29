@@ -4,7 +4,7 @@ import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express, { type Application } from 'express';
 import helmet from 'helmet';
-import { appConfig, corsOptions, helmetOptions, setupSwagger } from '@/config';
+import { appConfig, corsOptions, helmetOptions, setupSwagger } from '@/config/index.js';
 import {
   csrfProtectionMiddleware,
   errorHandler,
@@ -13,9 +13,9 @@ import {
   notFoundHandler,
   requestIdMiddleware,
   requestLoggerMiddleware,
-} from '@/middlewares';
-import { v1Router } from '@/routes';
-import { ApiResponse } from '@/utils/response/api-response';
+} from '@/middlewares/index.js';
+import { v1Router } from '@/routes/index.js';
+import { ApiResponse } from '@/utils/response/api-response.js';
 
 export function createApp(): Application {
   const app = express();

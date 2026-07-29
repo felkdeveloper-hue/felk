@@ -1,11 +1,11 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import { env } from '@/config/env';
+import { env } from '@/config/env.js';
 import type {
   StorageObject,
   StorageService,
   StorageUploadInput,
-} from '@/services/interfaces/storage.service';
+} from '@/services/interfaces/storage.service.js';
 
 const UPLOAD_ROOT = path.resolve(process.cwd(), 'uploads');
 

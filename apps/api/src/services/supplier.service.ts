@@ -1,9 +1,9 @@
-import { SupplierModel, SupplierProductModel } from '@/models/inventory.models';
-import { CmsCrudService, type ActorMeta } from '@/services/cms-crud.service';
-import { writeAuditLog } from '@/services/audit.service';
-import { ApiError } from '@/utils/errors/api-error';
-import { ProductVariantModel } from '@/models/product.models';
-import { INVENTORY_AUDIT } from '@/constants/inventory';
+import { SupplierModel, SupplierProductModel } from '@/models/inventory.models.js';
+import { CmsCrudService, type ActorMeta } from '@/services/cms-crud.service.js';
+import { writeAuditLog } from '@/services/audit.service.js';
+import { ApiError } from '@/utils/errors/api-error.js';
+import { ProductVariantModel } from '@/models/product.models.js';
+import { INVENTORY_AUDIT } from '@/constants/inventory.js';
 
 export class SupplierService extends CmsCrudService {
   constructor() {

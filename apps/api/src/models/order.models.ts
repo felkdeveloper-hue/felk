@@ -1,6 +1,6 @@
 import { Schema, model, type Document, type Model, type Types } from 'mongoose';
-import { ORDER_STATUS } from '@/constants/order-status';
-import { RETURN_STATUS, EXCHANGE_STATUS } from '@/constants/order';
+import { ORDER_STATUS } from '@/constants/order-status.js';
+import { RETURN_STATUS, EXCHANGE_STATUS } from '@/constants/order.js';
 
 const addressSnapshotSchema = new Schema(
   {

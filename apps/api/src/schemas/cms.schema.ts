@@ -4,8 +4,8 @@ import {
   responsiveImageZodSchema,
   seoZodSchema,
   slugSchema,
-} from '@/schemas/cms.shared.schema';
-import { objectIdSchema } from '@/schemas/common.schema';
+} from '@/schemas/cms.shared.schema.js';
+import { objectIdSchema } from '@/schemas/common.schema.js';
 
 const statusSchema = z.enum(['draft', 'active', 'inactive', 'archived', 'published', 'scheduled']);
 

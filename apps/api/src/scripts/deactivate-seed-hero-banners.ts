@@ -2,8 +2,8 @@
  * Deactivates mock seed hero banners so the storefront falls back to local uploaded images.
  * Usage: pnpm --filter @fe-platform/api exec tsx src/scripts/deactivate-seed-hero-banners.ts
  */
-import { connectDatabase, disconnectDatabase, logger } from '@/config';
-import { HeroBannerModel } from '@/models';
+import { connectDatabase, disconnectDatabase, logger } from '@/config/index.js';
+import { HeroBannerModel } from '@/models/index.js';
 
 const SEED_TITLES = [
   'Color, cut, confidence.',

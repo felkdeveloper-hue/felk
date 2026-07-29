@@ -1,7 +1,7 @@
 import type { Server } from 'node:http';
-import { appConfig } from '@/config/app.config';
-import { disconnectDatabase } from '@/config/database';
-import { logger } from '@/config/logger';
+import { appConfig } from '@/config/app.config.js';
+import { disconnectDatabase } from '@/config/database.js';
+import { logger } from '@/config/logger.js';
 
 let isShuttingDown = false;
 

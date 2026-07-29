@@ -1,5 +1,5 @@
-import { PaymentLogModel } from '@/models/payment.models';
-import { logger } from '@/config/logger';
+import { PaymentLogModel } from '@/models/payment.models.js';
+import { logger } from '@/config/logger.js';
 
 export async function writePaymentLog(input: {
   paymentId: string;

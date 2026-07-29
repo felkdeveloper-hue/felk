@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { objectIdSchema } from '@/schemas/common.schema';
+import { objectIdSchema } from '@/schemas/common.schema.js';
 
 export const cartAddItemSchema = z.object({
   variantId: objectIdSchema,

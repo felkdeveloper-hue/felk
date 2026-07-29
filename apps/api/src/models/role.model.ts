@@ -1,5 +1,5 @@
 import { Schema, model, type Document, type Model, type Types } from 'mongoose';
-import type { RoleKey } from '@/constants/roles';
+import type { RoleKey } from '@/constants/roles.js';
 
 export interface RoleDocument extends Document {
   key: RoleKey | string;

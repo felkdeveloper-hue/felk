@@ -1,21 +1,21 @@
 import { beforeAll, afterAll, beforeEach, describe, expect, it } from 'vitest';
 import type { Application } from 'express';
 import mongoose from 'mongoose';
-import { createApp } from '@/app';
-import { setupTestDatabase, teardownTestDatabase, resetCollections } from '@/test/helpers/db';
-import { registerCustomer } from '@/test/helpers/auth';
+import { createApp } from '@/app.js';
+import { setupTestDatabase, teardownTestDatabase, resetCollections } from '@/test/helpers/db.js';
+import { registerCustomer } from '@/test/helpers/auth.js';
 import {
   seedCatalogAndStock,
   addCustomerAddress,
   addToCart,
   startCheckout,
-} from '@/test/helpers/commerce';
-import { InventoryItemModel } from '@/models/inventory.models';
-import { OrderModel } from '@/models/order.models';
-import { PaymentModel } from '@/models/payment.models';
-import { CheckoutSessionModel } from '@/models/checkout.models';
-import { ProductModel } from '@/models/product.models';
-import { PRODUCT_STATUS } from '@/constants/product';
+} from '@/test/helpers/commerce.js';
+import { InventoryItemModel } from '@/models/inventory.models.js';
+import { OrderModel } from '@/models/order.models.js';
+import { PaymentModel } from '@/models/payment.models.js';
+import { CheckoutSessionModel } from '@/models/checkout.models.js';
+import { ProductModel } from '@/models/product.models.js';
+import { PRODUCT_STATUS } from '@/constants/product.js';
 
 /**
  * Performance / scale smoke tests.

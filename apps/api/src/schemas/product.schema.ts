@@ -1,13 +1,13 @@
 import { z } from 'zod';
-import { objectIdSchema, paginationQuerySchema } from '@/schemas/common.schema';
-import { seoZodSchema, slugSchema } from '@/schemas/cms.shared.schema';
+import { objectIdSchema, paginationQuerySchema } from '@/schemas/common.schema.js';
+import { seoZodSchema, slugSchema } from '@/schemas/cms.shared.schema.js';
 import {
   PRODUCT_STATUS,
   PRODUCT_VISIBILITY,
   VARIANT_STATUS,
   RELATIONSHIP_TYPES,
   MEDIA_TYPES,
-} from '@/constants/product';
+} from '@/constants/product.js';
 
 const priceNumber = z.number().min(0);
 const nullablePrice = z.number().min(0).nullable().optional();

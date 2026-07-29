@@ -1,6 +1,6 @@
-import { ProductModel, ProductVariantModel } from '@/models/product.models';
-import { ApiError } from '@/utils/errors/api-error';
-import { generateParentSku, nextLinkedSku, nextSkuAfter } from '@/utils/sku.helper';
+import { ProductModel, ProductVariantModel } from '@/models/product.models.js';
+import { ApiError } from '@/utils/errors/api-error.js';
+import { generateParentSku, nextLinkedSku, nextSkuAfter } from '@/utils/sku.helper.js';
 
 /**
  * SKU uniqueness must include soft-deleted rows — Mongo unique indexes on sku

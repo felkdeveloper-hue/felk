@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
-import { appConfig } from '@/config/app.config';
-import { logger } from '@/config/logger';
+import { appConfig } from '@/config/app.config.js';
+import { logger } from '@/config/logger.js';
 
 export type DatabaseStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 
@@ -37,7 +37,7 @@ async function repairVariantBarcodeIndex() {
     logger.info({ count: unsetResult.modifiedCount }, 'Cleared null/empty variant barcodes');
   }
 
-  const { ProductVariantModel } = await import('@/models/product.models');
+  const { ProductVariantModel } = await import('@/models/product.models.js');
   await ProductVariantModel.syncIndexes();
 }
 
@@ -69,7 +69,7 @@ async function repairOtpTokenIndexes() {
     }
   }
 
-  const { VerificationTokenModel, PasswordResetTokenModel } = await import('@/models');
+  const { VerificationTokenModel, PasswordResetTokenModel } = await import('@/models/index.js');
   await VerificationTokenModel.syncIndexes();
   await PasswordResetTokenModel.syncIndexes();
 }

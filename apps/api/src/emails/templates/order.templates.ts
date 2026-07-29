@@ -8,8 +8,8 @@ import {
   emailParagraph,
   orderReference,
   totalRow,
-} from '@/emails/layout';
-import type { EmailTemplate } from './auth.templates';
+} from '@/emails/layout.js';
+import type { EmailTemplate } from './auth.templates.js';
 
 export interface OrderLine {
   name: string;

@@ -1,4 +1,4 @@
-import { HTTP_STATUS, type HttpStatusCode } from '@/constants/http';
+import { HTTP_STATUS, type HttpStatusCode } from '@/constants/http.js';
 
 export type ErrorDetails = Record<string, unknown> | unknown[] | undefined;
 

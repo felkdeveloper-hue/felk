@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from 'express';
 import { ZodError, type ZodTypeAny } from 'zod';
-import { ERROR_MESSAGES } from '@/constants/error-messages';
-import { ApiError } from '@/utils/errors/api-error';
+import { ERROR_MESSAGES } from '@/constants/error-messages.js';
+import { ApiError } from '@/utils/errors/api-error.js';
 
 interface ValidateOptions {
   body?: ZodTypeAny;

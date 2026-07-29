@@ -1,12 +1,12 @@
 import type { NextFunction, Request, Response } from 'express';
 import { ZodError } from 'zod';
 import { MulterError } from 'multer';
-import { appConfig } from '@/config/app.config';
-import { logger } from '@/config/logger';
-import { ERROR_MESSAGES } from '@/constants/error-messages';
-import { HTTP_STATUS } from '@/constants/http';
-import { ApiError } from '@/utils/errors/api-error';
-import { ApiResponse } from '@/utils/response/api-response';
+import { appConfig } from '@/config/app.config.js';
+import { logger } from '@/config/logger.js';
+import { ERROR_MESSAGES } from '@/constants/error-messages.js';
+import { HTTP_STATUS } from '@/constants/http.js';
+import { ApiError } from '@/utils/errors/api-error.js';
+import { ApiResponse } from '@/utils/response/api-response.js';
 
 function errorMeta(req: Request) {
   return {

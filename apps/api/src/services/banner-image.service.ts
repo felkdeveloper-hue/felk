@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import type { Model } from 'mongoose';
-import { storageService } from '@/services/storage.factory';
-import { ApiError } from '@/utils/errors/api-error';
-import { processImage } from '@/utils/image.helper';
+import { storageService } from '@/services/storage.factory.js';
+import { ApiError } from '@/utils/errors/api-error.js';
+import { processImage } from '@/utils/image.helper.js';
 
 export async function uploadBannerDesktopImage(
   model: Model<any>,

@@ -1,10 +1,10 @@
 import { Router } from 'express';
 import { rateLimit } from 'express-rate-limit';
-import { validate } from '@/middlewares/validate.middleware';
-import { trackEventBodySchema } from '@/schemas/tracking.schema';
-import { analyticsService } from '@/services/analytics/analytics.service';
-import { ApiResponse } from '@/utils/response/api-response';
-import { asyncHandler } from '@/utils/async-handler';
+import { validate } from '@/middlewares/validate.middleware.js';
+import { trackEventBodySchema } from '@/schemas/tracking.schema.js';
+import { analyticsService } from '@/services/analytics/analytics.service.js';
+import { ApiResponse } from '@/utils/response/api-response.js';
+import { asyncHandler } from '@/utils/async-handler.js';
 
 export const trackingRouter = Router();
 

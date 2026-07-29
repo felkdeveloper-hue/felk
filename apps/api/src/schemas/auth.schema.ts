@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { AUTH_PORTAL } from '@/constants/auth';
-import { REGEX } from '@/constants/regex';
+import { AUTH_PORTAL } from '@/constants/auth.js';
+import { REGEX } from '@/constants/regex.js';
 
 const passwordSchema = z
   .string()

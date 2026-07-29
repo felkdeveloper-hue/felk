@@ -1,13 +1,13 @@
-import { ReturnRequestModel, OrderModel } from '@/models/order.models';
-import { customerService } from '@/services/customer.service';
-import { recordOrderTimeline } from '@/services/order-timeline.service';
-import { writeAuditLog } from '@/services/audit.service';
-import type { ActorMeta } from '@/services/cms-crud.service';
-import { ApiError } from '@/utils/errors/api-error';
-import { buildPaginationMeta, getPaginationSkip, parsePagination } from '@/utils/pagination';
-import { ORDER_STATUS } from '@/constants/order-status';
-import { ORDER_AUDIT, RETURN_STATUS } from '@/constants/order';
-import type { AuthenticatedUser } from '@/types';
+import { ReturnRequestModel, OrderModel } from '@/models/order.models.js';
+import { customerService } from '@/services/customer.service.js';
+import { recordOrderTimeline } from '@/services/order-timeline.service.js';
+import { writeAuditLog } from '@/services/audit.service.js';
+import type { ActorMeta } from '@/services/cms-crud.service.js';
+import { ApiError } from '@/utils/errors/api-error.js';
+import { buildPaginationMeta, getPaginationSkip, parsePagination } from '@/utils/pagination.js';
+import { ORDER_STATUS } from '@/constants/order-status.js';
+import { ORDER_AUDIT, RETURN_STATUS } from '@/constants/order.js';
+import type { AuthenticatedUser } from '@/types/index.js';
 
 /**
  * Returns — structure only for Phase 11. No refund/gateway reconciliation

@@ -4,9 +4,9 @@
  *
  *   pnpm --filter @fe-platform/api exec tsx src/scripts/fix-mega-menu-routes.ts
  */
-import { connectDatabase, disconnectDatabase, logger } from '@/config';
-import { CategoryModel } from '@/models/master-data.models';
-import { NavigationMenuModel } from '@/models/cms-content.models';
+import { connectDatabase, disconnectDatabase, logger } from '@/config/index.js';
+import { CategoryModel } from '@/models/master-data.models.js';
+import { NavigationMenuModel } from '@/models/cms-content.models.js';
 
 const PARENT_CATEGORIES = [
   { name: 'All Topwear', slug: 'all-topwear', sortOrder: 20 },

@@ -1,1 +1,1 @@
-export { validate } from '@/middlewares/validate.middleware';
+export { validate } from '@/middlewares/validate.middleware.js';

@@ -1,11 +1,11 @@
-import { CustomerModel } from '@/models/customer.models';
+import { CustomerModel } from '@/models/customer.models.js';
 import {
   orderStatusUpdateEmail,
   type NotifiableOrderStatus,
-} from '@/emails/templates/order.templates';
-import { emailQueueService } from '@/services/email-queue.service';
-import { logger } from '@/config/logger';
-import { appConfig } from '@/config/app.config';
+} from '@/emails/templates/order.templates.js';
+import { emailQueueService } from '@/services/email-queue.service.js';
+import { logger } from '@/config/logger.js';
+import { appConfig } from '@/config/app.config.js';
 
 const NOTIFIABLE_STATUSES = new Set<string>([
   'confirmed',

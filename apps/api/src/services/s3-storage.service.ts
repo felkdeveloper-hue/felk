@@ -6,13 +6,13 @@ import {
   S3Client,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { appConfig } from '@/config/app.config';
-import { ApiError } from '@/utils/errors/api-error';
+import { appConfig } from '@/config/app.config.js';
+import { ApiError } from '@/utils/errors/api-error.js';
 import type {
   StorageObject,
   StorageService,
   StorageUploadInput,
-} from '@/services/interfaces/storage.service';
+} from '@/services/interfaces/storage.service.js';
 
 function normalizeKey(key: string): string {
   return key.replace(/\\/g, '/').replace(/^\/+/, '');

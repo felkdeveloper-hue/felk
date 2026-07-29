@@ -1,5 +1,5 @@
-import { ShippingZoneModel, TaxConfigModel } from '@/models/settings.models';
-import { SHIPPING_METHOD, type ShippingMethod } from '@/constants/checkout';
+import { ShippingZoneModel, TaxConfigModel } from '@/models/settings.models.js';
+import { SHIPPING_METHOD, type ShippingMethod } from '@/constants/checkout.js';
 
 export interface ShippingCalcInput {
   country?: string | null;

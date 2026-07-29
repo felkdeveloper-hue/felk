@@ -1,14 +1,14 @@
-import { AUTH_LIMITS, AUDIT_ACTIONS, USER_STATUS } from '@/constants/auth';
-import { EmailOtpModel } from '@/models/email-otp.model';
-import { UserModel } from '@/models/user.model';
-import { emailService } from '@/services/email/email.service';
-import { writeAuditLog } from '@/services/audit.service';
-import type { AuthRequestMeta, AuthTokensResult } from '@/services/auth.service';
-import { addMinutes } from '@/utils/date.helper';
-import { normalizeEmail } from '@/utils/email.helper';
-import { generateEmailOtp, hashEmailOtp, verifyEmailOtp } from '@/utils/email-otp.helper';
-import { ApiError } from '@/utils/errors/api-error';
-import { logger } from '@/config/logger';
+import { AUTH_LIMITS, AUDIT_ACTIONS, USER_STATUS } from '@/constants/auth.js';
+import { EmailOtpModel } from '@/models/email-otp.model.js';
+import { UserModel } from '@/models/user.model.js';
+import { emailService } from '@/services/email/email.service.js';
+import { writeAuditLog } from '@/services/audit.service.js';
+import type { AuthRequestMeta, AuthTokensResult } from '@/services/auth.service.js';
+import { addMinutes } from '@/utils/date.helper.js';
+import { normalizeEmail } from '@/utils/email.helper.js';
+import { generateEmailOtp, hashEmailOtp, verifyEmailOtp } from '@/utils/email-otp.helper.js';
+import { ApiError } from '@/utils/errors/api-error.js';
+import { logger } from '@/config/logger.js';
 
 const GENERIC_SENT_MESSAGE = 'If verification is required, a verification code has been sent.';
 
@@ -140,7 +140,7 @@ export const otpService = {
       requestId: meta.requestId,
     });
 
-    const { authService } = await import('@/services/auth.service');
+    const { authService } = await import('@/services/auth.service.js');
     const tokens = await authService.issueAuthSession(user._id.toString(), meta, false);
 
     void emailService

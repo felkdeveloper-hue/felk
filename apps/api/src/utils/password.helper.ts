@@ -1,6 +1,6 @@
 import argon2 from 'argon2';
-import { AUTH_LIMITS } from '@/constants/auth';
-import { ApiError } from '@/utils/errors/api-error';
+import { AUTH_LIMITS } from '@/constants/auth.js';
+import { ApiError } from '@/utils/errors/api-error.js';
 
 const ARGON2_OPTIONS: argon2.Options = {
   type: argon2.argon2id,

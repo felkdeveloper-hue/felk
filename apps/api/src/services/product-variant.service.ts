@@ -1,18 +1,18 @@
-import { ProductModel, ProductVariantModel } from '@/models/product.models';
-import { productRepository } from '@/repositories/product.repository';
-import { writeAuditLog, writeActivityLog } from '@/services/audit.service';
-import type { ActorMeta } from '@/services/cms-crud.service';
-import { productService, syncProductStockStatus } from '@/services/product.service';
+import { ProductModel, ProductVariantModel } from '@/models/product.models.js';
+import { productRepository } from '@/repositories/product.repository.js';
+import { writeAuditLog, writeActivityLog } from '@/services/audit.service.js';
+import type { ActorMeta } from '@/services/cms-crud.service.js';
+import { productService, syncProductStockStatus } from '@/services/product.service.js';
 import {
   allocateUniqueLinkedSku,
   allocateUniqueParentSku,
   isSkuTaken,
-} from '@/services/sku-allocation.service';
-import { ApiError } from '@/utils/errors/api-error';
-import { assertSalePriceValid, computePricing } from '@/utils/pricing.helper';
-import { parseSkuNumeric } from '@/utils/sku.helper';
-import { invalidateStorefrontCatalogCache } from '@/utils/simple-cache';
-import { PRODUCT_AUDIT } from '@/constants/product';
+} from '@/services/sku-allocation.service.js';
+import { ApiError } from '@/utils/errors/api-error.js';
+import { assertSalePriceValid, computePricing } from '@/utils/pricing.helper.js';
+import { parseSkuNumeric } from '@/utils/sku.helper.js';
+import { invalidateStorefrontCatalogCache } from '@/utils/simple-cache.js';
+import { PRODUCT_AUDIT } from '@/constants/product.js';
 
 function toPlain(doc: { toObject: () => Record<string, unknown> }) {
   return doc.toObject();

@@ -6,4 +6,4 @@ export {
   StockMovementModel,
   StockReservationModel,
   type InventoryItemDocument,
-} from '@/models/inventory.models';
+} from '@/models/inventory.models.js';

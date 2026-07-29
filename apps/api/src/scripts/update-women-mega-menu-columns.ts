@@ -5,9 +5,9 @@
  *
  *   pnpm --filter @fe-platform/api exec tsx src/scripts/update-women-mega-menu-columns.ts
  */
-import { connectDatabase, disconnectDatabase, logger } from '@/config';
-import { NavigationMenuModel } from '@/models/cms-content.models';
-import { CategoryModel } from '@/models/master-data.models';
+import { connectDatabase, disconnectDatabase, logger } from '@/config/index.js';
+import { NavigationMenuModel } from '@/models/cms-content.models.js';
+import { CategoryModel } from '@/models/master-data.models.js';
 
 type MenuLink = { label: string; slug: string; heading?: boolean };
 type MenuColumn = { title: string; links: MenuLink[] };

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { md5Hex } from '@/utils/crypto.helper';
+import { md5Hex } from '@/utils/crypto.helper.js';
 
 const MERCHANT_ID = 'test-merchant-123';
 const MERCHANT_SECRET = 'test-secret-abc';
@@ -59,7 +59,7 @@ describe('PayHere gateway', () => {
   });
 
   it('returns a sandbox POST redirectForm with required checkout fields + hash', async () => {
-    const { PayHereGateway } = await import('@/services/gateways/payhere.gateway');
+    const { PayHereGateway } = await import('@/services/gateways/payhere.gateway.js');
     const gateway = new PayHereGateway();
 
     const result = await gateway.createSession({
@@ -86,7 +86,7 @@ describe('PayHere gateway', () => {
   });
 
   it('verifyWebhook returns valid=true with correct MD5 signature', async () => {
-    const { PayHereGateway } = await import('@/services/gateways/payhere.gateway');
+    const { PayHereGateway } = await import('@/services/gateways/payhere.gateway.js');
     const gateway = new PayHereGateway();
 
     const orderId = 'ORD-001';
@@ -117,7 +117,7 @@ describe('PayHere gateway', () => {
   });
 
   it('verifyWebhook returns valid=false with wrong signature', async () => {
-    const { PayHereGateway } = await import('@/services/gateways/payhere.gateway');
+    const { PayHereGateway } = await import('@/services/gateways/payhere.gateway.js');
     const gateway = new PayHereGateway();
 
     const body = new URLSearchParams({
@@ -134,7 +134,7 @@ describe('PayHere gateway', () => {
   });
 
   it('verifyWebhook returns valid=false when merchant ID mismatches', async () => {
-    const { PayHereGateway } = await import('@/services/gateways/payhere.gateway');
+    const { PayHereGateway } = await import('@/services/gateways/payhere.gateway.js');
     const gateway = new PayHereGateway();
 
     const body = new URLSearchParams({
@@ -151,7 +151,7 @@ describe('PayHere gateway', () => {
   });
 
   it('maps status_code -1 to cancelled', async () => {
-    const { PayHereGateway } = await import('@/services/gateways/payhere.gateway');
+    const { PayHereGateway } = await import('@/services/gateways/payhere.gateway.js');
     const gateway = new PayHereGateway();
 
     const orderId = 'ORD-002';
@@ -198,7 +198,7 @@ describe('PayHere gateway', () => {
         attempts: 1,
       });
 
-    const { PayHereGateway } = await import('@/services/gateways/payhere.gateway');
+    const { PayHereGateway } = await import('@/services/gateways/payhere.gateway.js');
     const gateway = new PayHereGateway();
     const result = await gateway.verifyTransaction('ORD-001');
 
@@ -226,7 +226,7 @@ describe('PayHere gateway', () => {
         attempts: 1,
       });
 
-    const { PayHereGateway } = await import('@/services/gateways/payhere.gateway');
+    const { PayHereGateway } = await import('@/services/gateways/payhere.gateway.js');
     const gateway = new PayHereGateway();
     const result = await gateway.refund({
       gatewayPaymentId: '320025023469',

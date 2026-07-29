@@ -1,13 +1,17 @@
 import { Router } from 'express';
 import type { Model } from 'mongoose';
 import type { ZodTypeAny } from 'zod';
-import { authenticate, authorizeAny, validate } from '@/middlewares';
-import type { PermissionKey } from '@/constants/permissions';
-import { CmsCrudService, actorFromRequest } from '@/services/cms-crud.service';
-import { asyncHandler } from '@/utils/async-handler';
-import { ApiResponse } from '@/utils/response/api-response';
-import { bulkStatusSchema, cmsListQuerySchema, idsBodySchema } from '@/schemas/cms.shared.schema';
-import { objectIdSchema } from '@/schemas/common.schema';
+import { authenticate, authorizeAny, validate } from '@/middlewares/index.js';
+import type { PermissionKey } from '@/constants/permissions.js';
+import { CmsCrudService, actorFromRequest } from '@/services/cms-crud.service.js';
+import { asyncHandler } from '@/utils/async-handler.js';
+import { ApiResponse } from '@/utils/response/api-response.js';
+import {
+  bulkStatusSchema,
+  cmsListQuerySchema,
+  idsBodySchema,
+} from '@/schemas/cms.shared.schema.js';
+import { objectIdSchema } from '@/schemas/common.schema.js';
 import { z } from 'zod';
 
 export interface CrudRouteConfig {

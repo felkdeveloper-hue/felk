@@ -1,10 +1,10 @@
 import jwt from 'jsonwebtoken';
 import { randomUUID } from 'node:crypto';
-import { appConfig } from '@/config/app.config';
-import type { RoleKey } from '@/constants/roles';
-import { ApiError } from '@/utils/errors/api-error';
-import { generateSecureToken, hashToken } from '@/utils/token.helper';
-import type { AccessTokenPayload } from '@/types';
+import { appConfig } from '@/config/app.config.js';
+import type { RoleKey } from '@/constants/roles.js';
+import { ApiError } from '@/utils/errors/api-error.js';
+import { generateSecureToken, hashToken } from '@/utils/token.helper.js';
+import type { AccessTokenPayload } from '@/types/index.js';
 
 function parseDurationToMs(value: string): number {
   const match = /^(\d+)([smhd])$/.exec(value);

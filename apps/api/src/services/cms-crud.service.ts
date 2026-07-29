@@ -1,9 +1,9 @@
 import type { Model } from 'mongoose';
 import type { Request } from 'express';
-import { BaseRepository, type ListOptions } from '@/repositories/base.repository';
-import { writeActivityLog, writeAuditLog } from '@/services/audit.service';
-import { ApiError } from '@/utils/errors/api-error';
-import { slugify } from '@/utils/slug.helper';
+import { BaseRepository, type ListOptions } from '@/repositories/base.repository.js';
+import { writeActivityLog, writeAuditLog } from '@/services/audit.service.js';
+import { ApiError } from '@/utils/errors/api-error.js';
+import { slugify } from '@/utils/slug.helper.js';
 
 export interface ActorMeta {
   userId?: string;

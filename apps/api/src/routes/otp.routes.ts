@@ -1,7 +1,7 @@
 import { Router } from 'express';
-import { otpController } from '@/controllers/otp.controller';
-import { authRateLimiter, otpRateLimiter, validate } from '@/middlewares';
-import { sendOtpSchema, verifyOtpSchema, resendOtpSchema } from '@/schemas/otp.schema';
+import { otpController } from '@/controllers/otp.controller.js';
+import { authRateLimiter, otpRateLimiter, validate } from '@/middlewares/index.js';
+import { sendOtpSchema, verifyOtpSchema, resendOtpSchema } from '@/schemas/otp.schema.js';
 
 export const otpRouter = Router();
 

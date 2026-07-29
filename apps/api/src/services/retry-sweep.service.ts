@@ -1,5 +1,5 @@
 import type { Model, Document } from 'mongoose';
-import { logger } from '@/config/logger';
+import { logger } from '@/config/logger.js';
 
 export interface RetrySweepDoc extends Document {
   status: string;

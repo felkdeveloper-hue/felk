@@ -1,13 +1,13 @@
 import type { FilterQuery } from 'mongoose';
 import { Types } from 'mongoose';
-import { BaseRepository, type ListOptions } from '@/repositories/base.repository';
+import { BaseRepository, type ListOptions } from '@/repositories/base.repository.js';
 import {
   InventoryItemModel,
   StockMovementModel,
   type InventoryItemDocument,
-} from '@/models/inventory.models';
-import { buildPaginationMeta, getPaginationSkip, parsePagination } from '@/utils/pagination';
-import { parseSort } from '@/utils/sorting';
+} from '@/models/inventory.models.js';
+import { buildPaginationMeta, getPaginationSkip, parsePagination } from '@/utils/pagination.js';
+import { parseSort } from '@/utils/sorting.js';
 
 export interface InventoryListFilters extends ListOptions {
   warehouseId?: string;

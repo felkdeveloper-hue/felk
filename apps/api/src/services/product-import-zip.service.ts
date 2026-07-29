@@ -15,8 +15,8 @@ import { pipeline } from 'node:stream/promises';
 import sharp from 'sharp';
 import { openPromise, validateFileName } from 'yauzl';
 import { ZipFile } from 'yazl';
-import { ApiError } from '@/utils/errors/api-error';
-import { logger } from '@/config';
+import { ApiError } from '@/utils/errors/api-error.js';
+import { logger } from '@/config/index.js';
 
 export const IMPORT_IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.avif']);
 

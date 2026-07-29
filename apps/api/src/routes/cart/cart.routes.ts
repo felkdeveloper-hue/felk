@@ -1,14 +1,14 @@
 import { Router, type Response } from 'express';
-import { PERMISSIONS } from '@/constants/permissions';
-import { optionalAuthenticate, authenticate, authorizeAny, validate } from '@/middlewares';
-import { actorFromRequest } from '@/services/cms-crud.service';
-import { cartService, extractGuestToken } from '@/services/cart.service';
-import { asyncHandler } from '@/utils/async-handler';
-import { ApiResponse } from '@/utils/response/api-response';
-import { ApiError } from '@/utils/errors/api-error';
-import { GUEST_CART_COOKIE, GUEST_CART_HEADER } from '@/constants/cart';
-import * as S from '@/schemas/cart.schema';
-import { appConfig } from '@/config/app.config';
+import { PERMISSIONS } from '@/constants/permissions.js';
+import { optionalAuthenticate, authenticate, authorizeAny, validate } from '@/middlewares/index.js';
+import { actorFromRequest } from '@/services/cms-crud.service.js';
+import { cartService, extractGuestToken } from '@/services/cart.service.js';
+import { asyncHandler } from '@/utils/async-handler.js';
+import { ApiResponse } from '@/utils/response/api-response.js';
+import { ApiError } from '@/utils/errors/api-error.js';
+import { GUEST_CART_COOKIE, GUEST_CART_HEADER } from '@/constants/cart.js';
+import * as S from '@/schemas/cart.schema.js';
+import { appConfig } from '@/config/app.config.js';
 
 const P = PERMISSIONS;
 

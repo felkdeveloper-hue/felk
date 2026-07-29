@@ -1,7 +1,7 @@
-import { EmailLogModel } from '@/models/email-log.model';
-import { emailService } from '@/services/email.service';
-import { logger } from '@/config/logger';
-import type { SendEmailInput } from '@/services/interfaces/email.service';
+import { EmailLogModel } from '@/models/email-log.model.js';
+import { emailService } from '@/services/email.service.js';
+import { logger } from '@/config/logger.js';
+import type { SendEmailInput } from '@/services/interfaces/email.service.js';
 
 export interface EnqueueEmailOptions extends SendEmailInput {
   templateKey?: string;

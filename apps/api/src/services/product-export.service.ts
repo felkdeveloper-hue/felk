@@ -12,10 +12,10 @@ import {
   MaterialModel,
   OccasionModel,
   SizeModel,
-} from '@/models/master-data.models';
-import { InventoryItemModel } from '@/models/inventory.models';
-import { ProductMediaModel, ProductModel, ProductVariantModel } from '@/models/product.models';
-import { IMPORT_COLUMNS } from '@/services/product-import.service';
+} from '@/models/master-data.models.js';
+import { InventoryItemModel } from '@/models/inventory.models.js';
+import { ProductMediaModel, ProductModel, ProductVariantModel } from '@/models/product.models.js';
+import { IMPORT_COLUMNS } from '@/services/product-import.service.js';
 
 interface ExportFilters {
   status?: string;

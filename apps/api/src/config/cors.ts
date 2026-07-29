@@ -1,6 +1,6 @@
 import type { CorsOptions } from 'cors';
-import { appConfig } from '@/config/app.config';
-import { env } from '@/config/env';
+import { appConfig } from '@/config/app.config.js';
+import { env } from '@/config/env.js';
 
 function isAllowedOrigin(origin: string): boolean {
   if (appConfig.cors.origins.includes(origin)) return true;

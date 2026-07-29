@@ -1,9 +1,9 @@
 import { Router } from 'express';
-import { PERMISSIONS } from '@/constants/permissions';
-import { authenticate, authorizeAny, validate } from '@/middlewares';
-import { adminAuditService, auditListQuerySchema } from '@/services/admin-audit.service';
-import { asyncHandler } from '@/utils/async-handler';
-import { ApiResponse } from '@/utils/response/api-response';
+import { PERMISSIONS } from '@/constants/permissions.js';
+import { authenticate, authorizeAny, validate } from '@/middlewares/index.js';
+import { adminAuditService, auditListQuerySchema } from '@/services/admin-audit.service.js';
+import { asyncHandler } from '@/utils/async-handler.js';
+import { ApiResponse } from '@/utils/response/api-response.js';
 
 const P = PERMISSIONS;
 

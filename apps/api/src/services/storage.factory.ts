@@ -1,8 +1,8 @@
-import { appConfig } from '@/config/app.config';
-import { logger } from '@/config/logger';
-import { LocalStorageService } from '@/services/local-storage.service';
-import { S3StorageService } from '@/services/s3-storage.service';
-import type { StorageService } from '@/services/interfaces/storage.service';
+import { appConfig } from '@/config/app.config.js';
+import { logger } from '@/config/logger.js';
+import { LocalStorageService } from '@/services/local-storage.service.js';
+import { S3StorageService } from '@/services/s3-storage.service.js';
+import type { StorageService } from '@/services/interfaces/storage.service.js';
 
 function createStorageService(): StorageService {
   const { provider } = appConfig.storage;

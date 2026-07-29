@@ -1,4 +1,4 @@
-import { appConfig } from '@/config/app.config';
+import { appConfig } from '@/config/app.config.js';
 
 /**
  * OpenAPI 3 specification — Platform Core + Auth (Phase 2).

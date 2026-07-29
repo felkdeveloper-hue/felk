@@ -6,7 +6,7 @@ import {
   randomBytes,
   timingSafeEqual,
 } from 'node:crypto';
-import { appConfig } from '@/config/app.config';
+import { appConfig } from '@/config/app.config.js';
 
 const ALGO = 'aes-256-gcm';
 

@@ -1,4 +1,4 @@
-import type { PaymentMethod } from '@/constants/payment-status';
+import type { PaymentMethod } from '@/constants/payment-status.js';
 
 /**
  * Payment gateway adapter contract — interface only.

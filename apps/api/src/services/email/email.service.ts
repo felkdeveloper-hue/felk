@@ -1,21 +1,21 @@
-import { logger } from '@/config/logger';
-import type { EmailService, SendEmailInput } from '@/services/interfaces/email.service';
+import { logger } from '@/config/logger.js';
+import type { EmailService, SendEmailInput } from '@/services/interfaces/email.service.js';
 import {
   getEmailTransporter,
   isEmailConfigured,
   verifyEmailTransporter,
-} from '@/services/email/transporter';
-import { verificationTemplate } from '@/services/email/templates/verification';
-import { welcomeTemplate, type WelcomeUser } from '@/services/email/templates/welcome';
-import { passwordResetTemplate } from '@/services/email/templates/password-reset';
-import { orderPlacedTemplate } from '@/services/email/templates/order-placed';
-import { orderConfirmationTemplate } from '@/services/email/templates/order-confirmation';
-import { orderCancelledTemplate } from '@/services/email/templates/order-cancelled';
-import { shippingTemplate } from '@/services/email/templates/shipping';
-import { refundTemplate } from '@/services/email/templates/refund';
-import { invoiceTemplate } from '@/services/email/templates/invoice';
-import { newsletterTemplate } from '@/services/email/templates/newsletter';
-import type { OrderEmailData } from '@/services/email/templates/order-types';
+} from '@/services/email/transporter.js';
+import { verificationTemplate } from '@/services/email/templates/verification.js';
+import { welcomeTemplate, type WelcomeUser } from '@/services/email/templates/welcome.js';
+import { passwordResetTemplate } from '@/services/email/templates/password-reset.js';
+import { orderPlacedTemplate } from '@/services/email/templates/order-placed.js';
+import { orderConfirmationTemplate } from '@/services/email/templates/order-confirmation.js';
+import { orderCancelledTemplate } from '@/services/email/templates/order-cancelled.js';
+import { shippingTemplate } from '@/services/email/templates/shipping.js';
+import { refundTemplate } from '@/services/email/templates/refund.js';
+import { invoiceTemplate } from '@/services/email/templates/invoice.js';
+import { newsletterTemplate } from '@/services/email/templates/newsletter.js';
+import type { OrderEmailData } from '@/services/email/templates/order-types.js';
 
 function buildFromAddress(): string {
   const from = process.env.EMAIL_FROM ?? '';

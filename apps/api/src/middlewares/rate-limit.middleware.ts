@@ -1,8 +1,8 @@
 import rateLimit from 'express-rate-limit';
-import { appConfig } from '@/config/app.config';
-import { AUTH_LIMITS } from '@/constants/auth';
-import { ERROR_MESSAGES } from '@/constants/error-messages';
-import { HTTP_STATUS } from '@/constants/http';
+import { appConfig } from '@/config/app.config.js';
+import { AUTH_LIMITS } from '@/constants/auth.js';
+import { ERROR_MESSAGES } from '@/constants/error-messages.js';
+import { HTTP_STATUS } from '@/constants/http.js';
 
 const skipLocalNoise = () => appConfig.app.isTest || appConfig.app.isDev;
 

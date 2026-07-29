@@ -6,7 +6,7 @@ import {
   emailParagraph,
   otpBlock,
   type EmailTemplateResult,
-} from '@/services/email/templates/layout';
+} from '@/services/email/templates/layout.js';
 
 export function verificationTemplate(
   name: string,

@@ -1,9 +1,9 @@
-import { appConfig } from '@/config/app.config';
-import { databaseManager } from '@/config/database';
-import { HTTP_STATUS } from '@/constants/http';
-import { ApiResponse } from '@/utils/response/api-response';
-import { asyncHandler } from '@/utils/async-handler';
-import { emailService } from '@/services/email.service';
+import { appConfig } from '@/config/app.config.js';
+import { databaseManager } from '@/config/database.js';
+import { HTTP_STATUS } from '@/constants/http.js';
+import { ApiResponse } from '@/utils/response/api-response.js';
+import { asyncHandler } from '@/utils/async-handler.js';
+import { emailService } from '@/services/email.service.js';
 
 const startedAt = Date.now();
 

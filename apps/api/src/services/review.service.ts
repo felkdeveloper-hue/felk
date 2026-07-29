@@ -1,12 +1,12 @@
 import { Types } from 'mongoose';
-import { ORDER_STATUS } from '@/constants/order-status';
-import { ReviewModel, REVIEW_STATUS, type ReviewDocument } from '@/models/review.model';
-import { OrderModel } from '@/models/order.models';
-import { ProductModel } from '@/models/product.models';
-import { customerService } from '@/services/customer.service';
-import type { ActorMeta } from '@/services/cms-crud.service';
-import { ApiError } from '@/utils/errors/api-error';
-import type { AuthenticatedUser } from '@/types';
+import { ORDER_STATUS } from '@/constants/order-status.js';
+import { ReviewModel, REVIEW_STATUS, type ReviewDocument } from '@/models/review.model.js';
+import { OrderModel } from '@/models/order.models.js';
+import { ProductModel } from '@/models/product.models.js';
+import { customerService } from '@/services/customer.service.js';
+import type { ActorMeta } from '@/services/cms-crud.service.js';
+import { ApiError } from '@/utils/errors/api-error.js';
+import type { AuthenticatedUser } from '@/types/index.js';
 
 const RECEIVED_STATUSES = [ORDER_STATUS.DELIVERED, ORDER_STATUS.COMPLETED] as const;
 

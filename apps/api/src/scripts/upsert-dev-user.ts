@@ -2,13 +2,13 @@
  * One-off: restore a dev customer account.
  * Usage: npx tsx src/scripts/upsert-dev-user.ts
  */
-import { connectDatabase, disconnectDatabase, logger } from '@/config';
-import { ROLE_SEED } from '@/constants/rbac-seed';
-import { PERMISSION_LIST } from '@/constants/permissions';
-import { ROLES } from '@/constants/roles';
-import { USER_STATUS } from '@/constants/auth';
-import { CustomerModel, PermissionModel, RoleModel, UserModel } from '@/models';
-import { hashPassword } from '@/utils/password.helper';
+import { connectDatabase, disconnectDatabase, logger } from '@/config/index.js';
+import { ROLE_SEED } from '@/constants/rbac-seed.js';
+import { PERMISSION_LIST } from '@/constants/permissions.js';
+import { ROLES } from '@/constants/roles.js';
+import { USER_STATUS } from '@/constants/auth.js';
+import { CustomerModel, PermissionModel, RoleModel, UserModel } from '@/models/index.js';
+import { hashPassword } from '@/utils/password.helper.js';
 
 const EMAIL = process.env.DEV_USER_EMAIL ?? 'sourav@gluckglobal.com';
 const PASSWORD = process.env.DEV_USER_PASSWORD ?? 'Test@123';

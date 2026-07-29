@@ -1,9 +1,9 @@
-import { InventoryAlertModel, InventoryRuleModel } from '@/models/inventory.models';
-import { writeAuditLog } from '@/services/audit.service';
-import type { ActorMeta } from '@/services/cms-crud.service';
-import { ApiError } from '@/utils/errors/api-error';
-import { buildPaginationMeta, getPaginationSkip, parsePagination } from '@/utils/pagination';
-import { ALERT_STATUS } from '@/constants/inventory';
+import { InventoryAlertModel, InventoryRuleModel } from '@/models/inventory.models.js';
+import { writeAuditLog } from '@/services/audit.service.js';
+import type { ActorMeta } from '@/services/cms-crud.service.js';
+import { ApiError } from '@/utils/errors/api-error.js';
+import { buildPaginationMeta, getPaginationSkip, parsePagination } from '@/utils/pagination.js';
+import { ALERT_STATUS } from '@/constants/inventory.js';
 
 export class InventoryAlertService {
   async listAlerts(options: {

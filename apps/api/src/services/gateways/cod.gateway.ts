@@ -1,13 +1,17 @@
-import { appConfig } from '@/config/app.config';
-import { PAYMENT_METHOD, PAYMENT_STATUS } from '@/constants/payment-status';
-import { hmacSha256Hex, safeCompare } from '@/utils/crypto.helper';
+import { appConfig } from '@/config/app.config.js';
+import { PAYMENT_METHOD, PAYMENT_STATUS } from '@/constants/payment-status.js';
+import { hmacSha256Hex, safeCompare } from '@/utils/crypto.helper.js';
 import type {
   CreatePaymentSessionInput,
   PaymentGateway,
   PaymentSessionResult,
   WebhookVerificationInput,
-} from '@/services/interfaces/payment-gateway.service';
-import { getHeader, parseWebhookPayload, rawBodyToString } from '@/services/gateways/gateway.utils';
+} from '@/services/interfaces/payment-gateway.service.js';
+import {
+  getHeader,
+  parseWebhookPayload,
+  rawBodyToString,
+} from '@/services/gateways/gateway.utils.js';
 
 const COD_STATUS_MAP: Record<string, string> = {
   collected: PAYMENT_STATUS.PAID,

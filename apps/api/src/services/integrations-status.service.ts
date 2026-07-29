@@ -1,8 +1,8 @@
-import { appConfig } from '@/config/app.config';
-import { PaymentWebhookModel } from '@/models/payment.models';
-import { EmailLogModel } from '@/models/email-log.model';
-import { AnalyticsEventLogModel } from '@/models/analytics.model';
-import { emailService } from '@/services/email.service';
+import { appConfig } from '@/config/app.config.js';
+import { PaymentWebhookModel } from '@/models/payment.models.js';
+import { EmailLogModel } from '@/models/email-log.model.js';
+import { AnalyticsEventLogModel } from '@/models/analytics.model.js';
+import { emailService } from '@/services/email.service.js';
 
 export interface IntegrationStatus {
   name: string;

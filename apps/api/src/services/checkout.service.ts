@@ -1,21 +1,21 @@
 import { randomBytes } from 'node:crypto';
 import { Types } from 'mongoose';
-import { CheckoutSessionModel, type CheckoutSessionDocument } from '@/models/checkout.models';
-import { OrderModel } from '@/models/order.models';
-import { InventoryItemModel, WarehouseModel } from '@/models/inventory.models';
-import { CustomerAddressModel } from '@/models/customer.models';
-import { cartService } from '@/services/cart.service';
-import { reservationService } from '@/services/reservation.service';
-import { customerService } from '@/services/customer.service';
+import { CheckoutSessionModel, type CheckoutSessionDocument } from '@/models/checkout.models.js';
+import { OrderModel } from '@/models/order.models.js';
+import { InventoryItemModel, WarehouseModel } from '@/models/inventory.models.js';
+import { CustomerAddressModel } from '@/models/customer.models.js';
+import { cartService } from '@/services/cart.service.js';
+import { reservationService } from '@/services/reservation.service.js';
+import { customerService } from '@/services/customer.service.js';
 import {
   applyCouponPlaceholder,
   applyGiftCardPlaceholder,
   calculateShipping,
   calculateTax,
-} from '@/services/checkout-calculators';
-import { writeAuditLog } from '@/services/audit.service';
-import type { ActorMeta } from '@/services/cms-crud.service';
-import { ApiError } from '@/utils/errors/api-error';
+} from '@/services/checkout-calculators.js';
+import { writeAuditLog } from '@/services/audit.service.js';
+import type { ActorMeta } from '@/services/cms-crud.service.js';
+import { ApiError } from '@/utils/errors/api-error.js';
 import {
   CHECKOUT_AUDIT,
   CHECKOUT_RESERVATION_TTL_MINUTES,
@@ -23,8 +23,8 @@ import {
   DELIVERY_METHOD,
   SHIPPING_METHOD,
   type ShippingMethod,
-} from '@/constants/checkout';
-import type { AuthenticatedUser } from '@/types';
+} from '@/constants/checkout.js';
+import type { AuthenticatedUser } from '@/types/index.js';
 
 function toPlain(doc: { toObject: () => Record<string, unknown> }) {
   return doc.toObject();

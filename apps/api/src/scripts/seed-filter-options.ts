@@ -3,15 +3,15 @@
  *
  *   pnpm --filter @fe-platform/api exec tsx src/scripts/seed-filter-options.ts
  */
-import { connectDatabase, disconnectDatabase, logger } from '@/config';
-import { NavigationMenuModel } from '@/models/cms-content.models';
+import { connectDatabase, disconnectDatabase, logger } from '@/config/index.js';
+import { NavigationMenuModel } from '@/models/cms-content.models.js';
 import {
   CategoryModel,
   ColorModel,
   MaterialModel,
   OccasionModel,
   SizeModel,
-} from '@/models/master-data.models';
+} from '@/models/master-data.models.js';
 
 function slugify(value: string): string {
   return value

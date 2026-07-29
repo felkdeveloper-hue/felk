@@ -1,1 +1,1 @@
-export { seedAuthNote } from './seed-auth.meta';
+export { seedAuthNote } from './seed-auth.meta.js';

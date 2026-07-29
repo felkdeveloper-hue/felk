@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto';
-import { metaCapiService, type MetaUserData, type MetaCustomData } from './meta-capi.service';
+import { metaCapiService, type MetaUserData, type MetaCustomData } from './meta-capi.service.js';
 import {
   tikTokEventsService,
   type TikTokUserData,
   type TikTokProperties,
-} from './tiktok-events.service';
+} from './tiktok-events.service.js';
 
 export interface TrackingUserData {
   email?: string | null;

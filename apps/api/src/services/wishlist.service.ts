@@ -1,11 +1,11 @@
 import { randomBytes } from 'node:crypto';
-import { WishlistModel, WishlistItemModel } from '@/models/customer.models';
-import { ProductModel, ProductVariantModel } from '@/models/product.models';
-import { customerService } from '@/services/customer.service';
-import { writeAuditLog } from '@/services/audit.service';
-import type { ActorMeta } from '@/services/cms-crud.service';
-import { ApiError } from '@/utils/errors/api-error';
-import { CUSTOMER_AUDIT, WISHLIST_VISIBILITY } from '@/constants/customer';
+import { WishlistModel, WishlistItemModel } from '@/models/customer.models.js';
+import { ProductModel, ProductVariantModel } from '@/models/product.models.js';
+import { customerService } from '@/services/customer.service.js';
+import { writeAuditLog } from '@/services/audit.service.js';
+import type { ActorMeta } from '@/services/cms-crud.service.js';
+import { ApiError } from '@/utils/errors/api-error.js';
+import { CUSTOMER_AUDIT, WISHLIST_VISIBILITY } from '@/constants/customer.js';
 
 export class WishlistService {
   async list(customerId: string) {

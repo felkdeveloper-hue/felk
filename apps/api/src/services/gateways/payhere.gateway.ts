@@ -1,16 +1,16 @@
-import { appConfig } from '@/config/app.config';
-import { logger } from '@/config/logger';
-import { PAYMENT_METHOD, PAYMENT_STATUS } from '@/constants/payment-status';
-import { md5Hex } from '@/utils/crypto.helper';
-import { fetchWithRetry, HttpRetryError } from '@/utils/http-retry';
+import { appConfig } from '@/config/app.config.js';
+import { logger } from '@/config/logger.js';
+import { PAYMENT_METHOD, PAYMENT_STATUS } from '@/constants/payment-status.js';
+import { md5Hex } from '@/utils/crypto.helper.js';
+import { fetchWithRetry, HttpRetryError } from '@/utils/http-retry.js';
 import type {
   CreatePaymentSessionInput,
   PaymentGateway,
   PaymentSessionResult,
   WebhookVerificationInput,
-} from '@/services/interfaces/payment-gateway.service';
-import { getHeader, parseWebhookPayload } from '@/services/gateways/gateway.utils';
-import { ApiError } from '@/utils/errors/api-error';
+} from '@/services/interfaces/payment-gateway.service.js';
+import { getHeader, parseWebhookPayload } from '@/services/gateways/gateway.utils.js';
+import { ApiError } from '@/utils/errors/api-error.js';
 
 /** PayHere notify status_code -> our verification status mapping. */
 const STATUS_CODE_MAP: Record<string, string> = {

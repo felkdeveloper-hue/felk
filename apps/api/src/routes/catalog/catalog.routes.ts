@@ -1,32 +1,32 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { PERMISSIONS } from '@/constants/permissions';
-import { authenticate, authorizeAny, validate } from '@/middlewares';
-import { actorFromRequest } from '@/services/cms-crud.service';
-import { productService } from '@/services/product.service';
-import { productVariantService } from '@/services/product-variant.service';
-import { productImportService } from '@/services/product-import.service';
-import { productExportService } from '@/services/product-export.service';
-import { productMediaService } from '@/services/product-media.service';
-import { productRelationshipService } from '@/services/product-relationship.service';
+import { PERMISSIONS } from '@/constants/permissions.js';
+import { authenticate, authorizeAny, validate } from '@/middlewares/index.js';
+import { actorFromRequest } from '@/services/cms-crud.service.js';
+import { productService } from '@/services/product.service.js';
+import { productVariantService } from '@/services/product-variant.service.js';
+import { productImportService } from '@/services/product-import.service.js';
+import { productExportService } from '@/services/product-export.service.js';
+import { productMediaService } from '@/services/product-media.service.js';
+import { productRelationshipService } from '@/services/product-relationship.service.js';
 import {
   productAttributeService,
   attributeValueService,
-} from '@/services/product-attribute.service';
-import { asyncHandler } from '@/utils/async-handler';
-import { ApiResponse } from '@/utils/response/api-response';
+} from '@/services/product-attribute.service.js';
+import { asyncHandler } from '@/utils/async-handler.js';
+import { ApiResponse } from '@/utils/response/api-response.js';
 import {
   multiImageUpload,
   productImportPreviewUpload,
   productImportZipOnlyUpload,
   singleImageUpload,
-} from '@/utils/file-upload.helper';
+} from '@/utils/file-upload.helper.js';
 import { unlink } from 'node:fs/promises';
 import type { NextFunction, Request, Response } from 'express';
-import { cmsListQuerySchema } from '@/schemas/cms.shared.schema';
-import { productImportSchema } from '@/schemas/product-import.schema';
-import * as S from '@/schemas/product.schema';
-import type { RelationshipType } from '@/constants/product';
+import { cmsListQuerySchema } from '@/schemas/cms.shared.schema.js';
+import { productImportSchema } from '@/schemas/product-import.schema.js';
+import * as S from '@/schemas/product.schema.js';
+import type { RelationshipType } from '@/constants/product.js';
 
 const P = PERMISSIONS;
 

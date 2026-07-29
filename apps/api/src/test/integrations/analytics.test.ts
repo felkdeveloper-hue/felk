@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { hashPii, hashPhone } from '@/utils/pii-hash';
+import { hashPii, hashPhone } from '@/utils/pii-hash.js';
 
 vi.mock('@/config/app.config', () => ({
   appConfig: {
@@ -58,8 +58,8 @@ describe('MetaCapiService', () => {
   });
 
   it('sends a Purchase event with hashed email', async () => {
-    const { MetaCapiService } = await import('@/services/analytics/meta-capi.service');
-    const { fetchWithRetry } = await import('@/utils/http-retry');
+    const { MetaCapiService } = await import('@/services/analytics/meta-capi.service.js');
+    const { fetchWithRetry } = await import('@/utils/http-retry.js');
     const service = new MetaCapiService();
 
     await service.trackPurchase({
@@ -80,8 +80,8 @@ describe('MetaCapiService', () => {
   });
 
   it('sends a Search event', async () => {
-    const { MetaCapiService } = await import('@/services/analytics/meta-capi.service');
-    const { fetchWithRetry } = await import('@/utils/http-retry');
+    const { MetaCapiService } = await import('@/services/analytics/meta-capi.service.js');
+    const { fetchWithRetry } = await import('@/utils/http-retry.js');
     const service = new MetaCapiService();
 
     await service.trackSearch('red dress');
@@ -95,8 +95,8 @@ describe('TikTokEventsService', () => {
   });
 
   it('sends an AddToCart event', async () => {
-    const { TikTokEventsService } = await import('@/services/analytics/tiktok-events.service');
-    const { fetchWithRetry } = await import('@/utils/http-retry');
+    const { TikTokEventsService } = await import('@/services/analytics/tiktok-events.service.js');
+    const { fetchWithRetry } = await import('@/utils/http-retry.js');
     const service = new TikTokEventsService();
 
     await service.trackAddToCart({
@@ -112,8 +112,8 @@ describe('TikTokEventsService', () => {
   });
 
   it('sends CompletePayment for purchase', async () => {
-    const { TikTokEventsService } = await import('@/services/analytics/tiktok-events.service');
-    const { fetchWithRetry } = await import('@/utils/http-retry');
+    const { TikTokEventsService } = await import('@/services/analytics/tiktok-events.service.js');
+    const { fetchWithRetry } = await import('@/utils/http-retry.js');
     const service = new TikTokEventsService();
 
     await service.trackPurchase({

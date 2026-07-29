@@ -1,7 +1,7 @@
 import { Types } from 'mongoose';
-import { CmsPageModel } from '@/models/cms-content.models';
-import { CmsCrudService, type ActorMeta } from '@/services/cms-crud.service';
-import { sanitizeRichText } from '@/utils/sanitize-html';
+import { CmsPageModel } from '@/models/cms-content.models.js';
+import { CmsCrudService, type ActorMeta } from '@/services/cms-crud.service.js';
+import { sanitizeRichText } from '@/utils/sanitize-html.js';
 
 class PageService extends CmsCrudService {
   constructor() {

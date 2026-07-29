@@ -4,14 +4,14 @@ import {
   clearAuthCookies,
   setAuthCookies,
   type AuthRequestMeta,
-} from '@/services/auth.service';
+} from '@/services/auth.service.js';
 import {
   getAccessTokenFromRequest,
   getRefreshTokenFromRequest,
-} from '@/middlewares/auth.middleware';
-import { asyncHandler } from '@/utils/async-handler';
-import { ApiResponse } from '@/utils/response/api-response';
-import { HTTP_STATUS } from '@/constants/http';
+} from '@/middlewares/auth.middleware.js';
+import { asyncHandler } from '@/utils/async-handler.js';
+import { ApiResponse } from '@/utils/response/api-response.js';
+import { HTTP_STATUS } from '@/constants/http.js';
 
 function meta(req: Request): AuthRequestMeta {
   return {

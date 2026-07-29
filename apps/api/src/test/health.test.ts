@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import request from 'supertest';
-import { createApp } from '@/app';
-import { appConfig } from '@/config/app.config';
+import { createApp } from '@/app.js';
+import { appConfig } from '@/config/app.config.js';
 
 describe('System health endpoints', () => {
   const app = createApp();

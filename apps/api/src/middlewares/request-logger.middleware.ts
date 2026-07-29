@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from 'express';
 import morgan from 'morgan';
-import { appConfig } from '@/config/app.config';
-import { logger } from '@/config/logger';
+import { appConfig } from '@/config/app.config.js';
+import { logger } from '@/config/logger.js';
 
 morgan.token('request-id', (req: Request) => req.requestId || '-');
 

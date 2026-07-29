@@ -1,6 +1,6 @@
 import nodemailer, { type Transporter } from 'nodemailer';
-import { appConfig } from '@/config/app.config';
-import { logger } from '@/config/logger';
+import { appConfig } from '@/config/app.config.js';
+import { logger } from '@/config/logger.js';
 
 let transporter: Transporter | null = null;
 

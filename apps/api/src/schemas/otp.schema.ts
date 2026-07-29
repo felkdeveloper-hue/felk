@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { REGEX } from '@/constants/regex';
+import { REGEX } from '@/constants/regex.js';
 
 export const sendOtpSchema = z.object({
   email: z

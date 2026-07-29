@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { objectIdSchema, paginationQuerySchema } from '@/schemas/common.schema';
-import { REGEX } from '@/constants/regex';
+import { objectIdSchema, paginationQuerySchema } from '@/schemas/common.schema.js';
+import { REGEX } from '@/constants/regex.js';
 
 export const seoZodSchema = z
   .object({

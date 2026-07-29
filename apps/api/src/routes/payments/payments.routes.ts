@@ -1,14 +1,14 @@
 import { Router } from 'express';
-import { PERMISSIONS } from '@/constants/permissions';
-import { authenticate, authorizeAny, validate } from '@/middlewares';
-import { actorFromRequest } from '@/services/cms-crud.service';
-import { paymentService } from '@/services/payment.service';
-import { refundService } from '@/services/refund.service';
-import { asyncHandler } from '@/utils/async-handler';
-import { ApiResponse } from '@/utils/response/api-response';
-import { ApiError } from '@/utils/errors/api-error';
-import * as S from '@/schemas/payment.schema';
-import type { PaymentMethod } from '@/constants/payment-status';
+import { PERMISSIONS } from '@/constants/permissions.js';
+import { authenticate, authorizeAny, validate } from '@/middlewares/index.js';
+import { actorFromRequest } from '@/services/cms-crud.service.js';
+import { paymentService } from '@/services/payment.service.js';
+import { refundService } from '@/services/refund.service.js';
+import { asyncHandler } from '@/utils/async-handler.js';
+import { ApiResponse } from '@/utils/response/api-response.js';
+import { ApiError } from '@/utils/errors/api-error.js';
+import * as S from '@/schemas/payment.schema.js';
+import type { PaymentMethod } from '@/constants/payment-status.js';
 
 const P = PERMISSIONS;
 

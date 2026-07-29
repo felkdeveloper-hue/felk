@@ -1,9 +1,9 @@
-import { CustomerAddressModel, CustomerModel } from '@/models/customer.models';
-import { customerService } from '@/services/customer.service';
-import { writeAuditLog } from '@/services/audit.service';
-import type { ActorMeta } from '@/services/cms-crud.service';
-import { ApiError } from '@/utils/errors/api-error';
-import { CUSTOMER_AUDIT } from '@/constants/customer';
+import { CustomerAddressModel, CustomerModel } from '@/models/customer.models.js';
+import { customerService } from '@/services/customer.service.js';
+import { writeAuditLog } from '@/services/audit.service.js';
+import type { ActorMeta } from '@/services/cms-crud.service.js';
+import { ApiError } from '@/utils/errors/api-error.js';
+import { CUSTOMER_AUDIT } from '@/constants/customer.js';
 
 export class CustomerAddressService {
   async list(customerId: string) {

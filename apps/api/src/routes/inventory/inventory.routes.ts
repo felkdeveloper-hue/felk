@@ -1,19 +1,19 @@
 import { Router } from 'express';
-import { PERMISSIONS } from '@/constants/permissions';
-import { authenticate, authorizeAny, validate } from '@/middlewares';
-import { actorFromRequest } from '@/services/cms-crud.service';
-import { warehouseService } from '@/services/warehouse.service';
-import { inventoryService } from '@/services/inventory.service';
-import { reservationService } from '@/services/reservation.service';
-import { supplierService } from '@/services/supplier.service';
-import { purchaseOrderService } from '@/services/purchase-order.service';
-import { transferService } from '@/services/transfer.service';
-import { inventoryAlertService } from '@/services/inventory-alert.service';
-import { asyncHandler } from '@/utils/async-handler';
-import { ApiResponse } from '@/utils/response/api-response';
-import { cmsListQuerySchema } from '@/schemas/cms.shared.schema';
-import * as S from '@/schemas/inventory.schema';
-import type { MovementType } from '@/constants/inventory';
+import { PERMISSIONS } from '@/constants/permissions.js';
+import { authenticate, authorizeAny, validate } from '@/middlewares/index.js';
+import { actorFromRequest } from '@/services/cms-crud.service.js';
+import { warehouseService } from '@/services/warehouse.service.js';
+import { inventoryService } from '@/services/inventory.service.js';
+import { reservationService } from '@/services/reservation.service.js';
+import { supplierService } from '@/services/supplier.service.js';
+import { purchaseOrderService } from '@/services/purchase-order.service.js';
+import { transferService } from '@/services/transfer.service.js';
+import { inventoryAlertService } from '@/services/inventory-alert.service.js';
+import { asyncHandler } from '@/utils/async-handler.js';
+import { ApiResponse } from '@/utils/response/api-response.js';
+import { cmsListQuerySchema } from '@/schemas/cms.shared.schema.js';
+import * as S from '@/schemas/inventory.schema.js';
+import type { MovementType } from '@/constants/inventory.js';
 
 const P = PERMISSIONS;
 

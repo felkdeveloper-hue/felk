@@ -1,8 +1,8 @@
 import multer, { type FileFilterCallback } from 'multer';
 import type { Request } from 'express';
 import os from 'node:os';
-import { appConfig } from '@/config/app.config';
-import { ApiError } from '@/utils/errors/api-error';
+import { appConfig } from '@/config/app.config.js';
+import { ApiError } from '@/utils/errors/api-error.js';
 
 function fileFilter(_req: Request, file: Express.Multer.File, cb: FileFilterCallback): void {
   if (!appConfig.upload.allowedMimeTypes.includes(file.mimetype)) {

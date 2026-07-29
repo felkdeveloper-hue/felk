@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { CentralizedEmailService } from '@/services/email/email.service';
+import { CentralizedEmailService } from '@/services/email/email.service.js';
 
 vi.mock('@/services/email/transporter', () => ({
   isEmailConfigured: vi.fn().mockReturnValue(true),

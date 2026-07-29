@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { objectIdSchema } from '@/schemas/common.schema';
-import { SHIPPING_METHOD, DELIVERY_METHOD } from '@/constants/checkout';
+import { objectIdSchema } from '@/schemas/common.schema.js';
+import { SHIPPING_METHOD, DELIVERY_METHOD } from '@/constants/checkout.js';
 
 export const checkoutStartSchema = z.object({
   shippingAddressId: objectIdSchema.optional(),

@@ -1,6 +1,6 @@
 import type { Response } from 'express';
-import { HTTP_STATUS, type HttpStatusCode } from '@/constants/http';
-import type { ApiErrorBody, ApiSuccessBody, PaginationMeta } from '@/types';
+import { HTTP_STATUS, type HttpStatusCode } from '@/constants/http.js';
+import type { ApiErrorBody, ApiSuccessBody, PaginationMeta } from '@/types/index.js';
 
 export class ApiResponse {
   static success<T>(

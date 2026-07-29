@@ -1,12 +1,12 @@
 import { z } from 'zod';
-import { objectIdSchema, paginationQuerySchema } from '@/schemas/common.schema';
+import { objectIdSchema, paginationQuerySchema } from '@/schemas/common.schema.js';
 import {
   CUSTOMER_STATUS,
   ADDRESS_TYPE,
   ADDRESS_LABEL,
   WISHLIST_VISIBILITY,
   LOYALTY_TIER,
-} from '@/constants/customer';
+} from '@/constants/customer.js';
 
 export const customerListQuerySchema = paginationQuerySchema.extend({
   status: z.string().optional(),

@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { objectIdSchema } from '@/schemas/common.schema';
-import { ORDER_STATUS } from '@/constants/order-status';
+import { objectIdSchema } from '@/schemas/common.schema.js';
+import { ORDER_STATUS } from '@/constants/order-status.js';
 
 const statusEnum = z.enum(Object.values(ORDER_STATUS) as [string, ...string[]]);
 

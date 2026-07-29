@@ -1,20 +1,20 @@
 import { Router } from 'express';
-import { authRouter } from '@/routes/auth.routes';
-import { systemRouter } from '@/routes/system.routes';
-import { cmsRouter } from '@/routes/cms/cms.routes';
-import { catalogRouter } from '@/routes/catalog/catalog.routes';
-import { inventoryRouter } from '@/routes/inventory/inventory.routes';
-import { customersRouter } from '@/routes/customers/customers.routes';
-import { usersRouter } from '@/routes/users/users.routes';
-import { auditRouter } from '@/routes/audit/audit.routes';
-import { cartRouter } from '@/routes/cart/cart.routes';
-import { checkoutRouter } from '@/routes/checkout/checkout.routes';
-import { paymentsRouter } from '@/routes/payments/payments.routes';
-import { ordersRouter } from '@/routes/orders/orders.routes';
-import { storefrontRouter } from '@/routes/storefront.routes';
-import { reviewsRouter } from '@/routes/reviews.routes';
-import { trackingRouter } from '@/routes/tracking/tracking.routes';
-import { integrationsRouter } from '@/routes/integrations/integrations.routes';
+import { authRouter } from '@/routes/auth.routes.js';
+import { systemRouter } from '@/routes/system.routes.js';
+import { cmsRouter } from '@/routes/cms/cms.routes.js';
+import { catalogRouter } from '@/routes/catalog/catalog.routes.js';
+import { inventoryRouter } from '@/routes/inventory/inventory.routes.js';
+import { customersRouter } from '@/routes/customers/customers.routes.js';
+import { usersRouter } from '@/routes/users/users.routes.js';
+import { auditRouter } from '@/routes/audit/audit.routes.js';
+import { cartRouter } from '@/routes/cart/cart.routes.js';
+import { checkoutRouter } from '@/routes/checkout/checkout.routes.js';
+import { paymentsRouter } from '@/routes/payments/payments.routes.js';
+import { ordersRouter } from '@/routes/orders/orders.routes.js';
+import { storefrontRouter } from '@/routes/storefront.routes.js';
+import { reviewsRouter } from '@/routes/reviews.routes.js';
+import { trackingRouter } from '@/routes/tracking/tracking.routes.js';
+import { integrationsRouter } from '@/routes/integrations/integrations.routes.js';
 
 /**
  * API v1 root router.

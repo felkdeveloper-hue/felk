@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { sweepPending, type RetrySweepDoc } from '@/services/retry-sweep.service';
+import { sweepPending, type RetrySweepDoc } from '@/services/retry-sweep.service.js';
 import type { Model } from 'mongoose';
 
 function makeDoc(

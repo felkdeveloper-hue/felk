@@ -1,12 +1,12 @@
 import { Router } from 'express';
-import { authController } from '@/controllers/auth.controller';
+import { authController } from '@/controllers/auth.controller.js';
 import {
   authenticate,
   authRateLimiter,
   optionalAuthenticate,
   otpRateLimiter,
   validate,
-} from '@/middlewares';
+} from '@/middlewares/index.js';
 import {
   changePasswordSchema,
   forgotPasswordSchema,
@@ -16,9 +16,9 @@ import {
   resendVerificationSchema,
   resetPasswordSchema,
   verifyEmailSchema,
-} from '@/schemas/auth.schema';
+} from '@/schemas/auth.schema.js';
 
-import { otpRouter } from '@/routes/otp.routes';
+import { otpRouter } from '@/routes/otp.routes.js';
 
 export const authRouter = Router();
 

@@ -1,12 +1,12 @@
 import { Schema, model, type Document, type Model, type Types } from 'mongoose';
-import { seoSchema } from '@/models/shared/seo.schema';
+import { seoSchema } from '@/models/shared/seo.schema.js';
 import {
   PRODUCT_STATUS,
   PRODUCT_VISIBILITY,
   VARIANT_STATUS,
   RELATIONSHIP_TYPES,
   MEDIA_TYPES,
-} from '@/constants/product';
+} from '@/constants/product.js';
 
 const softDelete = {
   isDeleted: { type: Boolean, default: false, index: true },

@@ -1,6 +1,6 @@
-import { AuditLogModel } from '@/models/audit-log.model';
-import { ActivityLogModel } from '@/models/activity-log.model';
-import { logger } from '@/config/logger';
+import { AuditLogModel } from '@/models/audit-log.model.js';
+import { ActivityLogModel } from '@/models/activity-log.model.js';
+import { logger } from '@/config/logger.js';
 
 export interface AuditInput {
   action: string;

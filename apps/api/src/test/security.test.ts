@@ -2,14 +2,14 @@ import { beforeAll, afterAll, beforeEach, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import type { Application } from 'express';
 import jwt from 'jsonwebtoken';
-import { createApp } from '@/app';
-import { setupTestDatabase, teardownTestDatabase, resetCollections } from '@/test/helpers/db';
-import { registerCustomer, createAdminUser, login, TEST_PASSWORD } from '@/test/helpers/auth';
-import { runPurchaseFlow } from '@/test/helpers/commerce';
-import { postCodWebhook, buildCodWebhookPayload, attemptOrderId } from '@/test/helpers/webhook';
-import { appConfig } from '@/config/app.config';
-import { sanitizeRichText } from '@/utils/sanitize-html';
-import { UserModel } from '@/models';
+import { createApp } from '@/app.js';
+import { setupTestDatabase, teardownTestDatabase, resetCollections } from '@/test/helpers/db.js';
+import { registerCustomer, createAdminUser, login, TEST_PASSWORD } from '@/test/helpers/auth.js';
+import { runPurchaseFlow } from '@/test/helpers/commerce.js';
+import { postCodWebhook, buildCodWebhookPayload, attemptOrderId } from '@/test/helpers/webhook.js';
+import { appConfig } from '@/config/app.config.js';
+import { sanitizeRichText } from '@/utils/sanitize-html.js';
+import { UserModel } from '@/models/index.js';
 
 const API = '/api/v1';
 
@@ -217,7 +217,7 @@ describe('Security review', () => {
 
   describe('File upload validation', () => {
     it('only allows configured image mime types and enforces size limit', async () => {
-      const { memoryUpload } = await import('@/utils/file-upload.helper');
+      const { memoryUpload } = await import('@/utils/file-upload.helper.js');
       expect(appConfig.upload.allowedMimeTypes).not.toContain('application/x-msdownload');
       expect(appConfig.upload.allowedMimeTypes.every((m: string) => m.startsWith('image/'))).toBe(
         true,

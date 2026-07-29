@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { hmacSha256Hex } from '@/utils/crypto.helper';
+import { hmacSha256Hex } from '@/utils/crypto.helper.js';
 
 vi.mock('@/config/app.config', () => ({
   appConfig: {
@@ -37,7 +37,7 @@ vi.mock('@/utils/http-retry', () => ({
 
 describe('Koko gateway', () => {
   it('rejects when API key / private key are missing', async () => {
-    const { KokoGateway } = await import('@/services/gateways/koko.gateway');
+    const { KokoGateway } = await import('@/services/gateways/koko.gateway.js');
     const gateway = new KokoGateway();
     await expect(
       gateway.createSession({
@@ -54,7 +54,7 @@ describe('Koko gateway', () => {
   });
 
   it('returns valid=true with correct HMAC', async () => {
-    const { KokoGateway } = await import('@/services/gateways/koko.gateway');
+    const { KokoGateway } = await import('@/services/gateways/koko.gateway.js');
     const gateway = new KokoGateway();
     const body = JSON.stringify({
       orderId: 'ORD-001',
@@ -75,7 +75,7 @@ describe('Koko gateway', () => {
   });
 
   it('returns valid=false with wrong HMAC', async () => {
-    const { KokoGateway } = await import('@/services/gateways/koko.gateway');
+    const { KokoGateway } = await import('@/services/gateways/koko.gateway.js');
     const gateway = new KokoGateway();
     const body = JSON.stringify({ orderId: 'ORD-001', status: 'approved' });
     const result = await gateway.verifyWebhook({
@@ -86,7 +86,7 @@ describe('Koko gateway', () => {
   });
 
   it('returns valid=false with missing signature header', async () => {
-    const { KokoGateway } = await import('@/services/gateways/koko.gateway');
+    const { KokoGateway } = await import('@/services/gateways/koko.gateway.js');
     const gateway = new KokoGateway();
     const body = JSON.stringify({ orderId: 'ORD-001', status: 'approved' });
     const result = await gateway.verifyWebhook({ headers: {}, rawBody: Buffer.from(body) });
@@ -96,7 +96,7 @@ describe('Koko gateway', () => {
 
 describe('Mintpay gateway', () => {
   it('returns sandbox login form redirect', async () => {
-    const { MintpayGateway } = await import('@/services/gateways/mintpay.gateway');
+    const { MintpayGateway } = await import('@/services/gateways/mintpay.gateway.js');
     const gateway = new MintpayGateway();
     const result = await gateway.createSession({
       orderId: 'ORD-MP-001',
@@ -116,7 +116,7 @@ describe('Mintpay gateway', () => {
   });
 
   it('returns valid=true with correct HMAC', async () => {
-    const { MintpayGateway } = await import('@/services/gateways/mintpay.gateway');
+    const { MintpayGateway } = await import('@/services/gateways/mintpay.gateway.js');
     const gateway = new MintpayGateway();
     const body = JSON.stringify({
       orderId: 'ORD-001',
@@ -137,7 +137,7 @@ describe('Mintpay gateway', () => {
   });
 
   it('returns valid=false with wrong signature', async () => {
-    const { MintpayGateway } = await import('@/services/gateways/mintpay.gateway');
+    const { MintpayGateway } = await import('@/services/gateways/mintpay.gateway.js');
     const gateway = new MintpayGateway();
     const body = JSON.stringify({ status: 'success' });
     const result = await gateway.verifyWebhook({

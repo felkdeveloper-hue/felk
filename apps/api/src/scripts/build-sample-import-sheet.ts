@@ -9,10 +9,10 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ExcelJS from 'exceljs';
-import { connectDatabase, disconnectDatabase } from '@/config';
-import { CategoryModel } from '@/models/master-data.models';
-import { OFFICIAL_BRAND_NAME } from '@/constants/product';
-import { IMPORT_COLUMNS } from '@/services/product-import.service';
+import { connectDatabase, disconnectDatabase } from '@/config/index.js';
+import { CategoryModel } from '@/models/master-data.models.js';
+import { OFFICIAL_BRAND_NAME } from '@/constants/product.js';
+import { IMPORT_COLUMNS } from '@/services/product-import.service.js';
 
 const OUT =
   process.env.SAMPLE_IMPORT_OUT ??

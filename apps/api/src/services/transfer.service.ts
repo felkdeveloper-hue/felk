@@ -1,16 +1,16 @@
-import { StockTransferModel } from '@/models/inventory.models';
-import { ProductVariantModel } from '@/models/product.models';
-import { inventoryService } from '@/services/inventory.service';
-import { writeAuditLog } from '@/services/audit.service';
-import type { ActorMeta } from '@/services/cms-crud.service';
-import { ApiError } from '@/utils/errors/api-error';
-import { buildPaginationMeta, getPaginationSkip, parsePagination } from '@/utils/pagination';
+import { StockTransferModel } from '@/models/inventory.models.js';
+import { ProductVariantModel } from '@/models/product.models.js';
+import { inventoryService } from '@/services/inventory.service.js';
+import { writeAuditLog } from '@/services/audit.service.js';
+import type { ActorMeta } from '@/services/cms-crud.service.js';
+import { ApiError } from '@/utils/errors/api-error.js';
+import { buildPaginationMeta, getPaginationSkip, parsePagination } from '@/utils/pagination.js';
 import {
   INVENTORY_AUDIT,
   MOVEMENT_TYPE,
   TRANSFER_STATUS,
   type TransferStatus,
-} from '@/constants/inventory';
+} from '@/constants/inventory.js';
 
 const FLOW: TransferStatus[] = [
   TRANSFER_STATUS.REQUESTED,

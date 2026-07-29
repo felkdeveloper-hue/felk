@@ -1,4 +1,4 @@
-import type { NotificationType } from '@/constants/notification-types';
+import type { NotificationType } from '@/constants/notification-types.js';
 
 /**
  * Notification fan-out contract — interface only.

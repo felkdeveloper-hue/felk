@@ -1,5 +1,5 @@
 import { Schema, model, type Document, type Model, type Types } from 'mongoose';
-import { mediaImageSchema, responsiveImageSchema, seoSchema } from '@/models/shared/seo.schema';
+import { mediaImageSchema, responsiveImageSchema, seoSchema } from '@/models/shared/seo.schema.js';
 
 const softDelete = {
   isDeleted: { type: Boolean, default: false, index: true },

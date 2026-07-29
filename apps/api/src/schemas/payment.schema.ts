@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { objectIdSchema } from '@/schemas/common.schema';
-import { PAYMENT_METHOD, PAYMENT_STATUS } from '@/constants/payment-status';
+import { objectIdSchema } from '@/schemas/common.schema.js';
+import { PAYMENT_METHOD, PAYMENT_STATUS } from '@/constants/payment-status.js';
 
 const methodEnum = z.enum(Object.values(PAYMENT_METHOD) as [string, ...string[]]);
 

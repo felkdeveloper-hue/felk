@@ -4,26 +4,26 @@ import {
   OrderNoteModel,
   OrderTimelineModel,
   type OrderDocument,
-} from '@/models/order.models';
-import { customerService } from '@/services/customer.service';
-import { invoiceService } from '@/services/invoice.service';
-import { recordOrderTimeline } from '@/services/order-timeline.service';
-import { publishOrderEvent } from '@/services/order-event-publisher';
-import { writeAuditLog } from '@/services/audit.service';
-import { inventoryService } from '@/services/inventory.service';
-import { notifyOrderStatusChange } from '@/services/order-notification.service';
-import type { ActorMeta } from '@/services/cms-crud.service';
-import { ApiError } from '@/utils/errors/api-error';
-import { buildPaginationMeta, getPaginationSkip, parsePagination } from '@/utils/pagination';
+} from '@/models/order.models.js';
+import { customerService } from '@/services/customer.service.js';
+import { invoiceService } from '@/services/invoice.service.js';
+import { recordOrderTimeline } from '@/services/order-timeline.service.js';
+import { publishOrderEvent } from '@/services/order-event-publisher.js';
+import { writeAuditLog } from '@/services/audit.service.js';
+import { inventoryService } from '@/services/inventory.service.js';
+import { notifyOrderStatusChange } from '@/services/order-notification.service.js';
+import type { ActorMeta } from '@/services/cms-crud.service.js';
+import { ApiError } from '@/utils/errors/api-error.js';
+import { buildPaginationMeta, getPaginationSkip, parsePagination } from '@/utils/pagination.js';
 import {
   ORDER_STATUS,
   ORDER_STATUS_TRANSITIONS,
   CANCELLABLE_ORDER_STATUSES,
   type OrderStatus,
-} from '@/constants/order-status';
-import { ORDER_AUDIT, ORDER_EVENT_TYPE } from '@/constants/order';
-import { MOVEMENT_TYPE } from '@/constants/inventory';
-import type { AuthenticatedUser } from '@/types';
+} from '@/constants/order-status.js';
+import { ORDER_AUDIT, ORDER_EVENT_TYPE } from '@/constants/order.js';
+import { MOVEMENT_TYPE } from '@/constants/inventory.js';
+import type { AuthenticatedUser } from '@/types/index.js';
 
 function toPlain(doc: { toObject: () => Record<string, unknown> }) {
   return doc.toObject();

@@ -1,7 +1,7 @@
-import { PaymentEventModel } from '@/models/payment.models';
-import type { PaymentEventType } from '@/constants/payment';
-import { domainEventBus } from '@/services/events/event-bus';
-import { logger } from '@/config/logger';
+import { PaymentEventModel } from '@/models/payment.models.js';
+import type { PaymentEventType } from '@/constants/payment.js';
+import { domainEventBus } from '@/services/events/event-bus.js';
+import { logger } from '@/config/logger.js';
 
 /**
  * Publish-only outbox for Payment Engine domain events.

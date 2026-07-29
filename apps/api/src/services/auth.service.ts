@@ -1,7 +1,7 @@
 import type { CookieOptions, Response } from 'express';
 import { randomUUID } from 'node:crypto';
-import { appConfig } from '@/config/app.config';
-import { logger } from '@/config/logger';
+import { appConfig } from '@/config/app.config.js';
+import { logger } from '@/config/logger.js';
 import {
   AUTH_COOKIES,
   AUTH_LIMITS,
@@ -10,21 +10,21 @@ import {
   STAFF_ROLES,
   USER_STATUS,
   type AuthPortal,
-} from '@/constants/auth';
-import { ERROR_MESSAGES } from '@/constants/error-messages';
-import { ROLES, type RoleKey } from '@/constants/roles';
-import { attachDevResetCode } from '@/utils/dev-verification.helper';
-import { loginAlertEmail, passwordChangedEmail } from '@/emails';
+} from '@/constants/auth.js';
+import { ERROR_MESSAGES } from '@/constants/error-messages.js';
+import { ROLES, type RoleKey } from '@/constants/roles.js';
+import { attachDevResetCode } from '@/utils/dev-verification.helper.js';
+import { loginAlertEmail, passwordChangedEmail } from '@/emails/index.js';
 import {
   PasswordResetTokenModel,
   RefreshTokenModel,
   UserModel,
   UserSessionModel,
   type UserDocument,
-} from '@/models';
-import { emailService, trySendEmail } from '@/services/email/email.service';
-import { writeActivityLog, writeAuditLog } from '@/services/audit.service';
-import { findRoleByKey, getPermissionsForRole } from '@/services/rbac.service';
+} from '@/models/index.js';
+import { emailService, trySendEmail } from '@/services/email/email.service.js';
+import { writeActivityLog, writeAuditLog } from '@/services/audit.service.js';
+import { findRoleByKey, getPermissionsForRole } from '@/services/rbac.service.js';
 import {
   blacklistAccessToken,
   createOpaqueRefreshToken,
@@ -32,12 +32,12 @@ import {
   getRefreshTokenTtlMs,
   signAccessToken,
   verifyAccessToken,
-} from '@/services/token.service';
-import type { AuthenticatedUser } from '@/types';
-import { addMinutes } from '@/utils/date.helper';
-import { normalizeEmail } from '@/utils/email.helper';
-import { ApiError } from '@/utils/errors/api-error';
-import { generateNumericOtp, hashOtp, verifyOtp } from '@/utils/otp.helper';
+} from '@/services/token.service.js';
+import type { AuthenticatedUser } from '@/types/index.js';
+import { addMinutes } from '@/utils/date.helper.js';
+import { normalizeEmail } from '@/utils/email.helper.js';
+import { ApiError } from '@/utils/errors/api-error.js';
+import { generateNumericOtp, hashOtp, verifyOtp } from '@/utils/otp.helper.js';
 import {
   assertPasswordStrength,
   assertRegisterPassword,
@@ -45,8 +45,8 @@ import {
   hashPassword,
   pushPasswordHistory,
   wasPasswordUsedRecently,
-} from '@/utils/password.helper';
-import { generateSecureToken, hashToken } from '@/utils/token.helper';
+} from '@/utils/password.helper.js';
+import { generateSecureToken, hashToken } from '@/utils/token.helper.js';
 
 export interface AuthRequestMeta {
   ip?: string;
@@ -299,7 +299,7 @@ export const authService = {
       }
     }
 
-    const { customerService } = await import('@/services/customer.service');
+    const { customerService } = await import('@/services/customer.service.js');
     await customerService.ensureForUser(
       {
         id: user._id.toString(),
@@ -317,7 +317,7 @@ export const authService = {
     );
 
     try {
-      const { otpService } = await import('@/services/otp.service');
+      const { otpService } = await import('@/services/otp.service.js');
       await otpService.issueOtpForUser(user._id.toString(), user.email);
     } catch (err) {
       logger.error({ err, email: user.email }, 'Register: verification email failed');
@@ -325,7 +325,7 @@ export const authService = {
     }
 
     // Track registration analytics (fire-and-forget)
-    void import('@/services/analytics/analytics.service')
+    void import('@/services/analytics/analytics.service.js')
       .then(({ analyticsService }) => {
         return analyticsService
           .trackCompleteRegistration({
@@ -836,7 +836,7 @@ export const authService = {
   },
 
   async verifyEmail(emailRaw: string, code: string, meta: AuthRequestMeta) {
-    const { otpService } = await import('@/services/otp.service');
+    const { otpService } = await import('@/services/otp.service.js');
     const result = await otpService.verifyOtp(emailRaw, code, meta);
     return {
       message: result.message,
@@ -848,7 +848,7 @@ export const authService = {
   },
 
   async resendVerification(emailRaw: string, meta: AuthRequestMeta) {
-    const { otpService } = await import('@/services/otp.service');
+    const { otpService } = await import('@/services/otp.service.js');
     return otpService.resendOtp(emailRaw, meta);
   },
 

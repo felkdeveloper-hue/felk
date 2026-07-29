@@ -1,11 +1,11 @@
-import { CMS_PERMISSIONS } from '@/constants/cms-permissions';
-import { PRODUCT_PERMISSIONS } from '@/constants/product';
-import { INVENTORY_PERMISSIONS } from '@/constants/inventory';
-import { CUSTOMER_PERMISSIONS } from '@/constants/customer';
-import { CART_PERMISSIONS } from '@/constants/cart';
-import { CHECKOUT_PERMISSIONS } from '@/constants/checkout';
-import { PAYMENT_PERMISSIONS } from '@/constants/payment';
-import { ORDER_PERMISSIONS } from '@/constants/order';
+import { CMS_PERMISSIONS } from '@/constants/cms-permissions.js';
+import { PRODUCT_PERMISSIONS } from '@/constants/product.js';
+import { INVENTORY_PERMISSIONS } from '@/constants/inventory.js';
+import { CUSTOMER_PERMISSIONS } from '@/constants/customer.js';
+import { CART_PERMISSIONS } from '@/constants/cart.js';
+import { CHECKOUT_PERMISSIONS } from '@/constants/checkout.js';
+import { PAYMENT_PERMISSIONS } from '@/constants/payment.js';
+import { ORDER_PERMISSIONS } from '@/constants/order.js';
 
 /**
  * Full permission catalog.

@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { PERMISSIONS } from '@/constants/permissions';
-import { createCrudRouter } from '@/routes/cms/create-crud-router';
+import { PERMISSIONS } from '@/constants/permissions.js';
+import { createCrudRouter } from '@/routes/cms/create-crud-router.js';
 import {
   BrandModel,
   CategoryModel,
@@ -11,7 +11,7 @@ import {
   ProductTagModel,
   SeasonCollectionModel,
   SizeModel,
-} from '@/models/master-data.models';
+} from '@/models/master-data.models.js';
 import {
   AnnouncementBarModel,
   BlogCategoryModel,
@@ -22,7 +22,7 @@ import {
   HomeSectionModel,
   NavigationMenuModel,
   PromoBannerModel,
-} from '@/models/cms-content.models';
+} from '@/models/cms-content.models.js';
 import {
   ContactInfoModel,
   CurrencyConfigModel,
@@ -31,23 +31,23 @@ import {
   ShippingZoneModel,
   SocialLinkModel,
   TaxConfigModel,
-} from '@/models/settings.models';
-import * as schemas from '@/schemas/cms.schema';
-import { categoryService } from '@/services/category.service';
-import { pageService } from '@/services/page.service';
-import { blogService } from '@/services/blog.service';
-import { settingsService } from '@/services/settings.service';
-import { actorFromRequest } from '@/services/cms-crud.service';
-import { uploadBannerDesktopImage } from '@/services/banner-image.service';
-import { storageService } from '@/services/storage.factory';
-import { authenticate, authorizeAny, validate } from '@/middlewares';
-import { asyncHandler } from '@/utils/async-handler';
-import { ApiResponse } from '@/utils/response/api-response';
-import { storeSettingUpsertSchema } from '@/schemas/cms.schema';
-import { singleImageUpload } from '@/utils/file-upload.helper';
-import { processImage } from '@/utils/image.helper';
+} from '@/models/settings.models.js';
+import * as schemas from '@/schemas/cms.schema.js';
+import { categoryService } from '@/services/category.service.js';
+import { pageService } from '@/services/page.service.js';
+import { blogService } from '@/services/blog.service.js';
+import { settingsService } from '@/services/settings.service.js';
+import { actorFromRequest } from '@/services/cms-crud.service.js';
+import { uploadBannerDesktopImage } from '@/services/banner-image.service.js';
+import { storageService } from '@/services/storage.factory.js';
+import { authenticate, authorizeAny, validate } from '@/middlewares/index.js';
+import { asyncHandler } from '@/utils/async-handler.js';
+import { ApiResponse } from '@/utils/response/api-response.js';
+import { storeSettingUpsertSchema } from '@/schemas/cms.schema.js';
+import { singleImageUpload } from '@/utils/file-upload.helper.js';
+import { processImage } from '@/utils/image.helper.js';
 import { z } from 'zod';
-import { objectIdSchema } from '@/schemas/common.schema';
+import { objectIdSchema } from '@/schemas/common.schema.js';
 import { randomUUID } from 'node:crypto';
 
 const P = PERMISSIONS;

@@ -5,25 +5,29 @@ import {
   ProductMediaModel,
   ProductRelationshipModel,
   type ProductDocument,
-} from '@/models/product.models';
-import { BrandModel } from '@/models/master-data.models';
-import { InventoryItemModel } from '@/models/inventory.models';
-import { productRepository, type ProductListFilters } from '@/repositories/product.repository';
-import { writeActivityLog, writeAuditLog } from '@/services/audit.service';
-import type { ActorMeta } from '@/services/cms-crud.service';
-import { ApiError } from '@/utils/errors/api-error';
-import { slugify } from '@/utils/slug.helper';
-import { sanitizeRichText } from '@/utils/sanitize-html';
-import { assertSalePriceValid, buildProductJsonLd, computePricing } from '@/utils/pricing.helper';
-import { invalidateStorefrontCatalogCache } from '@/utils/simple-cache';
+} from '@/models/product.models.js';
+import { BrandModel } from '@/models/master-data.models.js';
+import { InventoryItemModel } from '@/models/inventory.models.js';
+import { productRepository, type ProductListFilters } from '@/repositories/product.repository.js';
+import { writeActivityLog, writeAuditLog } from '@/services/audit.service.js';
+import type { ActorMeta } from '@/services/cms-crud.service.js';
+import { ApiError } from '@/utils/errors/api-error.js';
+import { slugify } from '@/utils/slug.helper.js';
+import { sanitizeRichText } from '@/utils/sanitize-html.js';
+import {
+  assertSalePriceValid,
+  buildProductJsonLd,
+  computePricing,
+} from '@/utils/pricing.helper.js';
+import { invalidateStorefrontCatalogCache } from '@/utils/simple-cache.js';
 import {
   OFFICIAL_BRAND_NAME,
   OFFICIAL_BRAND_SLUG,
   PRODUCT_AUDIT,
   PRODUCT_STATUS,
-} from '@/constants/product';
-import { allocateUniqueParentSku, isSkuTaken } from '@/services/sku-allocation.service';
-import { env } from '@/config/env';
+} from '@/constants/product.js';
+import { allocateUniqueParentSku, isSkuTaken } from '@/services/sku-allocation.service.js';
+import { env } from '@/config/env.js';
 
 /** Rewrite localhost upload URLs to the public API host (or path-only). */
 function publicMediaUrl(url?: string | null): string | undefined {
@@ -770,7 +774,7 @@ export class ProductService {
     const price = Number(product.pricing?.price ?? 0);
     if (price <= 0) return null;
 
-    const { productVariantService } = await import('@/services/product-variant.service');
+    const { productVariantService } = await import('@/services/product-variant.service.js');
     return productVariantService.create(
       productId,
       {

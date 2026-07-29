@@ -1,4 +1,4 @@
 /**
  * @deprecated Prefer `@/models/customer.models` — re-export for compatibility.
  */
-export { WishlistModel, WishlistItemModel } from '@/models/customer.models';
+export { WishlistModel, WishlistItemModel } from '@/models/customer.models.js';

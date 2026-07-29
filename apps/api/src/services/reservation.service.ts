@@ -1,16 +1,16 @@
-import { StockReservationModel } from '@/models/inventory.models';
-import { inventoryService } from '@/services/inventory.service';
-import { writeAuditLog } from '@/services/audit.service';
-import type { ActorMeta } from '@/services/cms-crud.service';
-import { ApiError } from '@/utils/errors/api-error';
-import { buildPaginationMeta, getPaginationSkip, parsePagination } from '@/utils/pagination';
+import { StockReservationModel } from '@/models/inventory.models.js';
+import { inventoryService } from '@/services/inventory.service.js';
+import { writeAuditLog } from '@/services/audit.service.js';
+import type { ActorMeta } from '@/services/cms-crud.service.js';
+import { ApiError } from '@/utils/errors/api-error.js';
+import { buildPaginationMeta, getPaginationSkip, parsePagination } from '@/utils/pagination.js';
 import {
   ALERT_TYPE,
   DEFAULT_RESERVATION_TTL_MINUTES,
   INVENTORY_AUDIT,
   MOVEMENT_TYPE,
   RESERVATION_STATUS,
-} from '@/constants/inventory';
+} from '@/constants/inventory.js';
 
 export class ReservationService {
   async list(options: {

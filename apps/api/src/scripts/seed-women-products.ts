@@ -8,8 +8,8 @@
 import { readdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { connectDatabase, disconnectDatabase, logger } from '@/config';
-import { computeAvailable, deriveStockStatus } from '@/utils/stock.helper';
+import { connectDatabase, disconnectDatabase, logger } from '@/config/index.js';
+import { computeAvailable, deriveStockStatus } from '@/utils/stock.helper.js';
 import {
   BrandModel,
   CategoryModel,
@@ -18,7 +18,7 @@ import {
   ProductModel,
   ProductVariantModel,
   WarehouseModel,
-} from '@/models';
+} from '@/models/index.js';
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(scriptDir, '../../../..');

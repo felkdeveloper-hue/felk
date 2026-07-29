@@ -7,8 +7,8 @@ import {
   emailParagraph,
   orderReference,
   type EmailTemplateResult,
-} from '@/services/email/templates/layout';
-import type { OrderEmailData } from '@/services/email/templates/order-types';
+} from '@/services/email/templates/layout.js';
+import type { OrderEmailData } from '@/services/email/templates/order-types.js';
 
 export function refundTemplate(order: OrderEmailData): EmailTemplateResult {
   const currency = order.currency ?? 'LKR';

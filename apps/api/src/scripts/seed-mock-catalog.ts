@@ -4,7 +4,7 @@
  * Usage:
  *   pnpm --filter @fe-platform/api exec tsx src/scripts/seed-mock-catalog.ts
  */
-import { connectDatabase, disconnectDatabase, logger } from '@/config';
+import { connectDatabase, disconnectDatabase, logger } from '@/config/index.js';
 import {
   BrandModel,
   CategoryModel,
@@ -23,7 +23,7 @@ import {
   SocialLinkModel,
   StoreSettingModel,
   WarehouseModel,
-} from '@/models';
+} from '@/models/index.js';
 
 const image = (id: string, width = 1200, height = 1600) =>
   `https://images.unsplash.com/${id}?auto=format&fit=crop&w=${width}&h=${height}&q=86`;

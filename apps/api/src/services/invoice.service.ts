@@ -1,8 +1,8 @@
-import { InvoiceModel, type OrderDocument } from '@/models/order.models';
-import { writeAuditLog } from '@/services/audit.service';
-import type { ActorMeta } from '@/services/cms-crud.service';
-import { ApiError } from '@/utils/errors/api-error';
-import { INVOICE_TAX_PLACEHOLDER, ORDER_AUDIT } from '@/constants/order';
+import { InvoiceModel, type OrderDocument } from '@/models/order.models.js';
+import { writeAuditLog } from '@/services/audit.service.js';
+import type { ActorMeta } from '@/services/cms-crud.service.js';
+import { ApiError } from '@/utils/errors/api-error.js';
+import { INVOICE_TAX_PLACEHOLDER, ORDER_AUDIT } from '@/constants/order.js';
 
 function toPlain(doc: { toObject: () => Record<string, unknown> }) {
   return doc.toObject();

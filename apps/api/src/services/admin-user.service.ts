@@ -1,9 +1,9 @@
 import { Types } from 'mongoose';
 import { z } from 'zod';
-import { AUDIT_ACTIONS, AUTH_LIMITS, USER_STATUS, type UserStatus } from '@/constants/auth';
-import { CART_STATUS } from '@/constants/cart';
-import { ORDER_STATUS } from '@/constants/order-status';
-import { ROLES, type RoleKey } from '@/constants/roles';
+import { AUDIT_ACTIONS, AUTH_LIMITS, USER_STATUS, type UserStatus } from '@/constants/auth.js';
+import { CART_STATUS } from '@/constants/cart.js';
+import { ORDER_STATUS } from '@/constants/order-status.js';
+import { ROLES, type RoleKey } from '@/constants/roles.js';
 import {
   CartItemModel,
   CartModel,
@@ -14,14 +14,18 @@ import {
   UserModel,
   UserSessionModel,
   VerificationTokenModel,
-} from '@/models';
-import { paginationQuerySchema, objectIdSchema } from '@/schemas/common.schema';
-import { findRoleByKey } from '@/services/rbac.service';
-import { writeAuditLog } from '@/services/audit.service';
-import { ApiError } from '@/utils/errors/api-error';
-import { assertPasswordStrength, hashPassword, pushPasswordHistory } from '@/utils/password.helper';
-import { buildPaginationMeta, getPaginationSkip, parsePagination } from '@/utils/pagination';
-import { parseSort } from '@/utils/sorting';
+} from '@/models/index.js';
+import { paginationQuerySchema, objectIdSchema } from '@/schemas/common.schema.js';
+import { findRoleByKey } from '@/services/rbac.service.js';
+import { writeAuditLog } from '@/services/audit.service.js';
+import { ApiError } from '@/utils/errors/api-error.js';
+import {
+  assertPasswordStrength,
+  hashPassword,
+  pushPasswordHistory,
+} from '@/utils/password.helper.js';
+import { buildPaginationMeta, getPaginationSkip, parsePagination } from '@/utils/pagination.js';
+import { parseSort } from '@/utils/sorting.js';
 
 const passwordSchema = z
   .string()

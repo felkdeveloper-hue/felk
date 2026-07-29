@@ -7,14 +7,14 @@
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { connectDatabase, disconnectDatabase, logger } from '@/config';
-import { BrandModel, CategoryModel, InventoryItemModel, WarehouseModel } from '@/models';
-import { productRepository } from '@/repositories/product.repository';
-import type { ActorMeta } from '@/services/cms-crud.service';
-import { productMediaService } from '@/services/product-media.service';
-import { productService } from '@/services/product.service';
-import { productVariantService } from '@/services/product-variant.service';
-import { logStorageBackend } from '@/storage';
+import { connectDatabase, disconnectDatabase, logger } from '@/config/index.js';
+import { BrandModel, CategoryModel, InventoryItemModel, WarehouseModel } from '@/models/index.js';
+import { productRepository } from '@/repositories/product.repository.js';
+import type { ActorMeta } from '@/services/cms-crud.service.js';
+import { productMediaService } from '@/services/product-media.service.js';
+import { productService } from '@/services/product.service.js';
+import { productVariantService } from '@/services/product-variant.service.js';
+import { logStorageBackend } from '@/storage/index.js';
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const IMAGE_PATH = join(scriptDir, 'assets', 'slate-blue-loafers.png');

@@ -3,7 +3,7 @@ import {
   PRODUCT_IMPORT_BATCH_LIMIT,
   PRODUCT_STATUS,
   PRODUCT_VISIBILITY,
-} from '@/constants/product';
+} from '@/constants/product.js';
 
 const importVariantSchema = z.object({
   row: z.number().int().min(0).default(0),

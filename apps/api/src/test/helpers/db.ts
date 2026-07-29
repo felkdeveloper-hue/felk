@@ -1,9 +1,9 @@
 import mongoose from 'mongoose';
-import { ROLE_SEED } from '@/constants/rbac-seed';
-import { PERMISSION_LIST } from '@/constants/permissions';
-import { PermissionModel, RoleModel } from '@/models';
-import { connectDatabase, disconnectDatabase } from '@/config/database';
-import { initOrderPaymentConsumer } from '@/services/order-payment-consumer.service';
+import { ROLE_SEED } from '@/constants/rbac-seed.js';
+import { PERMISSION_LIST } from '@/constants/permissions.js';
+import { PermissionModel, RoleModel } from '@/models/index.js';
+import { connectDatabase, disconnectDatabase } from '@/config/database.js';
+import { initOrderPaymentConsumer } from '@/services/order-payment-consumer.service.js';
 
 let rbacSeeded = false;
 let consumerReady = false;

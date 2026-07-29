@@ -1,15 +1,15 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { PERMISSIONS } from '@/constants/permissions';
-import { authenticate, authorizeAny, validate } from '@/middlewares';
-import { actorFromRequest } from '@/services/cms-crud.service';
-import { reviewService } from '@/services/review.service';
-import { storageService } from '@/services/storage.factory';
-import { asyncHandler } from '@/utils/async-handler';
-import { ApiResponse } from '@/utils/response/api-response';
-import { ApiError } from '@/utils/errors/api-error';
-import { multiImageUpload } from '@/utils/file-upload.helper';
-import * as S from '@/schemas/review.schema';
+import { PERMISSIONS } from '@/constants/permissions.js';
+import { authenticate, authorizeAny, validate } from '@/middlewares/index.js';
+import { actorFromRequest } from '@/services/cms-crud.service.js';
+import { reviewService } from '@/services/review.service.js';
+import { storageService } from '@/services/storage.factory.js';
+import { asyncHandler } from '@/utils/async-handler.js';
+import { ApiResponse } from '@/utils/response/api-response.js';
+import { ApiError } from '@/utils/errors/api-error.js';
+import { multiImageUpload } from '@/utils/file-upload.helper.js';
+import * as S from '@/schemas/review.schema.js';
 import { randomUUID } from 'node:crypto';
 
 const P = PERMISSIONS;

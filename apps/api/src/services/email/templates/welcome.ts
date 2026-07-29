@@ -5,7 +5,7 @@ import {
   emailMuted,
   emailParagraph,
   type EmailTemplateResult,
-} from '@/services/email/templates/layout';
+} from '@/services/email/templates/layout.js';
 
 export interface WelcomeUser {
   email: string;

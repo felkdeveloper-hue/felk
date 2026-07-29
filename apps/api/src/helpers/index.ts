@@ -12,4 +12,4 @@ export {
   parsePagination,
   parseSort,
   buildTextSearch,
-} from '@/utils';
+} from '@/utils/index.js';

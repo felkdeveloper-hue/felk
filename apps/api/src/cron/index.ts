@@ -1,10 +1,10 @@
-import { logger } from '@/config/logger';
-import { EmailLogModel } from '@/models/email-log.model';
-import { AnalyticsEventLogModel } from '@/models/analytics.model';
-import { sweepPending, type RetrySweepDoc } from '@/services/retry-sweep.service';
-import { PRODUCT_STATUS, PRODUCT_VISIBILITY } from '@/constants/product';
-import { productService } from '@/services/product.service';
-import { getCached, setCache, storefrontProductsCacheKey } from '@/utils/simple-cache';
+import { logger } from '@/config/logger.js';
+import { EmailLogModel } from '@/models/email-log.model.js';
+import { AnalyticsEventLogModel } from '@/models/analytics.model.js';
+import { sweepPending, type RetrySweepDoc } from '@/services/retry-sweep.service.js';
+import { PRODUCT_STATUS, PRODUCT_VISIBILITY } from '@/constants/product.js';
+import { productService } from '@/services/product.service.js';
+import { getCached, setCache, storefrontProductsCacheKey } from '@/utils/simple-cache.js';
 
 const EMAIL_SWEEP_INTERVAL_MS = 60_000;
 const ANALYTICS_SWEEP_INTERVAL_MS = 60_000;
@@ -17,7 +17,7 @@ let storefrontWarmupTimer: ReturnType<typeof setInterval> | null = null;
 
 async function runEmailSweep() {
   try {
-    const { emailQueueService } = await import('@/services/email-queue.service');
+    const { emailQueueService } = await import('@/services/email-queue.service.js');
     await sweepPending(
       EmailLogModel as unknown as Parameters<typeof sweepPending>[0],
       async (doc: RetrySweepDoc) => {
@@ -39,7 +39,7 @@ async function runEmailSweep() {
 
 async function runAnalyticsSweep() {
   try {
-    const { analyticsService } = await import('@/services/analytics/analytics.service');
+    const { analyticsService } = await import('@/services/analytics/analytics.service.js');
     await sweepPending(
       AnalyticsEventLogModel as unknown as Parameters<typeof sweepPending>[0],
       async (doc: RetrySweepDoc) => {

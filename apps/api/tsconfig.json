@@ -2,8 +2,8 @@
   "extends": "@fe-platform/tsconfig/base.json",
   "compilerOptions": {
     "lib": ["ES2022"],
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "outDir": "dist",
     "rootDir": "src",
     "types": ["node"],
@@ -17,5 +17,9 @@
     "noEmit": false
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "src/**/*.test.ts", "src/test/**/*", "vitest.config.ts"]
+  "exclude": ["node_modules", "dist", "src/**/*.test.ts", "src/test/**/*", "vitest.config.ts"],
+  "tsc-alias": {
+    "resolveFullPaths": true,
+    "resolveFullExtension": ".js"
+  }
 }

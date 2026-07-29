@@ -1,10 +1,10 @@
-import { AttributeValueModel, ProductAttributeModel } from '@/models/product.models';
-import { BaseRepository } from '@/repositories/base.repository';
-import { CmsCrudService } from '@/services/cms-crud.service';
-import { writeAuditLog } from '@/services/audit.service';
-import type { ActorMeta } from '@/services/cms-crud.service';
-import { ApiError } from '@/utils/errors/api-error';
-import { slugify } from '@/utils/slug.helper';
+import { AttributeValueModel, ProductAttributeModel } from '@/models/product.models.js';
+import { BaseRepository } from '@/repositories/base.repository.js';
+import { CmsCrudService } from '@/services/cms-crud.service.js';
+import { writeAuditLog } from '@/services/audit.service.js';
+import type { ActorMeta } from '@/services/cms-crud.service.js';
+import { ApiError } from '@/utils/errors/api-error.js';
+import { slugify } from '@/utils/slug.helper.js';
 
 class AttributeRepository extends BaseRepository {
   constructor() {

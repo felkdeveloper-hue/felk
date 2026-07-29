@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
-import { appConfig } from '@/config/app.config';
-import { logger } from '@/config/logger';
-import { fetchWithRetry } from '@/utils/http-retry';
-import { hashPii, hashPhone } from '@/utils/pii-hash';
-import { AnalyticsEventLogModel } from '@/models/analytics.model';
+import { appConfig } from '@/config/app.config.js';
+import { logger } from '@/config/logger.js';
+import { fetchWithRetry } from '@/utils/http-retry.js';
+import { hashPii, hashPhone } from '@/utils/pii-hash.js';
+import { AnalyticsEventLogModel } from '@/models/analytics.model.js';
 
 const GRAPH_API_VERSION = 'v19.0';
 

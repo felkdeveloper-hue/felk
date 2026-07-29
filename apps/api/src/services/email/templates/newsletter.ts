@@ -1,4 +1,4 @@
-import { emailLayout, type EmailTemplateResult } from '@/services/email/templates/layout';
+import { emailLayout, type EmailTemplateResult } from '@/services/email/templates/layout.js';
 
 export function newsletterTemplate(subject: string, htmlContent: string): EmailTemplateResult {
   const text = htmlContent

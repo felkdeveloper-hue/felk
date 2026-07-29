@@ -1,4 +1,4 @@
-import { INVENTORY_STATUS } from '@/constants/inventory-status';
+import { INVENTORY_STATUS } from '@/constants/inventory-status.js';
 
 export interface StockBuckets {
   onHand: number;

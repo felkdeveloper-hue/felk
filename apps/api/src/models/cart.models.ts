@@ -1,5 +1,5 @@
 import { Schema, model, type Document, type Model, type Types } from 'mongoose';
-import { CART_ITEM_LOCATION, CART_STATUS } from '@/constants/cart';
+import { CART_ITEM_LOCATION, CART_STATUS } from '@/constants/cart.js';
 
 const softDelete = {
   isDeleted: { type: Boolean, default: false, index: true },

@@ -1,17 +1,17 @@
 import type { Application } from 'express';
 import request from 'supertest';
-import { PRODUCT_STATUS, VARIANT_STATUS } from '@/constants/product';
+import { PRODUCT_STATUS, VARIANT_STATUS } from '@/constants/product.js';
 import { randomBytes } from 'node:crypto';
-import { productService } from '@/services/product.service';
-import { productVariantService } from '@/services/product-variant.service';
-import { inventoryService } from '@/services/inventory.service';
-import { WarehouseModel } from '@/models/inventory.models';
-import { MOVEMENT_TYPE } from '@/constants/inventory';
-import { OrderModel } from '@/models/order.models';
-import { InvoiceModel } from '@/models/order.models';
-import { CheckoutSessionModel } from '@/models/checkout.models';
-import { waitFor } from '@/test/helpers/db';
-import { attemptOrderId, buildCodWebhookPayload, postCodWebhook } from '@/test/helpers/webhook';
+import { productService } from '@/services/product.service.js';
+import { productVariantService } from '@/services/product-variant.service.js';
+import { inventoryService } from '@/services/inventory.service.js';
+import { WarehouseModel } from '@/models/inventory.models.js';
+import { MOVEMENT_TYPE } from '@/constants/inventory.js';
+import { OrderModel } from '@/models/order.models.js';
+import { InvoiceModel } from '@/models/order.models.js';
+import { CheckoutSessionModel } from '@/models/checkout.models.js';
+import { waitFor } from '@/test/helpers/db.js';
+import { attemptOrderId, buildCodWebhookPayload, postCodWebhook } from '@/test/helpers/webhook.js';
 
 const API = '/api/v1';
 

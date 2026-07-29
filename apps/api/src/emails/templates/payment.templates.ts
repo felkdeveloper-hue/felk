@@ -7,8 +7,8 @@ import {
   emailParagraph,
   infoTable,
   orderReference,
-} from '@/emails/layout';
-import type { EmailTemplate } from './auth.templates';
+} from '@/emails/layout.js';
+import type { EmailTemplate } from './auth.templates.js';
 
 export function paymentSuccessfulEmail(data: {
   name: string;

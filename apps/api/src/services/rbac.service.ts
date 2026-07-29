@@ -1,8 +1,8 @@
-import { RoleModel } from '@/models/role.model';
-import { PermissionModel } from '@/models/permission.model';
-import type { PermissionKey } from '@/constants/permissions';
-import type { RoleKey } from '@/constants/roles';
-import { ApiError } from '@/utils/errors/api-error';
+import { RoleModel } from '@/models/role.model.js';
+import { PermissionModel } from '@/models/permission.model.js';
+import type { PermissionKey } from '@/constants/permissions.js';
+import type { RoleKey } from '@/constants/roles.js';
+import { ApiError } from '@/utils/errors/api-error.js';
 
 export async function getPermissionsForRole(roleId: string): Promise<PermissionKey[]> {
   const role = await RoleModel.findById(roleId).lean();

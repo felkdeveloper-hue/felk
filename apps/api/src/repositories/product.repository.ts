@@ -1,9 +1,13 @@
 import type { FilterQuery } from 'mongoose';
 import { Types } from 'mongoose';
-import { BaseRepository, type ListOptions } from '@/repositories/base.repository';
-import { ProductModel, ProductVariantModel, type ProductDocument } from '@/models/product.models';
-import { buildPaginationMeta, getPaginationSkip, parsePagination } from '@/utils/pagination';
-import { parseSort } from '@/utils/sorting';
+import { BaseRepository, type ListOptions } from '@/repositories/base.repository.js';
+import {
+  ProductModel,
+  ProductVariantModel,
+  type ProductDocument,
+} from '@/models/product.models.js';
+import { buildPaginationMeta, getPaginationSkip, parsePagination } from '@/utils/pagination.js';
+import { parseSort } from '@/utils/sorting.js';
 
 export interface ProductListFilters extends ListOptions {
   ids?: string | string[];

@@ -1,9 +1,9 @@
 import type { Application } from 'express';
 import request from 'supertest';
-import { USER_STATUS } from '@/constants/auth';
-import { ROLES } from '@/constants/roles';
-import { RoleModel, UserModel } from '@/models';
-import { hashPassword } from '@/utils/password.helper';
+import { USER_STATUS } from '@/constants/auth.js';
+import { ROLES } from '@/constants/roles.js';
+import { RoleModel, UserModel } from '@/models/index.js';
+import { hashPassword } from '@/utils/password.helper.js';
 
 const API = '/api/v1';
 export const TEST_PASSWORD = 'TestPass1!';

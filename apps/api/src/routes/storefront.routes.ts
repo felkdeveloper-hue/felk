@@ -20,20 +20,16 @@ import {
   PromoBannerModel,
   SizeModel,
   SocialLinkModel,
-} from '@/models';
-import { productService } from '@/services/product.service';
-import { CmsCrudService } from '@/services/cms-crud.service';
-import { settingsService } from '@/services/settings.service';
-import { PRODUCT_STATUS, PRODUCT_VISIBILITY } from '@/constants/product';
-import { asyncHandler } from '@/utils/async-handler';
-import { ApiResponse } from '@/utils/response/api-response';
-import { ApiError } from '@/utils/errors/api-error';
-import {
-  getCached,
-  setCache,
-  storefrontProductsCacheKey,
-} from '@/utils/simple-cache';
-import { stableQueryKey } from '@/utils/stable-query-key';
+} from '@/models/index.js';
+import { productService } from '@/services/product.service.js';
+import { CmsCrudService } from '@/services/cms-crud.service.js';
+import { settingsService } from '@/services/settings.service.js';
+import { PRODUCT_STATUS, PRODUCT_VISIBILITY } from '@/constants/product.js';
+import { asyncHandler } from '@/utils/async-handler.js';
+import { ApiResponse } from '@/utils/response/api-response.js';
+import { ApiError } from '@/utils/errors/api-error.js';
+import { getCached, setCache, storefrontProductsCacheKey } from '@/utils/simple-cache.js';
+import { stableQueryKey } from '@/utils/stable-query-key.js';
 
 export const storefrontRouter = Router();
 
@@ -327,7 +323,7 @@ storefrontRouter.get(
       .sort({ displayOrder: 1 })
       .lean();
 
-    const { InventoryItemModel } = await import('@/models/inventory.models');
+    const { InventoryItemModel } = await import('@/models/inventory.models.js');
     const items = rows.length
       ? await InventoryItemModel.find({
           variantId: { $in: rows.map((r) => r._id) },

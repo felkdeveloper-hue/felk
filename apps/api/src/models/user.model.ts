@@ -1,7 +1,7 @@
 import { Schema, model, type Document, type Model, type Types } from 'mongoose';
-import type { RoleKey } from '@/constants/roles';
-import type { UserStatus } from '@/constants/auth';
-import { USER_STATUS } from '@/constants/auth';
+import type { RoleKey } from '@/constants/roles.js';
+import type { UserStatus } from '@/constants/auth.js';
+import { USER_STATUS } from '@/constants/auth.js';
 
 export interface UserDocument extends Document {
   email: string;

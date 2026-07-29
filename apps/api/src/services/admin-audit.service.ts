@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { AuditLogModel } from '@/models/audit-log.model';
-import { paginationQuerySchema } from '@/schemas/common.schema';
-import { buildPaginationMeta } from '@/utils/pagination';
+import { AuditLogModel } from '@/models/audit-log.model.js';
+import { paginationQuerySchema } from '@/schemas/common.schema.js';
+import { buildPaginationMeta } from '@/utils/pagination.js';
 
 export const auditListQuerySchema = paginationQuerySchema.extend({
   action: z.string().trim().max(120).optional(),

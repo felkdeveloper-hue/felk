@@ -1,4 +1,4 @@
-import type { PaginationMeta, PaginationParams, PaginationResult } from '@/types';
+import type { PaginationMeta, PaginationParams, PaginationResult } from '@/types/index.js';
 
 const DEFAULT_PAGE = 1;
 const DEFAULT_LIMIT = 20;

@@ -1,14 +1,14 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { PERMISSIONS } from '@/constants/permissions';
-import { authenticate, authorizeAny, validate } from '@/middlewares';
-import { actorFromRequest } from '@/services/cms-crud.service';
-import { checkoutService } from '@/services/checkout.service';
-import { asyncHandler } from '@/utils/async-handler';
-import { ApiResponse } from '@/utils/response/api-response';
-import { ApiError } from '@/utils/errors/api-error';
-import * as S from '@/schemas/checkout.schema';
-import type { ShippingMethod } from '@/constants/checkout';
+import { PERMISSIONS } from '@/constants/permissions.js';
+import { authenticate, authorizeAny, validate } from '@/middlewares/index.js';
+import { actorFromRequest } from '@/services/cms-crud.service.js';
+import { checkoutService } from '@/services/checkout.service.js';
+import { asyncHandler } from '@/utils/async-handler.js';
+import { ApiResponse } from '@/utils/response/api-response.js';
+import { ApiError } from '@/utils/errors/api-error.js';
+import * as S from '@/schemas/checkout.schema.js';
+import type { ShippingMethod } from '@/constants/checkout.js';
 
 const P = PERMISSIONS;
 

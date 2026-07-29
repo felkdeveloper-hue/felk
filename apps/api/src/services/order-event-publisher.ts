@@ -1,7 +1,7 @@
-import { OrderEventModel } from '@/models/order.models';
-import type { OrderEventType } from '@/constants/order';
-import { domainEventBus } from '@/services/events/event-bus';
-import { logger } from '@/config/logger';
+import { OrderEventModel } from '@/models/order.models.js';
+import type { OrderEventType } from '@/constants/order.js';
+import { domainEventBus } from '@/services/events/event-bus.js';
+import { logger } from '@/config/logger.js';
 
 /**
  * Publish-only outbox for Order Management domain events. Nothing in this

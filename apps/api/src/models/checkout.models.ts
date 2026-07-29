@@ -1,5 +1,5 @@
 import { Schema, model, type Document, type Model, type Types } from 'mongoose';
-import { CHECKOUT_STATUS, SHIPPING_METHOD, DELIVERY_METHOD } from '@/constants/checkout';
+import { CHECKOUT_STATUS, SHIPPING_METHOD, DELIVERY_METHOD } from '@/constants/checkout.js';
 
 const addressSnapshotSchema = new Schema(
   {

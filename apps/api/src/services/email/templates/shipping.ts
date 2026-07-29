@@ -7,8 +7,8 @@ import {
   infoTable,
   orderReference,
   type EmailTemplateResult,
-} from '@/services/email/templates/layout';
-import type { OrderEmailData } from '@/services/email/templates/order-types';
+} from '@/services/email/templates/layout.js';
+import type { OrderEmailData } from '@/services/email/templates/order-types.js';
 
 export function shippingTemplate(order: OrderEmailData): EmailTemplateResult {
   const subject = `Your order #${order.orderNumber} has shipped`;

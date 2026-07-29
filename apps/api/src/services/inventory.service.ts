@@ -5,30 +5,30 @@ import {
   InventoryAlertModel,
   WarehouseModel,
   type InventoryItemDocument,
-} from '@/models/inventory.models';
-import { ProductVariantModel } from '@/models/product.models';
+} from '@/models/inventory.models.js';
+import { ProductVariantModel } from '@/models/product.models.js';
 import {
   inventoryRepository,
   type InventoryListFilters,
-} from '@/repositories/inventory.repository';
-import { writeAuditLog, writeActivityLog } from '@/services/audit.service';
-import type { ActorMeta } from '@/services/cms-crud.service';
-import { syncProductStockStatus } from '@/services/product.service';
-import { ApiError } from '@/utils/errors/api-error';
-import { invalidateStorefrontCatalogCache } from '@/utils/simple-cache';
+} from '@/repositories/inventory.repository.js';
+import { writeAuditLog, writeActivityLog } from '@/services/audit.service.js';
+import type { ActorMeta } from '@/services/cms-crud.service.js';
+import { syncProductStockStatus } from '@/services/product.service.js';
+import { ApiError } from '@/utils/errors/api-error.js';
+import { invalidateStorefrontCatalogCache } from '@/utils/simple-cache.js';
 import {
   assertNonNegative,
   computeAvailable,
   deriveStockStatus,
   snapshotBalance,
-} from '@/utils/stock.helper';
+} from '@/utils/stock.helper.js';
 import {
   ALERT_TYPE,
   ALERT_STATUS,
   INVENTORY_AUDIT,
   MOVEMENT_TYPE,
   type MovementType,
-} from '@/constants/inventory';
+} from '@/constants/inventory.js';
 
 export interface ApplyMovementInput {
   warehouseId: string;

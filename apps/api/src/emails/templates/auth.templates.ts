@@ -7,7 +7,7 @@ import {
   emailParagraph,
   infoTable,
   otpBlock,
-} from '@/emails/layout';
+} from '@/emails/layout.js';
 
 export interface EmailTemplate {
   subject: string;

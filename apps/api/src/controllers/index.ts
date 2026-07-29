@@ -1,2 +1,2 @@
-export { healthController, versionController } from './system.controller';
-export { authController } from './auth.controller';
+export { healthController, versionController } from './system.controller.js';
+export { authController } from './auth.controller.js';

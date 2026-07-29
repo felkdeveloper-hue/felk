@@ -1,5 +1,5 @@
-import { ctaButton, emailGreeting, emailHeading, emailLayout } from '@/emails/layout';
-import type { EmailTemplate } from './auth.templates';
+import { ctaButton, emailGreeting, emailHeading, emailLayout } from '@/emails/layout.js';
+import type { EmailTemplate } from './auth.templates.js';
 
 export function newsletterEmail(data: {
   name?: string;

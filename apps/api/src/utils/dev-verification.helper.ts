@@ -1,5 +1,5 @@
-import { appConfig } from '@/config/app.config';
-import { logger } from '@/config/logger';
+import { appConfig } from '@/config/app.config.js';
+import { logger } from '@/config/logger.js';
 
 export function isEmailDeliveryConfigured(): boolean {
   const { enabled, host, from, password } = appConfig.email;

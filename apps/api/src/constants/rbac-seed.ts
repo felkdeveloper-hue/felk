@@ -1,5 +1,5 @@
-import { PERMISSIONS, type PermissionKey } from '@/constants/permissions';
-import { ROLES, type RoleKey } from '@/constants/roles';
+import { PERMISSIONS, type PermissionKey } from '@/constants/permissions.js';
+import { ROLES, type RoleKey } from '@/constants/roles.js';
 
 const P = PERMISSIONS;
 

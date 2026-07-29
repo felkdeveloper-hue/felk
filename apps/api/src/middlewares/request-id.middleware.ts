@@ -1,6 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
 import { randomUUID } from 'node:crypto';
-import { HEADER_NAMES } from '@/constants/environment';
+import { HEADER_NAMES } from '@/constants/environment.js';
 
 /**
  * Ensures every request has a stable request id for tracing/logs.

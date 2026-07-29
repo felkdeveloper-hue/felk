@@ -1,7 +1,7 @@
 import { Router } from 'express';
-import { authenticate } from '@/middlewares/auth.middleware';
-import { authorize } from '@/middlewares/authorize.middleware';
-import { integrationsController } from '@/controllers/integrations.controller';
+import { authenticate } from '@/middlewares/auth.middleware.js';
+import { authorize } from '@/middlewares/authorize.middleware.js';
+import { integrationsController } from '@/controllers/integrations.controller.js';
 
 export const integrationsRouter = Router();
 

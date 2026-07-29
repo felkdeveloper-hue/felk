@@ -1,13 +1,13 @@
 import { randomUUID } from 'node:crypto';
-import { ProductMediaModel } from '@/models/product.models';
-import { productRepository } from '@/repositories/product.repository';
-import { storageService } from '@/services/storage.factory';
-import { writeAuditLog } from '@/services/audit.service';
-import type { ActorMeta } from '@/services/cms-crud.service';
-import { ApiError } from '@/utils/errors/api-error';
-import { getImageMetadata, processImage } from '@/utils/image.helper';
-import { invalidateStorefrontCatalogCache } from '@/utils/simple-cache';
-import { MEDIA_TYPES, PRODUCT_AUDIT } from '@/constants/product';
+import { ProductMediaModel } from '@/models/product.models.js';
+import { productRepository } from '@/repositories/product.repository.js';
+import { storageService } from '@/services/storage.factory.js';
+import { writeAuditLog } from '@/services/audit.service.js';
+import type { ActorMeta } from '@/services/cms-crud.service.js';
+import { ApiError } from '@/utils/errors/api-error.js';
+import { getImageMetadata, processImage } from '@/utils/image.helper.js';
+import { invalidateStorefrontCatalogCache } from '@/utils/simple-cache.js';
+import { MEDIA_TYPES, PRODUCT_AUDIT } from '@/constants/product.js';
 
 export class ProductMediaService {
   async list(productId: string) {

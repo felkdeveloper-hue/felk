@@ -1,11 +1,11 @@
 import { Schema, model, type Document, type Model, type Types } from 'mongoose';
-import { PAYMENT_STATUS } from '@/constants/payment-status';
+import { PAYMENT_STATUS } from '@/constants/payment-status.js';
 import {
   PAYMENT_ATTEMPT_STATUS,
   REFUND_STATUS,
   REFUND_TYPE,
   SETTLEMENT_STATUS,
-} from '@/constants/payment';
+} from '@/constants/payment.js';
 
 /* -------------------------------------------------------------------------- */
 /* Payment — one per checkout session's attempt to pay                       */

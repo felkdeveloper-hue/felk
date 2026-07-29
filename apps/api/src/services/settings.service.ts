@@ -1,8 +1,8 @@
-import { StoreSettingModel } from '@/models/settings.models';
-import { writeActivityLog, writeAuditLog } from '@/services/audit.service';
-import type { ActorMeta } from '@/services/cms-crud.service';
-import { ApiError } from '@/utils/errors/api-error';
-import { decryptSecret, encryptSecret, maskSecret } from '@/utils/crypto.helper';
+import { StoreSettingModel } from '@/models/settings.models.js';
+import { writeActivityLog, writeAuditLog } from '@/services/audit.service.js';
+import type { ActorMeta } from '@/services/cms-crud.service.js';
+import { ApiError } from '@/utils/errors/api-error.js';
+import { decryptSecret, encryptSecret, maskSecret } from '@/utils/crypto.helper.js';
 
 function redactSetting(doc: Record<string, unknown>) {
   if (doc.isEncrypted || doc.type === 'secret') {

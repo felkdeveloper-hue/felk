@@ -10,13 +10,13 @@
  *   SEED_SUPER_ADMIN_FIRST_NAME
  *   SEED_SUPER_ADMIN_LAST_NAME
  */
-import { connectDatabase, disconnectDatabase, logger } from '@/config';
-import { ROLE_SEED } from '@/constants/rbac-seed';
-import { PERMISSION_LIST } from '@/constants/permissions';
-import { ROLES } from '@/constants/roles';
-import { USER_STATUS } from '@/constants/auth';
-import { PermissionModel, RoleModel, UserModel } from '@/models';
-import { hashPassword } from '@/utils/password.helper';
+import { connectDatabase, disconnectDatabase, logger } from '@/config/index.js';
+import { ROLE_SEED } from '@/constants/rbac-seed.js';
+import { PERMISSION_LIST } from '@/constants/permissions.js';
+import { ROLES } from '@/constants/roles.js';
+import { USER_STATUS } from '@/constants/auth.js';
+import { PermissionModel, RoleModel, UserModel } from '@/models/index.js';
+import { hashPassword } from '@/utils/password.helper.js';
 
 async function seedPermissions() {
   for (const key of PERMISSION_LIST) {

@@ -1,12 +1,12 @@
 import type { NextFunction, Request, Response } from 'express';
-import { AUTH_COOKIES } from '@/constants/auth';
-import { ERROR_MESSAGES } from '@/constants/error-messages';
-import type { PermissionKey } from '@/constants/permissions';
-import type { RoleKey } from '@/constants/roles';
-import { authService } from '@/services/auth.service';
-import { userHasPermission, userHasRole } from '@/services/rbac.service';
-import { isAccessTokenBlacklisted, verifyAccessToken } from '@/services/token.service';
-import { ApiError } from '@/utils/errors/api-error';
+import { AUTH_COOKIES } from '@/constants/auth.js';
+import { ERROR_MESSAGES } from '@/constants/error-messages.js';
+import type { PermissionKey } from '@/constants/permissions.js';
+import type { RoleKey } from '@/constants/roles.js';
+import { authService } from '@/services/auth.service.js';
+import { userHasPermission, userHasRole } from '@/services/rbac.service.js';
+import { isAccessTokenBlacklisted, verifyAccessToken } from '@/services/token.service.js';
+import { ApiError } from '@/utils/errors/api-error.js';
 
 function extractAccessToken(req: Request): string | undefined {
   const header = req.headers.authorization;

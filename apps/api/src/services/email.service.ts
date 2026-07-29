@@ -3,4 +3,4 @@ export {
   CentralizedEmailService,
   trySendEmail,
   verifyEmailTransporter,
-} from '@/services/email/email.service';
+} from '@/services/email/email.service.js';

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { objectIdSchema, paginationQuerySchema } from '@/schemas/common.schema';
+import { objectIdSchema, paginationQuerySchema } from '@/schemas/common.schema.js';
 import {
   MOVEMENT_TYPE,
   PO_STATUS,
@@ -8,7 +8,7 @@ import {
   SUPPLIER_STATUS,
   ALERT_TYPE,
   ALERT_STATUS,
-} from '@/constants/inventory';
+} from '@/constants/inventory.js';
 
 const addressSchema = z
   .object({

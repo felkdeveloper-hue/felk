@@ -1,17 +1,21 @@
 import { randomBytes } from 'node:crypto';
-import { appConfig } from '@/config/app.config';
-import { logger } from '@/config/logger';
-import { PAYMENT_METHOD, PAYMENT_STATUS } from '@/constants/payment-status';
-import { hmacSha256Hex, safeCompare } from '@/utils/crypto.helper';
-import { fetchWithRetry, HttpRetryError } from '@/utils/http-retry';
+import { appConfig } from '@/config/app.config.js';
+import { logger } from '@/config/logger.js';
+import { PAYMENT_METHOD, PAYMENT_STATUS } from '@/constants/payment-status.js';
+import { hmacSha256Hex, safeCompare } from '@/utils/crypto.helper.js';
+import { fetchWithRetry, HttpRetryError } from '@/utils/http-retry.js';
 import type {
   CreatePaymentSessionInput,
   PaymentGateway,
   PaymentSessionResult,
   WebhookVerificationInput,
-} from '@/services/interfaces/payment-gateway.service';
-import { getHeader, parseWebhookPayload, rawBodyToString } from '@/services/gateways/gateway.utils';
-import { ApiError } from '@/utils/errors/api-error';
+} from '@/services/interfaces/payment-gateway.service.js';
+import {
+  getHeader,
+  parseWebhookPayload,
+  rawBodyToString,
+} from '@/services/gateways/gateway.utils.js';
+import { ApiError } from '@/utils/errors/api-error.js';
 
 const MINTPAY_STATUS_MAP: Record<string, string> = {
   success: PAYMENT_STATUS.PAID,

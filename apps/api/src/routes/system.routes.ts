@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { healthController, versionController } from '@/controllers';
+import { healthController, versionController } from '@/controllers/index.js';
 
 export const systemRouter = Router();
 

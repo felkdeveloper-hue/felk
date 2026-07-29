@@ -1,8 +1,8 @@
 import type { NextFunction, Request, Response } from 'express';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
-import { appConfig } from '@/config/app.config';
-import { HTTP_STATUS } from '@/constants/http';
-import { ApiResponse } from '@/utils/response/api-response';
+import { appConfig } from '@/config/app.config.js';
+import { HTTP_STATUS } from '@/constants/http.js';
+import { ApiResponse } from '@/utils/response/api-response.js';
 
 const CSRF_COOKIE = 'fe_csrf_token';
 const CSRF_HEADER = 'x-csrf-token';

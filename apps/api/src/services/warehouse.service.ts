@@ -1,8 +1,8 @@
-import { WarehouseModel } from '@/models/inventory.models';
-import { CmsCrudService, type ActorMeta } from '@/services/cms-crud.service';
-import { writeAuditLog } from '@/services/audit.service';
-import { ApiError } from '@/utils/errors/api-error';
-import { INVENTORY_AUDIT } from '@/constants/inventory';
+import { WarehouseModel } from '@/models/inventory.models.js';
+import { CmsCrudService, type ActorMeta } from '@/services/cms-crud.service.js';
+import { writeAuditLog } from '@/services/audit.service.js';
+import { ApiError } from '@/utils/errors/api-error.js';
+import { INVENTORY_AUDIT } from '@/constants/inventory.js';
 
 export class WarehouseService extends CmsCrudService {
   constructor() {

@@ -1,15 +1,15 @@
-import { appConfig } from '@/config/app.config';
-import { logger } from '@/config/logger';
+import { appConfig } from '@/config/app.config.js';
+import { logger } from '@/config/logger.js';
 
-export { storageService } from '@/services/storage.factory';
+export { storageService } from '@/services/storage.factory.js';
 export type {
   StorageObject,
   StorageService,
   StorageUploadInput,
-} from '@/services/interfaces/storage.service';
+} from '@/services/interfaces/storage.service.js';
 
 /** Alias used by scripts / callers that prefer a function form. */
-export { storageService as getStorageService } from '@/services/storage.factory';
+export { storageService as getStorageService } from '@/services/storage.factory.js';
 
 export function logStorageBackend(): void {
   const { provider, bucket, publicUrl } = appConfig.storage;

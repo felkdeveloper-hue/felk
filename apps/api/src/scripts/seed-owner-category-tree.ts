@@ -5,9 +5,9 @@
  *
  *   pnpm --filter @fe-platform/api exec tsx src/scripts/seed-owner-category-tree.ts
  */
-import { connectDatabase, disconnectDatabase, logger } from '@/config';
-import { NavigationMenuModel } from '@/models/cms-content.models';
-import { CategoryModel } from '@/models/master-data.models';
+import { connectDatabase, disconnectDatabase, logger } from '@/config/index.js';
+import { NavigationMenuModel } from '@/models/cms-content.models.js';
+import { CategoryModel } from '@/models/master-data.models.js';
 
 type CatNode = {
   name: string;

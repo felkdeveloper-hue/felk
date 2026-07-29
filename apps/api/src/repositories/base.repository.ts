@@ -1,8 +1,8 @@
 import type { FilterQuery, Model, UpdateQuery } from 'mongoose';
-import { buildPaginationMeta, getPaginationSkip, parsePagination } from '@/utils/pagination';
-import { parseSort } from '@/utils/sorting';
-import { buildTextSearch } from '@/utils/search';
-import { ApiError } from '@/utils/errors/api-error';
+import { buildPaginationMeta, getPaginationSkip, parsePagination } from '@/utils/pagination.js';
+import { parseSort } from '@/utils/sorting.js';
+import { buildTextSearch } from '@/utils/search.js';
+import { ApiError } from '@/utils/errors/api-error.js';
 
 export interface ListOptions {
   page?: number;

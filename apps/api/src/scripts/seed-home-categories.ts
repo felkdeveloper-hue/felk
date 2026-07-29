@@ -10,8 +10,8 @@
 import { copyFile, mkdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { connectDatabase, disconnectDatabase, logger } from '@/config';
-import { CategoryModel } from '@/models';
+import { connectDatabase, disconnectDatabase, logger } from '@/config/index.js';
+import { CategoryModel } from '@/models/index.js';
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(scriptDir, '../../../..');

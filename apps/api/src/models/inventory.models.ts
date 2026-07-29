@@ -8,8 +8,8 @@ import {
   ALERT_STATUS,
   WAREHOUSE_STATUS,
   SUPPLIER_STATUS,
-} from '@/constants/inventory';
-import { INVENTORY_STATUS } from '@/constants/inventory-status';
+} from '@/constants/inventory.js';
+import { INVENTORY_STATUS } from '@/constants/inventory-status.js';
 
 const softDelete = {
   isDeleted: { type: Boolean, default: false, index: true },

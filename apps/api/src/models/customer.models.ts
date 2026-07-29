@@ -7,7 +7,7 @@ import {
   LOYALTY_TIER,
   REFERRAL_STATUS,
   REWARD_TX_TYPE,
-} from '@/constants/customer';
+} from '@/constants/customer.js';
 
 const softDelete = {
   isDeleted: { type: Boolean, default: false, index: true },

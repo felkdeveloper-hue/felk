@@ -1,14 +1,14 @@
 import { beforeAll, afterAll, beforeEach, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import type { Application } from 'express';
-import { createApp } from '@/app';
+import { createApp } from '@/app.js';
 import {
   setupTestDatabase,
   teardownTestDatabase,
   resetCollections,
   waitFor,
-} from '@/test/helpers/db';
-import { registerCustomer, createAdminUser } from '@/test/helpers/auth';
+} from '@/test/helpers/db.js';
+import { registerCustomer, createAdminUser } from '@/test/helpers/auth.js';
 import {
   seedCatalogAndStock,
   addCustomerAddress,
@@ -16,18 +16,18 @@ import {
   startCheckout,
   createCodPayment,
   completeCodPaymentAndWaitForOrder,
-} from '@/test/helpers/commerce';
-import { attemptOrderId, buildCodWebhookPayload, postCodWebhook } from '@/test/helpers/webhook';
-import { OrderModel } from '@/models/order.models';
-import { CheckoutSessionModel } from '@/models/checkout.models';
-import { StockReservationModel } from '@/models/inventory.models';
-import { PaymentModel } from '@/models/payment.models';
-import { InventoryItemModel } from '@/models/inventory.models';
-import { ProductVariantModel } from '@/models/product.models';
-import { reservationService } from '@/services/reservation.service';
-import { handlePaymentSucceededEvent } from '@/services/order-payment-consumer.service';
-import { PAYMENT_EVENT_TYPE } from '@/constants/payment';
-import { RESERVATION_STATUS } from '@/constants/inventory';
+} from '@/test/helpers/commerce.js';
+import { attemptOrderId, buildCodWebhookPayload, postCodWebhook } from '@/test/helpers/webhook.js';
+import { OrderModel } from '@/models/order.models.js';
+import { CheckoutSessionModel } from '@/models/checkout.models.js';
+import { StockReservationModel } from '@/models/inventory.models.js';
+import { PaymentModel } from '@/models/payment.models.js';
+import { InventoryItemModel } from '@/models/inventory.models.js';
+import { ProductVariantModel } from '@/models/product.models.js';
+import { reservationService } from '@/services/reservation.service.js';
+import { handlePaymentSucceededEvent } from '@/services/order-payment-consumer.service.js';
+import { PAYMENT_EVENT_TYPE } from '@/constants/payment.js';
+import { RESERVATION_STATUS } from '@/constants/inventory.js';
 
 const API = '/api/v1';
 

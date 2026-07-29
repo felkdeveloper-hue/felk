@@ -1,4 +1,4 @@
-import type { WebhookVerificationInput } from '@/services/interfaces/payment-gateway.service';
+import type { WebhookVerificationInput } from '@/services/interfaces/payment-gateway.service.js';
 
 /** Case-insensitive header lookup — Express lower-cases incoming header names, but be defensive. */
 export function getHeader(

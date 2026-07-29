@@ -1,15 +1,15 @@
 import http from 'node:http';
-import { createApp } from '@/app';
-import { appConfig, connectDatabase, logger } from '@/config';
-import { logStorageBackend } from '@/storage';
-import { registerGracefulShutdown } from '@/utils/shutdown';
+import { createApp } from '@/app.js';
+import { appConfig, connectDatabase, logger } from '@/config/index.js';
+import { logStorageBackend } from '@/storage/index.js';
+import { registerGracefulShutdown } from '@/utils/shutdown.js';
 import {
   initOrderPaymentConsumer,
   catchUpUnconsumedPaymentEvents,
   catchUpOrphanCodPayments,
-} from '@/services/order-payment-consumer.service';
-import { startCronJobs } from '@/cron';
-import { verifyEmailTransporter } from '@/services/email/transporter';
+} from '@/services/order-payment-consumer.service.js';
+import { startCronJobs } from '@/cron/index.js';
+import { verifyEmailTransporter } from '@/services/email/transporter.js';
 
 async function bootstrap(): Promise<void> {
   const app = createApp();

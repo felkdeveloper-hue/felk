@@ -1,8 +1,8 @@
-import { RecentlyViewedModel, SavedItemModel } from '@/models/customer.models';
-import { ProductModel, ProductVariantModel } from '@/models/product.models';
-import { customerService } from '@/services/customer.service';
-import { ApiError } from '@/utils/errors/api-error';
-import { RECENTLY_VIEWED_LIMIT } from '@/constants/customer';
+import { RecentlyViewedModel, SavedItemModel } from '@/models/customer.models.js';
+import { ProductModel, ProductVariantModel } from '@/models/product.models.js';
+import { customerService } from '@/services/customer.service.js';
+import { ApiError } from '@/utils/errors/api-error.js';
+import { RECENTLY_VIEWED_LIMIT } from '@/constants/customer.js';
 
 export class RecentlyViewedService {
   async list(customerId: string, limit = 20) {

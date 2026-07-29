@@ -1,6 +1,6 @@
-export { HTTP_STATUS, type HttpStatusCode } from './http';
-export { ROLES, ROLE_LIST, type RoleKey } from './roles';
-export { PERMISSIONS, PERMISSION_LIST, type PermissionKey } from './permissions';
+export { HTTP_STATUS, type HttpStatusCode } from './http.js';
+export { ROLES, ROLE_LIST, type RoleKey } from './roles.js';
+export { PERMISSIONS, PERMISSION_LIST, type PermissionKey } from './permissions.js';
 export {
   ORDER_STATUS,
   ORDER_STATUS_LIST,
@@ -8,7 +8,7 @@ export {
   TERMINAL_ORDER_STATUSES,
   ORDER_STATUS_TRANSITIONS,
   type OrderStatus,
-} from './order-status';
+} from './order-status.js';
 export {
   ORDER_PERMISSIONS,
   ORDER_AUDIT,
@@ -20,7 +20,7 @@ export {
   type OrderEventType,
   type ReturnStatus,
   type ExchangeStatus,
-} from './order';
+} from './order.js';
 export {
   PAYMENT_STATUS,
   PAYMENT_METHOD,
@@ -31,7 +31,7 @@ export {
   type PaymentStatus,
   type PaymentMethod,
   type FuturePaymentMethod,
-} from './payment-status';
+} from './payment-status.js';
 export {
   PAYMENT_PERMISSIONS,
   PAYMENT_ATTEMPT_STATUS,
@@ -47,13 +47,13 @@ export {
   type RefundStatus,
   type SettlementStatus,
   type PaymentEventType,
-} from './payment';
+} from './payment.js';
 export {
   INVENTORY_STATUS,
   STOCK_LEDGER_TYPE,
   type InventoryStatus,
   type StockLedgerType,
-} from './inventory-status';
+} from './inventory-status.js';
 export {
   INVENTORY_PERMISSIONS,
   MOVEMENT_TYPE,
@@ -69,7 +69,7 @@ export {
   type MovementType,
   type TransferStatus,
   type PurchaseOrderStatus,
-} from './inventory';
+} from './inventory.js';
 export {
   CUSTOMER_PERMISSIONS,
   CUSTOMER_STATUS,
@@ -83,7 +83,7 @@ export {
   RECENTLY_VIEWED_LIMIT,
   SYSTEM_CUSTOMER_TAGS,
   type CustomerStatus,
-} from './customer';
+} from './customer.js';
 export {
   CART_PERMISSIONS,
   CART_ITEM_LOCATION,
@@ -93,7 +93,7 @@ export {
   GUEST_CART_HEADER,
   GUEST_CART_COOKIE,
   type CartItemLocation,
-} from './cart';
+} from './cart.js';
 export {
   CHECKOUT_PERMISSIONS,
   CHECKOUT_STATUS,
@@ -103,15 +103,15 @@ export {
   CHECKOUT_AUDIT,
   type CheckoutStatus,
   type ShippingMethod,
-} from './checkout';
+} from './checkout.js';
 export {
   NOTIFICATION_TYPES,
   NOTIFICATION_CHANNELS,
   type NotificationType,
-} from './notification-types';
-export { ENVIRONMENTS, HEADER_NAMES, type EnvironmentName } from './environment';
-export { REGEX } from './regex';
-export { ERROR_MESSAGES } from './error-messages';
+} from './notification-types.js';
+export { ENVIRONMENTS, HEADER_NAMES, type EnvironmentName } from './environment.js';
+export { REGEX } from './regex.js';
+export { ERROR_MESSAGES } from './error-messages.js';
 export {
   USER_STATUS,
   AUTH_PORTAL,
@@ -121,8 +121,8 @@ export {
   AUDIT_ACTIONS,
   type UserStatus,
   type AuthPortal,
-} from './auth';
-export { CMS_PERMISSIONS, type CmsPermissionKey } from './cms-permissions';
+} from './auth.js';
+export { CMS_PERMISSIONS, type CmsPermissionKey } from './cms-permissions.js';
 export {
   PRODUCT_PERMISSIONS,
   PRODUCT_STATUS,
@@ -133,4 +133,4 @@ export {
   PRODUCT_AUDIT,
   type ProductStatus,
   type RelationshipType,
-} from './product';
+} from './product.js';

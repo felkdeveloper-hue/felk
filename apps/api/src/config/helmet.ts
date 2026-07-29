@@ -1,5 +1,5 @@
 import type { HelmetOptions } from 'helmet';
-import { appConfig } from '@/config/app.config';
+import { appConfig } from '@/config/app.config.js';
 
 /**
  * Secure HTTP headers via Helmet.

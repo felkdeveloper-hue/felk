@@ -1,15 +1,15 @@
 import { Router, type Request } from 'express';
-import { PERMISSIONS } from '@/constants/permissions';
-import { authenticate, authorizeAny, validate } from '@/middlewares';
+import { PERMISSIONS } from '@/constants/permissions.js';
+import { authenticate, authorizeAny, validate } from '@/middlewares/index.js';
 import {
   adminSetPasswordSchema,
   adminUpdateUserSchema,
   adminUserIdParamsSchema,
   adminUserListQuerySchema,
   adminUserService,
-} from '@/services/admin-user.service';
-import { asyncHandler } from '@/utils/async-handler';
-import { ApiResponse } from '@/utils/response/api-response';
+} from '@/services/admin-user.service.js';
+import { asyncHandler } from '@/utils/async-handler.js';
+import { ApiResponse } from '@/utils/response/api-response.js';
 
 const P = PERMISSIONS;
 

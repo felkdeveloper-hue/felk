@@ -6,16 +6,16 @@ import {
   CartItemModel,
   type CartDocument,
   type CartItemDocument,
-} from '@/models/cart.models';
-import { ProductModel, ProductVariantModel, ProductMediaModel } from '@/models/product.models';
-import { InventoryItemModel } from '@/models/inventory.models';
-import { ColorModel, SizeModel } from '@/models/master-data.models';
-import { customerService } from '@/services/customer.service';
-import { writeAuditLog } from '@/services/audit.service';
-import type { ActorMeta } from '@/services/cms-crud.service';
-import { ApiError } from '@/utils/errors/api-error';
-import { computePricing } from '@/utils/pricing.helper';
-import { computeAvailable } from '@/utils/stock.helper';
+} from '@/models/cart.models.js';
+import { ProductModel, ProductVariantModel, ProductMediaModel } from '@/models/product.models.js';
+import { InventoryItemModel } from '@/models/inventory.models.js';
+import { ColorModel, SizeModel } from '@/models/master-data.models.js';
+import { customerService } from '@/services/customer.service.js';
+import { writeAuditLog } from '@/services/audit.service.js';
+import type { ActorMeta } from '@/services/cms-crud.service.js';
+import { ApiError } from '@/utils/errors/api-error.js';
+import { computePricing } from '@/utils/pricing.helper.js';
+import { computeAvailable } from '@/utils/stock.helper.js';
 import {
   CART_AUDIT,
   CART_ITEM_LOCATION,
@@ -23,9 +23,9 @@ import {
   CART_STATUS,
   GUEST_CART_COOKIE,
   GUEST_CART_HEADER,
-} from '@/constants/cart';
-import { PRODUCT_STATUS, VARIANT_STATUS } from '@/constants/product';
-import type { AuthenticatedUser } from '@/types';
+} from '@/constants/cart.js';
+import { PRODUCT_STATUS, VARIANT_STATUS } from '@/constants/product.js';
+import type { AuthenticatedUser } from '@/types/index.js';
 
 export interface CartTotals {
   currency: string;

@@ -13,7 +13,7 @@ import {
   PRODUCT_IMPORT_BATCH_LIMIT,
   PRODUCT_STATUS,
   PRODUCT_VISIBILITY,
-} from '@/constants/product';
+} from '@/constants/product.js';
 import {
   BrandModel,
   CategoryModel,
@@ -21,23 +21,26 @@ import {
   MaterialModel,
   OccasionModel,
   SizeModel,
-} from '@/models/master-data.models';
-import { ProductModel } from '@/models/product.models';
-import type { ActorMeta } from '@/services/cms-crud.service';
-import { inventoryService } from '@/services/inventory.service';
-import { attachImportImages, uploadImportZipImage } from '@/services/product-import-image.service';
+} from '@/models/master-data.models.js';
+import { ProductModel } from '@/models/product.models.js';
+import type { ActorMeta } from '@/services/cms-crud.service.js';
+import { inventoryService } from '@/services/inventory.service.js';
+import {
+  attachImportImages,
+  uploadImportZipImage,
+} from '@/services/product-import-image.service.js';
 import {
   createImportZipSession,
   getImportZipSession,
   isSupportedImportImageFilename,
   buildSampleImagesZip,
   type ImportZipSession,
-} from '@/services/product-import-zip.service';
-import { productService } from '@/services/product.service';
-import { productVariantService } from '@/services/product-variant.service';
+} from '@/services/product-import-zip.service.js';
+import { productService } from '@/services/product.service.js';
+import { productVariantService } from '@/services/product-variant.service.js';
 import { readFile } from 'node:fs/promises';
-import { ApiError } from '@/utils/errors/api-error';
-import { slugify } from '@/utils/slug.helper';
+import { ApiError } from '@/utils/errors/api-error.js';
+import { slugify } from '@/utils/slug.helper.js';
 
 /* -------------------------------------------------------------------------- */
 /* Sheet contract                                                             */
@@ -1322,7 +1325,7 @@ export class ProductImportService {
       p.variants.filter((v) => v.sku).map((v) => v.sku.toUpperCase()),
     );
     if (skusFromSheet.length) {
-      const { ProductVariantModel } = await import('@/models/product.models');
+      const { ProductVariantModel } = await import('@/models/product.models.js');
       const existingSkus = await ProductVariantModel.find({
         sku: { $in: skusFromSheet },
         isDeleted: false,

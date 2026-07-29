@@ -1,7 +1,7 @@
 import type { Express } from 'express';
 import swaggerUi from 'swagger-ui-express';
-import { appConfig } from '@/config/app.config';
-import { openApiSpec } from '@/config/swagger';
+import { appConfig } from '@/config/app.config.js';
+import { openApiSpec } from '@/config/swagger.js';
 
 export function setupSwagger(app: Express): void {
   if (!appConfig.security.swaggerEnabled) {

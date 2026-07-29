@@ -1,8 +1,8 @@
 import { Types } from 'mongoose';
-import { BlogPostModel } from '@/models/cms-content.models';
-import { CmsCrudService, type ActorMeta } from '@/services/cms-crud.service';
-import { sanitizeRichText } from '@/utils/sanitize-html';
-import { ApiError } from '@/utils/errors/api-error';
+import { BlogPostModel } from '@/models/cms-content.models.js';
+import { CmsCrudService, type ActorMeta } from '@/services/cms-crud.service.js';
+import { sanitizeRichText } from '@/utils/sanitize-html.js';
+import { ApiError } from '@/utils/errors/api-error.js';
 
 class BlogService extends CmsCrudService {
   constructor() {

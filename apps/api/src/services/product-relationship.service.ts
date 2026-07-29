@@ -1,9 +1,9 @@
-import { ProductRelationshipModel } from '@/models/product.models';
-import { productRepository } from '@/repositories/product.repository';
-import { writeAuditLog } from '@/services/audit.service';
-import type { ActorMeta } from '@/services/cms-crud.service';
-import { ApiError } from '@/utils/errors/api-error';
-import { RELATIONSHIP_TYPES, type RelationshipType } from '@/constants/product';
+import { ProductRelationshipModel } from '@/models/product.models.js';
+import { productRepository } from '@/repositories/product.repository.js';
+import { writeAuditLog } from '@/services/audit.service.js';
+import type { ActorMeta } from '@/services/cms-crud.service.js';
+import { ApiError } from '@/utils/errors/api-error.js';
+import { RELATIONSHIP_TYPES, type RelationshipType } from '@/constants/product.js';
 
 export class ProductRelationshipService {
   async list(productId: string, type?: string) {

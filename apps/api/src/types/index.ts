@@ -1,5 +1,5 @@
-import type { PermissionKey } from '@/constants/permissions';
-import type { RoleKey } from '@/constants/roles';
+import type { PermissionKey } from '@/constants/permissions.js';
+import type { RoleKey } from '@/constants/roles.js';
 
 export interface PaginationParams {
   page?: number;

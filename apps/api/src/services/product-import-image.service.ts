@@ -15,10 +15,10 @@ import type { IncomingMessage } from 'node:http';
 import https from 'node:https';
 import http from 'node:http';
 import path from 'node:path';
-import { ProductMediaModel } from '@/models/product.models';
-import { storageService } from '@/services/storage.factory';
-import { getImageMetadata, processImage } from '@/utils/image.helper';
-import { logger } from '@/config';
+import { ProductMediaModel } from '@/models/product.models.js';
+import { storageService } from '@/services/storage.factory.js';
+import { getImageMetadata, processImage } from '@/utils/image.helper.js';
+import { logger } from '@/config/index.js';
 
 const MIME_BY_EXT: Record<string, string> = {
   jpg: 'image/jpeg',

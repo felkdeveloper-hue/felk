@@ -1,5 +1,5 @@
 import { EventEmitter } from 'node:events';
-import { logger } from '@/config/logger';
+import { logger } from '@/config/logger.js';
 
 /**
  * In-process domain event bus. Publishers (e.g. Payment Engine) have no idea

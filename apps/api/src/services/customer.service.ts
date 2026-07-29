@@ -1,14 +1,18 @@
 import { randomBytes } from 'node:crypto';
 import { Types } from 'mongoose';
-import { CustomerModel, LoyaltyTierModel, type CustomerDocument } from '@/models/customer.models';
-import { UserModel } from '@/models/user.model';
-import { writeAuditLog, writeActivityLog } from '@/services/audit.service';
-import type { ActorMeta } from '@/services/cms-crud.service';
-import { ApiError } from '@/utils/errors/api-error';
-import { buildPaginationMeta, getPaginationSkip, parsePagination } from '@/utils/pagination';
-import { parseSort } from '@/utils/sorting';
-import { CUSTOMER_AUDIT, CUSTOMER_STATUS, LOYALTY_TIER } from '@/constants/customer';
-import type { AuthenticatedUser } from '@/types';
+import {
+  CustomerModel,
+  LoyaltyTierModel,
+  type CustomerDocument,
+} from '@/models/customer.models.js';
+import { UserModel } from '@/models/user.model.js';
+import { writeAuditLog, writeActivityLog } from '@/services/audit.service.js';
+import type { ActorMeta } from '@/services/cms-crud.service.js';
+import { ApiError } from '@/utils/errors/api-error.js';
+import { buildPaginationMeta, getPaginationSkip, parsePagination } from '@/utils/pagination.js';
+import { parseSort } from '@/utils/sorting.js';
+import { CUSTOMER_AUDIT, CUSTOMER_STATUS, LOYALTY_TIER } from '@/constants/customer.js';
+import type { AuthenticatedUser } from '@/types/index.js';
 
 function toPlain(doc: { toObject: () => Record<string, unknown> }) {
   return doc.toObject();

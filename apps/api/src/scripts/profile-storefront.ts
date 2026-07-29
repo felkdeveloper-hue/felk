@@ -13,9 +13,9 @@ async function main() {
   process.env.NODE_ENV = 'test';
 
   const { ProductModel, ProductVariantModel, ProductMediaModel } =
-    await import('@/models/product.models');
-  const { productService } = await import('@/services/product.service');
-  const { PRODUCT_STATUS, PRODUCT_VISIBILITY } = await import('@/constants/product');
+    await import('@/models/product.models.js');
+  const { productService } = await import('@/services/product.service.js');
+  const { PRODUCT_STATUS, PRODUCT_VISIBILITY } = await import('@/constants/product.js');
 
   await mongoose.connect(process.env.MONGODB_URI);
   await Promise.all([
