@@ -108,12 +108,12 @@ pnpm docker:up
 3. Each app includes `vercel.json` with an SPA rewrite so client routes (e.g. `/login`, `/products`) do not 404.
 4. Set build-time env vars (then **Redeploy** — Vite embeds them at build):
 
-| Variable              | Example                                 |
-| --------------------- | --------------------------------------- |
-| `VITE_API_URL`        | `https://felk-mq41.onrender.com/api/v1` |
-| `VITE_SOCKET_URL`     | `https://felk-mq41.onrender.com`        |
-| `VITE_SITE_URL` (web) | `https://felk-web.vercel.app`           |
-| `VITE_APP_NAME`       | Your brand / admin title                |
+| Variable              | Example                       |
+| --------------------- | ----------------------------- |
+| `VITE_API_URL`        | `https://api.fe.lk/api/v1`    |
+| `VITE_SOCKET_URL`     | `https://api.fe.lk`           |
+| `VITE_SITE_URL` (web) | `https://felk-web.vercel.app` |
+| `VITE_APP_NAME`       | Your brand / admin title      |
 
 If `VITE_API_URL` is set to the API origin without `/api/v1`, the apps append `/api/v1` automatically.
 

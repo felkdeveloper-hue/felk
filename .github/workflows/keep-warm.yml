@@ -22,7 +22,7 @@ jobs:
       - name: Ping /health/live
         env:
           # Override with a repository variable if the API host changes.
-          API_URL: ${{ vars.API_URL || 'https://felk-mq41.onrender.com/api/v1' }}
+          API_URL: ${{ vars.API_URL || 'https://api.fe.lk/api/v1' }}
         run: |
           # Retry so a ping that lands mid-wake still succeeds.
           curl --fail --silent --show-error \

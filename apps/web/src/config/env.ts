@@ -15,7 +15,7 @@ function resolveApiUrl(raw: string | undefined, fallback: string): string {
   }
 }
 
-const defaultApiUrl = import.meta.env.PROD ? 'https://felk-mq41.onrender.com/api/v1' : '/api/v1';
+const defaultApiUrl = import.meta.env.PROD ? 'https://api.fe.lk/api/v1' : '/api/v1';
 
 const apiUrl = resolveApiUrl(import.meta.env.VITE_API_URL, defaultApiUrl);
 
@@ -28,12 +28,16 @@ function resolveApiOrigin(value: string): string {
   }
 }
 
+const apiOrigin = resolveApiOrigin(apiUrl);
+
 export const env = {
   apiUrl,
-  apiOrigin: resolveApiOrigin(apiUrl),
+  apiOrigin,
   appName: import.meta.env.VITE_APP_NAME || 'FE',
   cdnUrl: import.meta.env.VITE_CDN_URL ?? '',
-  socketUrl: import.meta.env.VITE_SOCKET_URL ?? '',
+  /** Production sockets default to the API origin when `VITE_SOCKET_URL` is unset. */
+  socketUrl:
+    (import.meta.env.VITE_SOCKET_URL ?? '').trim() || (import.meta.env.PROD ? apiOrigin : ''),
   isDev: import.meta.env.DEV,
   isProd: import.meta.env.PROD,
 } as const;
