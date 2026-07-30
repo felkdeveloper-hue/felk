@@ -41,6 +41,32 @@ function errorMessage(error: unknown, fallback: string) {
   return AppError.isAppError(error) ? error.message : fallback;
 }
 
+/** Prefer Zod details turned into Excel fix tips — never show a bare "Validation failed". */
+function importBatchErrorMessage(error: unknown): string {
+  if (!AppError.isAppError(error)) return 'Upload failed.';
+  if (Array.isArray(error.details) && error.details.length > 0) {
+    const first = error.details[0] as { path?: string; message?: string };
+    const path = typeof first.path === 'string' ? first.path : '';
+    const columnHints: Record<string, string> = {
+      seoTitle: 'SEO Title',
+      seoDescription: 'SEO Description',
+      name: 'Product Name',
+      category: 'Category',
+      shortDescription: 'Short Description',
+      description: 'Description',
+    };
+    const root = path.split('.')[0] ?? '';
+    const column = columnHints[root];
+    if (first.message?.includes('at most') && column) {
+      return `${column}: ${first.message}. Shorten that column in Excel and try again.`;
+    }
+    const label = column ? `${column}: ` : path ? `${path}: ` : '';
+    const more = error.details.length > 1 ? ` (+${error.details.length - 1} more)` : '';
+    return `${label}${first.message ?? error.message}${more}`;
+  }
+  return error.message || 'Upload failed.';
+}
+
 function Stat({
   label,
   value,
@@ -108,18 +134,28 @@ export function BulkProductUploadDialog({
   const [results, setResults] = useState<ImportProductResult[]>([]);
 
   const groups = useMemo(() => {
-    if (!preview) return { importable: [] as ImportProductInput[], blocked: [], duplicates: [] };
+    if (!preview) {
+      return {
+        importable: [] as ImportProductInput[],
+        blocked: [] as ImportProductInput[],
+        duplicates: [] as ImportProductInput[],
+        invalid: [] as ImportProductInput[],
+      };
+    }
     const missingCategories = new Set(preview.newValues.categories);
     const duplicateSlugs = new Set(preview.duplicates);
+    const issueRows = new Set(preview.issues.map((issue) => issue.row));
     const importable: ImportProductInput[] = [];
     const blocked: ImportProductInput[] = [];
     const duplicates: ImportProductInput[] = [];
+    const invalid: ImportProductInput[] = [];
     for (const product of editedProducts) {
-      if (missingCategories.has(product.category)) blocked.push(product);
+      if (product.rows.some((row) => issueRows.has(row))) invalid.push(product);
+      else if (missingCategories.has(product.category)) blocked.push(product);
       else if (duplicateSlugs.has(product.slug)) duplicates.push(product);
       else importable.push(product);
     }
-    return { importable, blocked, duplicates };
+    return { importable, blocked, duplicates, invalid };
   }, [preview, editedProducts]);
 
   const reset = () => {
@@ -242,13 +278,14 @@ export function BulkProductUploadDialog({
         });
         collected.push(...response.results);
       } catch (error) {
+        const reason = importBatchErrorMessage(error);
         for (const product of batch) {
           collected.push({
             handle: product.handle,
             name: product.name,
             row: product.rows[0] ?? 0,
             status: 'failed',
-            message: errorMessage(error, 'Upload failed.'),
+            message: reason,
           });
         }
       }
@@ -490,18 +527,25 @@ export function BulkProductUploadDialog({
               <div className="border border-amber-300 bg-amber-50">
                 <p className="flex items-center gap-2 border-b border-amber-200 px-3 py-2 text-xs font-bold uppercase tracking-wide text-amber-900">
                   <AlertTriangle className="h-4 w-4" />
-                  {preview.issues.length} row{preview.issues.length === 1 ? '' : 's'} with errors —
-                  these rows will not be imported
+                  {preview.issues.length} Excel issue{preview.issues.length === 1 ? '' : 's'} — fix
+                  these cells, then re-upload. Affected products are not imported.
                 </p>
                 <div className="max-h-40 overflow-y-auto">
                   <table className="w-full text-xs">
+                    <thead className="sticky top-0 bg-amber-100/80">
+                      <tr className="border-b border-amber-200 text-left text-amber-900">
+                        <th className="px-3 py-1.5 font-semibold">Row</th>
+                        <th className="px-3 py-1.5 font-semibold">Column</th>
+                        <th className="px-3 py-1.5 font-semibold">What to fix</th>
+                      </tr>
+                    </thead>
                     <tbody>
                       {preview.issues.slice(0, 100).map((issue, i) => (
                         <tr key={`${issue.row}-${i}`} className="border-b border-amber-100">
                           <td className="w-16 px-3 py-1.5 font-semibold text-amber-900">
-                            Row {issue.row}
+                            {issue.row || '—'}
                           </td>
-                          <td className="w-32 px-3 py-1.5 text-amber-800">{issue.column ?? ''}</td>
+                          <td className="w-36 px-3 py-1.5 text-amber-800">{issue.column ?? '—'}</td>
                           <td className="px-3 py-1.5 text-amber-900">{issue.message}</td>
                         </tr>
                       ))}
@@ -679,6 +723,13 @@ export function BulkProductUploadDialog({
               </p>
             ) : null}
 
+            {groups.invalid.length > 0 ? (
+              <p className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                {groups.invalid.length} product{groups.invalid.length === 1 ? '' : 's'} excluded
+                because of Excel validation issues listed above. Fix those cells and preview again.
+              </p>
+            ) : null}
+
             <label className="flex items-center gap-2 text-sm text-[var(--admin-ink)]">
               <input
                 type="checkbox"
@@ -732,7 +783,7 @@ export function BulkProductUploadDialog({
                           Status
                         </th>
                         <th className="px-3 py-1.5 text-left text-[var(--admin-ink-muted)]">
-                          Reason
+                          What to fix
                         </th>
                       </tr>
                     </thead>

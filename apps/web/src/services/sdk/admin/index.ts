@@ -48,3 +48,20 @@ export type { MediaUploadOptions, ProductMediaRow } from './media';
 
 export { integrationsApi } from './integrations';
 export type { IntegrationsStatus, GatewayStatus, SmtpStatus } from './integrations';
+
+export { adminAnalyticsApi } from './analytics';
+export type {
+  AnalyticsFilter,
+  OverviewData,
+  KpiMetric,
+  VisitorRow,
+  SessionRow,
+  PageStat,
+  LiveVisitor,
+  EventRow,
+  Breakdown,
+  DeviceBreakdownData,
+  GeoBreakdownData,
+  TrafficSourceRow,
+  EventBreakdownRow,
+} from './analytics';

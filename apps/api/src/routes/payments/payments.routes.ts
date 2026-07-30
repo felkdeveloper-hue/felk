@@ -9,6 +9,7 @@ import { ApiResponse } from '@/utils/response/api-response.js';
 import { ApiError } from '@/utils/errors/api-error.js';
 import * as S from '@/schemas/payment.schema.js';
 import type { PaymentMethod } from '@/constants/payment-status.js';
+import { emitBusinessEvent } from '@/services/platform-analytics/index.js';
 
 const P = PERMISSIONS;
 
@@ -37,6 +38,24 @@ function webhookHandler(gateway: string) {
 
     if (!result.ok && result.reason === 'invalid_signature') {
       throw ApiError.badRequest('Invalid webhook signature', undefined, 'INVALID_SIGNATURE');
+    }
+
+    if (
+      result.ok &&
+      (result as { payment?: { status?: string; id?: string } }).payment?.status === 'paid'
+    ) {
+      const payment = (result as { payment?: { id?: string; amount?: number; currency?: string } })
+        .payment;
+      void emitBusinessEvent({
+        eventId: crypto.randomUUID(),
+        name: 'payment_completed',
+        properties: {
+          gateway,
+          paymentId: payment?.id ?? null,
+          amount: payment?.amount ?? null,
+          currency: payment?.currency ?? null,
+        },
+      });
     }
 
     // Always acknowledge with 200 once signature-verified (even for business

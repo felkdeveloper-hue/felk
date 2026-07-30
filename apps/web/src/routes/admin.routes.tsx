@@ -369,6 +369,154 @@ const adminAuditRoute = createRoute({
   ),
 });
 
+// ─── Analytics routes ─────────────────────────────────────────────────────────
+
+const AnalyticsOverviewPage = lazy(() =>
+  import('@/pages/admin/analytics/analytics-overview-page').then((m) => ({
+    default: m.AnalyticsOverviewPage,
+  })),
+);
+const AnalyticsVisitorsPage = lazy(() =>
+  import('@/pages/admin/analytics/analytics-visitors-page').then((m) => ({
+    default: m.AnalyticsVisitorsPage,
+  })),
+);
+const AnalyticsSessionsPage = lazy(() =>
+  import('@/pages/admin/analytics/analytics-sessions-page').then((m) => ({
+    default: m.AnalyticsSessionsPage,
+  })),
+);
+const AnalyticsPagesPage = lazy(() =>
+  import('@/pages/admin/analytics/analytics-pages-page').then((m) => ({
+    default: m.AnalyticsPagesPage,
+  })),
+);
+const AnalyticsLivePage = lazy(() =>
+  import('@/pages/admin/analytics/analytics-live-page').then((m) => ({
+    default: m.AnalyticsLivePage,
+  })),
+);
+const AnalyticsEventsPage = lazy(() =>
+  import('@/pages/admin/analytics/analytics-events-page').then((m) => ({
+    default: m.AnalyticsEventsPage,
+  })),
+);
+const AnalyticsDevicesPage = lazy(() =>
+  import('@/pages/admin/analytics/analytics-devices-page').then((m) => ({
+    default: m.AnalyticsDevicesPage,
+  })),
+);
+const AnalyticsGeoPage = lazy(() =>
+  import('@/pages/admin/analytics/analytics-geo-page').then((m) => ({
+    default: m.AnalyticsGeoPage,
+  })),
+);
+const AnalyticsTrafficPage = lazy(() =>
+  import('@/pages/admin/analytics/analytics-traffic-page').then((m) => ({
+    default: m.AnalyticsTrafficPage,
+  })),
+);
+
+const analyticsPerms = [PERMISSIONS.ANALYTICS_VIEW, PERMISSIONS.REPORTS_VIEW];
+
+function AnalyticsWrap({ children }: { children: React.ReactNode }) {
+  return (
+    <AdminPermissionRoute permissions={analyticsPerms}>
+      <Suspense fallback={<AdminLazyFallback />}>{children}</Suspense>
+    </AdminPermissionRoute>
+  );
+}
+
+const adminAnalyticsRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: 'analytics',
+  component: () => (
+    <AnalyticsWrap>
+      <AnalyticsOverviewPage />
+    </AnalyticsWrap>
+  ),
+});
+
+const adminAnalyticsVisitorsRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: 'analytics/visitors',
+  component: () => (
+    <AnalyticsWrap>
+      <AnalyticsVisitorsPage />
+    </AnalyticsWrap>
+  ),
+});
+
+const adminAnalyticsSessionsRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: 'analytics/sessions',
+  component: () => (
+    <AnalyticsWrap>
+      <AnalyticsSessionsPage />
+    </AnalyticsWrap>
+  ),
+});
+
+const adminAnalyticsPagesRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: 'analytics/pages',
+  component: () => (
+    <AnalyticsWrap>
+      <AnalyticsPagesPage />
+    </AnalyticsWrap>
+  ),
+});
+
+const adminAnalyticsLiveRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: 'analytics/live',
+  component: () => (
+    <AnalyticsWrap>
+      <AnalyticsLivePage />
+    </AnalyticsWrap>
+  ),
+});
+
+const adminAnalyticsEventsRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: 'analytics/events',
+  component: () => (
+    <AnalyticsWrap>
+      <AnalyticsEventsPage />
+    </AnalyticsWrap>
+  ),
+});
+
+const adminAnalyticsDevicesRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: 'analytics/devices',
+  component: () => (
+    <AnalyticsWrap>
+      <AnalyticsDevicesPage />
+    </AnalyticsWrap>
+  ),
+});
+
+const adminAnalyticsGeoRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: 'analytics/geo',
+  component: () => (
+    <AnalyticsWrap>
+      <AnalyticsGeoPage />
+    </AnalyticsWrap>
+  ),
+});
+
+const adminAnalyticsTrafficRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: 'analytics/traffic',
+  component: () => (
+    <AnalyticsWrap>
+      <AnalyticsTrafficPage />
+    </AnalyticsWrap>
+  ),
+});
+
 export const adminRouteTree = adminLayoutRoute.addChildren([
   adminIndexRoute,
   adminForbiddenRoute,
@@ -399,4 +547,13 @@ export const adminRouteTree = adminLayoutRoute.addChildren([
   adminSettingsRoute,
   adminIntegrationsRoute,
   adminAuditRoute,
+  adminAnalyticsRoute,
+  adminAnalyticsVisitorsRoute,
+  adminAnalyticsSessionsRoute,
+  adminAnalyticsPagesRoute,
+  adminAnalyticsLiveRoute,
+  adminAnalyticsEventsRoute,
+  adminAnalyticsDevicesRoute,
+  adminAnalyticsGeoRoute,
+  adminAnalyticsTrafficRoute,
 ]);

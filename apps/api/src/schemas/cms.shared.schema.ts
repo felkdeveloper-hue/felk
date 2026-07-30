@@ -4,7 +4,7 @@ import { REGEX } from '@/constants/regex.js';
 
 export const seoZodSchema = z
   .object({
-    title: z.string().trim().max(200).nullable().optional(),
+    title: z.string().trim().max(500).nullable().optional(),
     description: z.string().trim().max(500).nullable().optional(),
     canonicalUrl: z.string().url().nullable().optional().or(z.literal('')),
     keywords: z.array(z.string().trim()).optional(),

@@ -9,6 +9,7 @@ import { ApiResponse } from '@/utils/response/api-response.js';
 import { ApiError } from '@/utils/errors/api-error.js';
 import * as S from '@/schemas/order.schema.js';
 import type { OrderStatus } from '@/constants/order-status.js';
+import { emitBusinessEvent } from '@/services/platform-analytics/index.js';
 
 const P = PERMISSIONS;
 
@@ -98,6 +99,12 @@ ordersRouter.patch(
       req.user,
       actorFromRequest(req),
     );
+    void emitBusinessEvent({
+      eventId: crypto.randomUUID(),
+      name: 'order_updated',
+      userId: req.user.id?.toString() ?? null,
+      properties: { orderId: String(req.params.id), status: body.status },
+    });
     ApiResponse.success(res, order, 'Order status updated');
   }),
 );

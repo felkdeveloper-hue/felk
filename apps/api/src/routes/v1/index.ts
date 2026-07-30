@@ -15,6 +15,7 @@ import { storefrontRouter } from '@/routes/storefront.routes.js';
 import { reviewsRouter } from '@/routes/reviews.routes.js';
 import { trackingRouter } from '@/routes/tracking/tracking.routes.js';
 import { integrationsRouter } from '@/routes/integrations/integrations.routes.js';
+import { analyticsRouter } from '@/routes/analytics/analytics.routes.js';
 
 /**
  * API v1 root router.
@@ -37,3 +38,4 @@ v1Router.use('/payments', paymentsRouter);
 v1Router.use('/orders', ordersRouter);
 v1Router.use('/tracking', trackingRouter);
 v1Router.use('/integrations', integrationsRouter);
+v1Router.use('/analytics', analyticsRouter);

@@ -1,5 +1,6 @@
 import type { LucideIcon } from 'lucide-react';
 import {
+  BarChart3,
   Filter,
   Image,
   LayoutDashboard,
@@ -29,6 +30,68 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     to: ADMIN_ROUTES.dashboard,
     icon: LayoutDashboard,
     permissions: [PERMISSIONS.REPORTS_VIEW, PERMISSIONS.ANALYTICS_VIEW, PERMISSIONS.ORDERS_VIEW],
+  },
+  {
+    label: 'Analytics',
+    to: ADMIN_ROUTES.analytics,
+    icon: BarChart3,
+    permissions: [PERMISSIONS.ANALYTICS_VIEW, PERMISSIONS.REPORTS_VIEW],
+    children: [
+      {
+        label: 'Overview',
+        to: ADMIN_ROUTES.analytics,
+        icon: BarChart3,
+        permissions: [PERMISSIONS.ANALYTICS_VIEW, PERMISSIONS.REPORTS_VIEW],
+      },
+      {
+        label: 'Visitors',
+        to: ADMIN_ROUTES.analyticsVisitors,
+        icon: Users,
+        permissions: [PERMISSIONS.ANALYTICS_VIEW],
+      },
+      {
+        label: 'Sessions',
+        to: ADMIN_ROUTES.analyticsSessions,
+        icon: BarChart3,
+        permissions: [PERMISSIONS.ANALYTICS_VIEW],
+      },
+      {
+        label: 'Pages',
+        to: ADMIN_ROUTES.analyticsPages,
+        icon: BarChart3,
+        permissions: [PERMISSIONS.ANALYTICS_VIEW],
+      },
+      {
+        label: 'Live',
+        to: ADMIN_ROUTES.analyticsLive,
+        icon: BarChart3,
+        permissions: [PERMISSIONS.ANALYTICS_VIEW],
+      },
+      {
+        label: 'Events',
+        to: ADMIN_ROUTES.analyticsEvents,
+        icon: BarChart3,
+        permissions: [PERMISSIONS.ANALYTICS_VIEW],
+      },
+      {
+        label: 'Devices',
+        to: ADMIN_ROUTES.analyticsDevices,
+        icon: BarChart3,
+        permissions: [PERMISSIONS.ANALYTICS_VIEW],
+      },
+      {
+        label: 'Geography',
+        to: ADMIN_ROUTES.analyticsGeo,
+        icon: BarChart3,
+        permissions: [PERMISSIONS.ANALYTICS_VIEW],
+      },
+      {
+        label: 'Traffic',
+        to: ADMIN_ROUTES.analyticsTraffic,
+        icon: BarChart3,
+        permissions: [PERMISSIONS.ANALYTICS_VIEW],
+      },
+    ],
   },
   {
     label: 'Users',

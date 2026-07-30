@@ -38,7 +38,9 @@ import {
 } from '@/services/product-import-zip.service.js';
 import { productService } from '@/services/product.service.js';
 import { productVariantService } from '@/services/product-variant.service.js';
+import { importProductSchema } from '@/schemas/product-import.schema.js';
 import { readFile } from 'node:fs/promises';
+import type { ZodIssue } from 'zod';
 import { ApiError } from '@/utils/errors/api-error.js';
 import { slugify } from '@/utils/slug.helper.js';
 
@@ -332,7 +334,7 @@ export const IMPORT_COLUMNS: ColumnDef[] = [
     label: 'SEO Title',
     aliases: ['metatitle', 'seotitle', 'pagetitle'],
     required: false,
-    help: 'Browser/Google title. Defaults to product name when blank.',
+    help: 'Browser/Google title — max 500 characters. Leave blank to use the product name.',
     example: '',
   },
   {
@@ -340,7 +342,7 @@ export const IMPORT_COLUMNS: ColumnDef[] = [
     label: 'SEO Description',
     aliases: ['metadescription', 'seodescription', 'metadesc'],
     required: false,
-    help: 'Meta description for search engines.',
+    help: 'Meta description for search engines — max 500 characters.',
     example: '',
   },
   // ── Returns / Warranty / Payment ─────────────────────────────────────────
@@ -453,6 +455,138 @@ export interface ImportIssue {
   row: number;
   column?: string;
   message: string;
+}
+
+/** Hard limits — must match product-import.schema / product SEO schema. */
+const FIELD_LIMITS = {
+  name: 200,
+  handle: 220,
+  slug: 220,
+  category: 160,
+  gender: 40,
+  brand: 160,
+  material: 160,
+  occasion: 160,
+  tag: 60,
+  shortDescription: 500,
+  description: 20_000,
+  seoTitle: 500,
+  seoDescription: 500,
+  returnsCriteria: 500,
+  warrantyDetails: 500,
+  sku: 120,
+  color: 120,
+  size: 120,
+  image: 2048,
+  specName: 120,
+  specValue: 500,
+} as const;
+
+/** Zod path segment → Excel column label for clear admin errors. */
+const PATH_TO_COLUMN: Record<string, string> = {
+  name: 'Product Name',
+  handle: 'Handle',
+  slug: 'Handle',
+  category: 'Category',
+  gender: 'Gender',
+  brand: 'Brand',
+  material: 'Material',
+  occasions: 'Occasions',
+  tags: 'Tags',
+  shortDescription: 'Short Description',
+  description: 'Description',
+  specifications: 'Additional Specifications',
+  seoTitle: 'SEO Title',
+  seoDescription: 'SEO Description',
+  paymentOption: 'Payment Method',
+  returnsAvailable: 'Returns',
+  returnsCriteria: 'Return Policy',
+  warrantyAvailable: 'Warranty',
+  warrantyDetails: 'Warranty Details',
+  status: 'Status',
+  visibility: 'Visibility',
+  color: 'Color',
+  size: 'Size',
+  price: 'Selling Price',
+  salePrice: 'Sale Price',
+  comparePrice: 'Compare Price',
+  stock: 'Stock',
+  sku: 'Variant SKU',
+  images: 'Images',
+};
+
+function pushTooLong(
+  issues: ImportIssue[],
+  row: number,
+  column: string,
+  value: string,
+  max: number,
+  tip: string,
+): boolean {
+  if (value.length <= max) return false;
+  issues.push({
+    row,
+    column,
+    message: `${column} is ${value.length} characters — maximum is ${max}. ${tip}`,
+  });
+  return true;
+}
+
+/** Turn a Zod issue into an Excel-facing fix instruction. */
+function humanizeZodIssue(issue: ZodIssue, product?: Partial<ImportProductInput> | null): string {
+  const root = String(issue.path[0] ?? '');
+  const leaf = String(issue.path[issue.path.length - 1] ?? root);
+  const column = PATH_TO_COLUMN[leaf] ?? PATH_TO_COLUMN[root] ?? (root ? root : 'Sheet');
+
+  const row = product?.rows?.[0];
+  const rowHint = row ? ` on Excel row ${row}` : '';
+
+  if (issue.code === 'too_big' && 'maximum' in issue && typeof issue.maximum === 'number') {
+    const max = issue.maximum;
+    let actual = '';
+    if (product && root in product) {
+      const raw = (product as Record<string, unknown>)[root];
+      if (typeof raw === 'string') actual = ` (currently ${raw.length})`;
+    }
+    if (root === 'seoTitle') {
+      return `SEO Title is too long${actual} — max ${max} characters. Shorten the "SEO Title" column${rowHint}, or leave it blank to use the product name.`;
+    }
+    if (root === 'seoDescription') {
+      return `SEO Description is too long${actual} — max ${max} characters. Shorten the "SEO Description" column${rowHint}.`;
+    }
+    return `${column} is too long${actual} — max ${max} characters. Shorten the "${column}" cell${rowHint}.`;
+  }
+
+  if (issue.code === 'too_small' && 'minimum' in issue) {
+    return `${column} is required or too short. Fix the "${column}" cell${rowHint}.`;
+  }
+
+  if (issue.code === 'invalid_enum_value' && 'options' in issue) {
+    const options = (issue.options as string[]).join(', ');
+    return `${column} has an invalid value. Use one of: ${options}.`;
+  }
+
+  if (issue.code === 'invalid_type') {
+    return `${column} has the wrong type of value. Check the "${column}" cell${rowHint}.`;
+  }
+
+  return `${column}: ${issue.message}. Fix the "${column}" cell${rowHint}.`;
+}
+
+function zodIssuesToImportIssues(
+  issues: ZodIssue[],
+  product: Partial<ImportProductInput>,
+): ImportIssue[] {
+  const row = product.rows?.[0] ?? 0;
+  return issues.map((issue) => {
+    const root = String(issue.path[0] ?? '');
+    const leaf = String(issue.path[issue.path.length - 1] ?? root);
+    return {
+      row,
+      column: PATH_TO_COLUMN[leaf] ?? PATH_TO_COLUMN[root],
+      message: humanizeZodIssue(issue, product),
+    };
+  });
 }
 
 export interface ImportVariantInput {
@@ -749,14 +883,18 @@ function buildSpecifications(values: Partial<Record<ImportColumnKey, string>>): 
   let order = 0;
 
   const fit = values.fit?.trim();
-  if (fit) specs.push({ name: 'Fit', value: fit, sortOrder: order++ });
+  if (fit) specs.push({ name: 'Fit', value: fit.slice(0, 500), sortOrder: order++ });
 
   const care = values.fabricCare?.trim();
-  if (care) specs.push({ name: 'Fabric Care', value: care, sortOrder: order++ });
+  if (care) specs.push({ name: 'Fabric Care', value: care.slice(0, 500), sortOrder: order++ });
 
   const extra = parseSpecifications(values.specifications ?? '');
   for (const spec of extra) {
-    specs.push({ ...spec, sortOrder: order++ });
+    specs.push({
+      name: spec.name.slice(0, 120),
+      value: spec.value.slice(0, 500),
+      sortOrder: order++,
+    });
   }
 
   return specs;
@@ -910,6 +1048,8 @@ function buildProducts(
   const usedSlugs = new Map<string, string>();
   // Track SKUs used in this file to catch intra-file duplicates
   const usedSkus = new Map<string, number>();
+  /** Handles rejected for product-level field errors — skip their later rows. */
+  const rejectedHandles = new Set<string>();
 
   for (const { row, values } of rows) {
     const name = values.name ?? '';
@@ -918,7 +1058,21 @@ function buildProducts(
       continue;
     }
 
+    if (
+      pushTooLong(
+        issues,
+        row,
+        'Product Name',
+        name,
+        FIELD_LIMITS.name,
+        'Shorten the "Product Name" cell in Excel.',
+      )
+    ) {
+      continue;
+    }
+
     const handle = normalizeKey(values.handle ?? name);
+    if (rejectedHandles.has(handle)) continue;
 
     // ── Prices ──────────────────────────────────────────────────────────────
     const price = parseMoney(values.price ?? '');
@@ -973,6 +1127,10 @@ function buildProducts(
     const images = splitList(values.images ?? '');
     let imageError: string | null = null;
     for (const ref of images) {
+      if (ref.length > FIELD_LIMITS.image) {
+        imageError = `Image reference is ${ref.length} characters — maximum is ${FIELD_LIMITS.image}. Use a shorter filename or URL.`;
+        break;
+      }
       const check = validateImageRef(ref, zipLookup);
       if (!check.ok) {
         imageError = check.message;
@@ -990,6 +1148,18 @@ function buildProducts(
 
     // ── SKU duplicate check ─────────────────────────────────────────────────
     const sku = values.sku?.trim() ?? '';
+    if (
+      pushTooLong(
+        issues,
+        row,
+        'Variant SKU',
+        sku,
+        FIELD_LIMITS.sku,
+        'Shorten the "Variant SKU" cell in Excel.',
+      )
+    ) {
+      continue;
+    }
     if (sku) {
       const prevRow = usedSkus.get(sku.toUpperCase());
       if (prevRow !== undefined) {
@@ -1001,6 +1171,22 @@ function buildProducts(
         continue;
       }
       usedSkus.set(sku.toUpperCase(), row);
+    }
+
+    const color = values.color ?? '';
+    const size = values.size ?? '';
+    if (
+      pushTooLong(
+        issues,
+        row,
+        'Color',
+        color,
+        FIELD_LIMITS.color,
+        'Shorten the "Color" cell in Excel.',
+      ) ||
+      pushTooLong(issues, row, 'Size', size, FIELD_LIMITS.size, 'Shorten the "Size" cell in Excel.')
+    ) {
+      continue;
     }
 
     // ── Positions ───────────────────────────────────────────────────────────
@@ -1020,6 +1206,20 @@ function buildProducts(
       const category = values.category ?? '';
       if (!category) {
         issues.push({ row, column: 'Category', message: 'Category is required.' });
+        rejectedHandles.add(handle);
+        continue;
+      }
+      if (
+        pushTooLong(
+          issues,
+          row,
+          'Category',
+          category,
+          FIELD_LIMITS.category,
+          'Shorten the "Category" cell, or use the exact name from the Reference sheet.',
+        )
+      ) {
+        rejectedHandles.add(handle);
         continue;
       }
 
@@ -1031,6 +1231,7 @@ function buildProducts(
           column: 'Gender',
           message: `"${genderRaw}" is not valid. Use women, men, unisex or kids.`,
         });
+        rejectedHandles.add(handle);
         continue;
       }
 
@@ -1042,6 +1243,7 @@ function buildProducts(
           column: 'Status',
           message: `"${statusRaw}" is not valid. Use draft or active.`,
         });
+        rejectedHandles.add(handle);
         continue;
       }
 
@@ -1055,6 +1257,7 @@ function buildProducts(
           column: 'Visibility',
           message: `"${visibilityRaw}" is not valid. Use public, hidden or catalog_only.`,
         });
+        rejectedHandles.add(handle);
         continue;
       }
 
@@ -1065,6 +1268,7 @@ function buildProducts(
           column: 'Payment Method',
           message: `"${values.paymentMethod}" is not valid. Use cod, prepaid or both.`,
         });
+        rejectedHandles.add(handle);
         continue;
       }
 
@@ -1075,6 +1279,7 @@ function buildProducts(
           column: 'Returns',
           message: `"${values.returns}" is not valid. Use yes or no.`,
         });
+        rejectedHandles.add(handle);
         continue;
       }
 
@@ -1085,10 +1290,129 @@ function buildProducts(
           column: 'Warranty',
           message: `"${values.warranty}" is not valid. Use yes or no.`,
         });
+        rejectedHandles.add(handle);
+        continue;
+      }
+
+      const seoTitle = values.seoTitle ?? '';
+      const seoDescription = values.seoDescription ?? '';
+      const shortDescription = values.shortDescription ?? '';
+      const description = values.description ?? '';
+      const brand = values.brand?.trim() || OFFICIAL_BRAND_NAME;
+      const material = values.material ?? '';
+      const returnsCriteria = values.returnPolicy ?? '';
+      const warrantyDetails = values.warrantyDetails ?? '';
+      const occasions = splitList(values.occasions ?? '');
+      const tags = splitList(values.tags ?? '');
+
+      const lengthBlocked =
+        pushTooLong(
+          issues,
+          row,
+          'SEO Title',
+          seoTitle,
+          FIELD_LIMITS.seoTitle,
+          `Product "${name}": shorten the "SEO Title" cell, or leave it blank to use the product name.`,
+        ) ||
+        pushTooLong(
+          issues,
+          row,
+          'SEO Description',
+          seoDescription,
+          FIELD_LIMITS.seoDescription,
+          `Product "${name}": shorten the "SEO Description" cell in Excel.`,
+        ) ||
+        pushTooLong(
+          issues,
+          row,
+          'Short Description',
+          shortDescription,
+          FIELD_LIMITS.shortDescription,
+          `Product "${name}": shorten the "Short Description" cell in Excel.`,
+        ) ||
+        pushTooLong(
+          issues,
+          row,
+          'Description',
+          description,
+          FIELD_LIMITS.description,
+          `Product "${name}": shorten the "Description" cell in Excel.`,
+        ) ||
+        pushTooLong(
+          issues,
+          row,
+          'Brand',
+          brand,
+          FIELD_LIMITS.brand,
+          'Shorten the "Brand" cell in Excel.',
+        ) ||
+        pushTooLong(
+          issues,
+          row,
+          'Material',
+          material,
+          FIELD_LIMITS.material,
+          'Shorten the "Material" cell in Excel.',
+        ) ||
+        pushTooLong(
+          issues,
+          row,
+          'Return Policy',
+          returnsCriteria,
+          FIELD_LIMITS.returnsCriteria,
+          'Shorten the "Return Policy" cell in Excel.',
+        ) ||
+        pushTooLong(
+          issues,
+          row,
+          'Warranty Details',
+          warrantyDetails,
+          FIELD_LIMITS.warrantyDetails,
+          'Shorten the "Warranty Details" cell in Excel.',
+        );
+
+      if (lengthBlocked) {
+        rejectedHandles.add(handle);
+        continue;
+      }
+
+      const longOccasion = occasions.find((item) => item.length > FIELD_LIMITS.occasion);
+      if (longOccasion) {
+        issues.push({
+          row,
+          column: 'Occasions',
+          message: `Occasion "${longOccasion.slice(0, 40)}…" is ${longOccasion.length} characters — maximum is ${FIELD_LIMITS.occasion}. Shorten it in the "Occasions" cell.`,
+        });
+        rejectedHandles.add(handle);
+        continue;
+      }
+
+      const longTag = tags.find((item) => item.length > FIELD_LIMITS.tag);
+      if (longTag) {
+        issues.push({
+          row,
+          column: 'Tags',
+          message: `Tag "${longTag.slice(0, 40)}…" is ${longTag.length} characters — maximum is ${FIELD_LIMITS.tag}. Shorten it in the "Tags" cell.`,
+        });
+        rejectedHandles.add(handle);
         continue;
       }
 
       const slug = slugify(values.handle ? values.handle : name);
+      if (
+        pushTooLong(
+          issues,
+          row,
+          'Handle',
+          slug,
+          FIELD_LIMITS.slug,
+          'Shorten the product name or set a shorter Handle.',
+        )
+      ) {
+        rejectedHandles.add(handle);
+        continue;
+      }
+
       const slugOwner = usedSlugs.get(slug);
       if (slugOwner && slugOwner !== handle) {
         issues.push({
@@ -1096,6 +1420,7 @@ function buildProducts(
           column: 'Product Name',
           message: `"${name}" produces the same web address as "${slugOwner}". Give one of them a different Handle.`,
         });
+        rejectedHandles.add(handle);
         continue;
       }
       usedSlugs.set(slug, handle);
@@ -1106,20 +1431,20 @@ function buildProducts(
         slug,
         category,
         gender,
-        brand: values.brand?.trim() || OFFICIAL_BRAND_NAME,
-        material: values.material ?? '',
-        occasions: splitList(values.occasions ?? ''),
-        tags: splitList(values.tags ?? ''),
-        shortDescription: values.shortDescription ?? '',
-        description: values.description ?? '',
+        brand,
+        material,
+        occasions,
+        tags,
+        shortDescription,
+        description,
         specifications: buildSpecifications(values),
-        seoTitle: values.seoTitle ?? '',
-        seoDescription: values.seoDescription ?? '',
+        seoTitle,
+        seoDescription,
         paymentOption,
         returnsAvailable,
-        returnsCriteria: values.returnPolicy ?? '',
+        returnsCriteria,
         warrantyAvailable,
-        warrantyDetails: values.warrantyDetails ?? '',
+        warrantyDetails,
         status,
         visibility,
         isBestSeller,
@@ -1132,8 +1457,6 @@ function buildProducts(
       seenVariants.set(handle, new Set());
     }
 
-    const color = values.color ?? '';
-    const size = values.size ?? '';
     const variantKey = `${normalizeKey(color)}::${normalizeKey(size)}`;
     const seen = seenVariants.get(handle);
     if (seen?.has(variantKey)) {
@@ -1185,7 +1508,23 @@ function buildProducts(
     }
   }
 
-  return { products: [...products.values()], issues };
+  // Final schema pass — anything that still fails becomes a clear Excel fix tip
+  const accepted: ImportProductInput[] = [];
+  for (const product of products.values()) {
+    const parsed = importProductSchema.safeParse(product);
+    if (!parsed.success) {
+      issues.push(...zodIssuesToImportIssues(parsed.error.issues, product));
+      continue;
+    }
+    accepted.push({
+      ...parsed.data,
+      // preserve original handle casing/spacing from sheet grouping key
+      handle: product.handle,
+      rows: product.rows,
+    });
+  }
+
+  return { products: accepted, issues };
 }
 
 /* -------------------------------------------------------------------------- */
@@ -1388,7 +1727,7 @@ export class ProductImportService {
 
   /** Create one batch of previously validated products. */
   async importProducts(
-    products: ImportProductInput[],
+    products: unknown[],
     actor: ActorMeta,
     options: {
       publish?: boolean;
@@ -1420,24 +1759,45 @@ export class ProductImportService {
       zipLookup = session.lookup;
     }
 
-    const needsZip = products.some((product) =>
-      product.variants.some((variant) => variant.images.some((ref) => !isHttpUrl(ref))),
-    );
-    if (needsZip && !zipLookup) {
-      throw ApiError.badRequest(
-        'This import includes image filenames. Upload an images ZIP (or use the session from preview).',
-        undefined,
-        'ZIP_REQUIRED',
-      );
-    }
-
     const lookups = await buildLookups();
     const results: ImportProductResult[] = [];
     const urlCache = new Map<string, string>();
 
-    for (const product of products) {
+    for (const raw of products) {
+      const parsed = importProductSchema.safeParse(raw);
+      if (!parsed.success) {
+        const fallback = (raw ?? {}) as Partial<ImportProductInput>;
+        const issue = parsed.error.issues[0];
+        results.push({
+          handle: String(fallback.handle ?? ''),
+          name: String(fallback.name ?? 'Unknown product'),
+          row: Number(fallback.rows?.[0] ?? 0),
+          status: 'failed',
+          message: issue
+            ? humanizeZodIssue(issue, fallback)
+            : 'This product failed validation. Check the Excel row and try again.',
+        });
+        continue;
+      }
+
+      const product = parsed.data;
       const row = product.rows[0] ?? 0;
       let createdProductId: string | null = null;
+
+      const needsZip = product.variants.some((variant) =>
+        variant.images.some((ref) => !isHttpUrl(ref)),
+      );
+      if (needsZip && !zipLookup) {
+        results.push({
+          handle: product.handle,
+          name: product.name,
+          row,
+          status: 'failed',
+          message:
+            'This product has image filenames. Upload an images ZIP (or use the session from preview).',
+        });
+        continue;
+      }
 
       try {
         // Upload ZIP filenames to R2 first, then keep URL-only attach path
@@ -1878,6 +2238,11 @@ export class ProductImportService {
         topic: 'Image inheritance',
         explanation:
           'Leave Images blank on same-color rows. The first image set for that color is automatically reused for every size of that color. Later rows may specify different filenames for variant-specific images.',
+      },
+      {
+        topic: 'SEO Title & Description',
+        explanation:
+          'SEO Title and SEO Description are each max 500 characters. Leave SEO Title blank to use the product name. Longer values are rejected in Preview with a clear fix tip — shorten the cell in Excel before Import.',
       },
       {
         topic: 'Specifications',

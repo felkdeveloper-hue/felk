@@ -13,7 +13,7 @@ const importVariantSchema = z.object({
   salePrice: z.number().min(0).nullable().default(null),
   comparePrice: z.number().min(0).nullable().default(null),
   stock: z.number().int().min(0).nullable().default(null),
-  sku: z.string().trim().max(64).default(''),
+  sku: z.string().trim().max(120).default(''),
   // HTTPS URLs or ZIP filenames (e.g. shirt-front.jpg) — resolved during import
   images: z.array(z.string().trim().min(1).max(2048)).max(20).default([]),
   ownListing: z.boolean().default(false),
@@ -22,7 +22,8 @@ const importVariantSchema = z.object({
   variantPosition: z.number().int().min(0).default(0),
 });
 
-const importProductSchema = z.object({
+/** Single product payload — validated per item so one bad row does not fail the batch. */
+export const importProductSchema = z.object({
   handle: z.string().trim().min(1).max(220),
   name: z.string().trim().min(1).max(200),
   slug: z.string().trim().min(1).max(220),
@@ -34,17 +35,18 @@ const importProductSchema = z.object({
   tags: z.array(z.string().trim().min(1).max(60)).max(40).default([]),
   shortDescription: z.string().trim().max(500).default(''),
   description: z.string().trim().max(20_000).default(''),
+  // Aligned with product.schema specificationSchema (name 120 / value 500)
   specifications: z
     .array(
       z.object({
-        name: z.string().trim().min(1).max(80),
-        value: z.string().trim().min(1).max(300),
+        name: z.string().trim().min(1).max(120),
+        value: z.string().trim().min(1).max(500),
         sortOrder: z.number().int().min(0).default(0),
       }),
     )
     .max(40)
     .default([]),
-  seoTitle: z.string().trim().max(200).default(''),
+  seoTitle: z.string().trim().max(500).default(''),
   seoDescription: z.string().trim().max(500).default(''),
   paymentOption: z.enum(['cod', 'prepaid', 'both']).default('both'),
   returnsAvailable: z.boolean().default(true),
@@ -60,9 +62,15 @@ const importProductSchema = z.object({
   variants: z.array(importVariantSchema).min(1).max(200),
 });
 
+export type ImportProductParsed = z.infer<typeof importProductSchema>;
+
+/** Request envelope only — products are validated one-by-one in the service. */
 export const productImportSchema = z.object({
   publish: z.boolean().optional(),
   /** Session created during preview when an images ZIP was uploaded */
-  imagesSessionId: z.string().uuid().optional(),
-  products: z.array(importProductSchema).min(1).max(PRODUCT_IMPORT_BATCH_LIMIT),
+  imagesSessionId: z.preprocess(
+    (value) => (value === null || value === '' ? undefined : value),
+    z.string().uuid().optional(),
+  ),
+  products: z.array(z.unknown()).min(1).max(PRODUCT_IMPORT_BATCH_LIMIT),
 });

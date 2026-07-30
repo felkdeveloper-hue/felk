@@ -10,6 +10,7 @@ import { SkipToContent } from '@/components/navigation/skip-to-content';
 import { CartBootstrap } from '@/components/cart';
 import { LiveRegion } from '@/components/commerce/live-region';
 import { trackingApi } from '@/services/sdk/tracking';
+import { AnalyticsProvider } from '@/components/analytics/AnalyticsProvider';
 
 /** Shell for all public, unauthenticated storefront pages. */
 export function PublicLayout() {
@@ -37,24 +38,26 @@ export function PublicLayout() {
   }, [location.pathname]);
 
   return (
-    <div className="bg-background text-foreground flex min-h-screen flex-col">
-      <ForceLightTheme />
-      <CartBootstrap />
-      <LiveRegion />
-      <SkipToContent />
-      <OfflineBanner />
-      <AnnouncementBar />
-      <StorefrontHeader />
-      <main
-        id="main-content"
-        className="safe-mobile-chrome flex-1 focus:outline-none lg:pb-0"
-        tabIndex={-1}
-      >
-        <Outlet />
-      </main>
-      <StorefrontFooter />
-      <MobileBottomNav />
-      <FloatingSearch />
-    </div>
+    <AnalyticsProvider>
+      <div className="bg-background text-foreground flex min-h-screen flex-col">
+        <ForceLightTheme />
+        <CartBootstrap />
+        <LiveRegion />
+        <SkipToContent />
+        <OfflineBanner />
+        <AnnouncementBar />
+        <StorefrontHeader />
+        <main
+          id="main-content"
+          className="safe-mobile-chrome flex-1 focus:outline-none lg:pb-0"
+          tabIndex={-1}
+        >
+          <Outlet />
+        </main>
+        <StorefrontFooter />
+        <MobileBottomNav />
+        <FloatingSearch />
+      </div>
+    </AnalyticsProvider>
   );
 }

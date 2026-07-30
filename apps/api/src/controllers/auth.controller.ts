@@ -12,6 +12,7 @@ import {
 import { asyncHandler } from '@/utils/async-handler.js';
 import { ApiResponse } from '@/utils/response/api-response.js';
 import { HTTP_STATUS } from '@/constants/http.js';
+import { emitBusinessEvent } from '@/services/platform-analytics/index.js';
 
 function meta(req: Request): AuthRequestMeta {
   return {
@@ -24,6 +25,12 @@ function meta(req: Request): AuthRequestMeta {
 export const authController = {
   register: asyncHandler(async (req, res) => {
     const result = await authService.register(req.body, meta(req));
+    void emitBusinessEvent({
+      eventId: crypto.randomUUID(),
+      name: 'signup',
+      userId: (result as { user?: { id?: string } }).user?.id ?? null,
+      properties: { portal: (req.body as { portal?: string }).portal ?? 'customer' },
+    });
     ApiResponse.created(res, result, result.message);
   }),
 
@@ -33,6 +40,12 @@ export const authController = {
       accessToken: result.accessToken,
       refreshToken: result.refreshToken,
       rememberMe: result.rememberMe,
+    });
+    void emitBusinessEvent({
+      eventId: crypto.randomUUID(),
+      name: 'login',
+      userId: result.user?.id ?? null,
+      properties: { portal: (req.body as { portal?: string }).portal ?? 'customer' },
     });
     ApiResponse.success(
       res,
@@ -69,11 +82,17 @@ export const authController = {
   }),
 
   logout: asyncHandler(async (req, res) => {
+    const userId = req.user?.id ?? null;
     await authService.logout({
       accessToken: getAccessTokenFromRequest(req),
       refreshToken: getRefreshTokenFromRequest(req),
       user: req.user,
       meta: meta(req),
+    });
+    void emitBusinessEvent({
+      eventId: crypto.randomUUID(),
+      name: 'logout',
+      userId,
     });
     clearAuthCookies(res);
     ApiResponse.success(res, null, 'Logged out');

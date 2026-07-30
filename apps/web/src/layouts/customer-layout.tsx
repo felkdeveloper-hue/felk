@@ -7,6 +7,7 @@ import { AccountNav } from '@/components/account';
 import { ADMIN_ROUTES } from '@/constants';
 import { useAuthStore } from '@/store';
 import { isStaffUser } from '@/utils/auth-redirect';
+import { AnalyticsProvider } from '@/components/analytics/AnalyticsProvider';
 
 /** Shell for authenticated account/orders pages. */
 export function CustomerLayout() {
@@ -17,22 +18,24 @@ export function CustomerLayout() {
   }
 
   return (
-    <div className="bg-background flex min-h-screen flex-col">
-      <ForceLightTheme />
-      <StorefrontHeader />
-      <div className="safe-mobile-chrome mx-auto flex w-full max-w-none flex-1 flex-col gap-8 px-4 py-8 sm:px-6 md:px-8 lg:flex-row lg:gap-10 lg:px-10 lg:pb-10 xl:px-14 2xl:px-20">
-        <aside className="lg:w-56 lg:shrink-0">
-          <div className="border-border bg-card sticky top-28 rounded-xl border p-3 sm:p-4">
-            <AccountNav />
-          </div>
-        </aside>
-        <main className="min-w-0 flex-1">
-          <Outlet />
-        </main>
+    <AnalyticsProvider>
+      <div className="bg-background flex min-h-screen flex-col">
+        <ForceLightTheme />
+        <StorefrontHeader />
+        <div className="safe-mobile-chrome mx-auto flex w-full max-w-none flex-1 flex-col gap-8 px-4 py-8 sm:px-6 md:px-8 lg:flex-row lg:gap-10 lg:px-10 lg:pb-10 xl:px-14 2xl:px-20">
+          <aside className="lg:w-56 lg:shrink-0">
+            <div className="border-border bg-card sticky top-28 rounded-xl border p-3 sm:p-4">
+              <AccountNav />
+            </div>
+          </aside>
+          <main className="min-w-0 flex-1">
+            <Outlet />
+          </main>
+        </div>
+        <StorefrontFooter />
+        <MobileBottomNav />
+        <FloatingSearch />
       </div>
-      <StorefrontFooter />
-      <MobileBottomNav />
-      <FloatingSearch />
-    </div>
+    </AnalyticsProvider>
   );
 }

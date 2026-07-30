@@ -28,6 +28,15 @@ export const ADMIN_ROUTES = {
   settings: '/admin/settings',
   audit: '/admin/audit',
   forbidden: '/admin/forbidden',
+  analytics: '/admin/analytics',
+  analyticsVisitors: '/admin/analytics/visitors',
+  analyticsSessions: '/admin/analytics/sessions',
+  analyticsPages: '/admin/analytics/pages',
+  analyticsLive: '/admin/analytics/live',
+  analyticsEvents: '/admin/analytics/events',
+  analyticsDevices: '/admin/analytics/devices',
+  analyticsGeo: '/admin/analytics/geo',
+  analyticsTraffic: '/admin/analytics/traffic',
 } as const;
 
 /**
