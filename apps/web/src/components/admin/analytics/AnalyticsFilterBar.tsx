@@ -131,14 +131,14 @@ export function AnalyticsFilterBar({
 
   const categories = useQuery({
     queryKey: ['analytics-filter', 'categories'],
-    queryFn: () => cmsApi.categories.list({ limit: 200 }),
+    queryFn: () => cmsApi.categories.list({ limit: 100 }),
     staleTime: 5 * 60_000,
     enabled: fields.has('category'),
   });
 
   const brands = useQuery({
     queryKey: ['analytics-filter', 'brands'],
-    queryFn: () => cmsApi.brands.list({ limit: 200 }),
+    queryFn: () => cmsApi.brands.list({ limit: 100 }),
     staleTime: 5 * 60_000,
     enabled: fields.has('brandId'),
   });

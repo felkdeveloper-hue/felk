@@ -18,6 +18,7 @@ import type {
   DashboardWidgetMeta,
   DashboardWidgetPlacement,
 } from '@/services/sdk/admin';
+import { AppError } from '@/lib/errors';
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
 
@@ -206,9 +207,14 @@ export function PersonalizedDashboard() {
   );
 
   if (layoutQuery.isError) {
+    const status = layoutQuery.error instanceof AppError ? layoutQuery.error.status : undefined;
     return (
       <AdminErrorState
-        message="Unable to load personalized dashboard."
+        message={
+          status === 404
+            ? 'Dashboard API is missing on the server (404). Deploy/restart the API on EC2 so /analytics/admin/dashboard routes are available.'
+            : 'Unable to load personalized dashboard.'
+        }
         onRetry={() => layoutQuery.refetch()}
       />
     );

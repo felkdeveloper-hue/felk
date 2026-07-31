@@ -30,7 +30,17 @@ export function AnalyticsOverviewPage() {
       <AnalyticsFilterBar filter={filter} onChange={(f) => setFilter((p) => ({ ...p, ...f }))} />
 
       {overview.isError ? (
-        <AdminErrorState message="Failed to load analytics." onRetry={() => overview.refetch()} />
+        <AdminErrorState
+          message={
+            overview.error &&
+            typeof overview.error === 'object' &&
+            'status' in overview.error &&
+            (overview.error as { status?: number }).status === 404
+              ? 'Analytics API is missing on the server (404). Deploy/restart the API on EC2, then try again.'
+              : 'Failed to load analytics.'
+          }
+          onRetry={() => overview.refetch()}
+        />
       ) : overview.isLoading ? (
         <KpiGridSkeleton count={11} />
       ) : !data ? null : (

@@ -1,0 +1,79 @@
+name: Deploy API to EC2
+
+# Auto-deploys the backend whenever main changes API-related code.
+# One-time setup: add GitHub secrets listed in docs/ec2-auto-deploy.md
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/api/**'
+      - 'packages/**'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'package.json'
+      - 'scripts/deploy-ec2.sh'
+      - '.github/workflows/deploy-ec2.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-ec2-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Pull · Build · Restart on EC2
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Check deploy secrets
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+        run: |
+          missing=0
+          for name in EC2_HOST EC2_USER EC2_SSH_KEY; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Missing GitHub secret: ${name}"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "Add secrets in GitHub → Settings → Secrets and variables → Actions"
+            echo "See docs/ec2-auto-deploy.md"
+            exit 1
+          fi
+
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: ${{ secrets.EC2_PORT != '' && secrets.EC2_PORT || 22 }}
+          script_stop: true
+          command_timeout: 20m
+          script: |
+            set -euo pipefail
+            APP_DIR="${{ secrets.EC2_APP_DIR }}"
+            if [ -z "$APP_DIR" ]; then
+              APP_DIR="$HOME/felk"
+            fi
+            export EC2_APP_DIR="$APP_DIR"
+            export EC2_BRANCH=main
+            export PM2_APP_NAME="${{ secrets.PM2_APP_NAME }}"
+
+            if [ ! -d "$APP_DIR/.git" ]; then
+              echo "Cloning repo into $APP_DIR"
+              mkdir -p "$(dirname "$APP_DIR")"
+              git clone https://github.com/${{ github.repository }}.git "$APP_DIR"
+            fi
+
+            cd "$APP_DIR"
+            # Ensure deploy script from this commit is present even before pull
+            git fetch origin main
+            git checkout main
+            git reset --hard origin/main
+            chmod +x scripts/deploy-ec2.sh
+            bash scripts/deploy-ec2.sh
