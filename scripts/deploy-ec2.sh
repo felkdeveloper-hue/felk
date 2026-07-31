@@ -58,13 +58,38 @@ else
 fi
 
 echo "==> Health check"
-sleep 2
-if curl -fsS "${HEALTH_URL}" >/dev/null; then
-  echo "API healthy at ${HEALTH_URL}"
-else
-  echo "WARNING: health check failed at ${HEALTH_URL} — check pm2 logs"
-  pm2 logs --lines 40 --nostream || true
-  exit 1
+HEALTH_TIMEOUT_SEC="${HEALTH_TIMEOUT_SEC:-60}"
+HEALTH_INTERVAL_SEC="${HEALTH_INTERVAL_SEC:-2}"
+MAX_ATTEMPTS=$((HEALTH_TIMEOUT_SEC / HEALTH_INTERVAL_SEC))
+if [[ "${MAX_ATTEMPTS}" -lt 1 ]]; then
+  MAX_ATTEMPTS=1
 fi
 
-echo "==> Deploy complete"
+health_started_at=$(date +%s)
+attempt=1
+http_code=""
+
+while [[ "${attempt}" -le "${MAX_ATTEMPTS}" ]]; do
+  echo "Waiting for API... (attempt ${attempt})"
+  http_code="$(
+    curl -sS -o /dev/null -w '%{http_code}' --connect-timeout 2 --max-time 5 "${HEALTH_URL}" 2>/dev/null || true
+  )"
+
+  if [[ "${http_code}" == "200" ]]; then
+    health_elapsed=$(( $(date +%s) - health_started_at ))
+    echo "API healthy at ${HEALTH_URL} (HTTP 200)"
+    echo "API startup time: ${health_elapsed}s"
+    echo "==> Deploy complete"
+    exit 0
+  fi
+
+  if [[ "${attempt}" -lt "${MAX_ATTEMPTS}" ]]; then
+    sleep "${HEALTH_INTERVAL_SEC}"
+  fi
+  attempt=$((attempt + 1))
+done
+
+health_elapsed=$(( $(date +%s) - health_started_at ))
+echo "WARNING: health check failed at ${HEALTH_URL} after ${health_elapsed}s (last HTTP ${http_code:-none})"
+pm2 logs --lines 40 --nostream || true
+exit 1
