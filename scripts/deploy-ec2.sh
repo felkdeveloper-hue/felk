@@ -35,26 +35,21 @@ fi
 echo "==> Building API"
 pnpm --filter @fe-platform/api build
 
-echo "==> Reloading process manager (zero-downtime when cluster + wait_ready)"
+echo "==> Restarting process manager"
 if command -v pm2 >/dev/null 2>&1; then
-  # Prefer ecosystem reload: old workers keep serving until new ones signal ready.
+  # Wipe ghost/errored workers (stale cluster ids cause "Process N not found").
+  # Always start clean from ecosystem so apps/api/.env controls NODE_ENV.
+  pm2 delete api 2>/dev/null || true
+  pm2 delete fe-api 2>/dev/null || true
+  pm2 delete felk-api 2>/dev/null || true
+
   if [[ -f ecosystem.config.cjs ]]; then
-    pm2 startOrReload ecosystem.config.cjs --update-env
+    pm2 start ecosystem.config.cjs
   elif [[ -n "${PM2_APP_NAME}" ]]; then
-    pm2 reload "${PM2_APP_NAME}" --update-env || pm2 restart "${PM2_APP_NAME}" --update-env
-  elif pm2 describe api >/dev/null 2>&1; then
-    pm2 reload api --update-env || pm2 restart api --update-env
-  elif pm2 describe fe-api >/dev/null 2>&1; then
-    pm2 reload fe-api --update-env || pm2 restart fe-api --update-env
-  elif pm2 describe felk-api >/dev/null 2>&1; then
-    pm2 reload felk-api --update-env || pm2 restart felk-api --update-env
+    pm2 restart "${PM2_APP_NAME}" --update-env || true
   else
-    echo "No known PM2 app — starting from ecosystem or restarting all"
-    if [[ -f ecosystem.config.cjs ]]; then
-      pm2 start ecosystem.config.cjs
-    else
-      pm2 restart all --update-env
-    fi
+    echo "ERROR: ecosystem.config.cjs missing and no PM2_APP_NAME set."
+    exit 1
   fi
   pm2 save || true
 elif [[ -f docker/docker-compose.yml ]]; then

@@ -57,22 +57,40 @@ cd ~/felk   # or your EC2_APP_DIR
 bash scripts/deploy-ec2.sh
 ```
 
-## One-time: switch to zero-downtime cluster reload
+## Recover when API crash-loops (Invalid environment variables)
 
-If the API was started as a single fork process (`pm2 start … --name api`), migrate once so deploys no longer hard-kill the process (nginx 502):
+`ecosystem.config.cjs` must **not** force `NODE_ENV=production`. That setting made PM2 ignore a `.env` that still had localhost CORS / dev payment secrets, so every worker exited immediately → nginx **502** (and browser CORS noise).
+
+**Bring the site back now:**
 
 ```bash
 cd ~/felk
 git pull origin main
-pnpm install --frozen-lockfile
 pnpm --filter @fe-platform/api build
-pm2 delete api fe-api felk-api 2>/dev/null || true
+pm2 delete all
 pm2 start ecosystem.config.cjs
 pm2 save
+pm2 logs api --lines 30 --nostream
 curl -sS http://127.0.0.1:4000/api/v1/health/ready
 ```
 
-Later deploys use `pm2 startOrReload` (via `scripts/deploy-ec2.sh`) so old workers keep traffic until Mongo is ready.
+**Production `.env` checklist** (`apps/api/.env` on EC2):
+
+```bash
+# Either keep NODE_ENV=development until secrets are ready, OR:
+NODE_ENV=production
+PRODUCTION_STRICT=false
+CORS_ORIGINS=https://fe.lk,https://www.fe.lk
+# (no localhost in CORS_ORIGINS when PRODUCTION_STRICT is true)
+```
+
+Then:
+
+```bash
+pm2 delete api
+pm2 start ecosystem.config.cjs
+pm2 save
+```
 
 ## Why Dashboard / Analytics 404 on fe.lk
 
