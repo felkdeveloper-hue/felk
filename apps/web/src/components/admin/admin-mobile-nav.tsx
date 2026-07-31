@@ -47,7 +47,7 @@ export function AdminMobileNav() {
           </button>
         </SheetHeader>
 
-        <div className="relative flex-1 overflow-y-auto overscroll-contain px-3 py-4 pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
+        <div className="admin-dark-scroll relative flex-1 overflow-y-auto overscroll-contain px-3 py-4 pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
           <AdminNavLinks onNavigate={() => setOpen(false)} />
           <p className="mt-8 px-3 text-xs text-white/35">Staff console · FE Platform</p>
         </div>

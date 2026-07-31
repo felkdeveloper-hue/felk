@@ -99,7 +99,7 @@ export function AdminSidebar() {
         </Link>
       </div>
 
-      <div className="relative flex-1 overflow-y-auto overscroll-contain px-2.5 py-4">
+      <div className="admin-dark-scroll relative flex-1 overflow-y-auto overscroll-contain px-2.5 py-4">
         <AdminNavLinks collapsed={collapsed} />
       </div>
 
