@@ -40,10 +40,9 @@ function webhookHandler(gateway: string) {
       throw ApiError.badRequest('Invalid webhook signature', undefined, 'INVALID_SIGNATURE');
     }
 
-    if (
-      result.ok &&
-      (result as { payment?: { status?: string; id?: string } }).payment?.status === 'paid'
-    ) {
+    const paymentStatus = (result as { payment?: { status?: string; id?: string } }).payment
+      ?.status;
+    if (result.ok && paymentStatus === 'paid') {
       const payment = (result as { payment?: { id?: string; amount?: number; currency?: string } })
         .payment;
       void emitBusinessEvent({
@@ -54,6 +53,23 @@ function webhookHandler(gateway: string) {
           paymentId: payment?.id ?? null,
           amount: payment?.amount ?? null,
           currency: payment?.currency ?? null,
+        },
+      });
+    } else if (
+      result.ok &&
+      (paymentStatus === 'failed' || paymentStatus === 'cancelled' || paymentStatus === 'canceled')
+    ) {
+      const payment = (result as { payment?: { id?: string; amount?: number; currency?: string } })
+        .payment;
+      void emitBusinessEvent({
+        eventId: crypto.randomUUID(),
+        name: 'payment_failed',
+        properties: {
+          gateway,
+          paymentId: payment?.id ?? null,
+          amount: payment?.amount ?? null,
+          currency: payment?.currency ?? null,
+          status: paymentStatus,
         },
       });
     }

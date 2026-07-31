@@ -10,10 +10,12 @@ import {
 } from '@/services/order-payment-consumer.service.js';
 import { startCronJobs } from '@/cron/index.js';
 import { verifyEmailTransporter } from '@/services/email/transporter.js';
+import { initAnalyticsLiveGateway } from '@/services/platform-analytics/live.gateway.js';
 
 async function bootstrap(): Promise<void> {
   const app = createApp();
   const server = http.createServer(app);
+  initAnalyticsLiveGateway(server);
 
   // Start accepting connections before touching MongoDB. Index repairs plus
   // Atlas server selection can take tens of seconds on a cold instance, and
@@ -71,6 +73,8 @@ async function bootstrap(): Promise<void> {
       });
   } catch (error) {
     logger.warn({ err: error }, 'MongoDB unavailable — starting in degraded mode');
+    const { databaseManager } = await import('@/config/database.js');
+    databaseManager.startReconnectLoop();
   }
 }
 

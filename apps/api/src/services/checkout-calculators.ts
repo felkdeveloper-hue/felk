@@ -89,7 +89,7 @@ export async function calculateShipping(input: ShippingCalcInput): Promise<Shipp
 
   if (!zone) {
     // Structure fallback rates
-    const amount = input.method === SHIPPING_METHOD.EXPRESS ? 800 : 400;
+    const amount = input.method === SHIPPING_METHOD.EXPRESS ? 800 : 500;
     return {
       status: 'placeholder',
       method: input.method,

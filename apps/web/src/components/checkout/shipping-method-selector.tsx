@@ -48,7 +48,7 @@ function priceLabel(
   if (optionId === 'free' || amount === 0) return 'Free';
   if (amount != null) return formatCurrency(amount, currency);
   if (isSelected) return formatCurrency(session.totals.shipping, currency);
-  if (optionId === 'standard') return formatCurrency(session.totals.shipping || 400, currency);
+  if (optionId === 'standard') return formatCurrency(session.totals.shipping || 500, currency);
   return '—';
 }
 

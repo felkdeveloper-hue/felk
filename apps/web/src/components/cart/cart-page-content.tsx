@@ -1,9 +1,11 @@
+import { useEffect } from 'react';
 import { Link } from '@tanstack/react-router';
 import { AnimatePresence } from 'framer-motion';
 import { ROUTES } from '@/constants';
 import { useCartQuery } from '@/hooks/cart';
 import { useAuthStore } from '@/store';
 import { AppError } from '@/lib/errors';
+import { consumePaymentFailedFlag, trackCommerceEvent } from '@/lib/analytics';
 import { formatCurrency } from '@/utils';
 import { CartItemRow } from '@/components/cart/cart-item-row';
 import { CartOrderSummary } from '@/components/cart/cart-order-summary';
@@ -26,6 +28,12 @@ export function CartPageContent() {
 
   const cart = cartQuery.data;
   const validation = cart?.validation;
+
+  useEffect(() => {
+    if (consumePaymentFailedFlag()) {
+      trackCommerceEvent('returned_to_cart');
+    }
+  }, []);
 
   if (cartQuery.isLoading) {
     return (

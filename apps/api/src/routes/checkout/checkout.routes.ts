@@ -9,6 +9,8 @@ import { ApiResponse } from '@/utils/response/api-response.js';
 import { ApiError } from '@/utils/errors/api-error.js';
 import * as S from '@/schemas/checkout.schema.js';
 import type { ShippingMethod } from '@/constants/checkout.js';
+import { emitBusinessEvent } from '@/services/platform-analytics/index.js';
+import { randomUUID } from 'node:crypto';
 
 const P = PERMISSIONS;
 
@@ -48,6 +50,14 @@ checkoutRouter.post(
       },
       actorFromRequest(req),
     );
+    void emitBusinessEvent({
+      eventId: randomUUID(),
+      name: 'checkout_started',
+      userId: String(req.user.id),
+      properties: {
+        checkoutToken: (summary as { checkoutToken?: string })?.checkoutToken ?? null,
+      },
+    });
     ApiResponse.created(res, summary, 'Checkout started');
   }),
 );
@@ -124,11 +134,18 @@ checkoutRouter.delete(
   validate({ body: checkoutRefBodySchema }),
   asyncHandler(async (req, res) => {
     if (!req.user) throw ApiError.unauthorized();
-    ApiResponse.success(
-      res,
-      await checkoutService.cancel(resolveCheckoutRef(req.body), req.user, actorFromRequest(req)),
-      'Cancelled',
+    const result = await checkoutService.cancel(
+      resolveCheckoutRef(req.body),
+      req.user,
+      actorFromRequest(req),
     );
+    void emitBusinessEvent({
+      eventId: randomUUID(),
+      name: 'checkout_abandoned',
+      userId: String(req.user.id),
+      properties: { checkoutToken: resolveCheckoutRef(req.body), reason: 'cancelled' },
+    });
+    ApiResponse.success(res, result, 'Cancelled');
   }),
 );
 
@@ -148,10 +165,17 @@ checkoutRouter.delete(
   validate({ params: S.checkoutIdParamsSchema }),
   asyncHandler(async (req, res) => {
     if (!req.user) throw ApiError.unauthorized();
-    ApiResponse.success(
-      res,
-      await checkoutService.cancel(String(req.params.id), req.user, actorFromRequest(req)),
-      'Cancelled',
+    const result = await checkoutService.cancel(
+      String(req.params.id),
+      req.user,
+      actorFromRequest(req),
     );
+    void emitBusinessEvent({
+      eventId: randomUUID(),
+      name: 'checkout_abandoned',
+      userId: String(req.user.id),
+      properties: { checkoutId: String(req.params.id), reason: 'cancelled' },
+    });
+    ApiResponse.success(res, result, 'Cancelled');
   }),
 );

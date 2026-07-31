@@ -24,6 +24,7 @@ import {
   useStartCheckoutMutation,
 } from '@/hooks/checkout';
 import { useCartStore, useCheckoutStore } from '@/store';
+import { trackCommerceEvent } from '@/lib/analytics';
 
 export function CheckoutInformationPage() {
   const navigate = useNavigate();
@@ -72,6 +73,7 @@ export function CheckoutInformationPage() {
       shippingAddressId: defaultShipping?.id,
       autoReserve: true,
     });
+    trackCommerceEvent('checkout_started');
   };
 
   // Start checkout in the background. Do not wait on a separate cart validate —

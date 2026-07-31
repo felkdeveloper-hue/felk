@@ -8,7 +8,25 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Image } from '@/components/media/image';
 import { QuantitySelector } from '@/components/cart/quantity-selector';
+import { productMetaFrom, trackCommerceEvent } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
+
+function lineMeta(item: CartLineItem) {
+  return productMetaFrom(
+    {
+      id: item.productId,
+      name: item.name,
+      sku: item.sku,
+      price: item.salePrice ?? item.unitPrice,
+      currency: item.currency,
+    },
+    {
+      variantId: item.variantId,
+      variantLabel: [item.colorName, item.sizeName].filter(Boolean).join(' / ') || null,
+      quantity: item.quantity,
+    },
+  );
+}
 
 export interface CartItemRowProps {
   item: CartLineItem;
@@ -78,7 +96,11 @@ export function CartItemRow({ item, compact, validationMessage, className }: Car
             variant="ghost"
             size="icon"
             aria-label={`Remove ${item.name} from cart`}
-            onClick={() => removeMutation.mutate(item.id)}
+            onClick={() =>
+              removeMutation.mutate(item.id, {
+                onSuccess: () => trackCommerceEvent('remove_from_cart', lineMeta(item)),
+              })
+            }
             loading={removeMutation.isPending}
           >
             <Trash2 className="size-4" />
@@ -114,9 +136,21 @@ export function CartItemRow({ item, compact, validationMessage, className }: Car
             min={0}
             onChange={(quantity) => {
               if (quantity === 0) {
-                removeMutation.mutate(item.id);
+                removeMutation.mutate(item.id, {
+                  onSuccess: () => trackCommerceEvent('remove_from_cart', lineMeta(item)),
+                });
               } else {
-                updateMutation.mutate({ itemId: item.id, payload: { quantity } });
+                const increased = quantity > item.quantity;
+                updateMutation.mutate(
+                  { itemId: item.id, payload: { quantity } },
+                  {
+                    onSuccess: () =>
+                      trackCommerceEvent(increased ? 'quantity_increased' : 'quantity_decreased', {
+                        ...lineMeta(item),
+                        quantity,
+                      }),
+                  },
+                );
               }
             }}
             loading={updateMutation.isPending || removeMutation.isPending}

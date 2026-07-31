@@ -17,6 +17,8 @@ export interface UserDocument extends Document {
   phoneVerifiedAt?: Date | null;
   lastLoginAt?: Date | null;
   lastLoginIp?: string | null;
+  lastLoginCountry?: string | null;
+  lastLoginDevice?: string | null;
   failedLoginAttempts: number;
   lockedUntil?: Date | null;
   passwordChangedAt?: Date | null;
@@ -36,7 +38,7 @@ const userSchema = new Schema<UserDocument>(
     passwordHash: { type: String, required: true, select: false },
     passwordHistory: { type: [String], default: [], select: false },
     firstName: { type: String, required: true, trim: true },
-    lastName: { type: String, required: true, trim: true },
+    lastName: { type: String, required: true, trim: true, default: '' },
     phone: { type: String, default: null },
     roleId: { type: Schema.Types.ObjectId, ref: 'Role', required: true, index: true },
     roleKey: { type: String, required: true, index: true },
@@ -50,6 +52,8 @@ const userSchema = new Schema<UserDocument>(
     phoneVerifiedAt: { type: Date, default: null },
     lastLoginAt: { type: Date, default: null },
     lastLoginIp: { type: String, default: null },
+    lastLoginCountry: { type: String, default: null },
+    lastLoginDevice: { type: String, default: null },
     failedLoginAttempts: { type: Number, default: 0 },
     lockedUntil: { type: Date, default: null },
     passwordChangedAt: { type: Date, default: null },

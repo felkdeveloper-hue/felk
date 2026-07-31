@@ -1,8 +1,72 @@
+import dns from 'node:dns';
+import { promisify } from 'node:util';
 import mongoose from 'mongoose';
 import { appConfig } from '@/config/app.config.js';
 import { logger } from '@/config/logger.js';
 
 export type DatabaseStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
+
+const resolveSrv = promisify(dns.resolveSrv);
+const resolveTxt = promisify(dns.resolveTxt);
+
+/**
+ * Node on Windows often hits `querySrv ETIMEOUT` for mongodb+srv while system DNS works.
+ * Prefer public resolvers before Atlas SRV lookups.
+ */
+function configureMongoDns(): void {
+  try {
+    dns.setServers(['8.8.8.8', '1.1.1.1', '8.8.4.4']);
+  } catch {
+    // ignore — some environments lock DNS settings
+  }
+}
+
+/**
+ * Expand mongodb+srv:// to a standard mongodb:// multi-host URI.
+ * Avoids the Node driver's internal querySrv path that frequently times out on Windows.
+ */
+async function expandSrvConnectionString(uri: string): Promise<string> {
+  if (!uri.startsWith('mongodb+srv://')) return uri;
+
+  configureMongoDns();
+  const parsed = new URL(uri);
+  const hostname = parsed.hostname;
+  const auth =
+    parsed.username || parsed.password
+      ? `${decodeURIComponent(parsed.username)}:${decodeURIComponent(parsed.password)}@`
+      : '';
+  const dbName = parsed.pathname.replace(/^\//, '') || 'fe-platform';
+
+  const [srvRecords, txtRecords] = await Promise.all([
+    resolveSrv(`_mongodb._tcp.${hostname}`),
+    resolveTxt(hostname).catch(() => [] as string[][]),
+  ]);
+
+  if (!srvRecords.length) {
+    throw new Error(`No SRV records found for ${hostname}`);
+  }
+
+  const txt = txtRecords.map((parts) => parts.join('')).join('');
+  const atlasParams = new URLSearchParams(txt);
+  const query = new URLSearchParams(parsed.search);
+  if (!query.has('ssl') && !query.has('tls')) query.set('tls', 'true');
+  if (!query.has('authSource') && atlasParams.get('authSource')) {
+    query.set('authSource', atlasParams.get('authSource')!);
+  }
+  if (!query.has('replicaSet') && atlasParams.get('replicaSet')) {
+    query.set('replicaSet', atlasParams.get('replicaSet')!);
+  }
+  if (!query.has('retryWrites')) query.set('retryWrites', 'true');
+  if (!query.has('w')) query.set('w', 'majority');
+
+  const hosts = srvRecords.map((record) => `${record.name}:${record.port}`).join(',');
+  const expanded = `mongodb://${auth}${hosts}/${dbName}?${query.toString()}`;
+  logger.info(
+    { hostCount: srvRecords.length, replicaSet: query.get('replicaSet') },
+    'Expanded mongodb+srv URI to standard hosts (Windows DNS workaround)',
+  );
+  return expanded;
+}
 
 /** Drop legacy unique barcode index that rejects multiple null barcodes. */
 async function repairVariantBarcodeIndex() {
@@ -128,13 +192,29 @@ class DatabaseManager {
     }
 
     this.status = 'connecting';
+    configureMongoDns();
     mongoose.set('strictQuery', true);
+    // Prefer immediate failures over 10s "buffering timed out" when disconnected.
+    mongoose.set('bufferCommands', true);
 
     try {
-      const connection = await mongoose.connect(appConfig.database.uri, {
+      let uri = appConfig.database.uri;
+      try {
+        uri = await expandSrvConnectionString(uri);
+      } catch (expandError) {
+        logger.warn(
+          { err: expandError },
+          'Could not expand mongodb+srv URI — falling back to driver SRV resolution',
+        );
+      }
+
+      const connection = await mongoose.connect(uri, {
         maxPoolSize: appConfig.database.maxPoolSize,
-        serverSelectionTimeoutMS: 10_000,
+        // Atlas SRV + cold clusters need more than the previous 10s window.
+        serverSelectionTimeoutMS: 30_000,
+        connectTimeoutMS: 30_000,
         socketTimeoutMS: 45_000,
+        family: 4,
       });
 
       this.status = 'connected';
@@ -181,13 +261,51 @@ class DatabaseManager {
         logger.warn({ err: error }, 'User email index repair skipped');
       });
 
+      // One-time rate bump: standard flat shipping 400 → 500 LKR.
+      void import('@/models/settings.models.js')
+        .then(({ ShippingZoneModel }) =>
+          ShippingZoneModel.updateMany(
+            { rate: 400, rateType: 'flat', isDeleted: false },
+            { $set: { rate: 500 } },
+          ),
+        )
+        .then((result) => {
+          if (result.modifiedCount > 0) {
+            logger.info(
+              { modifiedCount: result.modifiedCount },
+              'Updated flat shipping zones from LKR 400 to LKR 500',
+            );
+          }
+        })
+        .catch((error: unknown) => {
+          logger.warn({ err: error }, 'Shipping zone rate update skipped');
+        });
+
       return connection;
     } catch (error) {
       this.status = 'error';
       this.lastError = error instanceof Error ? error : new Error(String(error));
+      // Stop queueing queries that will never resolve while we are offline.
+      mongoose.set('bufferCommands', false);
       logger.error({ err: this.lastError }, 'MongoDB connection failed');
       throw this.lastError;
     }
+  }
+
+  /** Background retries after degraded boot (e.g. transient DNS / Atlas blip). */
+  startReconnectLoop(intervalMs = 15_000): void {
+    const tick = async () => {
+      if (this.isConnected() || this.status === 'connecting') return;
+      try {
+        logger.info('Retrying MongoDB connection…');
+        await this.connect();
+      } catch {
+        // logged in connect()
+      }
+    };
+    setInterval(() => {
+      void tick();
+    }, intervalMs).unref();
   }
 
   async disconnect(): Promise<void> {

@@ -1,6 +1,6 @@
 import { VisitorModel } from '@/models/analytics/index.js';
 import type { AnalyticsFilter } from '@/schemas/analytics/index.js';
-import { resolveDateRange } from './date-range.util.js';
+import { buildVisitorMatch } from './analytics-query.builder.js';
 
 const SOURCE_LABELS: Record<string, string> = {
   direct: 'Direct',
@@ -13,10 +13,10 @@ const SOURCE_LABELS: Record<string, string> = {
 };
 
 export async function getTrafficSources(filter: AnalyticsFilter) {
-  const range = resolveDateRange(filter);
+  const match = buildVisitorMatch(filter);
 
   const results = await VisitorModel.aggregate<{ _id: string; count: number }>([
-    { $match: { lastSeenAt: { $gte: range.from, $lte: range.to } } },
+    { $match: match },
     { $group: { _id: '$trafficSource', count: { $sum: 1 } } },
     { $sort: { count: -1 } },
   ]);

@@ -19,7 +19,8 @@ export const registerSchema = z.object({
     .transform((v) => v.trim().toLowerCase()),
   password: registerPasswordSchema,
   firstName: z.string().trim().min(1).max(100),
-  lastName: z.string().trim().min(1).max(100),
+  // Optional — single-name signups leave this empty (not a copy of firstName).
+  lastName: z.string().trim().max(100).optional().default(''),
   phone: z.string().regex(REGEX.E164_PHONE).optional(),
 });
 

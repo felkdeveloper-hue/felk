@@ -37,12 +37,13 @@ function splitFullName(fullName: string): { firstName: string; lastName: string 
   const spaceIndex = trimmed.indexOf(' ');
 
   if (spaceIndex === -1) {
-    return { firstName: trimmed, lastName: trimmed };
+    // Single given name — do not duplicate into lastName ("Rohit" → "Rohit Rohit").
+    return { firstName: trimmed, lastName: '' };
   }
 
   return {
     firstName: trimmed.slice(0, spaceIndex),
-    lastName: trimmed.slice(spaceIndex + 1).trim() || trimmed.slice(0, spaceIndex),
+    lastName: trimmed.slice(spaceIndex + 1).trim(),
   };
 }
 

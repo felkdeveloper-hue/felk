@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import {
   PieChart,
   Pie,
@@ -15,33 +14,39 @@ import {
 import { AdminErrorState, AdminPageHeader, PageMotion } from '@/components/admin';
 import {
   AnalyticsFilterBar,
+  AnalyticsBreadcrumbs,
   AnalyticsChartCard,
   AnalyticsEmpty,
   ChartSkeleton,
+  AnalyticsExportButton,
 } from '@/components/admin/analytics';
-import { useTrafficSources } from '@/hooks/admin';
-import type { AnalyticsFilter } from '@/services/sdk/admin';
+import { useTrafficSources, useAnalyticsFilters, useAnalyticsDrillDown } from '@/hooks/admin';
+import { ADMIN_CHART_COLORS, adminChartColor } from '@/lib/admin-chart-colors';
 
-const COLORS = [
-  'hsl(var(--primary))',
-  'hsl(var(--primary) / 0.75)',
-  'hsl(var(--primary) / 0.55)',
-  'hsl(var(--primary) / 0.4)',
-  'hsl(var(--primary) / 0.3)',
-  'hsl(var(--muted-foreground) / 0.5)',
-  'hsl(var(--muted-foreground) / 0.3)',
-];
+const COLORS = ADMIN_CHART_COLORS;
 
 export function AnalyticsTrafficPage() {
-  const [filter, setFilter] = useState<AnalyticsFilter>({ period: '7d' });
+  const { filter, setFilter, clearFilters } = useAnalyticsFilters({ defaults: { period: '7d' } });
+  const { drill, breadcrumbs, trail } = useAnalyticsDrillDown(filter);
   const query = useTrafficSources(filter);
   const sources = query.data ?? [];
 
   return (
     <PageMotion>
-      <AdminPageHeader title="Traffic Sources" description="Where your visitors come from." />
+      <AdminPageHeader
+        title="Traffic Sources"
+        description="Where your visitors come from."
+        actions={
+          <AnalyticsExportButton
+            reportType="traffic"
+            filter={filter}
+            drillLabel={trail.at(-1)?.label}
+          />
+        }
+      />
 
-      <AnalyticsFilterBar filter={filter} onChange={(f) => setFilter((p) => ({ ...p, ...f }))} />
+      <AnalyticsBreadcrumbs items={breadcrumbs} />
+      <AnalyticsFilterBar filter={filter} onChange={setFilter} onClear={clearFilters} />
 
       {query.isError ? (
         <AdminErrorState message="Failed to load traffic data." onRetry={() => query.refetch()} />
@@ -52,9 +57,9 @@ export function AnalyticsTrafficPage() {
       ) : (
         <div className="mt-4 space-y-5">
           <div className="grid gap-5 lg:grid-cols-2">
-            <AnalyticsChartCard title="Traffic distribution">
+            <AnalyticsChartCard title="Traffic distribution" description="Click a source">
               <ResponsiveContainer width="100%" height={280}>
-                <PieChart>
+                <PieChart style={{ cursor: 'pointer' }}>
                   <Pie
                     data={sources}
                     dataKey="count"
@@ -64,6 +69,15 @@ export function AnalyticsTrafficPage() {
                     outerRadius={100}
                     label={false}
                     labelLine={false}
+                    onClick={(_, index) => {
+                      const item = sources[index];
+                      if (!item?.source) return;
+                      drill({
+                        destination: 'visitors',
+                        label: `Visitors · ${item.label}`,
+                        append: { trafficSource: item.source },
+                      });
+                    }}
                   >
                     {sources.map((_, i) => (
                       <Cell key={i} fill={COLORS[i % COLORS.length]} />
@@ -99,7 +113,11 @@ export function AnalyticsTrafficPage() {
                     }}
                     formatter={(v: unknown) => [(v as number).toLocaleString(), 'Visitors']}
                   />
-                  <Bar dataKey="count" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="count" radius={[0, 4, 4, 0]}>
+                    {sources.map((_, i) => (
+                      <Cell key={i} fill={adminChartColor(i)} />
+                    ))}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </AnalyticsChartCard>

@@ -35,9 +35,17 @@ const sessionPayloadSchema = z.object({
   visitorId: z.string().uuid(),
   startedAt: z.string().datetime().optional(),
   entryPage: z.string().max(2000).optional().nullable(),
+  exitPage: z.string().max(2000).optional().nullable(),
+  lastPage: z.string().max(2000).optional().nullable(),
   pageCount: z.number().int().min(0).optional(),
   clickCount: z.number().int().min(0).optional(),
   maxScrollDepth: z.number().min(0).max(100).optional(),
+  activeMs: z.number().int().min(0).optional(),
+  idleMs: z.number().int().min(0).optional(),
+  durationMs: z.number().int().min(0).optional(),
+  avgTimePerPageMs: z.number().int().min(0).optional().nullable(),
+  endedAt: z.string().datetime().optional().nullable(),
+  isActive: z.boolean().optional(),
 });
 
 const pageViewPayloadSchema = z.object({
@@ -72,6 +80,8 @@ export const collectBodySchema = z.object({
     .object({
       sessionId: z.string().uuid(),
       visitorId: z.string().uuid(),
+      /** Current path so Live visitors show the page they're on */
+      path: z.string().trim().max(2048).optional(),
     })
     .optional(),
 });

@@ -15,15 +15,22 @@ export function normalizeAuthUser(raw: unknown): AuthUser {
       ? [roleKey]
       : ['customer'];
 
+  const firstName = typeof record.firstName === 'string' ? record.firstName : undefined;
+  const lastNameRaw = typeof record.lastName === 'string' ? record.lastName : undefined;
+  const lastName =
+    firstName && lastNameRaw && firstName.trim().toLowerCase() === lastNameRaw.trim().toLowerCase()
+      ? undefined
+      : lastNameRaw;
+
   return {
     id: String(record.id ?? record._id ?? ''),
     email: String(record.email ?? ''),
-    firstName: typeof record.firstName === 'string' ? record.firstName : undefined,
-    lastName: typeof record.lastName === 'string' ? record.lastName : undefined,
+    firstName,
+    lastName,
     name:
       typeof record.name === 'string'
         ? record.name
-        : [record.firstName, record.lastName].filter(Boolean).join(' ') || undefined,
+        : [firstName, lastName].filter(Boolean).join(' ') || undefined,
     avatarUrl:
       typeof record.profilePhotoUrl === 'string'
         ? record.profilePhotoUrl

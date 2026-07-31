@@ -12,5 +12,29 @@ export {
   useDeviceBreakdown,
   useGeoBreakdown,
   useTrafficSources,
+  useProductAnalytics,
+  useProductInterest,
+  useCartAnalytics,
+  useWishlistAnalytics,
+  usePaymentRecovery,
+  useReturningJourney,
+  useCustomerTimeline,
+  useSessionReplay,
+  useSearchAnalytics,
+  useProductFunnel,
+  useCheckoutAbandon,
+  useProductInsights,
+  useRevenueDashboard,
+  useActivityFeed,
   analyticsKeys,
 } from './use-analytics';
+export { useAnalyticsFilters } from './use-analytics-filters';
+export type { UseAnalyticsFiltersOptions } from './use-analytics-filters';
+export { useAnalyticsDrillDown } from './use-analytics-drill-down';
+export {
+  useDashboardLayoutQuery,
+  useDashboardCatalogQuery,
+  useSaveDashboardLayout,
+  useDashboardLayoutActions,
+  dashboardLayoutKeys,
+} from './use-dashboard-layout';

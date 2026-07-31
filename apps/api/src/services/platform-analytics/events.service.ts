@@ -1,18 +1,12 @@
 import { EventModel } from '@/models/analytics/index.js';
 import type { EventsFilter } from '@/schemas/analytics/index.js';
-import { resolveDateRange } from './date-range.util.js';
+import { buildEventMatch, resolveDateRange } from './analytics-query.builder.js';
 import { parsePagination, buildPaginationMeta } from '@/utils/pagination.js';
 
 export async function getEvents(filter: EventsFilter) {
-  const range = resolveDateRange(filter);
   const { page, limit } = parsePagination({ page: filter.page, limit: filter.limit });
   const skip = (page - 1) * limit;
-
-  const query: Record<string, unknown> = { occurredAt: { $gte: range.from, $lte: range.to } };
-  if (filter.eventName) query['name'] = filter.eventName;
-  if (filter.userId) query['userId'] = filter.userId;
-  if (filter.country) query['country'] = filter.country;
-  if (filter.device) query['deviceType'] = filter.device;
+  const query = await buildEventMatch(filter);
 
   const [data, total] = await Promise.all([
     EventModel.find(query).sort({ occurredAt: -1 }).skip(skip).limit(limit).lean(),
@@ -28,9 +22,9 @@ export async function getEventNames(filter: EventsFilter): Promise<string[]> {
 }
 
 export async function getEventBreakdown(filter: EventsFilter) {
-  const range = resolveDateRange(filter);
-  const matchStage: Record<string, unknown> = { occurredAt: { $gte: range.from, $lte: range.to } };
-  if (filter.userId) matchStage['userId'] = filter.userId;
+  const matchStage = await buildEventMatch(filter);
+  // Breakdown groups by name — drop fixed eventName so all names appear
+  delete matchStage['name'];
 
   return EventModel.aggregate([
     { $match: matchStage },

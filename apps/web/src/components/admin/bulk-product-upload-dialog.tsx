@@ -24,6 +24,7 @@ import { cn } from '@/lib/utils';
 import {
   PRODUCT_IMPORT_BATCH_SIZE,
   productImportApi,
+  productsApi,
   type ImportPreview,
   type ImportProductInput,
   type ImportProductResult,
@@ -65,6 +66,62 @@ function importBatchErrorMessage(error: unknown): string {
     return `${label}${first.message ?? error.message}${more}`;
   }
   return error.message || 'Upload failed.';
+}
+
+function isImportTransportError(error: unknown): boolean {
+  return AppError.isAppError(error) && (error.code === 'NETWORK_ERROR' || error.code === 'TIMEOUT');
+}
+
+/**
+ * When the proxy drops the HTTP response, the API may have already created products.
+ * Confirm by handle/name so we do not report false "Unable to reach the server" failures.
+ */
+async function verifyImportedProducts(batch: ImportProductInput[]): Promise<ImportProductResult[]> {
+  await new Promise((r) => setTimeout(r, 1500));
+  const results: ImportProductResult[] = [];
+  for (const product of batch) {
+    try {
+      const listed = await productsApi.list({
+        page: 1,
+        limit: 5,
+        search: product.handle || product.name,
+        q: product.handle || product.name,
+      });
+      const match = listed.data.find(
+        (row) =>
+          row.slug?.toLowerCase() === product.handle.toLowerCase() ||
+          row.name?.trim().toLowerCase() === product.name.trim().toLowerCase(),
+      );
+      if (match) {
+        results.push({
+          handle: product.handle,
+          name: product.name,
+          row: product.rows[0] ?? 0,
+          status: 'created',
+          message: 'Created (confirmed after connection drop)',
+        });
+      } else {
+        results.push({
+          handle: product.handle,
+          name: product.name,
+          row: product.rows[0] ?? 0,
+          status: 'failed',
+          message:
+            'Connection dropped before confirmation. Refresh Products — it may still have been created.',
+        });
+      }
+    } catch {
+      results.push({
+        handle: product.handle,
+        name: product.name,
+        row: product.rows[0] ?? 0,
+        status: 'failed',
+        message:
+          'Connection dropped before confirmation. Refresh Products — it may still have been created.',
+      });
+    }
+  }
+  return results;
 }
 
 function Stat({
@@ -278,15 +335,21 @@ export function BulkProductUploadDialog({
         });
         collected.push(...response.results);
       } catch (error) {
-        const reason = importBatchErrorMessage(error);
-        for (const product of batch) {
-          collected.push({
-            handle: product.handle,
-            name: product.name,
-            row: product.rows[0] ?? 0,
-            status: 'failed',
-            message: reason,
-          });
+        if (isImportTransportError(error)) {
+          // Server often finishes the batch after nginx/ALB closes the socket.
+          const recovered = await verifyImportedProducts(batch);
+          collected.push(...recovered);
+        } else {
+          const reason = importBatchErrorMessage(error);
+          for (const product of batch) {
+            collected.push({
+              handle: product.handle,
+              name: product.name,
+              row: product.rows[0] ?? 0,
+              status: 'failed',
+              message: reason,
+            });
+          }
         }
       }
       setProgress({ done: Math.min(index + batch.length, queue.length), total: queue.length });

@@ -52,6 +52,7 @@ export function useDashboardStatsQuery() {
         recentPayments: payments.data,
       };
     },
-    staleTime: 1000 * 30,
+    staleTime: 15_000,
+    refetchInterval: 15_000,
   });
 }

@@ -65,11 +65,12 @@ export const appConfig = {
     host: env.SMTP_HOST,
     port: env.SMTP_PORT,
     secure: env.SMTP_SECURE,
+    user: env.SMTP_USER ?? env.EMAIL_FROM,
     from: env.EMAIL_FROM,
     password: env.EMAIL_PASSWORD,
     fromName: env.FROM_NAME ?? 'Fashion Edge',
     shopUrl: env.SHOP_URL ?? 'http://localhost:5173',
-    configured: Boolean(env.SMTP_HOST && env.EMAIL_FROM && env.EMAIL_PASSWORD),
+    configured: Boolean(env.SMTP_HOST && (env.SMTP_USER || env.EMAIL_FROM) && env.EMAIL_PASSWORD),
   },
   storage: {
     provider: env.storageProvider,

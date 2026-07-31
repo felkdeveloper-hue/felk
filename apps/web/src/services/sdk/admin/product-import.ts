@@ -1,10 +1,14 @@
 import { http, httpClient } from '@/lib/http-client';
 
-/** Products sent per import request — must match the API batch limit. */
-export const PRODUCT_IMPORT_BATCH_SIZE = 25;
+/**
+ * Products sent per import request.
+ * Keep small so reverse-proxy / load-balancer timeouts (often 60s) do not
+ * drop the response after the API has already created the products.
+ */
+export const PRODUCT_IMPORT_BATCH_SIZE = 5;
 
-/** Large ZIPs need a longer client timeout than the default 30s. */
-const IMPORT_UPLOAD_TIMEOUT_MS = 10 * 60 * 1000;
+/** Large ZIPs / image work need a longer client timeout than the default 30s. */
+const IMPORT_UPLOAD_TIMEOUT_MS = 15 * 60 * 1000;
 
 export interface ImportIssue {
   row: number;

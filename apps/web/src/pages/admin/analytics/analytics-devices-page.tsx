@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import {
   PieChart,
   Pie,
@@ -15,23 +14,21 @@ import {
 import { AdminErrorState, AdminPageHeader, PageMotion } from '@/components/admin';
 import {
   AnalyticsFilterBar,
+  AnalyticsBreadcrumbs,
   AnalyticsChartCard,
   AnalyticsEmpty,
   ChartSkeleton,
+  AnalyticsExportButton,
 } from '@/components/admin/analytics';
-import { useDeviceBreakdown } from '@/hooks/admin';
-import type { AnalyticsFilter } from '@/services/sdk/admin';
+import { useDeviceBreakdown, useAnalyticsFilters, useAnalyticsDrillDown } from '@/hooks/admin';
 
-const COLORS = [
-  'hsl(var(--primary))',
-  'hsl(var(--primary) / 0.7)',
-  'hsl(var(--primary) / 0.45)',
-  'hsl(var(--primary) / 0.25)',
-  'hsl(var(--muted-foreground) / 0.4)',
-];
+import { ADMIN_CHART_COLORS, adminChartColor } from '@/lib/admin-chart-colors';
+
+const COLORS = ADMIN_CHART_COLORS;
 
 export function AnalyticsDevicesPage() {
-  const [filter, setFilter] = useState<AnalyticsFilter>({ period: '7d' });
+  const { filter, setFilter, clearFilters } = useAnalyticsFilters({ defaults: { period: '7d' } });
+  const { drill, breadcrumbs, trail } = useAnalyticsDrillDown(filter);
   const query = useDeviceBreakdown(filter);
   const data = query.data;
 
@@ -40,9 +37,17 @@ export function AnalyticsDevicesPage() {
       <AdminPageHeader
         title="Devices"
         description="Breakdown of visitors by device type, browser, and operating system."
+        actions={
+          <AnalyticsExportButton
+            reportType="devices"
+            filter={filter}
+            drillLabel={trail.at(-1)?.label}
+          />
+        }
       />
 
-      <AnalyticsFilterBar filter={filter} onChange={(f) => setFilter((p) => ({ ...p, ...f }))} />
+      <AnalyticsBreadcrumbs items={breadcrumbs} />
+      <AnalyticsFilterBar filter={filter} onChange={setFilter} onClear={clearFilters} />
 
       {query.isError ? (
         <AdminErrorState message="Failed to load device data." onRetry={() => query.refetch()} />
@@ -55,12 +60,12 @@ export function AnalyticsDevicesPage() {
       ) : !data ? null : (
         <div className="mt-4 grid gap-5 lg:grid-cols-3">
           {/* Device types */}
-          <AnalyticsChartCard title="Device type">
+          <AnalyticsChartCard title="Device type" description="Click a slice for sessions">
             {!data.deviceTypes.length ? (
               <AnalyticsEmpty />
             ) : (
               <ResponsiveContainer width="100%" height={240}>
-                <PieChart>
+                <PieChart style={{ cursor: 'pointer' }}>
                   <Pie
                     data={data.deviceTypes}
                     dataKey="count"
@@ -70,6 +75,16 @@ export function AnalyticsDevicesPage() {
                     outerRadius={80}
                     label={false}
                     labelLine={false}
+                    onClick={(_, index) => {
+                      const item = data.deviceTypes[index];
+                      if (!item?.label) return;
+                      const device = item.label as 'desktop' | 'mobile' | 'tablet' | 'unknown';
+                      drill({
+                        destination: 'sessions',
+                        label: `Sessions · ${item.label}`,
+                        append: { device },
+                      });
+                    }}
                   >
                     {data.deviceTypes.map((_, i) => (
                       <Cell key={i} fill={COLORS[i % COLORS.length]} />
@@ -88,12 +103,27 @@ export function AnalyticsDevicesPage() {
           </AnalyticsChartCard>
 
           {/* Browsers */}
-          <AnalyticsChartCard title="Browsers">
+          <AnalyticsChartCard title="Browsers" description="Click a bar for sessions">
             {!data.browsers.length ? (
               <AnalyticsEmpty />
             ) : (
               <ResponsiveContainer width="100%" height={240}>
-                <BarChart data={data.browsers} layout="vertical">
+                <BarChart
+                  data={data.browsers}
+                  layout="vertical"
+                  style={{ cursor: 'pointer' }}
+                  onClick={(state) => {
+                    const payload = (
+                      state as { activePayload?: Array<{ payload?: { label?: string } }> }
+                    )?.activePayload?.[0]?.payload;
+                    if (!payload?.label) return;
+                    drill({
+                      destination: 'sessions',
+                      label: `Sessions · ${payload.label}`,
+                      append: { browser: payload.label },
+                    });
+                  }}
+                >
                   <CartesianGrid
                     strokeDasharray="3 3"
                     horizontal={false}
@@ -108,7 +138,11 @@ export function AnalyticsDevicesPage() {
                       background: 'var(--card)',
                     }}
                   />
-                  <Bar dataKey="count" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="count" radius={[0, 4, 4, 0]}>
+                    {(data?.browsers ?? []).map((_, i) => (
+                      <Cell key={i} fill={adminChartColor(i)} />
+                    ))}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -135,7 +169,7 @@ export function AnalyticsDevicesPage() {
                       background: 'var(--card)',
                     }}
                   />
-                  <Bar dataKey="count" fill="hsl(var(--primary) / 0.7)" radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="count" fill={adminChartColor(1)} radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             )}

@@ -1,11 +1,16 @@
 import { TrendingDown, TrendingUp, Minus } from 'lucide-react';
 import type { KpiMetric } from '@/services/sdk/admin';
+import { cn } from '@/lib/utils';
+import { DRILL_TOOLTIP } from '@/lib/analytics/drill-down';
 
 interface Props {
   title: string;
   metric: KpiMetric;
   format?: (v: number) => string;
   hint?: string;
+  /** When set, card is clickable for drill-down */
+  onDrill?: () => void;
+  className?: string;
 }
 
 function formatDuration(ms: number): string {
@@ -17,18 +22,20 @@ function formatDuration(ms: number): string {
   return `${mins}m ${rem}s`;
 }
 
-export function KpiCardWithDelta({ title, metric, format, hint }: Props) {
+export function KpiCardWithDelta({ title, metric, format, hint, onDrill, className }: Props) {
   const display = format ? format(metric.value) : metric.value.toLocaleString();
   const pct = metric.pctChange;
   const isPositive = pct > 0;
   const isNeutral = pct === 0;
 
-  return (
-    <div className="bg-card border-border rounded-xl border p-4">
-      <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">{title}</p>
-      <p className="mt-1.5 text-2xl font-semibold tabular-nums">{display}</p>
-      {hint && <p className="text-muted-foreground mt-0.5 text-xs">{hint}</p>}
-      <div className="mt-2 flex items-center gap-1">
+  const body = (
+    <>
+      <p className="text-muted-foreground text-[10px] font-medium uppercase tracking-wide sm:text-xs">
+        {title}
+      </p>
+      <p className="mt-1 text-xl font-semibold tabular-nums sm:mt-1.5 sm:text-2xl">{display}</p>
+      {hint && <p className="text-muted-foreground mt-0.5 hidden text-xs sm:block">{hint}</p>}
+      <div className="mt-1.5 flex flex-wrap items-center gap-1 sm:mt-2">
         {isNeutral ? (
           <Minus className="text-muted-foreground h-3.5 w-3.5" />
         ) : isPositive ? (
@@ -37,17 +44,40 @@ export function KpiCardWithDelta({ title, metric, format, hint }: Props) {
           <TrendingDown className="h-3.5 w-3.5 text-red-500" />
         )}
         <span
-          className={`text-xs font-medium ${
+          className={`text-[11px] font-medium sm:text-xs ${
             isNeutral ? 'text-muted-foreground' : isPositive ? 'text-emerald-500' : 'text-red-500'
           }`}
         >
           {isPositive ? '+' : ''}
           {pct}%
         </span>
-        <span className="text-muted-foreground text-xs">vs prev period</span>
+        <span className="text-muted-foreground hidden text-xs sm:inline">vs prev</span>
       </div>
-    </div>
+    </>
   );
+
+  const shellClass = cn(
+    'bg-card border-border rounded-xl border p-3 sm:p-4',
+    onDrill &&
+      'hover:border-primary/40 hover:bg-primary/5 cursor-pointer transition-colors focus-visible:ring-primary/40 focus-visible:ring-2 focus-visible:outline-none active:scale-[0.99]',
+    className,
+  );
+
+  if (onDrill) {
+    return (
+      <button
+        type="button"
+        title={DRILL_TOOLTIP}
+        aria-label={`${title}: ${DRILL_TOOLTIP}`}
+        onClick={onDrill}
+        className={cn(shellClass, 'w-full text-left')}
+      >
+        {body}
+      </button>
+    );
+  }
+
+  return <div className={shellClass}>{body}</div>;
 }
 
 export { formatDuration };

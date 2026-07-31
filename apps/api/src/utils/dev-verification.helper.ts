@@ -2,8 +2,8 @@ import { appConfig } from '@/config/app.config.js';
 import { logger } from '@/config/logger.js';
 
 export function isEmailDeliveryConfigured(): boolean {
-  const { enabled, host, from, password } = appConfig.email;
-  return Boolean(enabled && host && from && password);
+  const { enabled, host, from, user, password } = appConfig.email;
+  return Boolean(enabled && host && (user || from) && password);
 }
 
 /**

@@ -11,6 +11,7 @@ import { formatCurrency } from '@/utils';
 import { ROUTES } from '@/constants';
 import type { Product, ProductMedia, ProductMoney, ProductVariant } from '@/services/sdk';
 import { AppError } from '@/lib/errors';
+import { productMetaFrom, trackCommerceEvent } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
 import { PriceDisplay } from './price-display';
 import { ProductColorSelector } from './product-color-selector';
@@ -250,6 +251,10 @@ export function ProductPurchasePanel({
       { variantId: resolved, quantity },
       {
         onSuccess: () => {
+          trackCommerceEvent(
+            'buy_now_clicked',
+            productMetaFrom(product, { variantId: resolved, quantity }),
+          );
           void navigate({ to: ROUTES.checkout });
         },
         onError: (error) => {

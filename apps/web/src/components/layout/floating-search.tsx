@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowLeft, Clock3, Search, TrendingUp, X } from 'lucide-react';
 import { ROUTES } from '@/constants';
 import { useUiStore } from '@/store/ui-store';
+import { trackCommerceEvent } from '@/lib/analytics';
 import { Button } from '@/components/ui/button';
 
 const RECENT_KEY = 'felk:recent-searches';
@@ -55,12 +56,15 @@ export function FloatingSearch() {
     };
   }, [open, setOpen]);
 
-  const goToSearch = (value: string) => {
+  const goToSearch = (value: string, fromSuggestion = false) => {
     const trimmed = value.trim();
     if (trimmed) {
       const next = [trimmed, ...readRecent().filter((item) => item !== trimmed)];
       writeRecent(next);
       setRecent(next);
+      if (fromSuggestion) {
+        trackCommerceEvent('search_suggestion_clicked', null, { query: trimmed });
+      }
     }
     setOpen(false);
     setQuery('');
@@ -151,7 +155,7 @@ export function FloatingSearch() {
                       <button
                         type="button"
                         className="flex min-h-11 w-full items-center gap-3 text-left text-[15px] font-medium tracking-wide active:opacity-70"
-                        onClick={() => goToSearch(item)}
+                        onClick={() => goToSearch(item, true)}
                       >
                         <Search className="text-muted-foreground size-4" aria-hidden />
                         {item}
@@ -204,7 +208,7 @@ export function FloatingSearch() {
                     key={chip}
                     type="button"
                     className="border-border text-foreground min-h-11 border px-3.5 text-sm font-medium tracking-wide transition-opacity duration-150 active:opacity-70"
-                    onClick={() => goToSearch(chip)}
+                    onClick={() => goToSearch(chip, true)}
                   >
                     {chip}
                   </button>

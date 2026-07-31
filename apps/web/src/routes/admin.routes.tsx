@@ -276,6 +276,12 @@ const adminOrderDetailRoute = createRoute({
   },
 });
 
+const CustomerDetailPage = lazy(() =>
+  import('@/pages/admin/customers/customer-detail-page').then((m) => ({
+    default: m.CustomerDetailPage,
+  })),
+);
+
 const adminCustomersRoute = createRoute({
   getParentRoute: () => adminLayoutRoute,
   path: 'customers',
@@ -289,11 +295,16 @@ const adminCustomersRoute = createRoute({
 const adminCustomerDetailRoute = createRoute({
   getParentRoute: () => adminLayoutRoute,
   path: 'customers/$customerId',
-  component: () => (
-    <AdminPermissionRoute permissions={[PERMISSIONS.CUSTOMERS_VIEW]}>
-      <PlaceholderModulePage title="Customer" description="Customer detail coming soon." />
-    </AdminPermissionRoute>
-  ),
+  component: function AdminCustomerDetailRoute() {
+    const { customerId } = adminCustomerDetailRoute.useParams();
+    return (
+      <AdminPermissionRoute permissions={[PERMISSIONS.CUSTOMERS_VIEW]}>
+        <Suspense fallback={<AdminLazyFallback />}>
+          <CustomerDetailPage customerId={customerId} />
+        </Suspense>
+      </AdminPermissionRoute>
+    );
+  },
 });
 
 const adminFinanceRoute = createRoute({
@@ -416,6 +427,61 @@ const AnalyticsTrafficPage = lazy(() =>
     default: m.AnalyticsTrafficPage,
   })),
 );
+const AnalyticsProductsPage = lazy(() =>
+  import('@/pages/admin/analytics/analytics-products-page').then((m) => ({
+    default: m.AnalyticsProductsPage,
+  })),
+);
+const AnalyticsCartPage = lazy(() =>
+  import('@/pages/admin/analytics/analytics-cart-page').then((m) => ({
+    default: m.AnalyticsCartPage,
+  })),
+);
+const AnalyticsWishlistPage = lazy(() =>
+  import('@/pages/admin/analytics/analytics-wishlist-page').then((m) => ({
+    default: m.AnalyticsWishlistPage,
+  })),
+);
+const AnalyticsRecoveryPage = lazy(() =>
+  import('@/pages/admin/analytics/analytics-recovery-page').then((m) => ({
+    default: m.AnalyticsRecoveryPage,
+  })),
+);
+const AnalyticsReturningPage = lazy(() =>
+  import('@/pages/admin/analytics/analytics-returning-page').then((m) => ({
+    default: m.AnalyticsReturningPage,
+  })),
+);
+const AnalyticsSearchPage = lazy(() =>
+  import('@/pages/admin/analytics/analytics-search-page').then((m) => ({
+    default: m.AnalyticsSearchPage,
+  })),
+);
+const AnalyticsFunnelPage = lazy(() =>
+  import('@/pages/admin/analytics/analytics-funnel-page').then((m) => ({
+    default: m.AnalyticsFunnelPage,
+  })),
+);
+const AnalyticsActivityPage = lazy(() =>
+  import('@/pages/admin/analytics/analytics-activity-page').then((m) => ({
+    default: m.AnalyticsActivityPage,
+  })),
+);
+const AnalyticsCheckoutPage = lazy(() =>
+  import('@/pages/admin/analytics/analytics-checkout-page').then((m) => ({
+    default: m.AnalyticsCheckoutPage,
+  })),
+);
+const AnalyticsRevenuePage = lazy(() =>
+  import('@/pages/admin/analytics/analytics-revenue-page').then((m) => ({
+    default: m.AnalyticsRevenuePage,
+  })),
+);
+const AnalyticsExportsPage = lazy(() =>
+  import('@/pages/admin/analytics/analytics-exports-page').then((m) => ({
+    default: m.AnalyticsExportsPage,
+  })),
+);
 
 const analyticsPerms = [PERMISSIONS.ANALYTICS_VIEW, PERMISSIONS.REPORTS_VIEW];
 
@@ -517,6 +583,116 @@ const adminAnalyticsTrafficRoute = createRoute({
   ),
 });
 
+const adminAnalyticsProductsRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: 'analytics/products',
+  component: () => (
+    <AnalyticsWrap>
+      <AnalyticsProductsPage />
+    </AnalyticsWrap>
+  ),
+});
+
+const adminAnalyticsCartRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: 'analytics/cart',
+  component: () => (
+    <AnalyticsWrap>
+      <AnalyticsCartPage />
+    </AnalyticsWrap>
+  ),
+});
+
+const adminAnalyticsWishlistRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: 'analytics/wishlist',
+  component: () => (
+    <AnalyticsWrap>
+      <AnalyticsWishlistPage />
+    </AnalyticsWrap>
+  ),
+});
+
+const adminAnalyticsRecoveryRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: 'analytics/recovery',
+  component: () => (
+    <AnalyticsWrap>
+      <AnalyticsRecoveryPage />
+    </AnalyticsWrap>
+  ),
+});
+
+const adminAnalyticsReturningRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: 'analytics/returning',
+  component: () => (
+    <AnalyticsWrap>
+      <AnalyticsReturningPage />
+    </AnalyticsWrap>
+  ),
+});
+
+const adminAnalyticsSearchRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: 'analytics/search',
+  component: () => (
+    <AnalyticsWrap>
+      <AnalyticsSearchPage />
+    </AnalyticsWrap>
+  ),
+});
+
+const adminAnalyticsFunnelRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: 'analytics/funnel',
+  component: () => (
+    <AnalyticsWrap>
+      <AnalyticsFunnelPage />
+    </AnalyticsWrap>
+  ),
+});
+
+const adminAnalyticsActivityRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: 'analytics/activity',
+  component: () => (
+    <AnalyticsWrap>
+      <AnalyticsActivityPage />
+    </AnalyticsWrap>
+  ),
+});
+
+const adminAnalyticsCheckoutRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: 'analytics/checkout',
+  component: () => (
+    <AnalyticsWrap>
+      <AnalyticsCheckoutPage />
+    </AnalyticsWrap>
+  ),
+});
+
+const adminAnalyticsRevenueRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: 'analytics/revenue',
+  component: () => (
+    <AnalyticsWrap>
+      <AnalyticsRevenuePage />
+    </AnalyticsWrap>
+  ),
+});
+
+const adminAnalyticsExportsRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: 'analytics/exports',
+  component: () => (
+    <AnalyticsWrap>
+      <AnalyticsExportsPage />
+    </AnalyticsWrap>
+  ),
+});
+
 export const adminRouteTree = adminLayoutRoute.addChildren([
   adminIndexRoute,
   adminForbiddenRoute,
@@ -556,4 +732,15 @@ export const adminRouteTree = adminLayoutRoute.addChildren([
   adminAnalyticsDevicesRoute,
   adminAnalyticsGeoRoute,
   adminAnalyticsTrafficRoute,
+  adminAnalyticsProductsRoute,
+  adminAnalyticsCartRoute,
+  adminAnalyticsWishlistRoute,
+  adminAnalyticsRecoveryRoute,
+  adminAnalyticsReturningRoute,
+  adminAnalyticsSearchRoute,
+  adminAnalyticsFunnelRoute,
+  adminAnalyticsActivityRoute,
+  adminAnalyticsCheckoutRoute,
+  adminAnalyticsRevenueRoute,
+  adminAnalyticsExportsRoute,
 ]);

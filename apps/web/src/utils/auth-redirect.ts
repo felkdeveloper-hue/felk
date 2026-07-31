@@ -49,6 +49,24 @@ export type VerifyEmailSearch = {
   pending?: boolean;
 };
 
+const DEV_VERIFY_CODE_KEY = 'fe_dev_verification_code';
+
+export function stashDevVerificationCode(code?: string): void {
+  if (typeof window === 'undefined') return;
+  if (code) {
+    sessionStorage.setItem(DEV_VERIFY_CODE_KEY, code);
+  } else {
+    sessionStorage.removeItem(DEV_VERIFY_CODE_KEY);
+  }
+}
+
+export function takeDevVerificationCode(): string | undefined {
+  if (typeof window === 'undefined') return undefined;
+  const code = sessionStorage.getItem(DEV_VERIFY_CODE_KEY) ?? undefined;
+  if (code) sessionStorage.removeItem(DEV_VERIFY_CODE_KEY);
+  return code;
+}
+
 export function buildVerifyEmailSearch(search: Partial<VerifyEmailSearch> = {}): VerifyEmailSearch {
   return {
     email: search.email,

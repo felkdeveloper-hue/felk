@@ -8,9 +8,13 @@ export interface SessionDocument extends Document {
   endedAt?: Date | null;
   lastActiveAt: Date;
   durationMs?: number | null;
+  activeMs: number;
+  idleMs: number;
+  avgTimePerPageMs?: number | null;
   isActive: boolean;
   entryPage?: string | null;
   exitPage?: string | null;
+  lastPage?: string | null;
   pageCount: number;
   clickCount: number;
   maxScrollDepth: number;
@@ -33,9 +37,13 @@ const sessionSchema = new Schema<SessionDocument>(
     endedAt: { type: Date, default: null },
     lastActiveAt: { type: Date, required: true },
     durationMs: { type: Number, default: null },
+    activeMs: { type: Number, default: 0 },
+    idleMs: { type: Number, default: 0 },
+    avgTimePerPageMs: { type: Number, default: null },
     isActive: { type: Boolean, default: true, index: true },
     entryPage: { type: String, default: null },
     exitPage: { type: String, default: null },
+    lastPage: { type: String, default: null },
     pageCount: { type: Number, default: 1 },
     clickCount: { type: Number, default: 0 },
     maxScrollDepth: { type: Number, default: 0 },

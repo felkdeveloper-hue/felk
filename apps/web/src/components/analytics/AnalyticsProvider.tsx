@@ -44,8 +44,9 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
     const path = location.pathname;
     trackRouteChange(path);
     posthogPageView(path);
-    // Flush on route change so page views are sent quickly
-    setTimeout(() => void flush(), 500);
+    // Flush quickly so Live + page views update without waiting for the interval
+    const t = window.setTimeout(() => void flush(), 300);
+    return () => window.clearTimeout(t);
   }, [location.pathname]);
 
   // User identity sync

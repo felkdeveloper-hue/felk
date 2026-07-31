@@ -1,10 +1,9 @@
 import { VisitorModel } from '@/models/analytics/index.js';
 import type { AnalyticsFilter } from '@/schemas/analytics/index.js';
-import { resolveDateRange } from './date-range.util.js';
+import { buildVisitorMatch } from './analytics-query.builder.js';
 
 export async function getGeoBreakdown(filter: AnalyticsFilter) {
-  const range = resolveDateRange(filter);
-  const match = { lastSeenAt: { $gte: range.from, $lte: range.to } };
+  const match = buildVisitorMatch(filter);
 
   const [countries, cities] = await Promise.all([
     VisitorModel.aggregate([

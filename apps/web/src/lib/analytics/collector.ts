@@ -41,14 +41,22 @@ interface VisitorPayload {
   utmContent?: string | null;
 }
 
-interface SessionPayload {
+export interface SessionPayload {
   sessionId: string;
   visitorId: string;
   startedAt?: string;
   entryPage?: string | null;
+  exitPage?: string | null;
+  lastPage?: string | null;
   pageCount?: number;
   clickCount?: number;
   maxScrollDepth?: number;
+  activeMs?: number;
+  idleMs?: number;
+  durationMs?: number;
+  avgTimePerPageMs?: number | null;
+  endedAt?: string | null;
+  isActive?: boolean;
 }
 
 interface CollectPayload {
@@ -56,7 +64,7 @@ interface CollectPayload {
   session?: SessionPayload;
   pageViews?: PageViewItem[];
   events?: EventItem[];
-  heartbeat?: { sessionId: string; visitorId: string };
+  heartbeat?: { sessionId: string; visitorId: string; path?: string };
 }
 
 let pageViewQueue: PageViewItem[] = [];
@@ -119,7 +127,7 @@ export function setPendingVisitor(v: VisitorPayload): void {
 }
 
 export function setPendingSession(s: SessionPayload): void {
-  pendingSession = s;
+  pendingSession = { ...pendingSession, ...s };
 }
 
 export async function flush(): Promise<void> {
@@ -140,8 +148,20 @@ export async function flush(): Promise<void> {
   });
 }
 
-export function sendHeartbeat(sessionId: string, visitorId: string): void {
-  void send({ heartbeat: { sessionId, visitorId } });
+export function sendHeartbeat(sessionId: string, visitorId: string, path?: string): void {
+  const currentPath =
+    path ?? (typeof window !== 'undefined' ? window.location.pathname : undefined);
+  void send({
+    heartbeat: { sessionId, visitorId, ...(currentPath ? { path: currentPath } : {}) },
+    // Keep the session explicitly active so Live counts survive mobile pagehide.
+    session: {
+      sessionId,
+      visitorId,
+      isActive: true,
+      lastPage: currentPath ?? null,
+      exitPage: currentPath ?? null,
+    },
+  });
 }
 
 export function startFlushInterval(): void {

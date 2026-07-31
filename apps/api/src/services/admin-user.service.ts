@@ -94,6 +94,8 @@ function mapUserRow(
     passwordHash?: string | null;
     googleId?: string | null;
     lastLoginAt?: Date | null;
+    lastLoginCountry?: string | null;
+    lastLoginDevice?: string | null;
     createdAt: Date;
     updatedAt: Date;
   },
@@ -104,11 +106,16 @@ function mapUserRow(
   },
 ) {
   const hasPassword = Boolean(user.passwordHash);
+  const firstName = user.firstName?.trim() ?? '';
+  const lastName = user.lastName?.trim() ?? '';
+  // Legacy single-name signups stored the same value twice — expose once for the admin UI.
+  const normalizedLast =
+    lastName && lastName.toLowerCase() !== firstName.toLowerCase() ? lastName : '';
   return {
     id: String(user._id),
     email: user.email,
-    firstName: user.firstName,
-    lastName: user.lastName,
+    firstName,
+    lastName: normalizedLast,
     roleKey: user.roleKey,
     status: user.status,
     hasPassword,
@@ -118,6 +125,8 @@ function mapUserRow(
     cartItemCount: extras.cartItemCount,
     purchasedItemCount: extras.purchasedItemCount,
     lastLoginAt: user.lastLoginAt ?? null,
+    lastLoginCountry: user.lastLoginCountry ?? null,
+    lastLoginDevice: user.lastLoginDevice ?? null,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   };

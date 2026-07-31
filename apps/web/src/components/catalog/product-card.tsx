@@ -20,6 +20,7 @@ import { useUiStore } from '@/store/ui-store';
 import { ROUTES } from '@/constants';
 import { resolveVariantId } from '@/utils/cart';
 import { needsOptionSelection } from '@/utils/catalog/needs-option-selection';
+import { productMetaFrom, trackCommerceEvent } from '@/lib/analytics';
 import { PriceDisplay } from './price-display';
 import { QuickViewModal } from './quick-view-modal';
 
@@ -137,37 +138,65 @@ function ProductCardComponent({
       void navigate({ to: ROUTES.authLogin, search: { redirect: window.location.pathname } });
       return;
     }
+
     const wishlistId = wishlistQuery.data?.id;
-    if (!wishlistId) return;
 
     setHeartBurst(true);
     window.setTimeout(() => setHeartBurst(false), 220);
 
     if (isInWishlist) {
+      if (!wishlistId) {
+        setCartAnnouncement('Wishlist is still loading. Try again in a moment.');
+        return;
+      }
       const item = wishlistQuery.data?.items.find(
         (entry) =>
           entry.productId === product.id &&
           (resolvedVariantId ? entry.variantId === resolvedVariantId : true),
       );
-      if (!item) return;
+      if (!item) {
+        setCartAnnouncement('Could not find that item in your wishlist.');
+        return;
+      }
       removeWishlist.mutate(
         { wishlistId, itemId: item.id },
-        { onSuccess: () => setCartAnnouncement(`${product.name} removed from wishlist`) },
+        {
+          onSuccess: () => {
+            setCartAnnouncement(`${product.name} removed from wishlist`);
+            trackCommerceEvent(
+              'remove_from_wishlist',
+              productMetaFrom(product, { variantId: resolvedVariantId }),
+            );
+          },
+          onError: () => {
+            setCartAnnouncement('Could not update wishlist. Please try again.');
+          },
+        },
       );
       return;
     }
 
     addWishlist.mutate(
       { productId: product.id, variantId: resolvedVariantId, wishlistId },
-      { onSuccess: () => setCartAnnouncement(`${product.name} added to wishlist`) },
+      {
+        onSuccess: () => {
+          setCartAnnouncement(`${product.name} added to wishlist`);
+          trackCommerceEvent(
+            'add_to_wishlist',
+            productMetaFrom(product, { variantId: resolvedVariantId }),
+          );
+        },
+        onError: () => {
+          setCartAnnouncement('Could not update wishlist. Please try again.');
+        },
+      },
     );
   }, [
     addWishlist,
     isAuthed,
     isInWishlist,
     navigate,
-    product.id,
-    product.name,
+    product,
     removeWishlist,
     resolvedVariantId,
     setCartAnnouncement,
@@ -260,6 +289,19 @@ function ProductCardComponent({
             preload="intent"
             aria-label={`View ${product.name}`}
             className="block touch-manipulation"
+            onClick={() => {
+              const meta = productMetaFrom(product, { variantId: resolvedVariantId });
+              trackCommerceEvent('product_card_clicked', meta);
+              trackCommerceEvent('product_image_clicked', meta);
+              try {
+                const q = new URLSearchParams(window.location.search).get('q');
+                if (window.location.pathname.startsWith('/search') && q) {
+                  trackCommerceEvent('search_result_clicked', meta, { query: q });
+                }
+              } catch {
+                /* ignore */
+              }
+            }}
             onTouchStart={onTouchStart}
             onTouchMove={onTouchMove}
             onTouchEnd={onTouchEnd}

@@ -5,10 +5,15 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { CheckCircle2, Mail } from 'lucide-react';
 import { ROUTES } from '@/constants';
 import { useResendVerificationMutation, useVerifyEmailMutation } from '@/hooks/auth';
-import { getPostLoginDestination, buildVerifyEmailSearch } from '@/utils/auth-redirect';
+import {
+  getPostLoginDestination,
+  buildVerifyEmailSearch,
+  takeDevVerificationCode,
+} from '@/utils/auth-redirect';
 import { resendVerificationSchema } from '@/schemas';
 import { AuthErrorAlert } from '@/components/auth/auth-error-alert';
 import { AuthFormHeader } from '@/components/auth/auth-form-header';
+import { DevVerificationCode } from '@/components/auth/dev-verification-code';
 import { OtpInput } from '@/components/forms/otp-input';
 import {
   Form,
@@ -33,11 +38,16 @@ export function VerifyEmailPanel({ email }: VerifyEmailPanelProps) {
   const resendMutation = useResendVerificationMutation();
   const [code, setCode] = useState('');
   const [verifiedEmail, setVerifiedEmail] = useState(email ?? '');
+  const [devCode, setDevCode] = useState<string | undefined>();
 
   const resendForm = useForm<{ email: string }>({
     resolver: zodResolver(resendVerificationSchema),
     defaultValues: { email: email ?? '' },
   });
+
+  useEffect(() => {
+    setDevCode(takeDevVerificationCode());
+  }, []);
 
   useEffect(() => {
     if (email) {
@@ -46,6 +56,12 @@ export function VerifyEmailPanel({ email }: VerifyEmailPanelProps) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [email]);
+
+  useEffect(() => {
+    const next = (resendMutation.data as { devVerificationCode?: string } | undefined)
+      ?.devVerificationCode;
+    if (next) setDevCode(next);
+  }, [resendMutation.data]);
 
   const handleVerify = (submittedCode: string) => {
     if (!verifiedEmail || submittedCode.length !== 6) return;
@@ -94,6 +110,8 @@ export function VerifyEmailPanel({ email }: VerifyEmailPanelProps) {
           </AlertDescription>
         </Alert>
       ) : null}
+
+      {devCode ? <DevVerificationCode code={devCode} /> : null}
 
       {!verifiedEmail ? (
         <EmailPrompt onSubmit={(value) => setVerifiedEmail(value)} />

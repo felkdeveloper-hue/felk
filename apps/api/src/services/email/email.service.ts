@@ -19,7 +19,8 @@ import type { OrderEmailData } from '@/services/email/templates/order-types.js';
 
 function buildFromAddress(): string {
   const from = process.env.EMAIL_FROM ?? '';
-  return `Fashion Edge <${from}>`;
+  const name = process.env.FROM_NAME?.trim() || 'Fashion Edge';
+  return `${name} <${from}>`;
 }
 
 export class CentralizedEmailService implements EmailService {

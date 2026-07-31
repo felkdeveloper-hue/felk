@@ -14,6 +14,7 @@ import { ROUTES } from '@/constants';
 import { SHIPPING_METHOD_OPTIONS } from '@/constants/checkout.constants';
 import { useCheckoutSessionQuery, useRefreshCheckoutMutation } from '@/hooks/checkout';
 import { useCheckoutStore } from '@/store';
+import { trackCommerceEvent } from '@/lib/analytics';
 
 export function CheckoutShippingPage() {
   const navigate = useNavigate();
@@ -30,6 +31,12 @@ export function CheckoutShippingPage() {
       void navigate({ to: ROUTES.checkout });
     }
   }, [checkoutToken, navigate, sessionQuery.isLoading]);
+
+  useEffect(() => {
+    if (checkoutToken) {
+      trackCommerceEvent('checkout_shipping_reached', null, { checkoutToken });
+    }
+  }, [checkoutToken]);
 
   useEffect(() => {
     if (!session?.shippingMethod) return;

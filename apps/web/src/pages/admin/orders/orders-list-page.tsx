@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import { Link, useNavigate } from '@tanstack/react-router';
-import { useMemo, useState } from 'react';
+import { Link, useNavigate, useSearch } from '@tanstack/react-router';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@fe-platform/ui';
 import {
   AdminErrorState,
@@ -35,14 +35,31 @@ function StatusBadge({ status }: { status: string }) {
 
 export function OrdersListPage() {
   const navigate = useNavigate();
+  const rawSearch = useSearch({ strict: false }) as {
+    q?: string;
+    status?: string;
+    customerId?: string;
+    productId?: string;
+  };
   const { orders: orderPerms } = useAdminPermissions();
   const [page, setPage] = useState(1);
-  const [search, setSearch] = useState('');
-  const [status, setStatus] = useState('');
+  const [search, setSearch] = useState(rawSearch.q ?? '');
+  const [status, setStatus] = useState(rawSearch.status ?? '');
+
+  useEffect(() => {
+    if (typeof rawSearch.q === 'string') setSearch(rawSearch.q);
+    if (typeof rawSearch.status === 'string') setStatus(rawSearch.status);
+  }, [rawSearch.q, rawSearch.status]);
 
   const params = useMemo(
-    () => ({ page, limit: 20, q: search || undefined, status: status || undefined }),
-    [page, search, status],
+    () => ({
+      page,
+      limit: 20,
+      q: search || undefined,
+      status: status || undefined,
+      customerId: rawSearch.customerId || undefined,
+    }),
+    [page, search, status, rawSearch.customerId],
   );
 
   const query = useQuery({

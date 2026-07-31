@@ -5,6 +5,7 @@ import { needsOptionSelection } from '@/utils/catalog/needs-option-selection';
 import { useUiStore } from '@/store/ui-store';
 import type { Product } from '@/services/sdk';
 import { trackingApi } from '@/services/sdk/tracking';
+import { productMetaFrom, trackCommerceEvent } from '@/lib/analytics';
 import { Button, type ButtonProps } from '@/components/ui/button';
 import { SelectOptionsSheet } from '@/components/catalog/select-options-sheet';
 import { AppError } from '@/lib/errors';
@@ -65,6 +66,10 @@ export function AddToCartButton({
               ? product.price
               : ((product.price as { amount?: number })?.amount ?? 0);
           void trackingApi.addToCart(resolvedVariantId, product.name, 'LKR', price);
+          trackCommerceEvent(
+            'add_to_cart',
+            productMetaFrom(product, { variantId: resolvedVariantId, quantity }),
+          );
           onAdded?.();
         },
         onError: (error) => {

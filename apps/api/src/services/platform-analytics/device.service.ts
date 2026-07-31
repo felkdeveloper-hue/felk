@@ -1,6 +1,6 @@
 import { VisitorModel, SessionModel } from '@/models/analytics/index.js';
 import type { AnalyticsFilter } from '@/schemas/analytics/index.js';
-import { resolveDateRange } from './date-range.util.js';
+import { buildVisitorMatch, buildSessionMatch } from './analytics-query.builder.js';
 
 interface Breakdown {
   label: string;
@@ -18,8 +18,7 @@ function toPct(items: Array<{ _id: string | null; count: number }>): Breakdown[]
 }
 
 export async function getDeviceBreakdown(filter: AnalyticsFilter) {
-  const range = resolveDateRange(filter);
-  const match = { lastSeenAt: { $gte: range.from, $lte: range.to } };
+  const match = buildVisitorMatch(filter);
 
   const [deviceTypes, browsers, operatingSystems] = await Promise.all([
     VisitorModel.aggregate<{ _id: string | null; count: number }>([
@@ -49,8 +48,7 @@ export async function getDeviceBreakdown(filter: AnalyticsFilter) {
 }
 
 export async function getSessionDeviceBreakdown(filter: AnalyticsFilter) {
-  const range = resolveDateRange(filter);
-  const match = { startedAt: { $gte: range.from, $lte: range.to } };
+  const match = buildSessionMatch(filter);
 
   const [deviceTypes, browsers] = await Promise.all([
     SessionModel.aggregate<{ _id: string | null; count: number }>([

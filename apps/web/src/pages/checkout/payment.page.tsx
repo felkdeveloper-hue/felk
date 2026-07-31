@@ -13,6 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ROUTES } from '@/constants';
 import { useCheckoutSessionQuery, useRefreshCheckoutMutation } from '@/hooks/checkout';
 import { useCheckoutStore } from '@/store';
+import { trackCommerceEvent } from '@/lib/analytics';
 
 export function CheckoutPaymentPage() {
   const navigate = useNavigate();
@@ -29,6 +30,12 @@ export function CheckoutPaymentPage() {
       void navigate({ to: ROUTES.checkout });
     }
   }, [checkoutToken, navigate, sessionQuery.isLoading]);
+
+  useEffect(() => {
+    if (checkoutToken) {
+      trackCommerceEvent('payment_page_reached', null, { checkoutToken });
+    }
+  }, [checkoutToken]);
 
   useEffect(() => {
     if (!paymentMethod) {

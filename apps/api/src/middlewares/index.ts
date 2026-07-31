@@ -18,3 +18,4 @@ export {
   getAccessTokenFromRequest,
 } from './auth.middleware.js';
 export { errorHandler, notFoundHandler } from './error.middleware.js';
+export { requireDatabase } from './require-database.middleware.js';

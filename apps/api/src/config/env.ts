@@ -59,6 +59,8 @@ const envSchema = z
       .enum(['true', 'false'])
       .default('false')
       .transform((v) => v === 'true'),
+    /** SMTP login user; defaults to EMAIL_FROM when omitted. */
+    SMTP_USER: z.string().optional(),
     EMAIL_FROM: z.string().optional(),
     EMAIL_PASSWORD: z.string().optional(),
     AWS_REGION: z.string().optional(),
@@ -253,7 +255,9 @@ export const env = {
   metricsEnabled: data.METRICS_ENABLED === undefined ? true : data.METRICS_ENABLED === 'true',
   csrfEnabled: data.CSRF_ENABLED === 'true',
   logLevel: isProd && data.LOG_LEVEL === 'debug' ? 'info' : data.LOG_LEVEL,
-  smtpEnabled: Boolean(data.SMTP_HOST && data.EMAIL_FROM && data.EMAIL_PASSWORD),
+  smtpEnabled: Boolean(
+    data.SMTP_HOST && (data.SMTP_USER || data.EMAIL_FROM) && data.EMAIL_PASSWORD,
+  ),
   isDev,
   isProd,
   isTest,

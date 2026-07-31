@@ -27,6 +27,7 @@ export const QUERY_KEYS = {
   },
   customers: {
     me: () => ['customers', 'me'] as const,
+    detail: (id: string) => ['customers', 'detail', id] as const,
     preferences: () => ['customers', 'me', 'preferences'] as const,
     addresses: () => ['customers', 'me', 'addresses'] as const,
     wishlists: () => ['customers', 'me', 'wishlists'] as const,

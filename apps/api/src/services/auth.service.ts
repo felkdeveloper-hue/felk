@@ -13,7 +13,7 @@ import {
 } from '@/constants/auth.js';
 import { ERROR_MESSAGES } from '@/constants/error-messages.js';
 import { ROLES, type RoleKey } from '@/constants/roles.js';
-import { attachDevResetCode } from '@/utils/dev-verification.helper.js';
+import { attachDevResetCode, attachDevVerificationCode } from '@/utils/dev-verification.helper.js';
 import { loginAlertEmail, passwordChangedEmail } from '@/emails/index.js';
 import {
   PasswordResetTokenModel,
@@ -47,11 +47,23 @@ import {
   wasPasswordUsedRecently,
 } from '@/utils/password.helper.js';
 import { generateSecureToken, hashToken } from '@/utils/token.helper.js';
+import { resolveCountryFromIp } from '@/services/platform-analytics/geoip.util.js';
+import { parseUserAgent } from '@/services/platform-analytics/ua-parser.util.js';
 
 export interface AuthRequestMeta {
   ip?: string;
   userAgent?: string;
   requestId?: string;
+  /** ISO country code from CDN/proxy headers when available. */
+  countryCode?: string;
+}
+
+function loginDeviceLabel(userAgent?: string): string {
+  const type = parseUserAgent(userAgent).type;
+  if (type === 'mobile') return 'Phone';
+  if (type === 'tablet') return 'Tablet';
+  if (type === 'desktop') return 'Desktop';
+  return 'Unknown';
 }
 
 export interface AuthTokensResult {
@@ -316,12 +328,13 @@ export const authService = {
       },
     );
 
+    let otpIssued: { delivered: boolean; otp: string } | null = null;
     try {
       const { otpService } = await import('@/services/otp.service.js');
-      await otpService.issueOtpForUser(user._id.toString(), user.email);
+      otpIssued = await otpService.issueOtpForUser(user._id.toString(), user.email);
     } catch (err) {
-      logger.error({ err, email: user.email }, 'Register: verification email failed');
-      throw ApiError.internal('Unable to send verification email', 'EMAIL_SEND_FAILED');
+      logger.error({ err, email: user.email }, 'Register: verification OTP issue failed');
+      throw ApiError.internal('Unable to create verification code', 'EMAIL_SEND_FAILED');
     }
 
     // Track registration analytics (fire-and-forget)
@@ -345,6 +358,7 @@ export const authService = {
       ip: meta.ip,
       userAgent: meta.userAgent,
       requestId: meta.requestId,
+      metadata: { emailDelivered: otpIssued.delivered },
     });
 
     await writeActivityLog({
@@ -354,10 +368,16 @@ export const authService = {
       ip: meta.ip,
     });
 
-    return {
-      user: sanitizeUser(user),
-      message: 'Registration successful. Please verify your email.',
-    };
+    return attachDevVerificationCode(
+      {
+        user: sanitizeUser(user),
+        message: otpIssued.delivered
+          ? 'Registration successful. Please verify your email.'
+          : 'Registration successful. Enter the verification code to continue.',
+      },
+      otpIssued.otp,
+      otpIssued.delivered,
+    );
   },
 
   async login(
@@ -445,6 +465,12 @@ export const authService = {
     }
     user.lastLoginAt = new Date();
     user.lastLoginIp = meta.ip ?? null;
+    user.lastLoginDevice = loginDeviceLabel(meta.userAgent);
+    const geo =
+      meta.countryCode && meta.countryCode !== 'XX'
+        ? { country: meta.countryCode, countryCode: meta.countryCode }
+        : await resolveCountryFromIp(meta.ip);
+    user.lastLoginCountry = geo?.country ?? geo?.countryCode ?? null;
     await user.save();
 
     const tokens = await createSessionAndTokens(user, meta, rememberMe);

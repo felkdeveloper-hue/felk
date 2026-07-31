@@ -37,6 +37,17 @@ export const ADMIN_ROUTES = {
   analyticsDevices: '/admin/analytics/devices',
   analyticsGeo: '/admin/analytics/geo',
   analyticsTraffic: '/admin/analytics/traffic',
+  analyticsProducts: '/admin/analytics/products',
+  analyticsCart: '/admin/analytics/cart',
+  analyticsWishlist: '/admin/analytics/wishlist',
+  analyticsRecovery: '/admin/analytics/recovery',
+  analyticsReturning: '/admin/analytics/returning',
+  analyticsSearch: '/admin/analytics/search',
+  analyticsFunnel: '/admin/analytics/funnel',
+  analyticsActivity: '/admin/analytics/activity',
+  analyticsCheckout: '/admin/analytics/checkout',
+  analyticsRevenue: '/admin/analytics/revenue',
+  analyticsExports: '/admin/analytics/exports',
 } as const;
 
 /**

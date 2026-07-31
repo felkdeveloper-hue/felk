@@ -4,6 +4,7 @@ import { UserModel } from '@/models/user.model.js';
 import { emailService } from '@/services/email/email.service.js';
 import { writeAuditLog } from '@/services/audit.service.js';
 import type { AuthRequestMeta, AuthTokensResult } from '@/services/auth.service.js';
+import { attachDevVerificationCode } from '@/utils/dev-verification.helper.js';
 import { addMinutes } from '@/utils/date.helper.js';
 import { normalizeEmail } from '@/utils/email.helper.js';
 import { generateEmailOtp, hashEmailOtp, verifyEmailOtp } from '@/utils/email-otp.helper.js';
@@ -12,17 +13,22 @@ import { logger } from '@/config/logger.js';
 
 const GENERIC_SENT_MESSAGE = 'If verification is required, a verification code has been sent.';
 
+export type OtpIssueResult = {
+  delivered: boolean;
+  otp: string;
+};
+
 async function invalidateExistingOtps(email: string): Promise<void> {
   await EmailOtpModel.deleteMany({ email, verified: false });
 }
 
-async function createAndSendOtp(email: string, userId?: string): Promise<void> {
+async function createAndSendOtp(email: string, userId?: string): Promise<OtpIssueResult | null> {
   const user = userId
     ? await UserModel.findById(userId)
     : await UserModel.findOne({ email, isDeleted: false });
 
   if (!user || user.emailVerifiedAt) {
-    return;
+    return null;
   }
 
   await invalidateExistingOtps(email);
@@ -39,15 +45,22 @@ async function createAndSendOtp(email: string, userId?: string): Promise<void> {
     userId: user._id,
   });
 
-  await emailService.sendVerificationOTP(email, otp, {
-    name: user.firstName,
-    expiryMinutes: AUTH_LIMITS.OTP_EXPIRY_MINUTES,
-  });
+  let delivered = false;
+  try {
+    await emailService.sendVerificationOTP(email, otp, {
+      name: user.firstName,
+      expiryMinutes: AUTH_LIMITS.OTP_EXPIRY_MINUTES,
+    });
+    delivered = true;
+  } catch (err) {
+    // Keep the OTP so registration / verify can continue; delivery can be retried via resend.
+    logger.error({ err, email }, 'OTP email delivery failed — code stored for verify/resend');
+  }
 
-  // Gmail SMTP "sent" ≠ recipient inbox. In local/dev, always print the OTP
-  // so testing is not blocked when the mail lands in Spam/Promotions.
+  // Always print the OTP locally so testing is not blocked when SMTP rejects credentials
+  // or the message lands in Spam/Promotions.
   if (process.env.NODE_ENV !== 'production') {
-    logger.warn({ email, otp }, 'DEV: verification OTP (check this if inbox is empty)');
+    logger.warn({ email, otp, delivered }, 'DEV: verification OTP (check this if inbox is empty)');
   }
 
   await writeAuditLog({
@@ -55,7 +68,10 @@ async function createAndSendOtp(email: string, userId?: string): Promise<void> {
     resourceType: 'user',
     resourceId: user._id.toString(),
     actorUserId: user._id.toString(),
+    metadata: { delivered },
   });
+
+  return { delivered, otp };
 }
 
 export const otpService = {
@@ -68,14 +84,16 @@ export const otpService = {
       return { message: GENERIC_SENT_MESSAGE };
     }
 
-    try {
-      await createAndSendOtp(email, user._id.toString());
-    } catch (err) {
-      logger.error({ err, email }, 'OTP send failed');
-      throw ApiError.internal('Unable to send verification email', 'EMAIL_SEND_FAILED');
+    const result = await createAndSendOtp(email, user._id.toString());
+    if (!result) {
+      return { message: GENERIC_SENT_MESSAGE };
     }
 
-    return { message: GENERIC_SENT_MESSAGE };
+    return attachDevVerificationCode(
+      { message: GENERIC_SENT_MESSAGE },
+      result.otp,
+      result.delivered,
+    );
   },
 
   async resendOtp(emailRaw: string, meta: AuthRequestMeta) {
@@ -154,7 +172,11 @@ export const otpService = {
     };
   },
 
-  async issueOtpForUser(userId: string, email: string): Promise<void> {
-    await createAndSendOtp(normalizeEmail(email), userId);
+  async issueOtpForUser(userId: string, email: string): Promise<OtpIssueResult> {
+    const result = await createAndSendOtp(normalizeEmail(email), userId);
+    if (!result) {
+      throw ApiError.badRequest('Unable to issue verification code', undefined, 'OTP_ISSUE_FAILED');
+    }
+    return result;
   },
 };

@@ -49,7 +49,10 @@ const STATUS_OPTIONS = [
 ];
 
 function displayName(row: AdminUserRow) {
-  return [row.firstName, row.lastName].filter(Boolean).join(' ') || row.email;
+  const first = row.firstName?.trim();
+  const last = row.lastName?.trim();
+  if (first && last && first.toLowerCase() !== last.toLowerCase()) return `${first} ${last}`;
+  return first || last || row.email;
 }
 
 export function UsersListPage() {
@@ -81,6 +84,8 @@ export function UsersListPage() {
   const query = useQuery({
     queryKey: QUERY_KEYS.adminUsers.list(params),
     queryFn: () => usersApi.list(params),
+    refetchInterval: 15_000,
+    refetchIntervalInBackground: false,
   });
 
   const summaryQueries = useQueries({
@@ -326,6 +331,16 @@ export function UsersListPage() {
             id: 'bought',
             header: 'Items bought',
             cell: (row) => row.purchasedItemCount,
+          },
+          {
+            id: 'country',
+            header: 'Country',
+            cell: (row) => row.lastLoginCountry || '—',
+          },
+          {
+            id: 'device',
+            header: 'Device',
+            cell: (row) => row.lastLoginDevice || '—',
           },
           {
             id: 'created',

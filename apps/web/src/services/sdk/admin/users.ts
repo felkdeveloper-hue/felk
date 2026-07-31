@@ -16,17 +16,25 @@ export interface AdminUserRow {
   cartItemCount: number;
   purchasedItemCount: number;
   lastLoginAt?: string | null;
+  lastLoginCountry?: string | null;
+  lastLoginDevice?: string | null;
   createdAt?: string;
 }
 
 function normalizeUser(raw: unknown): AdminUserRow {
   const record = raw as Record<string, unknown>;
   const hasPassword = Boolean(record.hasPassword);
+  const firstName = typeof record.firstName === 'string' ? record.firstName : undefined;
+  const lastName = typeof record.lastName === 'string' ? record.lastName : undefined;
+  const dedupedLast =
+    firstName && lastName && firstName.trim().toLowerCase() === lastName.trim().toLowerCase()
+      ? undefined
+      : lastName;
   return {
     id: normalizeId(record),
     email: String(record.email ?? ''),
-    firstName: typeof record.firstName === 'string' ? record.firstName : undefined,
-    lastName: typeof record.lastName === 'string' ? record.lastName : undefined,
+    firstName,
+    lastName: dedupedLast,
     roleKey: String(record.roleKey ?? ''),
     status: String(record.status ?? ''),
     hasPassword,
@@ -41,6 +49,8 @@ function normalizeUser(raw: unknown): AdminUserRow {
     cartItemCount: Number(record.cartItemCount ?? 0),
     purchasedItemCount: Number(record.purchasedItemCount ?? 0),
     lastLoginAt: typeof record.lastLoginAt === 'string' ? record.lastLoginAt : null,
+    lastLoginCountry: typeof record.lastLoginCountry === 'string' ? record.lastLoginCountry : null,
+    lastLoginDevice: typeof record.lastLoginDevice === 'string' ? record.lastLoginDevice : null,
     createdAt: typeof record.createdAt === 'string' ? record.createdAt : undefined,
   };
 }

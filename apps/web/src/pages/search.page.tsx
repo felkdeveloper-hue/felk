@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Seo } from '@/components/common/seo';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -6,6 +6,7 @@ import { CatalogListShell } from '@/components/catalog';
 import { buildAbsoluteUrl, siteConfig } from '@/config';
 import { useCatalogSearchParams, useInfiniteProducts, useSearchExperience } from '@/hooks/catalog';
 import { CATALOG_MAX_PRODUCTS } from '@/utils/catalog';
+import { trackCommerceEvent } from '@/lib/analytics';
 
 export function SearchPage() {
   const { state, setSearch, clearFilters } = useCatalogSearchParams();
@@ -35,10 +36,28 @@ export function SearchPage() {
     setSearch({ q: search.debouncedQuery }, { replace: true });
   }, [search.debouncedQuery, setSearch]);
 
-  const submit = (term: string) => {
+  const lastTrackedQuery = useRef<string | null>(null);
+
+  useEffect(() => {
+    const q = (search.debouncedQuery || state.q || '').trim();
+    if (!q || query.isLoading || query.isFetching) return;
+    if (total == null) return;
+    const key = `${q}:${total}`;
+    if (lastTrackedQuery.current === key) return;
+    lastTrackedQuery.current = key;
+    trackCommerceEvent('search', null, { query: q, resultCount: total });
+    if (total === 0) {
+      trackCommerceEvent('search_zero_results', null, { query: q, resultCount: 0 });
+    }
+  }, [search.debouncedQuery, state.q, total, query.isLoading, query.isFetching]);
+
+  const submit = (term: string, fromSuggestion = false) => {
     const normalized = term.trim();
     setInput(normalized);
     search.rememberSearch(normalized);
+    if (fromSuggestion && normalized) {
+      trackCommerceEvent('search_suggestion_clicked', null, { query: normalized });
+    }
     setSearch({ q: normalized || undefined, page: 1 });
   };
 
@@ -83,7 +102,12 @@ export function SearchPage() {
             <ul className="mt-4 flex flex-wrap gap-2" aria-label="Search suggestions">
               {search.suggestions.map((term) => (
                 <li key={term}>
-                  <Button type="button" size="sm" variant="outline" onClick={() => submit(term)}>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => submit(term, true)}
+                  >
                     {term}
                   </Button>
                 </li>

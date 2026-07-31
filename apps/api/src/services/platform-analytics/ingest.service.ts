@@ -101,6 +101,16 @@ async function upsertSession(
         ...(payload.pageCount !== undefined ? { pageCount: payload.pageCount } : {}),
         ...(payload.clickCount !== undefined ? { clickCount: payload.clickCount } : {}),
         ...(payload.maxScrollDepth !== undefined ? { maxScrollDepth: payload.maxScrollDepth } : {}),
+        ...(payload.activeMs !== undefined ? { activeMs: payload.activeMs } : {}),
+        ...(payload.idleMs !== undefined ? { idleMs: payload.idleMs } : {}),
+        ...(payload.durationMs !== undefined ? { durationMs: payload.durationMs } : {}),
+        ...(payload.avgTimePerPageMs !== undefined
+          ? { avgTimePerPageMs: payload.avgTimePerPageMs }
+          : {}),
+        ...(payload.exitPage !== undefined ? { exitPage: payload.exitPage } : {}),
+        ...(payload.lastPage !== undefined ? { lastPage: payload.lastPage } : {}),
+        ...(payload.endedAt ? { endedAt: new Date(payload.endedAt) } : {}),
+        ...(payload.isActive !== undefined ? { isActive: payload.isActive } : {}),
         ...(userId ? { userId } : {}),
       },
     },
@@ -110,6 +120,14 @@ async function upsertSession(
   // Not a bounce if more than 1 page
   if (payload.pageCount && payload.pageCount > 1) {
     await SessionModel.updateOne({ sessionId: payload.sessionId }, { $set: { isBounce: false } });
+  }
+
+  // Derive avg time per page when we have duration + page count
+  if (payload.durationMs && payload.pageCount && payload.pageCount > 0) {
+    await SessionModel.updateOne(
+      { sessionId: payload.sessionId, avgTimePerPageMs: null },
+      { $set: { avgTimePerPageMs: Math.round(payload.durationMs / payload.pageCount) } },
+    );
   }
 }
 
@@ -156,15 +174,61 @@ async function insertEvents(
   }));
 
   // Ignore duplicate eventIds (unique index) via ordered:false
-  await EventModel.insertMany(docs, { ordered: false });
+  try {
+    await EventModel.insertMany(docs, { ordered: false });
+  } catch {
+    /* duplicate keys */
+  }
+
+  // Broadcast high-signal events to live admin feed
+  try {
+    const { publishAnalyticsActivity } = await import('./live.gateway.js');
+    for (const d of docs) {
+      publishAnalyticsActivity({
+        eventId: d.eventId,
+        name: d.name,
+        occurredAt: d.occurredAt,
+        userId: d.userId ? String(d.userId) : null,
+        path: d.path,
+        sessionId: d.sessionId,
+        properties: d.properties as Record<string, unknown>,
+      });
+    }
+  } catch {
+    /* socket optional */
+  }
 }
 
-async function processHeartbeat(sessionId: string, visitorId: string): Promise<void> {
-  await SessionModel.updateOne(
-    { sessionId, isActive: true },
-    { $set: { lastActiveAt: new Date() } },
+async function processHeartbeat(
+  sessionId: string,
+  visitorId: string,
+  currentPage?: string | null,
+): Promise<void> {
+  const now = new Date();
+  // Always revive the session — mobile browsers often fire pagehide/beforeunload
+  // and mark isActive=false when switching apps; a later heartbeat must bring them back.
+  await SessionModel.findOneAndUpdate(
+    { sessionId },
+    {
+      $set: {
+        visitorId,
+        lastActiveAt: now,
+        isActive: true,
+        ...(currentPage ? { lastPage: currentPage, exitPage: currentPage } : {}),
+      },
+      $setOnInsert: {
+        sessionId,
+        visitorId,
+        startedAt: now,
+        deviceType: 'unknown',
+        isBounce: true,
+        entryPage: currentPage ?? null,
+      },
+      $unset: { endedAt: '' },
+    },
+    { upsert: true },
   );
-  await VisitorModel.updateOne({ visitorId }, { $set: { lastSeenAt: new Date() } });
+  await VisitorModel.updateOne({ visitorId }, { $set: { lastSeenAt: now } }, { upsert: false });
 }
 
 export async function processCollect(body: CollectBody, req: Request): Promise<void> {
@@ -189,7 +253,13 @@ export async function processCollect(body: CollectBody, req: Request): Promise<v
   }
 
   if (body.heartbeat) {
-    ops.push(processHeartbeat(body.heartbeat.sessionId, body.heartbeat.visitorId));
+    ops.push(
+      processHeartbeat(
+        body.heartbeat.sessionId,
+        body.heartbeat.visitorId,
+        body.heartbeat.path ?? null,
+      ),
+    );
   }
 
   await Promise.allSettled(ops);
@@ -206,6 +276,7 @@ export async function emitBusinessEvent(opts: {
   properties?: Record<string, unknown>;
 }): Promise<void> {
   try {
+    const occurredAt = new Date();
     await EventModel.create({
       eventId: opts.eventId,
       name: opts.name,
@@ -214,8 +285,22 @@ export async function emitBusinessEvent(opts: {
       visitorId: opts.visitorId ?? null,
       path: opts.path ?? null,
       properties: opts.properties ?? {},
-      occurredAt: new Date(),
+      occurredAt,
     });
+    try {
+      const { publishAnalyticsActivity } = await import('./live.gateway.js');
+      publishAnalyticsActivity({
+        eventId: opts.eventId,
+        name: opts.name,
+        occurredAt,
+        userId: opts.userId,
+        path: opts.path,
+        sessionId: opts.sessionId,
+        properties: opts.properties,
+      });
+    } catch {
+      /* socket optional */
+    }
   } catch {
     // duplicate eventId — already recorded
   }

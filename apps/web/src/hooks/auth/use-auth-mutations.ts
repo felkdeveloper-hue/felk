@@ -2,7 +2,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { QUERY_KEYS } from '@/constants/query-keys';
 import { ROUTES } from '@/constants/routes';
-import { getPostLoginDestination, buildVerifyEmailSearch } from '@/utils/auth-redirect';
+import {
+  getPostLoginDestination,
+  buildVerifyEmailSearch,
+  stashDevVerificationCode,
+} from '@/utils/auth-redirect';
 import { AppError } from '@/lib/errors';
 import { authApi } from '@/services/sdk';
 import { useAuthStore } from '@/store';
@@ -31,6 +35,7 @@ export function useRegisterMutation() {
   return useMutation({
     mutationFn: authApi.register,
     onSuccess: (result) => {
+      stashDevVerificationCode(result.devVerificationCode);
       navigate({
         to: ROUTES.authVerifyEmail,
         search: buildVerifyEmailSearch({

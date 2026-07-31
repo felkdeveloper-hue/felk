@@ -35,6 +35,12 @@ export function resolveDateRange(
       return { from: start, to: now };
     }
 
+    case '90d': {
+      const start = new Date(today);
+      start.setDate(start.getDate() - 89);
+      return { from: start, to: now };
+    }
+
     case 'custom': {
       if (filter.from && filter.to) {
         return { from: new Date(filter.from), to: new Date(filter.to) };

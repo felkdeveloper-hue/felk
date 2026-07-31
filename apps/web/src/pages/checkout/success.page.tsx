@@ -12,6 +12,7 @@ import { usePaymentStatusQuery } from '@/hooks/payment';
 import { cartApi } from '@/services/sdk';
 import { useCartStore, useCheckoutStore } from '@/store';
 import { clearCheckoutPlacedFlag, readCheckoutPlacedFlag } from '@/utils/checkout-placed-flag';
+import { trackCommerceEvent } from '@/lib/analytics';
 
 export function CheckoutSuccessPage() {
   const search = useSearch({ strict: false }) as { checkoutToken?: string };
@@ -47,6 +48,11 @@ export function CheckoutSuccessPage() {
     if (!isConfirmed || !checkoutToken) return;
 
     clearCheckoutPlacedFlag(checkoutToken);
+    trackCommerceEvent('payment_completed', null, {
+      checkoutToken,
+      orderNumber: orderNumber ?? null,
+      method,
+    });
 
     void (async () => {
       try {
@@ -59,7 +65,7 @@ export function CheckoutSuccessPage() {
       void queryClient.invalidateQueries({ queryKey: ['cart'] });
       void queryClient.invalidateQueries({ queryKey: ['orders'] });
     })();
-  }, [isConfirmed, checkoutToken, resetCheckoutUi, queryClient]);
+  }, [isConfirmed, checkoutToken, resetCheckoutUi, queryClient, orderNumber, method]);
 
   return (
     <>

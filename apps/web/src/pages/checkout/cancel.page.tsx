@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import { ROUTES } from '@/constants';
 import { useRetryPaymentMutation } from '@/hooks/payment';
 import { useCheckoutStore } from '@/store';
+import { markPaymentFailedFlag, trackCommerceEvent } from '@/lib/analytics';
+import { useEffect } from 'react';
 
 export function CheckoutCancelPage() {
   const navigate = useNavigate();
@@ -15,6 +17,11 @@ export function CheckoutCancelPage() {
   const checkoutToken = search.checkoutToken ?? storedToken ?? null;
 
   const retryPayment = useRetryPaymentMutation();
+
+  useEffect(() => {
+    markPaymentFailedFlag();
+    trackCommerceEvent('payment_failed', null, { checkoutToken, reason: 'cancelled' });
+  }, [checkoutToken]);
 
   const handleRetry = () => {
     if (!checkoutToken || !paymentMethod) {

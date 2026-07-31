@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { AdminErrorState, AdminPageHeader, PageMotion, DataTable } from '@/components/admin';
 import {
@@ -7,9 +6,11 @@ import {
   AnalyticsEmpty,
   TableSkeleton,
   ChartSkeleton,
+  AnalyticsExportButton,
 } from '@/components/admin/analytics';
-import { useAnalyticsPages } from '@/hooks/admin';
-import type { AnalyticsFilter, PageStat } from '@/services/sdk/admin';
+import { useAnalyticsPages, useAnalyticsFilters } from '@/hooks/admin';
+import { adminChartColor } from '@/lib/admin-chart-colors';
+import type { PageStat } from '@/services/sdk/admin';
 import type { DataTableColumn } from '@/components/admin';
 
 function formatMs(ms: number) {
@@ -33,7 +34,9 @@ const columns: DataTableColumn<PageStat>[] = [
 ];
 
 export function AnalyticsPagesPage() {
-  const [filter, setFilter] = useState<AnalyticsFilter>({ period: '7d', page: 1, limit: 20 });
+  const { filter, setFilter, clearFilters } = useAnalyticsFilters({
+    defaults: { period: '7d', page: 1, limit: 20 },
+  });
   const query = useAnalyticsPages(filter);
 
   const topPages = (query.data?.data ?? []).slice(0, 10).map((p: PageStat) => ({
@@ -43,12 +46,17 @@ export function AnalyticsPagesPage() {
 
   return (
     <PageMotion>
-      <AdminPageHeader title="Page Analytics" description="Pages sorted by total views." />
+      <AdminPageHeader
+        title="Page Analytics"
+        description="Pages sorted by total views."
+        actions={<AnalyticsExportButton reportType="pages" filter={filter} allowPageScope />}
+      />
 
       <AnalyticsFilterBar
         filter={filter}
-        onChange={(f) => setFilter((p) => ({ ...p, ...f, page: 1 }))}
-        showDevice
+        onChange={setFilter}
+        onClear={clearFilters}
+        visible={['period', 'device', 'country', 'userId', 'sessionId']}
       />
 
       {query.isError ? (
@@ -77,7 +85,7 @@ export function AnalyticsPagesPage() {
                       background: 'var(--card)',
                     }}
                   />
-                  <Bar dataKey="views" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="views" fill={adminChartColor(0)} radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             )}

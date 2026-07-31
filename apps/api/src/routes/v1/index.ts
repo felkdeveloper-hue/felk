@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { requireDatabase } from '@/middlewares/index.js';
 import { authRouter } from '@/routes/auth.routes.js';
 import { systemRouter } from '@/routes/system.routes.js';
 import { cmsRouter } from '@/routes/cms/cms.routes.js';
@@ -22,9 +23,12 @@ import { analyticsRouter } from '@/routes/analytics/analytics.routes.js';
  */
 export const v1Router = Router();
 
+// Health routes first (no DB required), then gate everything else on MongoDB.
+v1Router.use(systemRouter);
+v1Router.use(requireDatabase);
+
 v1Router.use('/storefront', storefrontRouter);
 v1Router.use(reviewsRouter);
-v1Router.use(systemRouter);
 v1Router.use('/auth', authRouter);
 v1Router.use('/cms', cmsRouter);
 v1Router.use('/catalog', catalogRouter);

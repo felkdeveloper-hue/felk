@@ -20,6 +20,7 @@ import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { PageMotion, CategoryTreePicker, type CategoryPickerNode } from '@/components/admin';
+import { ProductInsightsPanel } from '@/components/admin/analytics/ProductInsightsPanel';
 import { ADMIN_ROUTES, QUERY_KEYS } from '@/constants';
 import { findOfficialBrandId, OFFICIAL_BRAND_NAME } from '@/constants/store-brand';
 import { useAdminPermissions } from '@/hooks/admin';
@@ -1770,6 +1771,8 @@ export function ProductFormPage({ productId }: { productId?: string }) {
             </Link>
           </div>
         </div>
+
+        {isEdit && productId ? <ProductInsightsPanel productId={productId} /> : null}
 
         {/* ── Two-column layout ── */}
         <div className="grid gap-6 lg:grid-cols-3">

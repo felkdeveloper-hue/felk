@@ -1,6 +1,6 @@
 import { PageViewModel } from '@/models/analytics/index.js';
 import type { AnalyticsFilter } from '@/schemas/analytics/index.js';
-import { resolveDateRange } from './date-range.util.js';
+import { buildPageViewMatch } from './analytics-query.builder.js';
 import { parsePagination, buildPaginationMeta } from '@/utils/pagination.js';
 
 export interface PageStat {
@@ -14,13 +14,9 @@ export interface PageStat {
 }
 
 export async function getPages(filter: AnalyticsFilter) {
-  const range = resolveDateRange(filter);
   const { page, limit } = parsePagination({ page: filter.page, limit: filter.limit });
   const skip = (page - 1) * limit;
-
-  const matchStage: Record<string, unknown> = { viewedAt: { $gte: range.from, $lte: range.to } };
-  if (filter.country) matchStage['country'] = filter.country;
-  if (filter.device) matchStage['deviceType'] = filter.device;
+  const matchStage = buildPageViewMatch(filter);
 
   const pipeline = [
     { $match: matchStage },

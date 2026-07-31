@@ -1,5 +1,10 @@
-import { VisitorModel, SessionModel, PageViewModel, EventModel } from '@/models/analytics/index.js';
+import { VisitorModel, SessionModel, PageViewModel } from '@/models/analytics/index.js';
 import type { AnalyticsFilter } from '@/schemas/analytics/index.js';
+import {
+  buildVisitorMatch,
+  buildSessionMatch,
+  buildPageViewMatch,
+} from './analytics-query.builder.js';
 import { resolveDateRange, getComparisonRange, getPctChange } from './date-range.util.js';
 
 export interface KpiMetric {
@@ -23,81 +28,6 @@ export interface OverviewData {
   avgPagesPerSession: KpiMetric;
 }
 
-async function countVisitors(from: Date, to: Date) {
-  return VisitorModel.countDocuments({ lastSeenAt: { $gte: from, $lte: to } });
-}
-
-async function countUniqueVisitors(from: Date, to: Date) {
-  const result = await VisitorModel.distinct('visitorId', {
-    lastSeenAt: { $gte: from, $lte: to },
-  });
-  return result.length;
-}
-
-async function countLoggedIn(from: Date, to: Date) {
-  return VisitorModel.countDocuments({
-    lastSeenAt: { $gte: from, $lte: to },
-    userId: { $ne: null },
-  });
-}
-
-async function countReturning(from: Date, to: Date) {
-  return VisitorModel.countDocuments({
-    lastSeenAt: { $gte: from, $lte: to },
-    isReturning: true,
-  });
-}
-
-async function countSessions(from: Date, to: Date) {
-  return SessionModel.countDocuments({ startedAt: { $gte: from, $lte: to } });
-}
-
-async function avgDuration(from: Date, to: Date) {
-  const result = await SessionModel.aggregate<{ avg: number }>([
-    { $match: { startedAt: { $gte: from, $lte: to }, durationMs: { $ne: null } } },
-    { $group: { _id: null, avg: { $avg: '$durationMs' } } },
-  ]);
-  return Math.round(result[0]?.avg ?? 0);
-}
-
-async function bounceRatePct(from: Date, to: Date) {
-  const [total, bounces] = await Promise.all([
-    SessionModel.countDocuments({ startedAt: { $gte: from, $lte: to } }),
-    SessionModel.countDocuments({ startedAt: { $gte: from, $lte: to }, isBounce: true }),
-  ]);
-  if (!total) return 0;
-  return Math.round((bounces / total) * 100 * 10) / 10;
-}
-
-async function countPageViews(from: Date, to: Date) {
-  return PageViewModel.countDocuments({ viewedAt: { $gte: from, $lte: to } });
-}
-
-async function avgPages(from: Date, to: Date) {
-  const result = await SessionModel.aggregate<{ avg: number }>([
-    { $match: { startedAt: { $gte: from, $lte: to } } },
-    { $group: { _id: null, avg: { $avg: '$pageCount' } } },
-  ]);
-  return Math.round((result[0]?.avg ?? 1) * 10) / 10;
-}
-
-async function countActiveNow() {
-  const cutoff = new Date(Date.now() - 5 * 60 * 1000); // 5 min heartbeat window
-  return SessionModel.countDocuments({ isActive: true, lastActiveAt: { $gte: cutoff } });
-}
-
-async function countNewToday() {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return VisitorModel.countDocuments({ firstSeenAt: { $gte: today } });
-}
-
-async function sessionsToday() {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return SessionModel.countDocuments({ startedAt: { $gte: today } });
-}
-
 function makeMetric(current: number, previous: number): KpiMetric {
   return { value: current, prev: previous, pctChange: getPctChange(current, previous) };
 }
@@ -105,6 +35,18 @@ function makeMetric(current: number, previous: number): KpiMetric {
 export async function getOverview(filter: AnalyticsFilter): Promise<OverviewData> {
   const range = resolveDateRange(filter);
   const prev = getComparisonRange(range);
+
+  const visitorCur = buildVisitorMatch(filter, range);
+  const visitorPrev = buildVisitorMatch(filter, prev);
+  const sessionCur = buildSessionMatch(filter, range);
+  const sessionPrev = buildSessionMatch(filter, prev);
+  const pageCur = buildPageViewMatch(filter, range);
+  const pagePrev = buildPageViewMatch(filter, prev);
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  // Keep in sync with live.service ACTIVE_WINDOW_MS (2 minutes of recent activity)
+  const activeCutoff = new Date(Date.now() - 2 * 60 * 1000);
 
   const [
     tv,
@@ -125,23 +67,43 @@ export async function getOverview(filter: AnalyticsFilter): Promise<OverviewData
     newToday,
     sToday,
   ] = await Promise.all([
-    countVisitors(range.from, range.to),
-    countVisitors(prev.from, prev.to),
-    countLoggedIn(range.from, range.to),
-    countLoggedIn(prev.from, prev.to),
-    countReturning(range.from, range.to),
-    countReturning(prev.from, prev.to),
-    avgDuration(range.from, range.to),
-    avgDuration(prev.from, prev.to),
-    bounceRatePct(range.from, range.to),
-    bounceRatePct(prev.from, prev.to),
-    countPageViews(range.from, range.to),
-    countPageViews(prev.from, prev.to),
-    avgPages(range.from, range.to),
-    avgPages(prev.from, prev.to),
-    countActiveNow(),
-    countNewToday(),
-    sessionsToday(),
+    VisitorModel.countDocuments(visitorCur),
+    VisitorModel.countDocuments(visitorPrev),
+    VisitorModel.countDocuments({ ...visitorCur, userId: { $ne: null } }),
+    VisitorModel.countDocuments({ ...visitorPrev, userId: { $ne: null } }),
+    VisitorModel.countDocuments({ ...visitorCur, isReturning: true }),
+    VisitorModel.countDocuments({ ...visitorPrev, isReturning: true }),
+    SessionModel.aggregate<{ avg: number }>([
+      { $match: { ...sessionCur, durationMs: { $ne: null } } },
+      { $group: { _id: null, avg: { $avg: '$durationMs' } } },
+    ]).then((r) => Math.round(r[0]?.avg ?? 0)),
+    SessionModel.aggregate<{ avg: number }>([
+      { $match: { ...sessionPrev, durationMs: { $ne: null } } },
+      { $group: { _id: null, avg: { $avg: '$durationMs' } } },
+    ]).then((r) => Math.round(r[0]?.avg ?? 0)),
+    SessionModel.countDocuments(sessionCur).then(async (total) => {
+      if (!total) return 0;
+      const bounces = await SessionModel.countDocuments({ ...sessionCur, isBounce: true });
+      return Math.round((bounces / total) * 100 * 10) / 10;
+    }),
+    SessionModel.countDocuments(sessionPrev).then(async (total) => {
+      if (!total) return 0;
+      const bounces = await SessionModel.countDocuments({ ...sessionPrev, isBounce: true });
+      return Math.round((bounces / total) * 100 * 10) / 10;
+    }),
+    PageViewModel.countDocuments(pageCur),
+    PageViewModel.countDocuments(pagePrev),
+    SessionModel.aggregate<{ avg: number }>([
+      { $match: sessionCur },
+      { $group: { _id: null, avg: { $avg: '$pageCount' } } },
+    ]).then((r) => Math.round((r[0]?.avg ?? 1) * 10) / 10),
+    SessionModel.aggregate<{ avg: number }>([
+      { $match: sessionPrev },
+      { $group: { _id: null, avg: { $avg: '$pageCount' } } },
+    ]).then((r) => Math.round((r[0]?.avg ?? 1) * 10) / 10),
+    SessionModel.countDocuments({ lastActiveAt: { $gte: activeCutoff } }),
+    VisitorModel.countDocuments({ firstSeenAt: { $gte: today } }),
+    SessionModel.countDocuments({ startedAt: { $gte: today } }),
   ]);
 
   return {

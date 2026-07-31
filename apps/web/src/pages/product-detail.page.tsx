@@ -37,6 +37,7 @@ import {
 } from '@/utils/catalog/specifications';
 import { resolveProductGalleryMedia } from '@/utils/catalog/resolve-gallery-media';
 import type { ProductVariant } from '@/services/sdk';
+import { productMetaFrom, trackCommerceEvent } from '@/lib/analytics';
 
 function resolveBadgeLabel(product: {
   isFeatured?: boolean;
@@ -131,6 +132,12 @@ export function ProductDetailPage() {
       });
     }
   }, [navigate, product?.slug, slug, hintVariantId, hintColorId]);
+
+  useEffect(() => {
+    if (!product?.id) return;
+    trackCommerceEvent('product_viewed', productMetaFrom(product));
+    trackCommerceEvent('product_detail_opened', productMetaFrom(product));
+  }, [product?.id]);
 
   useEffect(() => {
     if (!product?.variants?.length) return;

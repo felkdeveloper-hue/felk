@@ -105,6 +105,21 @@ ordersRouter.patch(
       userId: req.user.id?.toString() ?? null,
       properties: { orderId: String(req.params.id), status: body.status },
     });
+    if (String(body.status).toLowerCase() === 'delivered') {
+      void emitBusinessEvent({
+        eventId: crypto.randomUUID(),
+        name: 'order_delivered',
+        userId:
+          (order as { userId?: { toString(): string } })?.userId?.toString?.() ??
+          req.user.id?.toString() ??
+          null,
+        properties: {
+          orderId: String(req.params.id),
+          status: body.status,
+          amount: (order as { totals?: { grandTotal?: number } })?.totals?.grandTotal ?? null,
+        },
+      });
+    }
     ApiResponse.success(res, order, 'Order status updated');
   }),
 );

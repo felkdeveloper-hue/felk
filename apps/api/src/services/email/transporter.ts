@@ -5,14 +5,23 @@ import { logger } from '@/config/logger.js';
 let transporter: Transporter | null = null;
 
 function resolveSmtpAuth(): { user: string; pass: string } | null {
-  const user = appConfig.email.from?.trim();
-  const pass = appConfig.email.password?.replace(/\s/g, '').trim();
+  const user = (appConfig.email.user ?? appConfig.email.from)?.trim();
+  // Gmail app passwords are often pasted with spaces; Hostinger passwords must stay intact.
+  const rawPass = appConfig.email.password?.trim() ?? '';
+  const pass = appConfig.email.host?.includes('gmail') ? rawPass.replace(/\s/g, '') : rawPass;
   if (!user || !pass) return null;
   return { user, pass };
 }
 
 export function isEmailConfigured(): boolean {
   return Boolean(appConfig.email.host && resolveSmtpAuth());
+}
+
+export function resetEmailTransporter(): void {
+  if (transporter) {
+    transporter.close();
+    transporter = null;
+  }
 }
 
 export function getEmailTransporter(): Transporter | null {
@@ -22,16 +31,26 @@ export function getEmailTransporter(): Transporter | null {
   }
 
   if (!transporter) {
+    const port = appConfig.email.port;
+    const secure = appConfig.email.secure || port === 465;
+
     transporter = nodemailer.createTransport({
       host: appConfig.email.host,
-      port: appConfig.email.port,
-      secure: appConfig.email.secure,
+      port,
+      secure,
+      // Hostinger (and most shared hosts) expect STARTTLS on 587
+      requireTLS: !secure && port === 587,
       auth,
+      // LOGIN handles special characters in passwords more reliably than PLAIN
+      authMethod: 'LOGIN',
+      tls: {
+        minVersion: 'TLSv1.2',
+      },
       pool: true,
       maxConnections: 3,
-      connectionTimeout: 10_000,
-      greetingTimeout: 10_000,
-      socketTimeout: 15_000,
+      connectionTimeout: 15_000,
+      greetingTimeout: 15_000,
+      socketTimeout: 20_000,
     });
   }
 
@@ -43,10 +62,10 @@ export async function verifyEmailTransporter(): Promise<boolean> {
     logger.error(
       {
         hasHost: Boolean(appConfig.email.host),
-        hasUser: Boolean(appConfig.email.from),
+        hasUser: Boolean(appConfig.email.user ?? appConfig.email.from),
         hasPassword: Boolean(appConfig.email.password),
       },
-      'Email configuration invalid — set SMTP_HOST, EMAIL_FROM, and EMAIL_PASSWORD',
+      'Email configuration invalid — set SMTP_HOST, EMAIL_FROM (or SMTP_USER), and EMAIL_PASSWORD',
     );
     return false;
   }
@@ -64,6 +83,7 @@ export async function verifyEmailTransporter(): Promise<boolean> {
         host: appConfig.email.host,
         port: appConfig.email.port,
         from: appConfig.email.from,
+        user: appConfig.email.user ?? appConfig.email.from,
       },
       'Email transporter verified successfully',
     );

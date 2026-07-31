@@ -63,6 +63,51 @@ export function useIsInWishlist(productId?: string, variantId?: string) {
   );
 }
 
+type NormalizedWishlist = ReturnType<typeof normalizeWishlist>;
+
+function findCachedWishlist(
+  queryClient: ReturnType<typeof useQueryClient>,
+  wishlistId?: string,
+): { key: readonly unknown[]; wishlist: NormalizedWishlist } | undefined {
+  const candidates = [
+    wishlistId ? QUERY_KEYS.customers.wishlist(wishlistId) : undefined,
+    QUERY_KEYS.customers.wishlist('default'),
+  ].filter(Boolean) as Array<ReturnType<typeof QUERY_KEYS.customers.wishlist>>;
+
+  for (const key of candidates) {
+    const wishlist = queryClient.getQueryData<NormalizedWishlist>(key);
+    if (wishlist) return { key, wishlist };
+  }
+
+  // Detail keys are ['customers','me','wishlists', id] — pick any hydrated detail cache.
+  const detailMatches = queryClient.getQueriesData<NormalizedWishlist>({
+    predicate: (query) => {
+      const key = query.queryKey;
+      return (
+        Array.isArray(key) &&
+        key.length === 4 &&
+        key[0] === 'customers' &&
+        key[1] === 'me' &&
+        key[2] === 'wishlists' &&
+        typeof key[3] === 'string'
+      );
+    },
+  });
+
+  for (const [key, wishlist] of detailMatches) {
+    if (wishlist) return { key, wishlist };
+  }
+
+  return undefined;
+}
+
+function isFullWishlistPayload(payload: unknown, wishlistId: string): boolean {
+  if (!payload || typeof payload !== 'object') return false;
+  const record = payload as Record<string, unknown>;
+  const id = String(record.id ?? record._id ?? '');
+  return id === wishlistId && Array.isArray(record.items);
+}
+
 export function useAddToWishlistMutation() {
   const queryClient = useQueryClient();
 
@@ -97,40 +142,47 @@ export function useAddToWishlistMutation() {
       }
 
       const updated = await customersApi.addWishlistItem(targetId, { productId, variantId });
-      return normalizeWishlist(updated);
-    },
-    onMutate: async ({ productId, variantId }) => {
-      await queryClient.cancelQueries({ queryKey: QUERY_KEYS.customers.wishlists() });
-      const previous = queryClient.getQueryData<ReturnType<typeof normalizeWishlist>>(
-        QUERY_KEYS.customers.wishlist('default'),
-      );
-
-      if (previous) {
-        const optimisticItem: EnrichedWishlistItem = {
-          id: `optimistic-${productId}`,
-          productId,
-          variantId,
-          productName: 'Adding…',
-        };
-        queryClient.setQueryData(QUERY_KEYS.customers.wishlist(previous.id), {
-          ...previous,
-          items: [...previous.items, optimisticItem],
-          itemCount: previous.items.length + 1,
-        });
+      // Prefer a full wishlist payload; if the API still returns only an item, refetch.
+      if (isFullWishlistPayload(updated, targetId)) {
+        return normalizeWishlist(updated);
       }
+      return normalizeWishlist(await customersApi.getWishlist(targetId));
+    },
+    onMutate: async ({ productId, variantId, wishlistId }) => {
+      await queryClient.cancelQueries({ queryKey: QUERY_KEYS.customers.wishlists() });
+      const cached = findCachedWishlist(queryClient, wishlistId);
+      if (!cached)
+        return {
+          previous: undefined as NormalizedWishlist | undefined,
+          key: undefined as readonly unknown[] | undefined,
+        };
 
-      return { previous };
+      const { key, wishlist: previous } = cached;
+      await queryClient.cancelQueries({ queryKey: key });
+
+      const optimisticItem: EnrichedWishlistItem = {
+        id: `optimistic-${productId}`,
+        productId,
+        variantId,
+        productName: 'Adding…',
+      };
+      queryClient.setQueryData(key, {
+        ...previous,
+        items: [...previous.items, optimisticItem],
+        itemCount: previous.items.length + 1,
+      });
+
+      return { previous, key };
     },
     onError: (_error, _variables, context) => {
-      if (context?.previous) {
-        queryClient.setQueryData(
-          QUERY_KEYS.customers.wishlist(context.previous.id),
-          context.previous,
-        );
+      if (context?.previous && context.key) {
+        queryClient.setQueryData(context.key, context.previous);
       }
     },
     onSuccess: (wishlist) => {
       queryClient.setQueryData(QUERY_KEYS.customers.wishlist(wishlist.id), wishlist);
+      // Keep the provisional 'default' detail cache in sync while list metadata refreshes.
+      queryClient.setQueryData(QUERY_KEYS.customers.wishlist('default'), wishlist);
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.customers.wishlists() });
     },
   });
@@ -142,12 +194,16 @@ export function useRemoveFromWishlistMutation() {
   return useMutation({
     mutationFn: async ({ wishlistId, itemId }: { wishlistId: string; itemId: string }) => {
       const updated = await customersApi.removeWishlistItem(wishlistId, itemId);
-      return normalizeWishlist(updated);
+      if (isFullWishlistPayload(updated, wishlistId)) {
+        return normalizeWishlist(updated);
+      }
+      return normalizeWishlist(await customersApi.getWishlist(wishlistId));
     },
     onMutate: async ({ wishlistId, itemId }) => {
-      const key = QUERY_KEYS.customers.wishlist(wishlistId);
+      const cached = findCachedWishlist(queryClient, wishlistId);
+      const key = cached?.key ?? QUERY_KEYS.customers.wishlist(wishlistId);
       await queryClient.cancelQueries({ queryKey: key });
-      const previous = queryClient.getQueryData<ReturnType<typeof normalizeWishlist>>(key);
+      const previous = cached?.wishlist ?? queryClient.getQueryData<NormalizedWishlist>(key);
 
       if (previous) {
         queryClient.setQueryData(key, {
@@ -166,6 +222,7 @@ export function useRemoveFromWishlistMutation() {
     },
     onSuccess: (wishlist) => {
       queryClient.setQueryData(QUERY_KEYS.customers.wishlist(wishlist.id), wishlist);
+      queryClient.setQueryData(QUERY_KEYS.customers.wishlist('default'), wishlist);
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.customers.wishlists() });
     },
   });

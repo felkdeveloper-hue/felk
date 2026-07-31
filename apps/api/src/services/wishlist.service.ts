@@ -182,7 +182,8 @@ export class WishlistService {
         after: item.toObject() as Record<string, unknown>,
       });
 
-      return item;
+      // Return the full wishlist so clients can refresh heart/item state from one response.
+      return this.getById(customerId, wishlistId);
     } catch (error) {
       if ((error as { code?: number }).code === 11000) {
         throw ApiError.conflict('Item already in wishlist');
@@ -201,7 +202,7 @@ export class WishlistService {
     });
     if (!before) throw ApiError.notFound('Wishlist item not found');
 
-    const item = await WishlistItemModel.findOneAndUpdate(
+    await WishlistItemModel.findOneAndUpdate(
       { _id: itemId, wishlistId, isDeleted: false },
       { $set: { isDeleted: true, deletedAt: new Date() } },
       { new: true },
@@ -222,7 +223,8 @@ export class WishlistService {
       before: before.toObject() as Record<string, unknown>,
     });
 
-    return item;
+    // Return the full wishlist so clients can refresh heart/item state from one response.
+    return this.getById(customerId, wishlistId);
   }
 
   /** Structure for future share / public wishlist links. */

@@ -5,18 +5,22 @@
 ## Configuration
 
 ```env
-SMTP_HOST=smtp.gmail.com
+SMTP_HOST=smtp.hostinger.com
 SMTP_PORT=587
 SMTP_SECURE=false
-EMAIL_FROM=yourgmail@gmail.com
-EMAIL_PASSWORD=your_16_char_app_password
+SMTP_USER=noreply@yourdomain.com
+EMAIL_FROM=noreply@yourdomain.com
+EMAIL_PASSWORD="your-mailbox-password"
 FROM_NAME=Fashion Edge
 SHOP_URL=http://localhost:5173
 ```
 
-Email is enabled when `SMTP_HOST`, `EMAIL_FROM`, and `EMAIL_PASSWORD` are all set.
+Email is enabled when `SMTP_HOST`, `EMAIL_FROM` (or `SMTP_USER`), and `EMAIL_PASSWORD` are all set.
+
+**Hostinger:** use `smtp.hostinger.com` with TLS on port `587` (`SMTP_SECURE=false`) or SSL on port `465` (`SMTP_SECURE=true`). Username is the full mailbox address. Quote passwords that contain `@` or `#`.
 
 For Gmail: enable 2-Step Verification, then create an App Password at https://myaccount.google.com/apppasswords (use the 16-character password with no spaces).
+Set `SMTP_HOST=smtp.gmail.com`.
 
 ## Sending Emails
 
@@ -57,9 +61,9 @@ Failed sends are stored in the `email_logs` MongoDB collection. A sweep runs eve
 
 ## Troubleshooting
 
-| Issue                              | Cause                | Fix                                                         |
-| ---------------------------------- | -------------------- | ----------------------------------------------------------- |
-| Emails not sent, `noop-` messageId | SMTP not configured  | Set `SMTP_HOST`, `EMAIL_FROM`, `EMAIL_PASSWORD`             |
-| `535 BadCredentials`               | Invalid app password | Regenerate Gmail App Password                               |
-| `ECONNREFUSED`                     | Wrong host/port      | Gmail: `smtp.gmail.com:587`, `SMTP_SECURE=false`            |
-| OTP not in inbox                   | Wrong mailbox        | Code goes to the **registered email**, not the SMTP account |
+| Issue                              | Cause                  | Fix                                                         |
+| ---------------------------------- | ---------------------- | ----------------------------------------------------------- |
+| Emails not sent, `noop-` messageId | SMTP not configured    | Set `SMTP_HOST`, `EMAIL_FROM`, `EMAIL_PASSWORD`             |
+| `535` / `EAUTH`                    | Wrong mailbox password | Reset password in Hostinger hPanel → Emails                 |
+| `ECONNREFUSED`                     | Wrong host/port        | Hostinger: `smtp.hostinger.com:587`, `SMTP_SECURE=false`    |
+| OTP not in inbox                   | Wrong mailbox          | Code goes to the **registered email**, not the SMTP account |

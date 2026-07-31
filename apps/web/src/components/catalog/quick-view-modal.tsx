@@ -11,8 +11,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { useEffect } from 'react';
 import { AddToCartButton } from '@/components/cart/add-to-cart-button';
 import { WishlistButton } from '@/components/wishlist/wishlist-button';
+import { productMetaFrom, trackCommerceEvent } from '@/lib/analytics';
 import { PriceDisplay } from './price-display';
 
 export interface QuickViewModalProps {
@@ -23,6 +25,12 @@ export interface QuickViewModalProps {
 
 /** Premium quick-view dialog — presentation only; uses list product payload. */
 export function QuickViewModal({ product, open, onOpenChange }: QuickViewModalProps) {
+  useEffect(() => {
+    if (open && product) {
+      trackCommerceEvent('product_quick_view', productMetaFrom(product));
+    }
+  }, [open, product]);
+
   if (!product) return null;
 
   const image = product.thumbnailUrl ?? product.media?.[0]?.url;

@@ -24,6 +24,7 @@ import { setCheckoutPlacedFlag } from '@/utils/checkout-placed-flag';
 import { AppError } from '@/lib/errors';
 import { cn } from '@/lib/utils';
 import { useCheckoutStore } from '@/store';
+import { trackCommerceEvent } from '@/lib/analytics';
 import { formatCurrency } from '@/utils/format';
 import type { PaymentMethod, ShippingMethod } from '@/services/sdk';
 
@@ -147,6 +148,12 @@ export function CheckoutReviewPage() {
       void navigate({ to: ROUTES.checkout });
     }
   }, [checkoutToken, navigate, sessionQuery.isLoading]);
+
+  useEffect(() => {
+    if (checkoutToken) {
+      trackCommerceEvent('checkout_review_reached', null, { checkoutToken });
+    }
+  }, [checkoutToken]);
 
   useEffect(() => {
     if (session?.checkoutToken) {

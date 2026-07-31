@@ -1,5 +1,11 @@
 export { AnalyticsFilterBar } from './AnalyticsFilterBar';
+export type { AnalyticsFilterField } from './AnalyticsFilterBar';
 export { KpiCardWithDelta, formatDuration } from './KpiCardWithDelta';
 export { AnalyticsChartCard } from './AnalyticsChartCard';
 export { KpiGridSkeleton, ChartSkeleton, TableSkeleton } from './AnalyticsSkeleton';
 export { AnalyticsEmpty } from './AnalyticsEmpty';
+export { Drillable } from './Drillable';
+export { AnalyticsBreadcrumbs } from './AnalyticsBreadcrumbs';
+export type { AnalyticsBreadcrumbItem } from './AnalyticsBreadcrumbs';
+export { AnalyticsExportButton } from './AnalyticsExportButton';
+export type { AnalyticsExportButtonProps } from './AnalyticsExportButton';

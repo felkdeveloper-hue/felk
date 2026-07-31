@@ -1,6 +1,7 @@
 import { SessionModel } from '@/models/analytics/index.js';
 
-const ACTIVE_WINDOW_MS = 5 * 60 * 1000; // 5 minute heartbeat window
+/** Visitors with activity inside this window count as "live". */
+const ACTIVE_WINDOW_MS = 2 * 60 * 1000;
 
 export interface LiveVisitor {
   sessionId: string;
@@ -15,23 +16,35 @@ export interface LiveVisitor {
   lastActiveAt: Date;
 }
 
+/**
+ * Live = recent activity on lastActiveAt.
+ * Do not require isActive — mobile browsers often mark sessions inactive on
+ * pagehide even while the user is still on the site.
+ */
+function liveMatch(cutoff: Date) {
+  return { lastActiveAt: { $gte: cutoff } };
+}
+
 export async function getLiveVisitors(): Promise<LiveVisitor[]> {
   const cutoff = new Date(Date.now() - ACTIVE_WINDOW_MS);
 
-  const sessions = await SessionModel.find({
-    isActive: true,
-    lastActiveAt: { $gte: cutoff },
-  })
+  const sessions = await SessionModel.find(liveMatch(cutoff))
     .sort({ lastActiveAt: -1 })
     .limit(200)
     .lean();
+
+  // Mark stale "active" flags cleanly for sessions that fell out of the window
+  void SessionModel.updateMany(
+    { isActive: true, lastActiveAt: { $lt: cutoff } },
+    { $set: { isActive: false } },
+  ).catch(() => undefined);
 
   return sessions.map((s) => ({
     sessionId: s.sessionId,
     visitorId: s.visitorId,
     userId: s.userId?.toString() ?? null,
-    currentPage: s.exitPage ?? s.entryPage ?? null,
-    timeOnSiteMs: s.lastActiveAt.getTime() - s.startedAt.getTime(),
+    currentPage: s.lastPage ?? s.exitPage ?? s.entryPage ?? null,
+    timeOnSiteMs: Math.max(0, s.lastActiveAt.getTime() - s.startedAt.getTime()),
     country: s.country ?? null,
     deviceType: s.deviceType,
     browser: s.browser ?? null,
@@ -42,5 +55,5 @@ export async function getLiveVisitors(): Promise<LiveVisitor[]> {
 
 export async function getActiveCount(): Promise<number> {
   const cutoff = new Date(Date.now() - ACTIVE_WINDOW_MS);
-  return SessionModel.countDocuments({ isActive: true, lastActiveAt: { $gte: cutoff } });
+  return SessionModel.countDocuments(liveMatch(cutoff));
 }

@@ -42,6 +42,8 @@ export interface RegisterPayload {
 export interface RegisterResult {
   user: AuthUser;
   message: string;
+  /** Present in development when SMTP delivery failed. */
+  devVerificationCode?: string;
 }
 
 export interface ChangePasswordPayload {

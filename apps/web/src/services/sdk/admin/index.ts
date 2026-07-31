@@ -49,9 +49,20 @@ export type { MediaUploadOptions, ProductMediaRow } from './media';
 export { integrationsApi } from './integrations';
 export type { IntegrationsStatus, GatewayStatus, SmtpStatus } from './integrations';
 
-export { adminAnalyticsApi } from './analytics';
+export { adminAnalyticsApi, ANALYTICS_FILTER_KEYS } from './analytics';
+export { adminDashboardApi } from './dashboard-layout';
+export type {
+  DashboardWidgetSettings,
+  DashboardWidgetPlacement,
+  DashboardLayoutSnapshot,
+  DashboardLayoutData,
+  DashboardWidgetMeta,
+  DashboardTemplateMeta,
+  DashboardCatalog,
+} from './dashboard-layout';
 export type {
   AnalyticsFilter,
+  AnalyticsPeriod,
   OverviewData,
   KpiMetric,
   VisitorRow,
@@ -64,4 +75,28 @@ export type {
   GeoBreakdownData,
   TrafficSourceRow,
   EventBreakdownRow,
+  ProductCountRow,
+  ProductConversionRow,
+  ProductAnalyticsData,
+  ProductInterestData,
+  CartAnalyticsData,
+  WishlistAnalyticsData,
+  PaymentRecoveryData,
+  ReturningJourneyData,
+  TimelineItem,
+  SessionReplayData,
+  SearchAnalyticsData,
+  SearchKeywordRow,
+  ProductFunnelData,
+  CheckoutAbandonData,
+  ProductInsightsData,
+  RevenueDashboardData,
+  ActivityFeedItem,
+  AnalyticsExportFormat,
+  AnalyticsExportScope,
+  AnalyticsExportStatus,
+  AnalyticsExportReportMeta,
+  CreateAnalyticsExportBody,
+  AnalyticsExportAsyncResult,
+  AnalyticsExportJob,
 } from './analytics';
