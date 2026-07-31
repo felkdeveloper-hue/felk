@@ -13,6 +13,9 @@ import { verifyEmailTransporter } from '@/services/email/transporter.js';
 import { initAnalyticsLiveGateway } from '@/services/platform-analytics/live.gateway.js';
 
 async function bootstrap(): Promise<void> {
+  // Temporary marker to verify GitHub Actions → EC2 auto-deploy.
+  console.log('Auto deploy test');
+
   const app = createApp();
   const server = http.createServer(app);
   initAnalyticsLiveGateway(server);
