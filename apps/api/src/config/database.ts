@@ -293,12 +293,17 @@ class DatabaseManager {
   }
 
   /** Background retries after degraded boot (e.g. transient DNS / Atlas blip). */
-  startReconnectLoop(intervalMs = 15_000): void {
+  startReconnectLoop(intervalMs = 15_000, onConnected?: () => void): void {
+    let signaled = false;
     const tick = async () => {
       if (this.isConnected() || this.status === 'connecting') return;
       try {
         logger.info('Retrying MongoDB connection…');
         await this.connect();
+        if (!signaled) {
+          signaled = true;
+          onConnected?.();
+        }
       } catch {
         // logged in connect()
       }

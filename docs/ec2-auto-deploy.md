@@ -57,6 +57,23 @@ cd ~/felk   # or your EC2_APP_DIR
 bash scripts/deploy-ec2.sh
 ```
 
+## One-time: switch to zero-downtime cluster reload
+
+If the API was started as a single fork process (`pm2 start … --name api`), migrate once so deploys no longer hard-kill the process (nginx 502):
+
+```bash
+cd ~/felk
+git pull origin main
+pnpm install --frozen-lockfile
+pnpm --filter @fe-platform/api build
+pm2 delete api fe-api felk-api 2>/dev/null || true
+pm2 start ecosystem.config.cjs
+pm2 save
+curl -sS http://127.0.0.1:4000/api/v1/health/ready
+```
+
+Later deploys use `pm2 startOrReload` (via `scripts/deploy-ec2.sh`) so old workers keep traffic until Mongo is ready.
+
 ## Why Dashboard / Analytics 404 on fe.lk
 
 The storefront/admin on Vercel already has the new UI. Those pages call:

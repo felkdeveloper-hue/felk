@@ -12,10 +12,15 @@ import { startCronJobs } from '@/cron/index.js';
 import { verifyEmailTransporter } from '@/services/email/transporter.js';
 import { initAnalyticsLiveGateway } from '@/services/platform-analytics/live.gateway.js';
 
-async function bootstrap(): Promise<void> {
-  // Temporary marker to verify GitHub Actions → EC2 auto-deploy.
-  console.log('Auto deploy test');
+/** Tell PM2 (wait_ready) this worker can receive traffic — after Mongo is up. */
+function notifyProcessManagerReady(): void {
+  if (typeof process.send === 'function') {
+    process.send('ready');
+    logger.info('Signaled process manager: ready');
+  }
+}
 
+async function bootstrap(): Promise<void> {
   const app = createApp();
   const server = http.createServer(app);
   initAnalyticsLiveGateway(server);
@@ -42,6 +47,7 @@ async function bootstrap(): Promise<void> {
 
   try {
     await connectDatabase();
+    notifyProcessManagerReady();
 
     void verifyEmailTransporter();
 
@@ -77,7 +83,8 @@ async function bootstrap(): Promise<void> {
   } catch (error) {
     logger.warn({ err: error }, 'MongoDB unavailable — starting in degraded mode');
     const { databaseManager } = await import('@/config/database.js');
-    databaseManager.startReconnectLoop();
+    // Delay PM2 ready until Mongo reconnects so reload does not cut over early.
+    databaseManager.startReconnectLoop(15_000, () => notifyProcessManagerReady());
   }
 }
 
