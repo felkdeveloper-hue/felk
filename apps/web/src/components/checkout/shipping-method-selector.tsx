@@ -1,8 +1,7 @@
-import { BadgeCheck, Clock3, Package, ShieldCheck, Truck } from 'lucide-react';
-import { SHIPPING_METHOD_OPTIONS } from '@/constants/checkout.constants';
+import { BadgeCheck, Clock3, ShieldCheck, Truck } from 'lucide-react';
+import { FIXED_SHIPPING_AMOUNT, SHIPPING_METHOD_OPTIONS } from '@/constants/checkout.constants';
 import { formatCurrency } from '@/utils/format';
 import type { CheckoutSession, ShippingMethod } from '@/services/sdk';
-import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { cn } from '@/lib/utils';
@@ -13,11 +12,6 @@ export interface ShippingMethodSelectorProps {
   onChange: (method: ShippingMethod) => void;
   disabled?: boolean;
 }
-
-const METHOD_ICONS = {
-  standard: Truck,
-  free: Package,
-} as const;
 
 const TRUST_BADGES = [
   { icon: ShieldCheck, label: 'Tracked delivery' },
@@ -38,18 +32,11 @@ function estimateForMethod(session: CheckoutSession, method: ShippingMethod) {
   return null;
 }
 
-function priceLabel(
-  optionId: ShippingMethod,
-  session: CheckoutSession,
-  isSelected: boolean,
-  amount: number | undefined,
-) {
+function priceLabel(session: CheckoutSession, amount: number | undefined) {
   const { currency } = session;
-  if (optionId === 'free' || amount === 0) return 'Free';
   if (amount != null) return formatCurrency(amount, currency);
-  if (isSelected) return formatCurrency(session.totals.shipping, currency);
-  if (optionId === 'standard') return formatCurrency(session.totals.shipping || 500, currency);
-  return '—';
+  const fallback = session.totals.shipping > 0 ? session.totals.shipping : FIXED_SHIPPING_AMOUNT;
+  return formatCurrency(fallback, currency);
 }
 
 export function ShippingMethodSelector({
@@ -65,13 +52,12 @@ export function ShippingMethodSelector({
       <RadioGroup
         value={value}
         onValueChange={(next) => onChange(next as ShippingMethod)}
-        className="grid gap-3 sm:grid-cols-2"
+        className="grid gap-3"
       >
         {SHIPPING_METHOD_OPTIONS.map((option) => {
           const estimate = estimateForMethod(session, option.id);
           const amount = estimate?.amount;
           const isSelected = value === option.id;
-          const Icon = METHOD_ICONS[option.id as keyof typeof METHOD_ICONS] ?? Truck;
           const eta =
             estimate?.estimatedDaysMin != null
               ? `${estimate.estimatedDaysMin}${
@@ -87,24 +73,18 @@ export function ShippingMethodSelector({
               key={option.id}
               htmlFor={`shipping-${option.id}`}
               className={cn(
-                'bg-card relative flex min-h-[168px] cursor-pointer flex-col gap-4 rounded-2xl border p-5 transition-all',
-                'hover:border-foreground/40',
+                'bg-card relative flex min-h-[168px] flex-col gap-4 rounded-2xl border p-5 transition-all',
                 isSelected
                   ? 'border-primary ring-primary/25 shadow-[var(--shadow-soft)] ring-2'
                   : 'border-border',
-                disabled && 'cursor-not-allowed opacity-60',
+                disabled
+                  ? 'cursor-not-allowed opacity-60'
+                  : 'hover:border-foreground/40 cursor-pointer',
               )}
             >
               <div className="flex items-start justify-between gap-3">
-                <span
-                  className={cn(
-                    'flex size-11 items-center justify-center rounded-2xl',
-                    option.id === 'free'
-                      ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400'
-                      : 'bg-muted text-foreground',
-                  )}
-                >
-                  <Icon className="size-5" aria-hidden />
+                <span className="bg-muted text-foreground flex size-11 items-center justify-center rounded-2xl">
+                  <Truck className="size-5" aria-hidden />
                 </span>
                 <RadioGroupItem
                   value={option.id}
@@ -115,12 +95,9 @@ export function ShippingMethodSelector({
               </div>
 
               <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Label htmlFor={`shipping-${option.id}`} className="text-base font-semibold">
-                    {option.label}
-                  </Label>
-                  {option.badge ? <Badge variant="secondary">{option.badge}</Badge> : null}
-                </div>
+                <Label htmlFor={`shipping-${option.id}`} className="text-base font-semibold">
+                  {option.label}
+                </Label>
                 <p className="text-muted-foreground mt-1 text-sm leading-snug">
                   {option.description}
                 </p>
@@ -134,9 +111,7 @@ export function ShippingMethodSelector({
                 <span className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
                   Shipping fee
                 </span>
-                <span className="text-base font-semibold">
-                  {priceLabel(option.id, session, isSelected, amount)}
-                </span>
+                <span className="text-base font-semibold">{priceLabel(session, amount)}</span>
               </div>
             </label>
           );

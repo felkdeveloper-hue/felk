@@ -10,14 +10,16 @@ export interface CartOrderSummaryProps {
 
 export function CartOrderSummary({ totals, validation }: CartOrderSummaryProps) {
   const currency = totals.currency ?? 'LKR';
+  const shipping = totals.shipping > 0 ? totals.shipping : 500;
+  const displayTotal = totals.shipping > 0 ? totals.total : totals.total + shipping;
 
   return (
     <aside className="border-border bg-card space-y-4 rounded-xl border p-5">
       <h2 className="text-base font-semibold">Price summary</h2>
 
       {validation && !validation.isValid ? (
-        <Alert variant="warning">
-          <AlertDescription>Some items need attention before checkout.</AlertDescription>
+        <Alert variant="destructive">
+          <AlertDescription>Remove out-of-stock items before you can checkout.</AlertDescription>
         </Alert>
       ) : null}
 
@@ -33,12 +35,8 @@ export function CartOrderSummary({ totals, validation }: CartOrderSummaryProps) 
           </div>
         ) : null}
         <div className="flex justify-between">
-          <dt className="text-muted-foreground">Shipping estimate</dt>
-          <dd>
-            {totals.shipping > 0
-              ? formatCurrency(totals.shipping, currency)
-              : 'Calculated at checkout'}
-          </dd>
+          <dt className="text-muted-foreground">Shipping</dt>
+          <dd>{formatCurrency(shipping, currency)}</dd>
         </div>
         <div className="flex justify-between">
           <dt className="text-muted-foreground">Tax estimate</dt>
@@ -52,7 +50,7 @@ export function CartOrderSummary({ totals, validation }: CartOrderSummaryProps) 
 
       <div className="flex justify-between text-base font-semibold">
         <span>Total</span>
-        <span>{formatCurrency(totals.total, currency)}</span>
+        <span>{formatCurrency(displayTotal, currency)}</span>
       </div>
     </aside>
   );

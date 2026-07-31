@@ -25,6 +25,10 @@ export interface AddToCartButtonProps extends Omit<ButtonProps, 'onClick'> {
   skipOptionGate?: boolean;
 }
 
+function isProductOutOfStock(product: Product) {
+  return product.inStock === false || product.status === 'out_of_stock';
+}
+
 export function AddToCartButton({
   product,
   variantId,
@@ -41,14 +45,15 @@ export function AddToCartButton({
   const [optionsOpen, setOptionsOpen] = useState(false);
 
   const resolvedVariantId = resolveVariantId(variantId, product);
+  const outOfStock = isProductOutOfStock(product);
   const mustPickOptions = !skipOptionGate && !variantId && needsOptionSelection(product);
-  const isDisabled =
-    disabled ||
-    (!mustPickOptions && !resolvedVariantId) ||
-    product.inStock === false ||
-    product.status === 'out_of_stock';
+  const isDisabled = disabled || outOfStock || (!mustPickOptions && !resolvedVariantId);
 
   const handleClick = () => {
+    if (outOfStock) {
+      toast.error('This item is out of stock');
+      return;
+    }
     if (mustPickOptions) {
       setOptionsOpen(true);
       return;
@@ -87,12 +92,12 @@ export function AddToCartButton({
         type="button"
         onClick={handleClick}
         disabled={isDisabled}
-        loading={loading || addMutation.isPending}
+        loading={loading || (!outOfStock && addMutation.isPending)}
         {...props}
       >
-        {label}
+        {outOfStock ? 'Out of stock' : label}
       </Button>
-      {!skipOptionGate ? (
+      {!skipOptionGate && !outOfStock ? (
         <SelectOptionsSheet product={product} open={optionsOpen} onOpenChange={setOptionsOpen} />
       ) : null}
     </>

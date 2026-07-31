@@ -80,7 +80,7 @@ export function CheckoutShippingPage() {
     });
   };
 
-  if (sessionQuery.isLoading) {
+  if (sessionQuery.isLoading && !session) {
     return (
       <>
         <Seo title="Shipping" description="Choose a shipping method." noIndex />

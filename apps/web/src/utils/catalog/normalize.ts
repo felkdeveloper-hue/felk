@@ -156,6 +156,17 @@ export function normalizeProduct(raw: unknown): Product {
     insights?.isOnSale ??
     Boolean(salePrice && price && salePrice.amount > 0 && salePrice.amount < price.amount);
 
+  const status = String(record.status ?? 'draft');
+  const trackedVariants = variants?.filter((variant) => typeof variant.stock === 'number') ?? [];
+  const derivedInStock =
+    typeof record.inStock === 'boolean'
+      ? record.inStock
+      : status === 'out_of_stock'
+        ? false
+        : trackedVariants.length > 0
+          ? trackedVariants.some((variant) => (variant.stock ?? 0) > 0)
+          : undefined;
+
   return {
     id: pickId(record),
     name: String(record.name ?? ''),
@@ -163,7 +174,8 @@ export function normalizeProduct(raw: unknown): Product {
     shortDescription:
       typeof record.shortDescription === 'string' ? record.shortDescription : undefined,
     description: typeof record.description === 'string' ? record.description : undefined,
-    status: String(record.status ?? 'draft'),
+    status,
+    inStock: derivedInStock,
     visibility: typeof record.visibility === 'string' ? record.visibility : undefined,
     price,
     salePrice,

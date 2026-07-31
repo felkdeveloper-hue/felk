@@ -15,7 +15,7 @@ import { writeAuditLog } from '@/services/audit.service.js';
 import type { ActorMeta } from '@/services/cms-crud.service.js';
 import { ApiError } from '@/utils/errors/api-error.js';
 import { computePricing } from '@/utils/pricing.helper.js';
-import { computeAvailable } from '@/utils/stock.helper.js';
+import { computeAvailable, deriveStockStatus } from '@/utils/stock.helper.js';
 import {
   CART_AUDIT,
   CART_ITEM_LOCATION,
@@ -24,6 +24,7 @@ import {
   GUEST_CART_COOKIE,
   GUEST_CART_HEADER,
 } from '@/constants/cart.js';
+import { INVENTORY_STATUS } from '@/constants/inventory-status.js';
 import { PRODUCT_STATUS, VARIANT_STATUS } from '@/constants/product.js';
 import type { AuthenticatedUser } from '@/types/index.js';
 
@@ -442,15 +443,74 @@ export class CartService {
     if (!items.length) return [];
 
     const productIds = [...new Set(items.map((item) => item.productId.toString()))];
-    const products = await ProductModel.find({ _id: { $in: productIds }, isDeleted: false })
-      .select('slug')
-      .lean();
+    const variantIds = [...new Set(items.map((item) => item.variantId.toString()))];
+    const [products, availableByVariant] = await Promise.all([
+      ProductModel.find({ _id: { $in: productIds }, isDeleted: false })
+        .select('slug')
+        .lean(),
+      (async () => {
+        const map = new Map<string, number>();
+        await Promise.all(
+          variantIds.map(async (variantId) => {
+            map.set(variantId, await this.getAvailableStock(variantId));
+          }),
+        );
+        return map;
+      })(),
+    ]);
     const slugByProductId = new Map(products.map((product) => [String(product._id), product.slug]));
 
-    return items.map((item) => ({
-      ...toPlain(item),
-      productSlug: slugByProductId.get(item.productId.toString()) ?? null,
-    }));
+    return items.map((item) => {
+      const available = availableByVariant.get(item.variantId.toString()) ?? 0;
+      const tracked = available < CART_QTY.MAX;
+      const inStock = !tracked || available >= item.quantity;
+      const stockStatus = !tracked ? INVENTORY_STATUS.IN_STOCK : deriveStockStatus(available, 0, 0);
+
+      return {
+        ...toPlain(item),
+        productSlug: slugByProductId.get(item.productId.toString()) ?? null,
+        availableQuantity: tracked ? available : null,
+        inStock,
+        stockStatus: inStock ? stockStatus : INVENTORY_STATUS.OUT_OF_STOCK,
+      };
+    });
+  }
+
+  private buildStockValidation(items: Array<Record<string, unknown>>): {
+    valid: boolean;
+    issues: ValidationIssue[];
+  } {
+    const issues: ValidationIssue[] = [];
+
+    for (const item of items) {
+      const quantity = Number(item.quantity ?? 1);
+      const available = item.availableQuantity == null ? null : Number(item.availableQuantity);
+      const inStock = item.inStock !== false;
+      const variantId = item.variantId ? String(item.variantId) : undefined;
+      const itemId = item._id ? String(item._id) : item.id ? String(item.id) : undefined;
+      const title = String(item.title ?? item.name ?? 'Item');
+      const sku = typeof item.sku === 'string' ? item.sku : undefined;
+
+      if (!inStock || (available != null && available < quantity)) {
+        const out = available != null && available <= 0;
+        issues.push({
+          code: out ? 'OUT_OF_STOCK' : 'INSUFFICIENT_STOCK',
+          message: out
+            ? `${title} is out of stock`
+            : available != null
+              ? `Only ${available} left for ${sku ?? title}`
+              : `${title} is out of stock`,
+          itemId,
+          variantId,
+          severity: 'error',
+        });
+      }
+    }
+
+    return {
+      valid: !issues.some((issue) => issue.severity === 'error'),
+      issues,
+    };
   }
 
   async buildView(
@@ -486,16 +546,31 @@ export class CartService {
       this.enrichItemsWithProductSlug(saved),
     ]);
 
+    const stockValidation = this.buildStockValidation(enrichedItems);
+
     const view: CartView = {
       cart: toPlain(cart),
       items: enrichedItems,
       savedForLater: enrichedSaved,
       totals,
       guestCartToken: options?.guestCartToken ?? cart.guestToken ?? null,
+      // Always expose stock validation so the bag can block checkout.
+      validation: stockValidation,
     };
 
     if (options?.validate) {
-      view.validation = await this.validateCart(cart._id.toString());
+      const full = await this.validateCart(cart._id.toString());
+      const byKey = new Map(
+        [...stockValidation.issues, ...full.issues].map((issue) => [
+          `${issue.code}:${issue.itemId ?? ''}:${issue.variantId ?? ''}:${issue.message}`,
+          issue,
+        ]),
+      );
+      const issues = [...byKey.values()];
+      view.validation = {
+        valid: !issues.some((issue) => issue.severity === 'error'),
+        issues,
+      };
     }
 
     return view;

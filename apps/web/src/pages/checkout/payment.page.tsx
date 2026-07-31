@@ -45,17 +45,12 @@ export function CheckoutPaymentPage() {
 
   const handleContinue = () => {
     if (!session?.checkoutToken || !paymentMethod) return;
-    refreshCheckout.mutate(
-      {
-        checkoutRef: session.checkoutToken,
-        payload: { extendReservation: true },
-      },
-      {
-        onSuccess: () => {
-          void navigate({ to: ROUTES.checkoutReview });
-        },
-      },
-    );
+    // Navigate immediately; extend reservation in the background to avoid a blocking round-trip.
+    void navigate({ to: ROUTES.checkoutReview });
+    refreshCheckout.mutate({
+      checkoutRef: session.checkoutToken,
+      payload: { extendReservation: true },
+    });
   };
 
   const handleExtend = () => {
@@ -66,7 +61,7 @@ export function CheckoutPaymentPage() {
     });
   };
 
-  if (sessionQuery.isLoading) {
+  if (sessionQuery.isLoading && !session) {
     return (
       <>
         <Seo title="Payment" description="Choose a payment method." noIndex />

@@ -120,20 +120,38 @@ export function CartItemRow({ item, compact, validationMessage, className }: Car
           </Alert>
         ) : null}
 
-        {validationMessage ? (
-          <Alert variant="destructive" className="py-2">
-            <AlertDescription className="text-xs">{validationMessage}</AlertDescription>
-          </Alert>
-        ) : null}
+        {(() => {
+          const outOfStock = item.inStock === false || item.stockStatus === 'out_of_stock';
+          const lowStock =
+            !outOfStock &&
+            typeof item.availableQuantity === 'number' &&
+            item.availableQuantity > 0 &&
+            item.availableQuantity < item.quantity;
+          const stockMessage =
+            validationMessage ??
+            (outOfStock
+              ? 'Out of stock — remove this item to continue checkout'
+              : lowStock
+                ? `Only ${item.availableQuantity} left — reduce quantity or remove this item`
+                : null);
 
-        {!item.inStock || item.stockStatus === 'out_of_stock' ? (
-          <p className="text-destructive text-xs font-medium">Out of stock</p>
-        ) : null}
+          return stockMessage ? (
+            <Alert variant="destructive" className="py-2">
+              <AlertTriangle className="size-4" aria-hidden />
+              <AlertDescription className="text-xs font-medium">{stockMessage}</AlertDescription>
+            </Alert>
+          ) : null;
+        })()}
 
         <div className="flex flex-wrap items-center justify-between gap-3">
           <QuantitySelector
             value={item.quantity}
             min={0}
+            max={
+              typeof item.availableQuantity === 'number' && item.availableQuantity > 0
+                ? item.availableQuantity
+                : undefined
+            }
             onChange={(quantity) => {
               if (quantity === 0) {
                 removeMutation.mutate(item.id, {
@@ -154,7 +172,11 @@ export function CartItemRow({ item, compact, validationMessage, className }: Car
               }
             }}
             loading={updateMutation.isPending || removeMutation.isPending}
-            disabled={item.id.startsWith('optimistic-')}
+            disabled={
+              item.id.startsWith('optimistic-') ||
+              item.inStock === false ||
+              item.stockStatus === 'out_of_stock'
+            }
           />
 
           <div className="text-right">

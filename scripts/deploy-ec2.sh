@@ -35,18 +35,19 @@ fi
 echo "==> Building API"
 pnpm --filter @fe-platform/api build
 
-echo "==> Restarting process manager"
+echo "==> Restarting process manager (zero-downtime preferred)"
 if command -v pm2 >/dev/null 2>&1; then
-  # Wipe ghost/errored workers (stale cluster ids cause "Process N not found").
-  # Always start clean from ecosystem so apps/api/.env controls NODE_ENV.
-  pm2 delete api 2>/dev/null || true
-  pm2 delete fe-api 2>/dev/null || true
-  pm2 delete felk-api 2>/dev/null || true
-
   if [[ -f ecosystem.config.cjs ]]; then
-    pm2 start ecosystem.config.cjs
+    if pm2 describe api >/dev/null 2>&1; then
+      # Prefer graceful restart over delete so nginx does not 502 mid-deploy.
+      pm2 reload ecosystem.config.cjs --update-env || pm2 restart ecosystem.config.cjs --update-env
+    else
+      pm2 delete fe-api 2>/dev/null || true
+      pm2 delete felk-api 2>/dev/null || true
+      pm2 start ecosystem.config.cjs
+    fi
   elif [[ -n "${PM2_APP_NAME}" ]]; then
-    pm2 restart "${PM2_APP_NAME}" --update-env || true
+    pm2 reload "${PM2_APP_NAME}" --update-env || pm2 restart "${PM2_APP_NAME}" --update-env
   else
     echo "ERROR: ecosystem.config.cjs missing and no PM2_APP_NAME set."
     exit 1

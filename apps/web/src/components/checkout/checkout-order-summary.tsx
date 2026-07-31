@@ -1,46 +1,14 @@
-import { useState } from 'react';
 import { formatCurrency } from '@/utils/format';
-import { getSetting } from '@/utils/cms';
-import { usePublicSettings } from '@/hooks/cms';
 import type { CheckoutSession } from '@/services/sdk';
+import { Image } from '@/components/media/image';
 import { Separator } from '@/components/ui/separator';
 
 export interface CheckoutOrderSummaryProps {
   session: CheckoutSession;
 }
 
-function LineThumbnail({ src, storeName }: { src?: string; storeName: string }) {
-  const [broken, setBroken] = useState(false);
-  const showLogo = !src || broken;
-
-  if (showLogo) {
-    return (
-      <div
-        className="border-border bg-muted flex size-14 shrink-0 items-center justify-center rounded-2xl border"
-        aria-hidden
-      >
-        <span className="font-display text-foreground text-sm font-bold uppercase tracking-[-0.04em]">
-          {storeName}
-        </span>
-      </div>
-    );
-  }
-
-  return (
-    <img
-      src={src}
-      alt=""
-      className="border-border size-14 shrink-0 rounded-2xl border object-cover"
-      onError={() => setBroken(true)}
-    />
-  );
-}
-
 export function CheckoutOrderSummary({ session }: CheckoutOrderSummaryProps) {
   const { totals, lines, currency } = session;
-  const { data: settings } = usePublicSettings();
-  const storeName =
-    getSetting<string>(settings, 'store.name') ?? getSetting<string>(settings, 'storeName') ?? 'FE';
 
   return (
     <aside className="border-border/70 bg-card/90 rounded-[1.75rem] border p-6 shadow-[var(--shadow-elevated)] backdrop-blur">
@@ -51,7 +19,16 @@ export function CheckoutOrderSummary({ session }: CheckoutOrderSummaryProps) {
             key={`${line.variantId}-${line.cartItemId ?? line.sku}`}
             className="flex gap-3 text-sm"
           >
-            <LineThumbnail src={line.thumbnailUrl} storeName={storeName} />
+            <div className="border-border size-14 shrink-0 overflow-hidden rounded-2xl border">
+              <Image
+                src={line.thumbnailUrl}
+                alt={line.title}
+                aspectRatio="1/1"
+                containerClassName="size-full"
+                className="size-full object-cover"
+                loading="eager"
+              />
+            </div>
             <div className="min-w-0 flex-1">
               <p className="font-medium leading-snug">{line.title}</p>
               {(line.colorName || line.sizeName) && (

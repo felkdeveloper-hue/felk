@@ -175,6 +175,11 @@ export class CheckoutService {
       lineSubtotal: number;
       weightGrams: number;
       priceChanged?: boolean;
+      colorName?: string | null;
+      sizeName?: string | null;
+      thumbnailUrl?: string | null;
+      availableQuantity?: number;
+      inStock?: boolean;
     }>;
 
     const [defaultWarehouseId, inventoryByVariant] = await Promise.all([
@@ -185,11 +190,19 @@ export class CheckoutService {
     const lines = typedItems.map((item) => {
       const invRows = inventoryByVariant.get(item.variantId.toString()) ?? [];
       const inv = pickInventoryForVariant(invRows, item.quantity, defaultWarehouseId);
+      // Prefer cart-enriched availability (bucket math). Untracked = sellable.
+      const available =
+        typeof item.availableQuantity === 'number'
+          ? item.availableQuantity
+          : invRows.length
+            ? invRows.reduce((sum, row) => sum + Number(row.available ?? 0), 0)
+            : item.quantity;
 
-      if (!inv || inv.available < item.quantity) {
+      if (available < item.quantity) {
         issues.push({
-          code: 'OUT_OF_STOCK',
-          message: `Insufficient stock for ${item.sku}`,
+          code: available <= 0 ? 'OUT_OF_STOCK' : 'INSUFFICIENT_STOCK',
+          message:
+            available <= 0 ? `${item.title} is out of stock` : `Insufficient stock for ${item.sku}`,
           variantId: item.variantId.toString(),
           severity: 'error',
         });
@@ -215,9 +228,12 @@ export class CheckoutService {
         salePrice: item.salePrice ?? null,
         compareAtPrice: item.compareAtPrice ?? null,
         lineSubtotal: item.lineSubtotal,
+        colorName: item.colorName ?? null,
+        sizeName: item.sizeName ?? null,
+        thumbnailUrl: item.thumbnailUrl ?? null,
         weightGrams: item.weightGrams ?? 0,
         taxClass: null,
-        warehouseId: inv && inv.available >= item.quantity ? inv.warehouseId : null,
+        warehouseId: available >= item.quantity ? (inv?.warehouseId ?? null) : null,
         reservationId: null,
       };
     });

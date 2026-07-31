@@ -25,6 +25,9 @@ export interface ShippingMethodOption {
   badge?: string;
 }
 
+/** Flat shipping fee applied site-wide (LKR). */
+export const FIXED_SHIPPING_AMOUNT = 500;
+
 export const SHIPPING_METHOD_OPTIONS: ShippingMethodOption[] = [
   {
     id: 'standard',
@@ -32,14 +35,6 @@ export const SHIPPING_METHOD_OPTIONS: ShippingMethodOption[] = [
     description: 'Reliable doorstep delivery across Sri Lanka',
     deliveryMethod: 'delivery',
     eta: '3–7 business days',
-  },
-  {
-    id: 'free',
-    label: 'Free shipping',
-    description: 'Economy delivery at no extra cost',
-    deliveryMethod: 'delivery',
-    eta: '5–10 business days',
-    badge: 'Best value',
   },
 ];
 
@@ -65,7 +60,7 @@ export const PAYMENT_METHOD_OPTIONS: PaymentMethodOption[] = [
     id: 'koko',
     label: 'Koko',
     description: 'Buy now, pay later in installments',
-    enabled: true,
+    enabled: false, // temporarily hidden — env/credentials not ready
     logoSrc: '/payments/koko.svg',
     accent: '#6C2BD9',
   },

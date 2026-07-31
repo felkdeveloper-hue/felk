@@ -19,7 +19,6 @@ import { useAuthStore } from '@/store';
 import { useUiStore } from '@/store/ui-store';
 import { ROUTES } from '@/constants';
 import { resolveVariantId } from '@/utils/cart';
-import { needsOptionSelection } from '@/utils/catalog/needs-option-selection';
 import { productMetaFrom, trackCommerceEvent } from '@/lib/analytics';
 import { PriceDisplay } from './price-display';
 import { QuickViewModal } from './quick-view-modal';
@@ -255,13 +254,12 @@ function ProductCardComponent({
     lastTap.current = now;
   };
 
+  const isSoldOut = product.inStock === false || product.status === 'out_of_stock';
+
   const openQuickAdd = (event: React.MouseEvent) => {
     event.preventDefault();
     event.stopPropagation();
-    if (needsOptionSelection(product) || !resolveVariantId(undefined, product)) {
-      setOptionsOpen(true);
-      return;
-    }
+    if (isSoldOut) return;
     setOptionsOpen(true);
   };
 
@@ -411,7 +409,7 @@ function ProductCardComponent({
           ) : null}
 
           {/* Desktop hover ATC — never on mobile */}
-          {!isList ? (
+          {!isSoldOut && !isList ? (
             <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[2] hidden translate-y-full opacity-0 transition-all duration-300 ease-out lg:block lg:group-hover:pointer-events-auto lg:group-hover:translate-y-0 lg:group-hover:opacity-100">
               <AddToCartButton
                 product={product}
@@ -419,7 +417,8 @@ function ProductCardComponent({
                 className="h-11 w-full rounded-none border-0 bg-zinc-950 text-[11px] font-semibold uppercase tracking-[0.18em] text-white shadow-none hover:bg-zinc-900 hover:text-white"
               />
             </div>
-          ) : (
+          ) : null}
+          {!isSoldOut && isList ? (
             <div className="pointer-events-none absolute inset-x-2 bottom-2 hidden translate-y-1 opacity-0 transition-all duration-300 lg:block lg:group-hover:pointer-events-auto lg:group-hover:translate-y-0 lg:group-hover:opacity-100">
               <AddToCartButton
                 product={product}
@@ -427,10 +426,17 @@ function ProductCardComponent({
                 className="w-full rounded-full shadow-[var(--shadow-elevated)]"
               />
             </div>
-          )}
+          ) : null}
+          {isSoldOut ? (
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[2] hidden lg:block">
+              <div className="flex h-11 w-full items-center justify-center bg-zinc-950/85 text-[11px] font-semibold uppercase tracking-[0.18em] text-white opacity-0 transition-opacity lg:group-hover:opacity-100">
+                Out of stock
+              </div>
+            </div>
+          ) : null}
 
           {/* Mobile quick-add — icon only, no box */}
-          {!isList ? (
+          {!isList && !isSoldOut ? (
             <button
               type="button"
               aria-label={`Quick add ${product.name}`}

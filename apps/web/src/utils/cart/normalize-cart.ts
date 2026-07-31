@@ -45,6 +45,10 @@ export function normalizeCartLineItem(raw: unknown): CartLineItem {
     salePriceMoney: salePrice != null ? asMoney(salePrice, currency) : undefined,
     inStock: record.inStock !== false,
     stockStatus: typeof record.stockStatus === 'string' ? record.stockStatus : undefined,
+    availableQuantity:
+      record.availableQuantity != null && Number.isFinite(Number(record.availableQuantity))
+        ? Number(record.availableQuantity)
+        : undefined,
   };
 }
 

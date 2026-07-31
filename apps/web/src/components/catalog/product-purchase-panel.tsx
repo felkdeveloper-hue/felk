@@ -167,6 +167,7 @@ export function ProductPurchasePanel({
   const isSelectionOutOfStock =
     colorHasNoSizes ||
     (hasSeparateSizeSelector ? selectedSizeOutOfStock : selectedVariantOutOfStock);
+  const productOutOfStock = product.inStock === false || product.status === 'out_of_stock';
 
   const isInCart = useMemo(
     () => Boolean(cartVariantId && cart?.items?.some((item) => item.variantId === cartVariantId)),
@@ -430,7 +431,7 @@ export function ProductPurchasePanel({
               <ShoppingBag className="size-4" />
               Go to bag
             </Link>
-          ) : colorHasNoSizes || (isSelectionOutOfStock && selectionReady) ? (
+          ) : productOutOfStock || colorHasNoSizes || (isSelectionOutOfStock && selectionReady) ? (
             <button
               type="button"
               disabled
@@ -467,16 +468,11 @@ export function ProductPurchasePanel({
           )}
         </div>
 
-        {!colorHasNoSizes && !(isSelectionOutOfStock && selectionReady) ? (
+        {!productOutOfStock && !colorHasNoSizes && !(isSelectionOutOfStock && selectionReady) ? (
           <button
             type="button"
             onClick={handleBuyNow}
-            disabled={
-              addMutation.isPending ||
-              product.inStock === false ||
-              product.status === 'out_of_stock' ||
-              isSelectionOutOfStock
-            }
+            disabled={addMutation.isPending || isSelectionOutOfStock}
             className="bg-foreground text-background lg:hover:bg-foreground/90 inline-flex h-12 w-full items-center justify-center rounded-none text-[11px] font-bold uppercase tracking-[0.18em] transition-opacity active:opacity-85 disabled:opacity-50 lg:text-sm lg:tracking-[0.14em]"
           >
             {addMutation.isPending ? 'Please wait…' : 'Buy it now'}

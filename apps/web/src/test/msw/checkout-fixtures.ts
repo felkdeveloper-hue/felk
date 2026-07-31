@@ -170,12 +170,7 @@ export const checkoutHandlers = [
       extendReservation?: boolean;
     };
 
-    const shippingAmount =
-      body.shippingMethod === 'express'
-        ? 800
-        : body.shippingMethod === 'free' || body.shippingMethod === 'pickup'
-          ? 0
-          : 400;
+    const shippingAmount = body.shippingMethod === 'pickup' ? 0 : 500;
 
     checkoutState = {
       ...checkoutState,

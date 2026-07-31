@@ -25,9 +25,14 @@ import {
 } from '@/hooks/checkout';
 import { useCartStore, useCheckoutStore } from '@/store';
 import { trackCommerceEvent } from '@/lib/analytics';
+import { AppError } from '@/lib/errors';
+import { QUERY_KEYS } from '@/constants';
+import type { CustomerAddress } from '@/services/sdk';
+import { useQueryClient } from '@tanstack/react-query';
 
 export function CheckoutInformationPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const startedRef = useRef(false);
   const recoveringClosedRef = useRef(false);
   const [recoveringClosed, setRecoveringClosed] = useState(false);
@@ -68,24 +73,53 @@ export function CheckoutInformationPage() {
       return;
     }
 
-    const defaultShipping = addresses?.find((address) => address.isDefaultShipping);
-    await startCheckout.mutateAsync({
-      shippingAddressId: defaultShipping?.id,
-      autoReserve: true,
-    });
-    trackCommerceEvent('checkout_started');
+    const hasUnavailable =
+      storeCart?.validation?.isValid === false ||
+      storeCart?.items.some(
+        (item) =>
+          item.inStock === false ||
+          item.stockStatus === 'out_of_stock' ||
+          (typeof item.availableQuantity === 'number' && item.availableQuantity < item.quantity),
+      );
+    if (hasUnavailable) {
+      void navigate({ to: ROUTES.cart });
+      return;
+    }
+
+    const cachedAddresses =
+      addresses ?? queryClient.getQueryData<CustomerAddress[]>(QUERY_KEYS.customers.addresses());
+    const defaultShipping = cachedAddresses?.find((address) => address.isDefaultShipping);
+    try {
+      await startCheckout.mutateAsync({
+        shippingAddressId: defaultShipping?.id,
+        autoReserve: true,
+      });
+      trackCommerceEvent('checkout_started');
+    } catch (error) {
+      // Stock / cart validation failures belong on the bag, not the checkout form.
+      if (
+        AppError.isAppError(error) &&
+        (error.code === 'CHECKOUT_INVALID' ||
+          error.code === 'OUT_OF_STOCK' ||
+          error.code === 'INSUFFICIENT_STOCK' ||
+          error.code === 'CART_EMPTY')
+      ) {
+        useCheckoutStore.getState().resetCheckoutUi();
+        void navigate({ to: ROUTES.cart });
+        return;
+      }
+      throw error;
+    }
   };
 
-  // Start checkout in the background. Do not wait on a separate cart validate —
-  // start already rebuilds/validates the cart. Wait for addresses to settle so
-  // the default shipping id can be sent on the first request.
+  // Start checkout immediately — do not block on addresses (they load in parallel).
+  // Default shipping id is attached when addresses are already cached.
   useEffect(() => {
     if (startedRef.current) return;
     if (useCheckoutStore.getState().checkoutToken) {
       startedRef.current = true;
       return;
     }
-    if (addressesQuery.isPending) return;
 
     startedRef.current = true;
 
@@ -97,13 +131,13 @@ export function CheckoutInformationPage() {
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- bootstrap once per mount/token clear
-  }, [addresses, addressesQuery.isPending, navigate, startCheckout]);
+  }, [navigate, startCheckout]);
 
   // Stale completed/cancelled tokens: clear and start a fresh session automatically.
   useEffect(() => {
     const closedError =
       isCheckoutClosedError(sessionQuery.error) || isCheckoutClosedError(startCheckout.error);
-    if (!closedError || recoveringClosedRef.current || addressesQuery.isPending) return;
+    if (!closedError || recoveringClosedRef.current) return;
 
     recoveringClosedRef.current = true;
     setRecoveringClosed(true);
@@ -121,7 +155,7 @@ export function CheckoutInformationPage() {
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- recover once per closed error
-  }, [sessionQuery.error, startCheckout.error, addressesQuery.isPending]);
+  }, [sessionQuery.error, startCheckout.error]);
 
   useEffect(() => {
     if (!addresses?.length) return;
@@ -131,6 +165,20 @@ export function CheckoutInformationPage() {
     const defaultShipping = addresses.find((address) => address.isDefaultShipping) ?? addresses[0];
     if (defaultShipping?.id) setShippingAddressId(defaultShipping.id);
   }, [addresses, shippingAddressId, setShippingAddressId]);
+
+  // Stale sessions that became out of stock after start — send shopper back to bag.
+  useEffect(() => {
+    const blocking = session?.validationIssues?.some(
+      (issue) =>
+        issue.severity !== 'warning' &&
+        (issue.code === 'OUT_OF_STOCK' ||
+          issue.code === 'INSUFFICIENT_STOCK' ||
+          /out of stock|insufficient stock/i.test(issue.message)),
+    );
+    if (!blocking) return;
+    useCheckoutStore.getState().resetCheckoutUi();
+    void navigate({ to: ROUTES.cart });
+  }, [session?.validationIssues, navigate]);
 
   useEffect(() => {
     if (!billingSameAsShipping || !shippingAddressId) return;
@@ -153,10 +201,7 @@ export function CheckoutInformationPage() {
     recovering ||
     (!session &&
       !bootstrapError &&
-      (addressesQuery.isPending ||
-        startCheckout.isPending ||
-        sessionQuery.isLoading ||
-        !checkoutToken));
+      (startCheckout.isPending || sessionQuery.isLoading || !checkoutToken));
   const sessionReady = Boolean(session?.checkoutToken);
 
   const handleContinue = () => {
@@ -164,17 +209,21 @@ export function CheckoutInformationPage() {
     const billingId = billingSameAsShipping ? shippingAddressId : billingAddressId;
     if (!billingId) return;
 
+    // Apply addresses + fixed standard shipping in one refresh, then go to payment.
     refreshCheckout.mutate(
       {
         checkoutRef: session.checkoutToken,
         payload: {
           shippingAddressId,
           billingAddressId: billingId,
+          shippingMethod: 'standard',
+          deliveryMethod: 'delivery',
           extendReservation: true,
         },
       },
       {
         onSuccess: () => {
+          useCheckoutStore.getState().setSelectedShippingMethod('standard');
           void navigate({ to: ROUTES.checkoutShipping });
         },
       },

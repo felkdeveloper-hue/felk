@@ -74,7 +74,7 @@ export function ProductDeliveryCheck({
         )}
       >
         <Truck className="text-muted-foreground size-4 shrink-0 lg:size-5 lg:text-sky-600 dark:lg:text-sky-300" />
-        This product is eligible for FREE SHIPPING
+        Flat shipping LKR 500 island-wide
       </div>
 
       <div

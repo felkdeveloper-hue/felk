@@ -23,6 +23,7 @@ export interface CartLineItem {
   salePriceMoney?: { amount: number; currency: string };
   inStock?: boolean;
   stockStatus?: string;
+  availableQuantity?: number;
   [key: string]: unknown;
 }
 

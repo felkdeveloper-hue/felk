@@ -27,7 +27,7 @@ export function PaymentMethodSelector({ value, onChange, disabled }: PaymentMeth
         onValueChange={(next) => onChange(next as PaymentMethod)}
         className="grid gap-3 sm:grid-cols-2"
       >
-        {PAYMENT_METHOD_OPTIONS.map((option) => {
+        {PAYMENT_METHOD_OPTIONS.filter((option) => option.enabled).map((option) => {
           const isSelected = value === option.id;
 
           return (

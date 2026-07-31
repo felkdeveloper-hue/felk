@@ -70,8 +70,11 @@ export function useCheckoutSessionQuery(checkoutRef?: string | null) {
       return session;
     },
     enabled: Boolean(ref),
-    staleTime: 1000 * 15,
+    staleTime: 1000 * 60,
+    gcTime: 1000 * 60 * 10,
+    refetchOnWindowFocus: false,
     retry: false,
+    placeholderData: (previous) => previous,
   });
 }
 

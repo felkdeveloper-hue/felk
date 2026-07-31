@@ -44,9 +44,11 @@ export interface TaxCalcResult {
   provider: string;
 }
 
+/** Flat island-wide shipping fee (LKR). Free shipping is intentionally disabled. */
+export const FIXED_SHIPPING_AMOUNT = 500;
+
 /**
- * Shipping calculator structure — uses CMS shipping zones when available.
- * Carrier integrations are future work.
+ * Shipping calculator — fixed LKR 500 for delivery; pickup remains free.
  */
 export async function calculateShipping(input: ShippingCalcInput): Promise<ShippingCalcResult> {
   if (input.method === SHIPPING_METHOD.PICKUP) {
@@ -62,16 +64,11 @@ export async function calculateShipping(input: ShippingCalcInput): Promise<Shipp
     };
   }
 
-  if (input.method === SHIPPING_METHOD.FREE) {
-    return {
-      status: 'calculated',
-      method: SHIPPING_METHOD.FREE,
-      amount: 0,
-      currency: input.currency,
-      message: 'Free shipping applied (structure)',
-      carrier: 'internal',
-    };
-  }
+  // Normalize legacy "free" / express selections onto the fixed standard rate.
+  const method =
+    input.method === SHIPPING_METHOD.EXPRESS || input.method === SHIPPING_METHOD.FREE
+      ? SHIPPING_METHOD.STANDARD
+      : input.method;
 
   const country = input.country?.toUpperCase();
   const zones = await ShippingZoneModel.find({
@@ -87,54 +84,17 @@ export async function calculateShipping(input: ShippingCalcInput): Promise<Shipp
         : true,
     ) ?? zones[0];
 
-  if (!zone) {
-    // Structure fallback rates
-    const amount = input.method === SHIPPING_METHOD.EXPRESS ? 800 : 500;
-    return {
-      status: 'placeholder',
-      method: input.method,
-      amount,
-      currency: input.currency,
-      message: 'No shipping zone matched — using fallback rate (carrier integrations pending)',
-      carrier: 'placeholder',
-      estimatedDaysMin: input.method === SHIPPING_METHOD.EXPRESS ? 1 : 3,
-      estimatedDaysMax: input.method === SHIPPING_METHOD.EXPRESS ? 2 : 7,
-    };
-  }
-
-  let amount = 0;
-  if (zone.rateType === 'free') {
-    amount = 0;
-  } else if (zone.rateType === 'weight') {
-    const kg = Math.max(0.1, input.totalWeightGrams / 1000);
-    amount = Number((zone.rate * kg).toFixed(2));
-  } else {
-    amount = zone.rate;
-  }
-
-  if (input.method === SHIPPING_METHOD.EXPRESS) {
-    amount = Number((amount * 1.75).toFixed(2));
-  }
-
-  if (
-    zone.minOrderAmount != null &&
-    input.subtotal >= zone.minOrderAmount &&
-    zone.rateType !== 'free'
-  ) {
-    // optional free threshold structure
-  }
-
   return {
-    status: 'calculated',
-    method: input.method,
-    amount,
-    currency: zone.currency || input.currency,
-    zoneId: zone._id.toString(),
-    zoneName: zone.name,
-    estimatedDaysMin: zone.estimatedDaysMin,
-    estimatedDaysMax: zone.estimatedDaysMax,
-    message: `Shipping via zone ${zone.name}`,
-    carrier: 'internal',
+    status: zone ? 'calculated' : 'placeholder',
+    method,
+    amount: FIXED_SHIPPING_AMOUNT,
+    currency: zone?.currency || input.currency,
+    zoneId: zone?._id.toString() ?? null,
+    zoneName: zone?.name ?? null,
+    estimatedDaysMin: zone?.estimatedDaysMin ?? 3,
+    estimatedDaysMax: zone?.estimatedDaysMax ?? 7,
+    message: zone ? `Fixed shipping via zone ${zone.name}` : 'Fixed island-wide shipping rate',
+    carrier: zone ? 'internal' : 'placeholder',
   };
 }
 

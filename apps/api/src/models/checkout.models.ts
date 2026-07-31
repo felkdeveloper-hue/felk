@@ -28,6 +28,9 @@ const lineSchema = new Schema(
     salePrice: { type: Number, default: null },
     compareAtPrice: { type: Number, default: null },
     lineSubtotal: { type: Number, required: true },
+    colorName: { type: String, default: null },
+    sizeName: { type: String, default: null },
+    thumbnailUrl: { type: String, default: null },
     weightGrams: { type: Number, default: 0 },
     taxClass: { type: String, default: null },
     warehouseId: { type: Schema.Types.ObjectId, ref: 'Warehouse', default: null },
@@ -68,6 +71,9 @@ export interface CheckoutSessionDocument extends Document {
     salePrice?: number | null;
     compareAtPrice?: number | null;
     lineSubtotal: number;
+    colorName?: string | null;
+    sizeName?: string | null;
+    thumbnailUrl?: string | null;
     weightGrams: number;
     taxClass?: string | null;
     warehouseId?: Types.ObjectId | null;
