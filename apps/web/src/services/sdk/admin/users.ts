@@ -65,10 +65,25 @@ export interface AdminUpdateUserPayload {
   roleKey?: string;
 }
 
+export interface AdminCreateUserPayload {
+  email: string;
+  password: string;
+  firstName: string;
+  lastName?: string;
+  phone?: string;
+  roleKey: string;
+  status?: string;
+}
+
 export const usersApi = {
   async list(params?: UserListParams): Promise<PaginatedResult<AdminUserRow>> {
     const result = await http.getPaginated<unknown>('/users', { params });
     return { ...result, data: normalizeList(result.data, normalizeUser) };
+  },
+
+  async create(payload: AdminCreateUserPayload): Promise<AdminUserRow> {
+    const raw = await http.post<unknown>('/users', payload);
+    return normalizeUser(raw);
   },
 
   async update(userId: string, payload: AdminUpdateUserPayload): Promise<AdminUserRow> {

@@ -42,6 +42,7 @@ export function useAdminPermissions() {
     },
     users: {
       view: hasAnyPermission([PERMISSIONS.USERS_READ, PERMISSIONS.USERS_MANAGE]),
+      create: hasAnyPermission([PERMISSIONS.USERS_CREATE, PERMISSIONS.USERS_MANAGE]),
       update: hasAnyPermission([PERMISSIONS.USERS_UPDATE, PERMISSIONS.USERS_MANAGE]),
       lock: hasAnyPermission([PERMISSIONS.USERS_LOCK, PERMISSIONS.USERS_MANAGE]),
       delete: hasAnyPermission([PERMISSIONS.USERS_DELETE, PERMISSIONS.USERS_MANAGE]),

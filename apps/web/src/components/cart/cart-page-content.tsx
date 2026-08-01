@@ -1,10 +1,10 @@
 import { useEffect } from 'react';
-import { Link } from '@tanstack/react-router';
+import { Link, useNavigate } from '@tanstack/react-router';
 import { AnimatePresence } from 'framer-motion';
 import { useQueryClient } from '@tanstack/react-query';
 import { QUERY_KEYS, ROUTES } from '@/constants';
 import { useCartQuery } from '@/hooks/cart';
-import { useAuthStore } from '@/store';
+import { useAuthStore, useCheckoutStore } from '@/store';
 import { AppError } from '@/lib/errors';
 import { consumePaymentFailedFlag, trackCommerceEvent } from '@/lib/analytics';
 import { formatCurrency } from '@/utils';
@@ -44,6 +44,7 @@ function cartHasBlockingStockIssues(cart: {
 }
 
 export function CartPageContent() {
+  const navigate = useNavigate();
   const cartQuery = useCartQuery();
   const queryClient = useQueryClient();
   const hasHydrated = useAuthStore((state) => state.hasHydrated);
@@ -62,7 +63,6 @@ export function CartPageContent() {
       staleTime: 1000 * 60 * 2,
     });
     void import('@/pages/checkout/information.page');
-    void import('@/pages/checkout/shipping.page');
     void import('@/pages/checkout/payment.page');
   }, [checkoutBlocked, isAuthed, queryClient]);
 
@@ -154,15 +154,18 @@ export function CartPageContent() {
             <Button className="w-full" size="lg" disabled>
               Remove unavailable items to checkout
             </Button>
-          ) : isAuthed ? (
-            <Button asChild className="w-full" size="lg">
-              <Link to={ROUTES.checkout}>Proceed to checkout</Link>
-            </Button>
           ) : (
-            <Button asChild className="w-full" size="lg">
-              <Link to={ROUTES.authLogin} search={{ redirect: ROUTES.checkout }}>
-                Sign in to checkout
-              </Link>
+            <Button
+              className="w-full"
+              size="lg"
+              onClick={() => {
+                // Full-bag checkout — clear Buy Now scope + stale session cache.
+                useCheckoutStore.getState().resetCheckoutUi();
+                queryClient.removeQueries({ queryKey: ['checkout'] });
+                void navigate({ to: ROUTES.checkout });
+              }}
+            >
+              Proceed to checkout
             </Button>
           )}
           <Button asChild variant="ghost" className="w-full">
@@ -205,23 +208,17 @@ export function CartPageContent() {
             >
               Remove unavailable items
             </Button>
-          ) : isAuthed ? (
-            <Button
-              asChild
-              className="h-12 w-full rounded-none text-sm font-bold uppercase tracking-[0.14em]"
-              size="lg"
-            >
-              <Link to={ROUTES.checkout}>Checkout</Link>
-            </Button>
           ) : (
             <Button
-              asChild
               className="h-12 w-full rounded-none text-sm font-bold uppercase tracking-[0.14em]"
               size="lg"
+              onClick={() => {
+                useCheckoutStore.getState().resetCheckoutUi();
+                queryClient.removeQueries({ queryKey: ['checkout'] });
+                void navigate({ to: ROUTES.checkout });
+              }}
             >
-              <Link to={ROUTES.authLogin} search={{ redirect: ROUTES.checkout }}>
-                Sign in to checkout
-              </Link>
+              Checkout
             </Button>
           )}
         </div>

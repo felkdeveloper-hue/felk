@@ -4,10 +4,11 @@ import { Seo } from '@/components/common/seo';
 import { AuthErrorAlert } from '@/components/auth/auth-error-alert';
 import { Button } from '@/components/ui/button';
 import { ROUTES } from '@/constants';
+import { useReleaseCheckoutMutation } from '@/hooks/checkout';
 import { useRetryPaymentMutation } from '@/hooks/payment';
 import { useCheckoutStore } from '@/store';
 import { markPaymentFailedFlag, trackCommerceEvent } from '@/lib/analytics';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 export function CheckoutCancelPage() {
   const navigate = useNavigate();
@@ -15,13 +16,22 @@ export function CheckoutCancelPage() {
   const storedToken = useCheckoutStore((state) => state.checkoutToken);
   const paymentMethod = useCheckoutStore((state) => state.selectedPaymentMethod);
   const checkoutToken = search.checkoutToken ?? storedToken ?? null;
+  const releasedRef = useRef(false);
 
   const retryPayment = useRetryPaymentMutation();
+  const releaseCheckout = useReleaseCheckoutMutation();
 
   useEffect(() => {
     markPaymentFailedFlag();
     trackCommerceEvent('payment_failed', null, { checkoutToken, reason: 'cancelled' });
   }, [checkoutToken]);
+
+  // Release payment-window stock hold; keep checkout usable for retry.
+  useEffect(() => {
+    if (!checkoutToken || releasedRef.current) return;
+    releasedRef.current = true;
+    releaseCheckout.mutate(checkoutToken);
+  }, [checkoutToken, releaseCheckout]);
 
   const handleRetry = () => {
     if (!checkoutToken || !paymentMethod) {

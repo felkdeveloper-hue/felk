@@ -5,6 +5,7 @@ import {
   setAuthCookies,
   type AuthRequestMeta,
 } from '@/services/auth.service.js';
+import { checkoutAuthService } from '@/services/checkout-auth.service.js';
 import {
   getAccessTokenFromRequest,
   getRefreshTokenFromRequest,
@@ -170,5 +171,66 @@ export const authController = {
     const me = await authService.getMe(req.user!.id);
     me.sessionId = req.user!.sessionId;
     ApiResponse.success(res, me);
+  }),
+
+  checkoutEmailStatus: asyncHandler(async (req, res) => {
+    const result = await checkoutAuthService.emailStatus(req.body.email);
+    ApiResponse.success(res, result);
+  }),
+
+  checkoutSendOtp: asyncHandler(async (req, res) => {
+    const result = await checkoutAuthService.sendOtp(req.body.email, meta(req));
+    ApiResponse.success(res, result, result.message);
+  }),
+
+  checkoutVerifyOtp: asyncHandler(async (req, res) => {
+    const result = await checkoutAuthService.verifyOtp(req.body.email, req.body.otp);
+    if (result.mode === 'login') {
+      setAuthCookies(res, {
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+        rememberMe: result.rememberMe,
+      });
+      ApiResponse.success(
+        res,
+        {
+          mode: 'login',
+          accessToken: result.accessToken,
+          refreshToken: result.refreshToken,
+          expiresIn: result.expiresIn,
+          tokenType: 'Bearer',
+          user: result.user,
+        },
+        result.message,
+      );
+      return;
+    }
+    ApiResponse.success(res, result, result.message);
+  }),
+
+  checkoutCompleteSignup: asyncHandler(async (req, res) => {
+    const result = await checkoutAuthService.completeSignup(req.body, meta(req));
+    setAuthCookies(res, {
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+      rememberMe: result.rememberMe,
+    });
+    void emitBusinessEvent({
+      eventId: crypto.randomUUID(),
+      name: 'signup',
+      userId: result.user?.id ?? null,
+      properties: { portal: 'customer', source: 'checkout' },
+    });
+    ApiResponse.created(
+      res,
+      {
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+        expiresIn: result.expiresIn,
+        tokenType: 'Bearer',
+        user: result.user,
+      },
+      result.message,
+    );
   }),
 };

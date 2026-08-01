@@ -25,7 +25,7 @@ import {
   PAYMENT_METHOD,
   type PaymentMethod,
 } from '@/constants/payment-status.js';
-import { CHECKOUT_STATUS } from '@/constants/checkout.js';
+import { CHECKOUT_STATUS, CHECKOUT_RESERVATION_TTL_MINUTES } from '@/constants/checkout.js';
 import {
   PAYMENT_ATTEMPT_STATUS,
   PAYMENT_AUDIT,
@@ -101,7 +101,11 @@ export class PaymentService {
       throw ApiError.forbidden('You can only pay for your own checkout session');
     }
 
-    if (checkout.status !== CHECKOUT_STATUS.READY) {
+    if (
+      ![CHECKOUT_STATUS.OPEN, CHECKOUT_STATUS.READY, CHECKOUT_STATUS.RESERVED].includes(
+        checkout.status as never,
+      )
+    ) {
       throw ApiError.badRequest(
         `Checkout is not ready for payment (status: ${checkout.status})`,
         { checkoutId: checkout._id.toString() },
@@ -109,13 +113,22 @@ export class PaymentService {
       );
     }
 
-    if (checkout.reservationExpiresAt && checkout.reservationExpiresAt <= new Date()) {
+    if (!checkout.shippingAddress || !checkout.lines?.length) {
       throw ApiError.badRequest(
-        'Checkout reservation has expired — refresh checkout before paying',
+        'Checkout is missing a shipping address or line items',
         { checkoutId: checkout._id.toString() },
-        'RESERVATION_EXPIRED',
+        'CHECKOUT_NOT_READY',
       );
     }
+
+    // Hold stock only when Place Order begins — never earlier in the funnel.
+    await checkoutService.ensureReservedForPayment(
+      checkout._id.toString(),
+      user,
+      actor,
+      CHECKOUT_RESERVATION_TTL_MINUTES,
+    );
+    const reservedCheckout = await checkoutService.getByIdOrToken(checkout._id.toString());
 
     let payment = await PaymentModel.findOne({
       checkoutId: checkout._id,
@@ -142,6 +155,8 @@ export class PaymentService {
             const { redirectForm: _removed, ...rest } = payment.metadata;
             payment.metadata = rest;
           }
+          // Keep amount in sync with current reserved checkout totals.
+          payment.amount = reservedCheckout.totals.grandTotal;
           await payment.save();
           return this.createAttempt(payment, customer, actor);
         }
@@ -151,6 +166,7 @@ export class PaymentService {
           // between create() and createAttempt()) — finish creating it now.
           if (payload.returnUrl) payment.returnUrl = payload.returnUrl;
           if (payload.cancelUrl) payment.cancelUrl = payload.cancelUrl;
+          payment.amount = reservedCheckout.totals.grandTotal;
           await payment.save();
           return this.createAttempt(payment, customer, actor);
         }
@@ -197,21 +213,21 @@ export class PaymentService {
 
     payment = await PaymentModel.create({
       referenceNumber: newReferenceNumber(),
-      checkoutId: checkout._id,
-      checkoutToken: checkout.checkoutToken,
+      checkoutId: reservedCheckout._id,
+      checkoutToken: reservedCheckout.checkoutToken,
       customerId: customer._id,
       userId: user.id,
       method: payload.method,
       status: PAYMENT_STATUS.PENDING,
-      amount: checkout.totals.grandTotal,
-      currency: checkout.currency,
+      amount: reservedCheckout.totals.grandTotal,
+      currency: reservedCheckout.currency,
       returnUrl:
         payload.returnUrl ??
-        `${appConfig.payment.returnUrl}?checkoutToken=${checkout.checkoutToken}`,
+        `${appConfig.payment.returnUrl}?checkoutToken=${reservedCheckout.checkoutToken}`,
       cancelUrl:
         payload.cancelUrl ??
-        `${appConfig.payment.cancelUrl}?checkoutToken=${checkout.checkoutToken}`,
-      idempotencyKey: `${checkout._id.toString()}:${customer._id.toString()}:${randomUUID()}`,
+        `${appConfig.payment.cancelUrl}?checkoutToken=${reservedCheckout.checkoutToken}`,
+      idempotencyKey: `${reservedCheckout._id.toString()}:${customer._id.toString()}:${randomUUID()}`,
       attemptCount: 0,
       maxAttempts: appConfig.payment.maxRetryAttempts || PAYMENT_MAX_RETRY_ATTEMPTS,
       expiresAt: new Date(Date.now() + appConfig.payment.attemptTtlMinutes * 60_000),
@@ -236,7 +252,7 @@ export class PaymentService {
         currency: payment.currency,
         method: payment.method,
       },
-      { paymentId: payment._id.toString(), checkoutId: checkout._id.toString() },
+      { paymentId: payment._id.toString(), checkoutId: reservedCheckout._id.toString() },
     );
 
     return this.createAttempt(payment, customer, actor);
@@ -273,7 +289,11 @@ export class PaymentService {
     if (!checkout) {
       throw ApiError.notFound('Checkout session for this payment no longer exists');
     }
-    if (checkout.status !== CHECKOUT_STATUS.READY) {
+    if (
+      ![CHECKOUT_STATUS.OPEN, CHECKOUT_STATUS.READY, CHECKOUT_STATUS.RESERVED].includes(
+        checkout.status as never,
+      )
+    ) {
       throw ApiError.badRequest(
         `Checkout is not ready for payment (status: ${checkout.status})`,
         { checkoutId: checkout._id.toString() },
@@ -281,9 +301,17 @@ export class PaymentService {
       );
     }
 
+    await checkoutService.ensureReservedForPayment(
+      checkout._id.toString(),
+      user,
+      actor,
+      CHECKOUT_RESERVATION_TTL_MINUTES,
+    );
+    const reservedCheckout = await checkoutService.getByIdOrToken(checkout._id.toString());
+
     if (payload.method) payment.method = payload.method;
-    payment.amount = checkout.totals.grandTotal;
-    payment.currency = checkout.currency;
+    payment.amount = reservedCheckout.totals.grandTotal;
+    payment.currency = reservedCheckout.currency;
     payment.status = PAYMENT_STATUS.PENDING;
     payment.failureReason = null;
     payment.expiresAt = new Date(Date.now() + appConfig.payment.attemptTtlMinutes * 60_000);
@@ -430,6 +458,14 @@ export class PaymentService {
         level: 'error',
         message: attempt.errorMessage ?? 'Gateway session creation failed',
       });
+
+      // Gateway never started — do not leave stock locked.
+      void checkoutService
+        .releaseForPaymentFailure(
+          payment.checkoutId.toString(),
+          'Gateway session creation failed — release hold',
+        )
+        .catch(() => {});
 
       throw error;
     }

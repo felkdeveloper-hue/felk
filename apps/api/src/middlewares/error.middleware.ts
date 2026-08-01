@@ -56,7 +56,7 @@ export function errorHandler(err: unknown, req: Request, res: Response, _next: N
     return;
   }
 
-  // Mongo duplicate key (unique slug/SKU/barcode) — surface as 409, not 500.
+  // Mongo duplicate key — surface as 409 with a field-accurate code (not always SKU).
   const mongoCode =
     err && typeof err === 'object' && 'code' in err
       ? Number((err as { code?: unknown }).code)
@@ -67,16 +67,27 @@ export function errorHandler(err: unknown, req: Request, res: Response, _next: N
         ? (err as { keyPattern?: Record<string, unknown> }).keyPattern
         : undefined;
     const field = keyPattern ? Object.keys(keyPattern)[0] : undefined;
-    const label = field === 'slug' ? 'Slug' : field === 'barcode' ? 'Barcode' : 'SKU';
+    const duplicateMap: Record<string, { label: string; code: string }> = {
+      sku: { label: 'SKU', code: 'SKU_EXISTS' },
+      slug: { label: 'Slug', code: 'SLUG_EXISTS' },
+      barcode: { label: 'Barcode', code: 'BARCODE_EXISTS' },
+      email: { label: 'Email', code: 'EMAIL_EXISTS' },
+      userId: { label: 'User', code: 'USER_EXISTS' },
+      referralCode: { label: 'Referral code', code: 'REFERRAL_EXISTS' },
+    };
+    const mapped = (field && duplicateMap[field]) || {
+      label: field ? field : 'Record',
+      code: 'DUPLICATE_KEY',
+    };
     logger.warn(
       { err: { code: 11000, field, message: (err as Error).message }, requestId },
       'Duplicate key',
     );
     ApiResponse.error(
       res,
-      `${label} already exists`,
+      `${mapped.label} already exists`,
       HTTP_STATUS.CONFLICT,
-      field === 'slug' ? 'SLUG_EXISTS' : field === 'barcode' ? 'BARCODE_EXISTS' : 'SKU_EXISTS',
+      mapped.code,
       undefined,
       meta,
     );

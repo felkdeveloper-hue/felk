@@ -212,6 +212,7 @@ export function useMergeCartMutation() {
     onSuccess: (cart) => {
       queryClient.setQueryData(QUERY_KEYS.cart.current(), cart);
       syncCartToStore(cart);
+      useCartStore.getState().setGuestCartToken(null);
     },
   });
 }

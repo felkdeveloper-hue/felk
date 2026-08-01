@@ -173,11 +173,12 @@ export async function handlePaymentSucceededEvent(payload: Record<string, unknow
         );
         committedReservationIds.push(line.reservationId);
       } catch (error) {
-        // Already committed/released — don't block order creation on a stock ledger race.
-        logger.warn(
-          { err: error, reservationId: line.reservationId.toString() },
-          'Failed to commit reservation during order creation — continuing',
+        // Do not create a paid order when stock commit fails for a reserved line.
+        logger.error(
+          { err: error, reservationId: line.reservationId.toString(), paymentId },
+          'Failed to commit reservation during order creation — aborting order',
         );
+        throw error;
       }
     }
 
@@ -326,11 +327,52 @@ export async function catchUpOrphanCodPayments(): Promise<{ scanned: number; ful
   return { scanned: payments.length, fulfilled };
 }
 
+/**
+ * Payment failed/cancelled/expired — release any payment-window inventory hold
+ * so available stock is restored immediately.
+ */
+export async function handlePaymentFailedEvent(
+  payload: Record<string, unknown>,
+  refs?: Record<string, unknown>,
+): Promise<void> {
+  const paymentId = String(payload.paymentId ?? refs?.paymentId ?? '');
+  const checkoutIdFromPayload = String(payload.checkoutId ?? refs?.checkoutId ?? '');
+  try {
+    let checkoutId = checkoutIdFromPayload;
+    if (!checkoutId && paymentId) {
+      const payment = await PaymentModel.findById(paymentId).select('checkoutId').lean();
+      checkoutId = payment?.checkoutId?.toString() ?? '';
+    }
+    if (!checkoutId) {
+      logger.warn(
+        { payload, refs },
+        'PaymentFailed event missing checkoutId — cannot release stock',
+      );
+      return;
+    }
+
+    const { checkoutService } = await import('@/services/checkout.service.js');
+    await checkoutService.releaseForPaymentFailure(
+      checkoutId,
+      `Payment failed (${String(payload.status ?? 'failed')}) — release hold`,
+    );
+    logger.info({ checkoutId, paymentId }, 'Released checkout reservations after payment failure');
+  } catch (error) {
+    logger.error({ err: error, paymentId, payload }, 'Failed to release stock on PaymentFailed');
+  }
+}
+
 /** Registers the real-time, in-process subscription. Call once at bootstrap. */
 export function initOrderPaymentConsumer(): void {
   domainEventBus.on(PAYMENT_SUCCEEDED, (payload: Record<string, unknown>) => {
     void handlePaymentSucceededEvent(payload);
   });
+  domainEventBus.on(
+    PAYMENT_EVENT_TYPE.PAYMENT_FAILED,
+    (payload: Record<string, unknown>, refs?: Record<string, unknown>) => {
+      void handlePaymentFailedEvent(payload, refs);
+    },
+  );
 }
 
 /**

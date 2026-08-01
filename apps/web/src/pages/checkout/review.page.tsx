@@ -200,7 +200,7 @@ export function CheckoutReviewPage() {
   };
 
   const handleExtend = () => {
-    if (!session?.checkoutToken) return;
+    if (!session?.checkoutToken || !session.reservationIds?.length) return;
     refreshCheckout.mutate({
       checkoutRef: session.checkoutToken,
       payload: { extendReservation: true },
@@ -230,7 +230,17 @@ export function CheckoutReviewPage() {
     );
   }
 
-  if (!session) return null;
+  if (!session) {
+    return (
+      <>
+        <Seo title="Review" description="Review your order." noIndex />
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]" aria-busy="true">
+          <Skeleton className="h-64 w-full" />
+          <Skeleton className="h-64 w-full" />
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
@@ -282,12 +292,7 @@ export function CheckoutReviewPage() {
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
-              <ReviewSection
-                icon={Truck}
-                title="Delivery"
-                editTo={ROUTES.checkoutShipping}
-                editLabel="Change"
-              >
+              <ReviewSection icon={Truck} title="Delivery">
                 <p className="font-medium capitalize">{shippingLabel(session.shippingMethod)}</p>
                 {shippingDescription(session.shippingMethod) ? (
                   <p className="text-muted-foreground mt-1 text-sm">

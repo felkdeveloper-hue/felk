@@ -46,11 +46,12 @@ export function useUpdatePreferencesMutation() {
   });
 }
 
-export function useAddressesQuery() {
+export function useAddressesQuery(enabled = true) {
   return useQuery({
     queryKey: QUERY_KEYS.customers.addresses(),
     queryFn: () => customersApi.listAddresses(),
     staleTime: 1000 * 60 * 2,
+    enabled,
   });
 }
 

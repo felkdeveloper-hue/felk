@@ -4,6 +4,8 @@
 export const ROLES = {
   SUPER_ADMIN: 'super_admin',
   ADMIN: 'admin',
+  /** Limited staff — day-to-day ops without user/role management. */
+  SUB_ADMIN: 'sub_admin',
   MANAGER: 'manager',
   INVENTORY_MANAGER: 'inventory_manager',
   MARKETING_MANAGER: 'marketing_manager',

@@ -46,11 +46,12 @@ export function getEmailTransporter(): Transporter | null {
       tls: {
         minVersion: 'TLSv1.2',
       },
-      pool: true,
-      maxConnections: 3,
+      // Avoid pooled sockets — Titan often drops idle connections → "Greeting never received".
+      pool: false,
+      // Titan/shared SMTP can be slow from some networks; keep under client timeout.
       connectionTimeout: 15_000,
       greetingTimeout: 15_000,
-      socketTimeout: 20_000,
+      socketTimeout: 25_000,
     });
   }
 
@@ -91,5 +92,8 @@ export async function verifyEmailTransporter(): Promise<boolean> {
   } catch (err) {
     logger.error({ err, host: appConfig.email.host }, 'Email transporter verification failed');
     return false;
+  } finally {
+    // Titan is flaky if the verify socket is reused for the next sendMail.
+    resetEmailTransporter();
   }
 }

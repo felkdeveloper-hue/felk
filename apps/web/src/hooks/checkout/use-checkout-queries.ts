@@ -7,6 +7,7 @@ import {
   type CheckoutSession,
   type CheckoutStartPayload,
 } from '@/services/sdk';
+import { useAuthStore } from '@/store/auth-store';
 import { useCheckoutStore } from '@/store/checkout-store';
 
 const CLOSED_CHECKOUT_STATUSES = new Set(['completed', 'cancelled', 'expired']);
@@ -50,6 +51,7 @@ function cacheCheckoutSession(
 
 export function useCheckoutSessionQuery(checkoutRef?: string | null) {
   const storedToken = useCheckoutStore((state) => state.checkoutToken);
+  const accessToken = useAuthStore((state) => state.accessToken);
   const ref = checkoutRef ?? storedToken;
   const queryClient = useQueryClient();
 
@@ -69,7 +71,8 @@ export function useCheckoutSessionQuery(checkoutRef?: string | null) {
       syncCheckoutSession(session);
       return session;
     },
-    enabled: Boolean(ref),
+    // Never hit /checkout while logged out — stale tokens caused 401 spam + slow guest UX.
+    enabled: Boolean(ref && accessToken),
     staleTime: 1000 * 60,
     gcTime: 1000 * 60 * 10,
     refetchOnWindowFocus: false,
@@ -91,16 +94,15 @@ async function startOrResumeCheckout(payload: CheckoutStartPayload): Promise<Che
       const details = error.details as { checkoutId?: string; checkoutToken?: string };
       const ref = details.checkoutToken ?? details.checkoutId;
       if (ref) {
+        // Never refresh a prior Buy Now session for full-bag checkout — that
+        // filtered lines to one SKU and left the summary empty.
         try {
-          return await checkoutApi.refresh(ref, { extendReservation: true });
-        } catch (refreshError) {
-          // Active session was closed between conflict and refresh — start clean.
-          if (isCheckoutClosedError(refreshError)) {
-            useCheckoutStore.getState().resetCheckoutUi();
-            return checkoutApi.start(payload);
-          }
-          throw refreshError;
+          await checkoutApi.cancel(ref);
+        } catch {
+          /* already closed */
         }
+        useCheckoutStore.getState().setCheckoutToken(null);
+        return checkoutApi.start(payload);
       }
     }
     throw error;
@@ -159,6 +161,18 @@ export function useReserveCheckoutMutation() {
 
   return useMutation({
     mutationFn: (checkoutRef: string) => checkoutApi.reserve(checkoutRef),
+    onSuccess: (session) => {
+      syncCheckoutSession(session);
+      cacheCheckoutSession(queryClient, session);
+    },
+  });
+}
+
+export function useReleaseCheckoutMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (checkoutRef: string) => checkoutApi.release(checkoutRef),
     onSuccess: (session) => {
       syncCheckoutSession(session);
       cacheCheckoutSession(queryClient, session);

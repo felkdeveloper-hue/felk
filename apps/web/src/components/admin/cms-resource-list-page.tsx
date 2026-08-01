@@ -22,6 +22,10 @@ import { AppError } from '@/lib/errors';
 import { cn, formatDate } from '@/lib/utils';
 import type { createCmsResourceApi } from '@/services/sdk/admin';
 import type { CmsResource } from '@/services/sdk/admin';
+import type { PaginatedResult } from '@/types';
+
+type CmsListCache = PaginatedResult<CmsResource>;
+type CmsListSnapshot = Array<[readonly unknown[], CmsListCache | undefined]>;
 
 type CmsApi = ReturnType<typeof createCmsResourceApi>;
 
@@ -168,23 +172,55 @@ export function CmsResourceListPage({
   );
 
   const listQueryKey = QUERY_KEYS.adminCms.resource(resourceKey, params);
+  const listRootKey = ['admin', 'cms', resourceKey] as const;
 
   const query = useQuery({
     queryKey: listQueryKey,
     queryFn: () => api.list(params),
+    staleTime: 30_000,
+    placeholderData: (prev) => prev,
   });
 
-  const invalidateList = () =>
-    queryClient.invalidateQueries({ queryKey: ['admin', 'cms', resourceKey] });
+  const invalidateList = () => queryClient.invalidateQueries({ queryKey: listRootKey });
 
   const removeMutation = useMutation({
     mutationFn: (id: string) => api.remove(id),
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: listRootKey });
+      const previous = queryClient.getQueriesData<CmsListCache>({
+        queryKey: listRootKey,
+      }) as CmsListSnapshot;
+      queryClient.setQueriesData<CmsListCache>({ queryKey: listRootKey }, (old) => {
+        if (!old) return old;
+        const data = old.data.filter((row) => row.id !== id);
+        if (data.length === old.data.length) return old;
+        const total = Math.max(0, old.meta.total - 1);
+        return {
+          ...old,
+          data,
+          meta: {
+            ...old.meta,
+            total,
+            totalPages: Math.max(1, Math.ceil(total / (old.meta.limit || 1))),
+          },
+        };
+      });
+      setSelectedIds((current) => current.filter((value) => value !== id));
+      return { previous };
+    },
+    onError: (error, _id, context) => {
+      if (context?.previous) {
+        for (const [key, data] of context.previous) {
+          queryClient.setQueryData(key, data);
+        }
+      }
+      toast.error(error instanceof AppError ? error.message : `Unable to delete ${itemLabel}`);
+    },
     onSuccess: () => {
-      void invalidateList();
       toast.success(`${itemLabel} deleted`);
     },
-    onError: (error) => {
-      toast.error(error instanceof AppError ? error.message : `Unable to delete ${itemLabel}`);
+    onSettled: () => {
+      void invalidateList();
     },
   });
 
@@ -193,9 +229,29 @@ export function CmsResourceListPage({
       if (editing) return api.update(editing.id, payload);
       return api.create(payload);
     },
-    onSuccess: () => {
+    onSuccess: (row) => {
+      const wasEdit = Boolean(editing);
+      queryClient.setQueriesData<CmsListCache>({ queryKey: listRootKey }, (old) => {
+        if (!old) return old;
+        const idx = old.data.findIndex((item) => item.id === row.id);
+        if (idx >= 0) {
+          const data = [...old.data];
+          data[idx] = { ...data[idx], ...row };
+          return { ...old, data };
+        }
+        const total = old.meta.total + 1;
+        return {
+          ...old,
+          data: [row, ...old.data],
+          meta: {
+            ...old.meta,
+            total,
+            totalPages: Math.max(1, Math.ceil(total / (old.meta.limit || 1))),
+          },
+        };
+      });
       void invalidateList();
-      toast.success(editing ? `${itemLabel} updated` : `${itemLabel} created`);
+      toast.success(wasEdit ? `${itemLabel} updated` : `${itemLabel} created`);
       setDialogOpen(false);
       setEditing(null);
       setForm(EMPTY_FORM);

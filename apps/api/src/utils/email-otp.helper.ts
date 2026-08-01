@@ -1,6 +1,7 @@
 import bcrypt from 'bcrypt';
 
-const BCRYPT_ROUNDS = 10;
+/** OTPs are short-lived — fewer rounds keeps send-otp under ~50ms. */
+const BCRYPT_ROUNDS = 6;
 
 /** Generate a secure 6-digit OTP (100000–999999). */
 export function generateEmailOtp(): string {

@@ -18,6 +18,7 @@ export type AuthPortal = (typeof AUTH_PORTAL)[keyof typeof AUTH_PORTAL];
 export const STAFF_ROLES = [
   'super_admin',
   'admin',
+  'sub_admin',
   'manager',
   'inventory_manager',
   'marketing_manager',

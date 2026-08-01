@@ -4,8 +4,12 @@ import { STORAGE_KEYS } from '@/constants/storage-keys';
 import { zustandStorage } from '@/lib/storage';
 import type { PaymentMethod, ShippingMethod } from '@/services/sdk';
 
+export type BuyNowItem = { variantId: string; quantity: number };
+
 interface CheckoutState {
   checkoutToken: string | null;
+  /** When set, checkout shows only these SKUs (Buy Now). Full bag checkout clears this. */
+  buyNowItems: BuyNowItem[] | null;
   billingSameAsShipping: boolean;
   selectedShippingAddressId: string | null;
   selectedBillingAddressId: string | null;
@@ -16,6 +20,7 @@ interface CheckoutState {
 
 interface CheckoutActions {
   setCheckoutToken: (token: string | null) => void;
+  setBuyNowItems: (items: BuyNowItem[] | null) => void;
   setBillingSameAsShipping: (value: boolean) => void;
   setSelectedShippingAddressId: (id: string | null) => void;
   setSelectedBillingAddressId: (id: string | null) => void;
@@ -29,6 +34,7 @@ export type CheckoutStore = CheckoutState & CheckoutActions;
 
 const initialState: CheckoutState = {
   checkoutToken: null,
+  buyNowItems: null,
   billingSameAsShipping: true,
   selectedShippingAddressId: null,
   selectedBillingAddressId: null,
@@ -43,6 +49,8 @@ export const useCheckoutStore = create<CheckoutStore>()(
       ...initialState,
 
       setCheckoutToken: (checkoutToken) => set({ checkoutToken }),
+
+      setBuyNowItems: (buyNowItems) => set({ buyNowItems }),
 
       setBillingSameAsShipping: (billingSameAsShipping) => set({ billingSameAsShipping }),
 
@@ -64,6 +72,7 @@ export const useCheckoutStore = create<CheckoutStore>()(
       storage: createJSONStorage(() => zustandStorage),
       partialize: (state) => ({
         checkoutToken: state.checkoutToken,
+        buyNowItems: state.buyNowItems,
         billingSameAsShipping: state.billingSameAsShipping,
         selectedShippingAddressId: state.selectedShippingAddressId,
         selectedBillingAddressId: state.selectedBillingAddressId,

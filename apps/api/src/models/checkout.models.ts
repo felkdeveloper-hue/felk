@@ -160,7 +160,7 @@ const checkoutSessionSchema = new Schema<CheckoutSessionDocument>(
     totals: { type: totalsSchema, default: () => ({}) },
     reservationIds: [{ type: Schema.Types.ObjectId, ref: 'StockReservation' }],
     reservationExpiresAt: { type: Date, default: null, index: true },
-    reservationTimeoutMinutes: { type: Number, default: 30 },
+    reservationTimeoutMinutes: { type: Number, default: 10 },
     expiresAt: { type: Date, default: null, index: true },
     validationIssues: { type: [Schema.Types.Mixed], default: [] } as never,
     metadata: { type: Schema.Types.Mixed, default: {} },

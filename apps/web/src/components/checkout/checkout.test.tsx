@@ -23,7 +23,7 @@ describe('checkoutApi integration', () => {
   });
 
   it('starts checkout and resumes duplicate sessions', async () => {
-    await expect(checkoutApi.start({ autoReserve: true })).rejects.toSatisfy((error: unknown) => {
+    await expect(checkoutApi.start({ autoReserve: false })).rejects.toSatisfy((error: unknown) => {
       return AppError.isAppError(error) && error.code === 'DUPLICATE_CHECKOUT';
     });
 

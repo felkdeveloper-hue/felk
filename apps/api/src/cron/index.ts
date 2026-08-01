@@ -4,15 +4,19 @@ import { AnalyticsEventLogModel } from '@/models/analytics.model.js';
 import { sweepPending, type RetrySweepDoc } from '@/services/retry-sweep.service.js';
 import { PRODUCT_STATUS, PRODUCT_VISIBILITY } from '@/constants/product.js';
 import { productService } from '@/services/product.service.js';
+import { reservationService } from '@/services/reservation.service.js';
+import { checkoutService } from '@/services/checkout.service.js';
 import { getCached, setCache, storefrontProductsCacheKey } from '@/utils/simple-cache.js';
 
 const EMAIL_SWEEP_INTERVAL_MS = 60_000;
 const ANALYTICS_SWEEP_INTERVAL_MS = 60_000;
+const RESERVATION_SWEEP_INTERVAL_MS = 60_000;
 /** Keep storefront product lists warm so Vercel SPAs do not hit a cold Mongo path. */
 const STOREFRONT_WARMUP_INTERVAL_MS = 4 * 60_000;
 
 let emailSweepTimer: ReturnType<typeof setInterval> | null = null;
 let analyticsSweepTimer: ReturnType<typeof setInterval> | null = null;
+let reservationSweepTimer: ReturnType<typeof setInterval> | null = null;
 let storefrontWarmupTimer: ReturnType<typeof setInterval> | null = null;
 
 async function runEmailSweep() {
@@ -78,6 +82,23 @@ async function runStorefrontWarmup() {
   }
 }
 
+async function runReservationSweep() {
+  try {
+    const [reservations, checkouts] = await Promise.all([
+      reservationService.expireDue({}),
+      checkoutService.expireDueSessions({}),
+    ]);
+    if (reservations.processed || checkouts.released) {
+      logger.info(
+        { reservations: reservations.processed, checkouts: checkouts.released },
+        'Cron: expired payment-window inventory holds',
+      );
+    }
+  } catch (err) {
+    logger.error({ err }, 'Reservation sweep error');
+  }
+}
+
 export function startCronJobs(): void {
   logger.info('Cron: starting retry sweep jobs');
 
@@ -89,6 +110,10 @@ export function startCronJobs(): void {
     void runAnalyticsSweep();
   }, ANALYTICS_SWEEP_INTERVAL_MS);
 
+  reservationSweepTimer = setInterval(() => {
+    void runReservationSweep();
+  }, RESERVATION_SWEEP_INTERVAL_MS);
+
   storefrontWarmupTimer = setInterval(() => {
     void runStorefrontWarmup();
   }, STOREFRONT_WARMUP_INTERVAL_MS);
@@ -96,15 +121,18 @@ export function startCronJobs(): void {
   // Run once shortly after startup
   setTimeout(() => void runEmailSweep(), 5_000);
   setTimeout(() => void runAnalyticsSweep(), 5_000);
+  setTimeout(() => void runReservationSweep(), 6_000);
   setTimeout(() => void runStorefrontWarmup(), 8_000);
 }
 
 export function stopCronJobs(): void {
   if (emailSweepTimer) clearInterval(emailSweepTimer);
   if (analyticsSweepTimer) clearInterval(analyticsSweepTimer);
+  if (reservationSweepTimer) clearInterval(reservationSweepTimer);
   if (storefrontWarmupTimer) clearInterval(storefrontWarmupTimer);
   emailSweepTimer = null;
   analyticsSweepTimer = null;
+  reservationSweepTimer = null;
   storefrontWarmupTimer = null;
   logger.info('Cron: retry sweep jobs stopped');
 }

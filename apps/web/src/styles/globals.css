@@ -1,4 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Figtree:ital,wght@0,300..900;1,300..900&family=Instrument+Serif:ital@0;1&family=Syne:wght@500;600;700;800&display=swap');
 @import 'tailwindcss';
 
 @custom-variant dark (&:where(.dark, .dark *));
@@ -460,6 +459,16 @@
   .mobile-press:active {
     transform: scale(0.97);
     opacity: 0.92;
+  }
+}
+
+html {
+  scroll-padding-top: 5.5rem;
+}
+
+@media (min-width: 1024px) {
+  html {
+    scroll-padding-top: 6.5rem;
   }
 }
 

@@ -5,10 +5,12 @@ import { Seo } from '@/components/common/seo';
 import {
   AddressPicker,
   CheckoutExpiryBanner,
+  CheckoutGuestAuthDialog,
   CheckoutNavigation,
   CheckoutOrderSummary,
   CheckoutValidationAlert,
 } from '@/components/checkout';
+import { CartItemRow, CartOrderSummary } from '@/components/cart';
 import { AuthErrorAlert } from '@/components/auth/auth-error-alert';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -23,11 +25,11 @@ import {
   useRefreshCheckoutMutation,
   useStartCheckoutMutation,
 } from '@/hooks/checkout';
-import { useCartStore, useCheckoutStore } from '@/store';
+import { useAuthStore, useCartStore, useCheckoutStore } from '@/store';
 import { trackCommerceEvent } from '@/lib/analytics';
 import { AppError } from '@/lib/errors';
 import { QUERY_KEYS } from '@/constants';
-import type { CustomerAddress } from '@/services/sdk';
+import { cartApi, type CustomerAddress } from '@/services/sdk';
 import { useQueryClient } from '@tanstack/react-query';
 
 export function CheckoutInformationPage() {
@@ -39,6 +41,14 @@ export function CheckoutInformationPage() {
   const [offline, setOffline] = useState(() =>
     typeof navigator !== 'undefined' ? !navigator.onLine : false,
   );
+  // Stay on the guest bridge (dialog + bag preview) until merge/address finish —
+  // setSession alone must not start checkout or unmount the dialog mid-flow.
+  const [guestBridgeOpen, setGuestBridgeOpen] = useState(false);
+
+  const hasHydrated = useAuthStore((state) => state.hasHydrated);
+  const accessToken = useAuthStore((state) => state.accessToken);
+  const isAuthed = Boolean(accessToken);
+  const guestCart = useCartStore((state) => state.cart);
 
   const billingSameAsShipping = useCheckoutStore((state) => state.billingSameAsShipping);
   const shippingAddressId = useCheckoutStore((state) => state.selectedShippingAddressId);
@@ -50,7 +60,7 @@ export function CheckoutInformationPage() {
 
   const startCheckout = useStartCheckoutMutation();
   const refreshCheckout = useRefreshCheckoutMutation();
-  const addressesQuery = useAddressesQuery();
+  const addressesQuery = useAddressesQuery(isAuthed);
   const { data: addresses } = addressesQuery;
   const sessionQuery = useCheckoutSessionQuery();
   const session = sessionQuery.data;
@@ -67,15 +77,26 @@ export function CheckoutInformationPage() {
   }, []);
 
   const beginCheckout = async () => {
-    const storeCart = useCartStore.getState().cart;
-    if (storeCart && storeCart.items.length === 0) {
+    let storeCart = useCartStore.getState().cart;
+    if (!storeCart?.items?.length) {
+      try {
+        const fresh = await cartApi.get();
+        useCartStore.getState().setCart(fresh);
+        queryClient.setQueryData(QUERY_KEYS.cart.current(), fresh);
+        storeCart = fresh;
+      } catch {
+        /* use local snapshot */
+      }
+    }
+
+    if (!storeCart?.items?.length) {
       void navigate({ to: ROUTES.cart });
       return;
     }
 
     const hasUnavailable =
-      storeCart?.validation?.isValid === false ||
-      storeCart?.items.some(
+      storeCart.validation?.isValid === false ||
+      storeCart.items.some(
         (item) =>
           item.inStock === false ||
           item.stockStatus === 'out_of_stock' ||
@@ -89,10 +110,12 @@ export function CheckoutInformationPage() {
     const cachedAddresses =
       addresses ?? queryClient.getQueryData<CustomerAddress[]>(QUERY_KEYS.customers.addresses());
     const defaultShipping = cachedAddresses?.find((address) => address.isDefaultShipping);
+    const buyNowItems = useCheckoutStore.getState().buyNowItems;
     try {
       await startCheckout.mutateAsync({
         shippingAddressId: defaultShipping?.id,
-        autoReserve: true,
+        autoReserve: false,
+        ...(buyNowItems?.length ? { items: buyNowItems } : {}),
       });
       trackCommerceEvent('checkout_started');
     } catch (error) {
@@ -112,14 +135,23 @@ export function CheckoutInformationPage() {
     }
   };
 
-  // Start checkout immediately — do not block on addresses (they load in parallel).
-  // Default shipping id is attached when addresses are already cached.
+  // Open guest bridge when arriving logged out; clear stale checkout tokens.
   useEffect(() => {
-    if (startedRef.current) return;
-    if (useCheckoutStore.getState().checkoutToken) {
-      startedRef.current = true;
-      return;
+    if (!hasHydrated) return;
+    if (!isAuthed) {
+      setGuestBridgeOpen(true);
+      if (useCheckoutStore.getState().checkoutToken) {
+        useCheckoutStore.getState().resetCheckoutUi();
+      }
+      startedRef.current = false;
     }
+  }, [hasHydrated, isAuthed]);
+
+  // Start/refresh checkout from the live cart after guest bridge finishes.
+  // Always call start (resume path refreshes lines) — never reuse a stale token alone.
+  useEffect(() => {
+    if (!hasHydrated || !isAuthed || guestBridgeOpen) return;
+    if (startedRef.current) return;
 
     startedRef.current = true;
 
@@ -130,8 +162,13 @@ export function CheckoutInformationPage() {
         /* surfaced via mutation state */
       }
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- bootstrap once per mount/token clear
-  }, [navigate, startCheckout]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- bootstrap once per ready auth
+  }, [hasHydrated, isAuthed, guestBridgeOpen, navigate, startCheckout]);
+
+  const handleGuestAuthenticated = () => {
+    startedRef.current = false;
+    setGuestBridgeOpen(false);
+  };
 
   // Stale completed/cancelled tokens: clear and start a fresh session automatically.
   useEffect(() => {
@@ -210,6 +247,7 @@ export function CheckoutInformationPage() {
     if (!billingId) return;
 
     // Apply addresses + fixed standard shipping in one refresh, then go to payment.
+    // Do not extend/create inventory reservations here — that happens at Place Order.
     refreshCheckout.mutate(
       {
         checkoutRef: session.checkoutToken,
@@ -218,20 +256,19 @@ export function CheckoutInformationPage() {
           billingAddressId: billingId,
           shippingMethod: 'standard',
           deliveryMethod: 'delivery',
-          extendReservation: true,
         },
       },
       {
         onSuccess: () => {
           useCheckoutStore.getState().setSelectedShippingMethod('standard');
-          void navigate({ to: ROUTES.checkoutShipping });
+          void navigate({ to: ROUTES.checkoutPayment });
         },
       },
     );
   };
 
   const handleExtend = () => {
-    if (!session?.checkoutToken) return;
+    if (!session?.checkoutToken || !session.reservationIds?.length) return;
     refreshCheckout.mutate({
       checkoutRef: session.checkoutToken,
       payload: { extendReservation: true },
@@ -244,6 +281,62 @@ export function CheckoutInformationPage() {
     void navigate({ to: ROUTES.checkout, replace: true });
     window.location.reload();
   };
+
+  if (hasHydrated && guestBridgeOpen) {
+    return (
+      <>
+        <Seo title="Checkout" description="Continue checkout with your email." noIndex />
+        <CheckoutGuestAuthDialog open onAuthenticated={handleGuestAuthenticated} />
+
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <section aria-labelledby="checkout-information-heading" className="space-y-8">
+            <div>
+              <h2 id="checkout-information-heading" className="text-lg font-semibold">
+                Customer information
+              </h2>
+              <p className="text-muted-foreground mt-1 text-sm">
+                Confirm your email in the popup to continue — shipping details unlock after sign-in.
+              </p>
+            </div>
+
+            <div className="border-border bg-muted/30 space-y-3 rounded-xl border border-dashed p-5">
+              <p className="text-sm font-medium">Contact & shipping</p>
+              <p className="text-muted-foreground text-sm">
+                Email, password / OTP, and delivery address will appear here after you continue in
+                the popup.
+              </p>
+            </div>
+
+            {guestCart?.items?.length ? (
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold">Your bag ({guestCart.items.length})</h3>
+                <div className="border-border bg-card divide-border divide-y overflow-hidden rounded-xl border">
+                  {guestCart.items.map((item) => (
+                    <CartItemRow
+                      key={item.id}
+                      item={item}
+                      compact
+                      className="border-0 px-4 last:border-0 sm:px-5"
+                    />
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <p className="text-muted-foreground text-sm">Loading your bag…</p>
+            )}
+          </section>
+
+          <div className="lg:sticky lg:top-24 lg:self-start">
+            {guestCart?.totals ? (
+              <CartOrderSummary totals={guestCart.totals} validation={guestCart.validation} />
+            ) : (
+              <Skeleton className="h-64 w-full" />
+            )}
+          </div>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
@@ -324,7 +417,7 @@ export function CheckoutInformationPage() {
               <CheckoutNavigation
                 showBack={false}
                 onNext={handleContinue}
-                nextLabel="Continue to shipping"
+                nextLabel="Continue to payment"
                 nextDisabled={
                   !sessionReady ||
                   !shippingAddressId ||
@@ -356,7 +449,7 @@ export function CheckoutInformationPage() {
 
         {session ? (
           <div className="lg:sticky lg:top-24 lg:self-start">
-            <CheckoutOrderSummary session={session} />
+            <CheckoutOrderSummary session={session} editable />
           </div>
         ) : sessionPending ? (
           <div className="lg:sticky lg:top-24 lg:self-start" aria-busy="true">

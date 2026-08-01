@@ -67,6 +67,7 @@ export interface CheckoutSession {
   coupon?: Record<string, unknown>;
   giftCard?: Record<string, unknown>;
   totals: CheckoutTotals;
+  reservationIds?: string[];
   reservationExpiresAt?: string | null;
   expiresAt?: string | null;
   validationIssues?: CheckoutValidationIssue[];
@@ -83,6 +84,8 @@ export interface CheckoutStartPayload {
   couponCode?: string;
   giftCardCode?: string;
   autoReserve?: boolean;
+  /** Buy Now — only these variants appear in checkout. */
+  items?: Array<{ variantId: string; quantity: number }>;
 }
 
 export interface CheckoutRefreshPayload {

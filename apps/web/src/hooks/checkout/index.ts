@@ -4,6 +4,7 @@ export {
   useCancelCheckoutMutation,
   useCheckoutSessionQuery,
   useRefreshCheckoutMutation,
+  useReleaseCheckoutMutation,
   useReserveCheckoutMutation,
   useStartCheckoutMutation,
   useValidateCheckoutMutation,

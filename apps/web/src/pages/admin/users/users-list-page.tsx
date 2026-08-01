@@ -20,6 +20,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { QUERY_KEYS } from '@/constants';
+import { ADMIN_ROLE_OPTIONS, roleSummary } from '@/constants/admin-role-guide';
 import { useAdminPermissions } from '@/hooks/admin';
 import { AppError } from '@/lib/errors';
 import { cn, formatDate } from '@/lib/utils';
@@ -29,17 +30,7 @@ const actionBtn = 'admin-btn';
 const actionSecondary = 'admin-btn-secondary';
 const actionDanger = 'admin-btn-danger';
 
-const ROLE_OPTIONS = [
-  { label: 'Customer', value: 'customer' },
-  { label: 'Admin', value: 'admin' },
-  { label: 'Super admin', value: 'super_admin' },
-  { label: 'Manager', value: 'manager' },
-  { label: 'Support', value: 'customer_support' },
-  { label: 'Finance', value: 'finance' },
-  { label: 'Inventory manager', value: 'inventory_manager' },
-  { label: 'Marketing manager', value: 'marketing_manager' },
-  { label: 'Warehouse staff', value: 'warehouse_staff' },
-];
+const ROLE_OPTIONS = ADMIN_ROLE_OPTIONS.map(({ label, value }) => ({ label, value }));
 
 const STATUS_OPTIONS = [
   { label: 'Active', value: 'active' },
@@ -65,6 +56,14 @@ export function UsersListPage() {
   const [passwordTarget, setPasswordTarget] = useState<AdminUserRow | null>(null);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createForm, setCreateForm] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    password: '',
+    roleKey: 'sub_admin',
+  });
 
   const params = useMemo(
     () => ({
@@ -157,10 +156,53 @@ export function UsersListPage() {
     },
   });
 
+  const createMutation = useMutation({
+    mutationFn: () =>
+      usersApi.create({
+        email: createForm.email.trim(),
+        password: createForm.password,
+        firstName: createForm.firstName.trim(),
+        lastName: createForm.lastName.trim() || undefined,
+        roleKey: createForm.roleKey,
+        status: 'active',
+      }),
+    onSuccess: (row) => {
+      toast.success(`Created ${displayName(row)}`);
+      setCreateOpen(false);
+      setCreateForm({
+        firstName: '',
+        lastName: '',
+        email: '',
+        password: '',
+        roleKey: 'sub_admin',
+      });
+      invalidateUsers();
+    },
+    onError: (error) => {
+      toast.error(AppError.isAppError(error) ? error.message : 'Unable to create user');
+    },
+  });
+
   const closePasswordDialog = () => {
     setPasswordTarget(null);
     setNewPassword('');
     setConfirmPassword('');
+  };
+
+  const submitCreate = () => {
+    if (!createForm.firstName.trim()) {
+      toast.error('First name is required');
+      return;
+    }
+    if (!createForm.email.trim()) {
+      toast.error('Email is required');
+      return;
+    }
+    if (createForm.password.length < 8) {
+      toast.error('Password must be at least 8 characters');
+      return;
+    }
+    createMutation.mutate();
   };
 
   const submitPassword = () => {
@@ -184,7 +226,14 @@ export function UsersListPage() {
     <PageMotion>
       <AdminPageHeader
         title="Users"
-        description="Manage accounts, set passwords, change roles/status, or delete users. Stored passwords stay hashed and cannot be viewed."
+        description="Create staff or customers, assign limited roles (sub-admin), set passwords, or delete users. Passwords stay hashed."
+        actions={
+          userPerms.create ? (
+            <Button type="button" onClick={() => setCreateOpen(true)}>
+              Create user
+            </Button>
+          ) : null
+        }
       />
 
       <div className="mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -445,6 +494,102 @@ export function UsersListPage() {
             </Button>
             <Button type="button" loading={setPasswordMutation.isPending} onClick={submitPassword}>
               Save password
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Create user</DialogTitle>
+            <DialogDescription>
+              Create a customer or staff account and assign a role. Sub-admin is limited — they
+              cannot manage users, roles, refunds, or system settings.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium" htmlFor="create-first-name">
+                  First name
+                </label>
+                <input
+                  id="create-first-name"
+                  className="w-full rounded-md border border-[var(--admin-line)] bg-[var(--admin-panel-soft)] px-3 py-2 text-sm"
+                  value={createForm.firstName}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, firstName: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium" htmlFor="create-last-name">
+                  Last name
+                </label>
+                <input
+                  id="create-last-name"
+                  className="w-full rounded-md border border-[var(--admin-line)] bg-[var(--admin-panel-soft)] px-3 py-2 text-sm"
+                  value={createForm.lastName}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, lastName: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium" htmlFor="create-email">
+                Email
+              </label>
+              <input
+                id="create-email"
+                type="email"
+                className="w-full rounded-md border border-[var(--admin-line)] bg-[var(--admin-panel-soft)] px-3 py-2 text-sm"
+                value={createForm.email}
+                onChange={(e) => setCreateForm((f) => ({ ...f, email: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium" htmlFor="create-password">
+                Temporary password
+              </label>
+              <PasswordField
+                id="create-password"
+                autoComplete="new-password"
+                value={createForm.password}
+                onChange={(e) => setCreateForm((f) => ({ ...f, password: e.target.value }))}
+              />
+              <p className="text-muted-foreground text-xs">
+                Min 8 chars with upper, lower, number, and special character.
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium" htmlFor="create-role">
+                Role
+              </label>
+              <select
+                id="create-role"
+                className="w-full rounded-md border border-[var(--admin-line)] bg-[var(--admin-panel-soft)] px-3 py-2 text-sm"
+                value={createForm.roleKey}
+                onChange={(e) => setCreateForm((f) => ({ ...f, roleKey: e.target.value }))}
+              >
+                {ROLE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              {roleSummary(createForm.roleKey) ? (
+                <p className="rounded-md border border-teal-500/20 bg-teal-500/5 px-3 py-2 text-xs text-[var(--admin-ink)]">
+                  {roleSummary(createForm.roleKey)}
+                </p>
+              ) : null}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="button" loading={createMutation.isPending} onClick={submitCreate}>
+              Create user
             </Button>
           </DialogFooter>
         </DialogContent>

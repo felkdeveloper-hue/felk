@@ -99,6 +99,7 @@ export type PermissionKey = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
 export const STAFF_ROLES = [
   'super_admin',
   'admin',
+  'sub_admin',
   'manager',
   'inventory_manager',
   'marketing_manager',

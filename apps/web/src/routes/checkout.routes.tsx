@@ -1,24 +1,20 @@
-import { createRoute } from '@tanstack/react-router';
-import { ProtectedRoute } from '@/guards';
+import { createRoute, redirect } from '@tanstack/react-router';
 import { CheckoutLayout } from '@/layouts/checkout-layout';
 import {
   CheckoutCancelPage,
   CheckoutInformationPage,
   CheckoutPaymentPage,
   CheckoutReviewPage,
-  CheckoutShippingPage,
   CheckoutSuccessPage,
 } from '@/pages/checkout';
+import { ROUTES } from '@/constants';
 import { rootRoute } from './root-route';
 
 export const checkoutLayoutRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/checkout',
-  component: () => (
-    <ProtectedRoute>
-      <CheckoutLayout />
-    </ProtectedRoute>
-  ),
+  // Guest checkout: auth happens inline on the Information step (no login redirect).
+  component: () => <CheckoutLayout />,
 });
 
 export const checkoutIndexRoute = createRoute({
@@ -27,10 +23,13 @@ export const checkoutIndexRoute = createRoute({
   component: CheckoutInformationPage,
 });
 
+/** Legacy shipping step — permanently redirect to payment. */
 export const checkoutShippingRoute = createRoute({
   getParentRoute: () => checkoutLayoutRoute,
   path: 'shipping',
-  component: CheckoutShippingPage,
+  beforeLoad: () => {
+    throw redirect({ to: ROUTES.checkoutPayment });
+  },
 });
 
 export const checkoutPaymentRoute = createRoute({

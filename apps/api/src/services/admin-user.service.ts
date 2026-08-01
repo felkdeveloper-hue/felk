@@ -51,6 +51,19 @@ export const adminSetPasswordSchema = z.object({
   password: passwordSchema,
 });
 
+const assignableRoleKeySchema = z.enum([
+  ROLES.SUPER_ADMIN,
+  ROLES.ADMIN,
+  ROLES.SUB_ADMIN,
+  ROLES.MANAGER,
+  ROLES.INVENTORY_MANAGER,
+  ROLES.MARKETING_MANAGER,
+  ROLES.CUSTOMER_SUPPORT,
+  ROLES.FINANCE,
+  ROLES.WAREHOUSE_STAFF,
+  ROLES.CUSTOMER,
+]);
+
 export const adminUpdateUserSchema = z.object({
   status: z
     .enum([
@@ -61,20 +74,42 @@ export const adminUpdateUserSchema = z.object({
       USER_STATUS.INVITED,
     ])
     .optional(),
-  roleKey: z
-    .enum([
-      ROLES.SUPER_ADMIN,
-      ROLES.ADMIN,
-      ROLES.MANAGER,
-      ROLES.INVENTORY_MANAGER,
-      ROLES.MARKETING_MANAGER,
-      ROLES.CUSTOMER_SUPPORT,
-      ROLES.FINANCE,
-      ROLES.WAREHOUSE_STAFF,
-      ROLES.CUSTOMER,
-    ])
-    .optional(),
+  roleKey: assignableRoleKeySchema.optional(),
 });
+
+export const adminCreateUserSchema = z.object({
+  email: z
+    .string()
+    .email()
+    .transform((v) => v.trim().toLowerCase()),
+  password: passwordSchema,
+  firstName: z.string().trim().min(1).max(100),
+  lastName: z.string().trim().max(100).optional().default(''),
+  phone: z.string().trim().max(40).optional(),
+  roleKey: assignableRoleKeySchema.default(ROLES.CUSTOMER),
+  status: z
+    .enum([USER_STATUS.ACTIVE, USER_STATUS.PENDING_VERIFICATION, USER_STATUS.INVITED])
+    .optional()
+    .default(USER_STATUS.ACTIVE),
+});
+
+export type AdminCreateUserInput = z.infer<typeof adminCreateUserSchema>;
+
+/** Roles only a super_admin may assign. */
+const PRIVILEGED_ROLES: RoleKey[] = [ROLES.SUPER_ADMIN, ROLES.ADMIN];
+
+async function assertCanAssignRole(actorUserId: string, roleKey: RoleKey) {
+  if (!PRIVILEGED_ROLES.includes(roleKey)) return;
+  const actor = await UserModel.findOne({ _id: actorUserId, isDeleted: false })
+    .select('roleKey')
+    .lean();
+  if (!actor || actor.roleKey !== ROLES.SUPER_ADMIN) {
+    throw ApiError.forbidden(
+      'Only a super admin can assign Admin or Super admin roles',
+      'ROLE_ASSIGN_FORBIDDEN',
+    );
+  }
+}
 
 export interface AdminActorMeta {
   userId: string;
@@ -311,6 +346,103 @@ export class AdminUserService {
     return { message: 'Password updated', userId: user._id.toString() };
   }
 
+  async create(input: AdminCreateUserInput, actor: AdminActorMeta) {
+    await assertCanAssignRole(actor.userId, input.roleKey);
+
+    const existing = await UserModel.findOne({ email: input.email, isDeleted: false }).lean();
+    if (existing) {
+      throw ApiError.conflict('A user with this email already exists', undefined, 'EMAIL_TAKEN');
+    }
+
+    let role = await findRoleByKey(input.roleKey);
+    if (!role) {
+      // Auto-upsert from ROLE_SEED so new roles (e.g. sub_admin) work without a manual seed.
+      const { ROLE_SEED } = await import('@/constants/rbac-seed.js');
+      const { PermissionModel, RoleModel } = await import('@/models/index.js');
+      const seed = ROLE_SEED.find((r) => r.key === input.roleKey);
+      if (!seed) {
+        throw ApiError.badRequest(
+          `Role "${input.roleKey}" is not seeded. Run seed:auth first.`,
+          undefined,
+          'ROLE_MISSING',
+        );
+      }
+      const permissionDocs = await PermissionModel.find({
+        key: { $in: seed.permissions },
+      }).select('_id');
+      await RoleModel.updateOne(
+        { key: seed.key },
+        {
+          $set: {
+            key: seed.key,
+            name: seed.name,
+            description: seed.description,
+            permissionIds: permissionDocs.map((p) => p._id),
+            isSystem: true,
+            status: 'active',
+            isDeleted: false,
+            deletedAt: null,
+          },
+        },
+        { upsert: true },
+      );
+      role = await findRoleByKey(input.roleKey);
+      if (!role) {
+        throw ApiError.badRequest('Role not found after seed', undefined, 'ROLE_MISSING');
+      }
+    }
+
+    assertPasswordStrength(input.password);
+    const passwordHash = await hashPassword(input.password);
+    const status = input.status ?? USER_STATUS.ACTIVE;
+
+    const firstName = input.firstName.trim();
+    const lastName = (input.lastName ?? '').trim() || '-';
+
+    const user = await UserModel.create({
+      email: input.email,
+      passwordHash,
+      passwordHistory: [],
+      firstName,
+      lastName,
+      phone: input.phone?.trim() || null,
+      roleId: role._id,
+      roleKey: input.roleKey,
+      status,
+      emailVerifiedAt: status === USER_STATUS.ACTIVE ? new Date() : null,
+    });
+
+    if (input.roleKey === ROLES.CUSTOMER) {
+      const { customerService } = await import('@/services/customer.service.js');
+      await customerService.ensureForUser({
+        id: user._id.toString(),
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        phone: user.phone,
+      });
+    }
+
+    await writeAuditLog({
+      action: AUDIT_ACTIONS.USER_REGISTERED,
+      resourceType: 'user',
+      resourceId: user._id.toString(),
+      actorUserId: actor.userId,
+      ip: actor.ip,
+      requestId: actor.requestId,
+      metadata: {
+        email: user.email,
+        roleKey: user.roleKey,
+        createdByAdmin: true,
+      },
+    });
+
+    return mapUserRow(user.toObject(), {
+      cartItemCount: 0,
+      purchasedItemCount: 0,
+    });
+  }
+
   async update(
     userId: string,
     input: { status?: UserStatus; roleKey?: RoleKey },
@@ -335,6 +467,7 @@ export class AdminUserService {
     };
 
     if (input.roleKey && input.roleKey !== user.roleKey) {
+      await assertCanAssignRole(actor.userId, input.roleKey);
       const role = await findRoleByKey(input.roleKey);
       if (!role) {
         throw ApiError.badRequest('Role not found', undefined, 'ROLE_MISSING');

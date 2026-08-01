@@ -42,28 +42,17 @@ async function createAndSendOtp(email: string, userId?: string): Promise<OtpIssu
     expiresAt: addMinutes(new Date(), AUTH_LIMITS.OTP_EXPIRY_MINUTES),
     attempts: 0,
     verified: false,
+    purpose: 'email_verification',
     userId: user._id,
   });
 
-  let delivered = false;
-  try {
-    await emailService.sendVerificationOTP(email, otp, {
-      name: user.firstName,
-      expiryMinutes: AUTH_LIMITS.OTP_EXPIRY_MINUTES,
-    });
-    delivered = true;
-  } catch (err) {
-    // Keep the OTP so registration / verify can continue; delivery can be retried via resend.
-    logger.error({ err, email }, 'OTP email delivery failed — code stored for verify/resend');
-  }
+  emailService.enqueueVerificationOTP(email, otp, {
+    name: user.firstName,
+    expiryMinutes: AUTH_LIMITS.OTP_EXPIRY_MINUTES,
+  });
+  const delivered = emailService.isConfigured();
 
-  // Always print the OTP locally so testing is not blocked when SMTP rejects credentials
-  // or the message lands in Spam/Promotions.
-  if (process.env.NODE_ENV !== 'production') {
-    logger.warn({ email, otp, delivered }, 'DEV: verification OTP (check this if inbox is empty)');
-  }
-
-  await writeAuditLog({
+  void writeAuditLog({
     action: AUDIT_ACTIONS.EMAIL_VERIFICATION_SENT,
     resourceType: 'user',
     resourceId: user._id.toString(),

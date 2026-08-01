@@ -93,46 +93,86 @@ export class CustomerService {
     const existing = await this.getByUserId(user.id);
     if (existing) return existing;
 
+    // Orphan customer from a prior partial signup — reclaim instead of E11000.
+    const byEmail = await CustomerModel.findOne({
+      email: user.email.toLowerCase(),
+      isDeleted: false,
+    });
+    if (byEmail) {
+      if (!byEmail.userId || byEmail.userId.toString() !== user.id) {
+        byEmail.userId = new Types.ObjectId(user.id);
+        byEmail.firstName = user.firstName;
+        byEmail.lastName = user.lastName;
+        if (user.phone) byEmail.phone = user.phone;
+        byEmail.status = CUSTOMER_STATUS.ACTIVE;
+        await byEmail.save();
+      }
+      return byEmail;
+    }
+
     const dbUser = await UserModel.findById(user.id);
     let code = generateReferralCode(user.email.split('@')[0]);
     while (await CustomerModel.exists({ referralCode: code })) {
       code = generateReferralCode();
     }
 
-    const customer = await CustomerModel.create({
-      userId: user.id,
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      phone: user.phone ?? dbUser?.phone ?? null,
-      profilePhotoUrl: dbUser?.avatarUrl ?? null,
-      status: CUSTOMER_STATUS.ACTIVE,
-      referralCode: code,
-      loyaltyTierKey: LOYALTY_TIER.SILVER,
-      preferences: {
-        language: 'en',
-        currency: 'LKR',
-        timezone: 'Asia/Colombo',
-        newsletter: false,
-        sms: false,
-        pushNotifications: true,
-        marketingEmails: false,
-        darkMode: false,
-      },
-    });
+    try {
+      const customer = await CustomerModel.create({
+        userId: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        phone: user.phone ?? dbUser?.phone ?? null,
+        profilePhotoUrl: dbUser?.avatarUrl ?? null,
+        status: CUSTOMER_STATUS.ACTIVE,
+        referralCode: code,
+        loyaltyTierKey: LOYALTY_TIER.SILVER,
+        preferences: {
+          language: 'en',
+          currency: 'LKR',
+          timezone: 'Asia/Colombo',
+          newsletter: false,
+          sms: false,
+          pushNotifications: true,
+          marketingEmails: false,
+          darkMode: false,
+        },
+      });
 
-    await writeAuditLog({
-      action: CUSTOMER_AUDIT.CUSTOMER_CREATED,
-      resourceType: 'customers',
-      resourceId: customer._id.toString(),
-      actorUserId: actor?.userId ?? user.id,
-      ip: actor?.ip,
-      requestId: actor?.requestId,
-      after: toPlain(customer),
-      metadata: { source: 'ensureForUser' },
-    });
+      await writeAuditLog({
+        action: CUSTOMER_AUDIT.CUSTOMER_CREATED,
+        resourceType: 'customers',
+        resourceId: customer._id.toString(),
+        actorUserId: actor?.userId ?? user.id,
+        ip: actor?.ip,
+        requestId: actor?.requestId,
+        after: toPlain(customer),
+        metadata: { source: 'ensureForUser' },
+      });
 
-    return customer;
+      return customer;
+    } catch (err) {
+      const codeNum =
+        err && typeof err === 'object' && 'code' in err
+          ? Number((err as { code?: unknown }).code)
+          : NaN;
+      if (
+        codeNum === 11000 ||
+        (err instanceof Error && /E11000|duplicate key/i.test(err.message))
+      ) {
+        const recovered =
+          (await this.getByUserId(user.id)) ??
+          (await CustomerModel.findOne({ email: user.email.toLowerCase(), isDeleted: false }));
+        if (recovered) {
+          if (!recovered.userId || recovered.userId.toString() !== user.id) {
+            recovered.userId = new Types.ObjectId(user.id);
+            await recovered.save();
+          }
+          return recovered;
+        }
+      }
+      throw err;
+    }
   }
 
   async assertOwnOrAdmin(

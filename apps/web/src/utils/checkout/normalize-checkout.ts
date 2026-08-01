@@ -96,6 +96,9 @@ export function normalizeCheckoutSession(raw: unknown): CheckoutSession {
     coupon: asRecord(record.coupon),
     giftCard: asRecord(record.giftCard),
     totals,
+    reservationIds: Array.isArray(record.reservationIds)
+      ? record.reservationIds.map((id) => String(id))
+      : undefined,
     reservationExpiresAt:
       typeof record.reservationExpiresAt === 'string'
         ? record.reservationExpiresAt

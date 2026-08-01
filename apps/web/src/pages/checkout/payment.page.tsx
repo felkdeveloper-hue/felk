@@ -45,41 +45,44 @@ export function CheckoutPaymentPage() {
 
   const handleContinue = () => {
     if (!session?.checkoutToken || !paymentMethod) return;
-    // Navigate immediately; extend reservation in the background to avoid a blocking round-trip.
+    // No inventory hold on this step — reserve happens at Place Order.
     void navigate({ to: ROUTES.checkoutReview });
-    refreshCheckout.mutate({
-      checkoutRef: session.checkoutToken,
-      payload: { extendReservation: true },
-    });
   };
 
   const handleExtend = () => {
-    if (!session?.checkoutToken) return;
+    if (!session?.checkoutToken || !session.reservationIds?.length) return;
     refreshCheckout.mutate({
       checkoutRef: session.checkoutToken,
       payload: { extendReservation: true },
     });
   };
-
-  if (sessionQuery.isLoading && !session) {
-    return (
-      <>
-        <Seo title="Payment" description="Choose a payment method." noIndex />
-        <Skeleton className="h-64 w-full" aria-busy="true" />
-      </>
-    );
-  }
 
   if (sessionQuery.error) {
     return (
       <>
         <Seo title="Payment" description="Choose a payment method." noIndex />
-        <AuthErrorAlert error={sessionQuery.error} onRetry={() => sessionQuery.refetch()} />
+        <AuthErrorAlert error={sessionQuery.error} onRetry={() => void sessionQuery.refetch()} />
       </>
     );
   }
 
-  if (!session) return null;
+  // Never render a blank page — isLoading can be false while the query is still pending/disabled.
+  if (!session) {
+    return (
+      <>
+        <Seo title="Payment" description="Choose a payment method." noIndex />
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]" aria-busy="true">
+          <div className="space-y-4">
+            <Skeleton className="h-8 w-48" />
+            <Skeleton className="h-4 w-72" />
+            <Skeleton className="h-40 w-full" />
+            <Skeleton className="h-40 w-full" />
+          </div>
+          <Skeleton className="h-64 w-full" />
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
@@ -109,7 +112,7 @@ export function CheckoutPaymentPage() {
             />
 
             <CheckoutNavigation
-              backTo={ROUTES.checkoutShipping}
+              backTo={ROUTES.checkout}
               onNext={handleContinue}
               nextLabel="Review order"
               nextDisabled={!paymentMethod}

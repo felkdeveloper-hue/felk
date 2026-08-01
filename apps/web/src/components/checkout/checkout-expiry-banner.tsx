@@ -18,8 +18,12 @@ export function CheckoutExpiryBanner({
   onRestart,
   isExtending,
 }: CheckoutExpiryBannerProps) {
-  const reservationExpired = isExpired(session.reservationExpiresAt);
-  const sessionExpired = session.status === 'expired' || isExpired(session.expiresAt);
+  const hasReservationHold = Boolean(session.reservationIds?.length);
+  const reservationExpired = hasReservationHold && isExpired(session.reservationExpiresAt);
+  // Session expiry only applies after a payment hold existed (or status is expired).
+  const sessionExpired =
+    session.status === 'expired' ||
+    (hasReservationHold && isExpired(session.expiresAt) && isExpired(session.reservationExpiresAt));
   const [reservationRemaining, setReservationRemaining] = useState(() =>
     msUntilExpiry(session.reservationExpiresAt),
   );

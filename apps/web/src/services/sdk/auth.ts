@@ -82,4 +82,66 @@ export const authApi = {
     const raw = await http.get<unknown>('/auth/me');
     return normalizeAuthUser(raw);
   },
+
+  /** Guest checkout — email lookup (exists / verified). */
+  checkoutEmailStatus(email: string): Promise<{ exists: boolean; verified: boolean }> {
+    return http.post<{ exists: boolean; verified: boolean }>(
+      '/auth/checkout/email-status',
+      { email },
+      { skipAuthRefresh: true, timeout: 12_000 },
+    );
+  },
+
+  checkoutSendOtp(email: string): Promise<MessageResult & { devVerificationCode?: string }> {
+    return http.post<MessageResult & { devVerificationCode?: string }>(
+      '/auth/checkout/send-otp',
+      { email },
+      { skipAuthRefresh: true, timeout: 12_000 },
+    );
+  },
+
+  async checkoutVerifyOtp(
+    email: string,
+    otp: string,
+  ): Promise<
+    | (AuthSession & { mode: 'login' })
+    | { mode: 'signup'; signupToken: string; email: string; expiresIn: number; message: string }
+  > {
+    const raw = await http.post<{
+      mode?: string;
+      signupToken?: string;
+      email?: string;
+      expiresIn?: number;
+      message?: string;
+      accessToken?: string;
+      refreshToken?: string;
+      user?: unknown;
+    }>('/auth/checkout/verify-otp', { email, otp }, { skipAuthRefresh: true, timeout: 15_000 });
+
+    if (raw.mode === 'signup' && raw.signupToken) {
+      return {
+        mode: 'signup',
+        signupToken: raw.signupToken,
+        email: raw.email ?? email,
+        expiresIn: raw.expiresIn ?? 900,
+        message: raw.message ?? 'Email verified',
+      };
+    }
+
+    return { mode: 'login', ...normalizeAuthSession(raw) };
+  },
+
+  async checkoutCompleteSignup(payload: {
+    signupToken: string;
+    password: string;
+    firstName: string;
+    lastName: string;
+    phone?: string;
+  }): Promise<AuthSession> {
+    const raw = await http.post<unknown>('/auth/checkout/complete-signup', payload, {
+      skipAuthRefresh: true,
+      timeout: 20_000,
+    });
+    return normalizeAuthSession(raw);
+  },
 };

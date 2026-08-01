@@ -49,7 +49,7 @@ export function PublicLayout() {
         <StorefrontHeader />
         <main
           id="main-content"
-          className="safe-mobile-chrome flex-1 focus:outline-none lg:pb-0"
+          className="safe-mobile-chrome flex-1 scroll-pt-20 focus:outline-none lg:scroll-pt-28 lg:pb-0"
           tabIndex={-1}
         >
           <Outlet />

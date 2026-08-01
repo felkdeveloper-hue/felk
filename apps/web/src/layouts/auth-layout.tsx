@@ -3,17 +3,16 @@ import { ArrowLeft } from 'lucide-react';
 import { ROUTES } from '@/constants';
 import { Image } from '@/components/media/image';
 
-const AUTH_PANEL_IMAGE =
-  'https://images.unsplash.com/photo-1496747611176-843222e1e57c?auto=format&fit=crop&w=1600&h=2000&q=85';
+const AUTH_PANEL_IMAGE = '/images/auth-panel.webp';
 
 /** Split fashion panel + form shell for login/register/password-reset flows. */
 export function AuthLayout() {
   return (
     <div className="bg-background text-foreground grid min-h-svh lg:grid-cols-2">
-      <aside className="relative hidden overflow-hidden lg:block">
+      <aside className="relative hidden overflow-hidden bg-[#141414] lg:block">
         <Image
           src={AUTH_PANEL_IMAGE}
-          alt="FE fashion editorial"
+          alt="Fashion Edge editorial"
           className="absolute inset-0 h-full w-full object-cover"
           containerClassName="absolute inset-0"
           loading="eager"
@@ -45,7 +44,7 @@ export function AuthLayout() {
       </aside>
 
       <div className="relative flex min-h-svh flex-col">
-        <div className="relative h-44 overflow-hidden lg:hidden">
+        <div className="relative h-44 overflow-hidden bg-[#141414] lg:hidden">
           <Image
             src={AUTH_PANEL_IMAGE}
             alt=""

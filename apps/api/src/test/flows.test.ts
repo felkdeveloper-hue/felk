@@ -44,18 +44,22 @@ describe('Flow 1 — Cart → Checkout → Reserve → Payment → Webhook → O
     const cart = await addToCart(app, customer.auth, catalog.variantId, 2);
     expect(cart).toBeTruthy();
 
-    const checkout = await startCheckout(app, customer.auth, String(addr._id ?? addr.id), true);
-    expect(['ready', 'reserved']).toContain(checkout.status);
+    // Start checkout must NOT hold stock — reservation happens at Place Order / payment create.
+    const checkout = await startCheckout(app, customer.auth, String(addr._id ?? addr.id), false);
+    expect(['ready', 'open']).toContain(checkout.status);
 
-    const reserved = await StockReservationModel.find({
+    const reservedBeforePay = await StockReservationModel.find({
       variantId: catalog.variantId,
       status: RESERVATION_STATUS.ACTIVE,
     });
-    expect(reserved.length).toBeGreaterThanOrEqual(1);
+    expect(reservedBeforePay.length).toBe(0);
 
     const beforePay = await InventoryItemModel.findOne({ variantId: catalog.variantId });
-    expect(beforePay?.reserved).toBeGreaterThanOrEqual(2);
+    expect(beforePay?.reserved ?? 0).toBe(0);
+    expect(beforePay?.available).toBe(8);
+    expect(beforePay?.onHand).toBe(8);
 
+    // COD place-order: reserve then immediately commit + create order.
     const payment = await createCodPayment(app, customer.auth, checkout.checkoutToken);
     expect(payment.status).toMatch(/processing|pending/);
 
@@ -184,8 +188,14 @@ describe('Flow 4 — Register → Add products → Cart → Checkout → Reserve
 
     const addr = await addCustomerAddress(app, customer.auth);
     await addToCart(app, customer.auth, catalog.variantId, 1);
-    const checkout = await startCheckout(app, customer.auth, String(addr._id ?? addr.id), true);
+    const checkout = await startCheckout(app, customer.auth, String(addr._id ?? addr.id), false);
     expect(checkout.status).toBeTruthy();
+    expect(
+      await StockReservationModel.countDocuments({
+        variantId: catalog.variantId,
+        status: RESERVATION_STATUS.ACTIVE,
+      }),
+    ).toBe(0);
 
     const payment = await createCodPayment(app, customer.auth, checkout.checkoutToken);
     const { order, invoice } = await completeCodPaymentAndWaitForOrder(app, payment);

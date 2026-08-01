@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from '@tanstack/react-router';
 import { Minus, Plus, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { AddToCartButton } from '@/components/cart/add-to-cart-button';
@@ -13,9 +12,8 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import { useAddToCartMutation } from '@/hooks/cart';
+import { useBuyNowMutation } from '@/hooks/cart';
 import { useCatalogFilterFacets, useProductById } from '@/hooks/catalog';
-import { ROUTES } from '@/constants';
 import { AppError } from '@/lib/errors';
 import { cn } from '@/lib/utils';
 import { resolveVariantId } from '@/utils/cart';
@@ -81,8 +79,7 @@ export interface SelectOptionsSheetProps {
 }
 
 export function SelectOptionsSheet({ product, open, onOpenChange }: SelectOptionsSheetProps) {
-  const navigate = useNavigate();
-  const addMutation = useAddToCartMutation();
+  const buyNowMutation = useBuyNowMutation();
   const detailQuery = useProductById(open ? product.id : '');
   const { sizes, colors } = useCatalogFilterFacets({ enabled: open });
   const isMobile = useIsMobileSheet();
@@ -251,12 +248,11 @@ export function SelectOptionsSheet({ product, open, onOpenChange }: SelectOption
       toast.error('Please select a size for this color');
       return;
     }
-    addMutation.mutate(
+    buyNowMutation.mutate(
       { variantId: resolved, quantity },
       {
         onSuccess: () => {
           onOpenChange(false);
-          void navigate({ to: ROUTES.checkout });
         },
         onError: (error) => {
           toast.error(AppError.isAppError(error) ? error.message : 'Unable to start checkout');
@@ -490,14 +486,14 @@ export function SelectOptionsSheet({ product, open, onOpenChange }: SelectOption
                       type="button"
                       onClick={handleBuyNow}
                       disabled={
-                        addMutation.isPending ||
+                        buyNowMutation.isPending ||
                         detail.inStock === false ||
                         detail.status === 'out_of_stock' ||
                         isSelectionOutOfStock
                       }
                       className="bg-foreground text-background hover:bg-foreground/90 inline-flex h-12 w-full items-center justify-center rounded-none text-sm font-bold uppercase tracking-[0.14em] transition-colors disabled:opacity-50"
                     >
-                      {addMutation.isPending ? 'Please wait…' : 'Buy it now'}
+                      {buyNowMutation.isPending ? 'Please wait…' : 'Buy it now'}
                     </button>
                   ) : null}
                 </div>

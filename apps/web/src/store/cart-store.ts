@@ -27,10 +27,12 @@ export const useCartStore = create<CartStore>()(
       isSyncing: false,
 
       setCart: (cart) =>
-        set({
+        set((state) => ({
           cart,
-          guestCartToken: cart?.guestCartToken ?? null,
-        }),
+          // Never wipe a pending guest token when an authenticated cart refresh
+          // returns guestCartToken: null — merge still needs that token.
+          guestCartToken: cart?.guestCartToken ? cart.guestCartToken : state.guestCartToken,
+        })),
 
       setGuestCartToken: (token) => set({ guestCartToken: token }),
 

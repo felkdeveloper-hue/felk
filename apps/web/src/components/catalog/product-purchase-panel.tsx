@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
-import { Link, useNavigate } from '@tanstack/react-router';
+import { Link } from '@tanstack/react-router';
 import { Minus, Plus, RefreshCcw, ShieldCheck, ShoppingBag } from 'lucide-react';
 import { toast } from 'sonner';
 import { AddToCartButton } from '@/components/cart/add-to-cart-button';
 import { WishlistButton } from '@/components/wishlist/wishlist-button';
-import { useAddToCartMutation } from '@/hooks/cart';
+import { useBuyNowMutation } from '@/hooks/cart';
 import { useCartStore } from '@/store/cart-store';
 import { resolveVariantId } from '@/utils/cart';
 import { formatCurrency } from '@/utils';
@@ -116,9 +116,8 @@ export function ProductPurchasePanel({
   materialLabel,
   badgeLabel,
 }: ProductPurchasePanelProps) {
-  const navigate = useNavigate();
   const cart = useCartStore((state) => state.cart);
-  const addMutation = useAddToCartMutation();
+  const buyNowMutation = useBuyNowMutation();
   const [quantity, setQuantity] = useState(1);
   const [sizeError, setSizeError] = useState(false);
   const variants = product.variants ?? [];
@@ -248,7 +247,7 @@ export function ProductPurchasePanel({
       setSizeError(true);
       return;
     }
-    addMutation.mutate(
+    buyNowMutation.mutate(
       { variantId: resolved, quantity },
       {
         onSuccess: () => {
@@ -256,7 +255,6 @@ export function ProductPurchasePanel({
             'buy_now_clicked',
             productMetaFrom(product, { variantId: resolved, quantity }),
           );
-          void navigate({ to: ROUTES.checkout });
         },
         onError: (error) => {
           toast.error(AppError.isAppError(error) ? error.message : 'Unable to start checkout');
@@ -472,10 +470,10 @@ export function ProductPurchasePanel({
           <button
             type="button"
             onClick={handleBuyNow}
-            disabled={addMutation.isPending || isSelectionOutOfStock}
+            disabled={buyNowMutation.isPending || isSelectionOutOfStock}
             className="bg-foreground text-background lg:hover:bg-foreground/90 inline-flex h-12 w-full items-center justify-center rounded-none text-[11px] font-bold uppercase tracking-[0.18em] transition-opacity active:opacity-85 disabled:opacity-50 lg:text-sm lg:tracking-[0.14em]"
           >
-            {addMutation.isPending ? 'Please wait…' : 'Buy it now'}
+            {buyNowMutation.isPending ? 'Please wait…' : 'Buy it now'}
           </button>
         ) : null}
       </div>

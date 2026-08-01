@@ -1,5 +1,6 @@
 export { AddressPicker } from './address-picker';
 export { CheckoutExpiryBanner } from './checkout-expiry-banner';
+export { CheckoutGuestAuthDialog } from './checkout-guest-auth-dialog';
 export { CheckoutNavigation } from './checkout-navigation';
 export { CheckoutOrderSummary } from './checkout-order-summary';
 export { CheckoutStepIndicator } from './checkout-step-indicator';

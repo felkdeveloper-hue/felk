@@ -1,8 +1,9 @@
 import { http, HttpResponse } from 'msw';
 
-const API = 'http://localhost:4000/api/v1';
+/** Match absolute (CI) and relative (Vite/jsdom) API bases. */
+const API = '*/api/v1';
 
-const RESERVATION_TTL_MS = 30 * 60 * 1000;
+const RESERVATION_TTL_MS = 10 * 60 * 1000;
 
 function createCheckoutSession(overrides: Record<string, unknown> = {}) {
   const now = Date.now();
@@ -170,7 +171,8 @@ export const checkoutHandlers = [
       extendReservation?: boolean;
     };
 
-    const shippingAmount = body.shippingMethod === 'pickup' ? 0 : 500;
+    const shippingAmount =
+      body.shippingMethod === 'pickup' ? 0 : body.shippingMethod === 'express' ? 800 : 500;
 
     checkoutState = {
       ...checkoutState,

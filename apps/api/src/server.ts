@@ -9,7 +9,7 @@ import {
   catchUpOrphanCodPayments,
 } from '@/services/order-payment-consumer.service.js';
 import { startCronJobs } from '@/cron/index.js';
-import { verifyEmailTransporter } from '@/services/email/transporter.js';
+import { resetEmailTransporter, verifyEmailTransporter } from '@/services/email/transporter.js';
 import { initAnalyticsLiveGateway } from '@/services/platform-analytics/live.gateway.js';
 
 /** Tell PM2 (wait_ready) this worker can receive traffic — after Mongo is up. */
@@ -49,7 +49,10 @@ async function bootstrap(): Promise<void> {
     await connectDatabase();
     notifyProcessManagerReady();
 
-    void verifyEmailTransporter();
+    // Verify SMTP, then drop the socket — Titan often fails the next send if we keep it.
+    void verifyEmailTransporter().finally(() => {
+      resetEmailTransporter();
+    });
 
     // Order Management subscribes to PaymentSucceeded in-process, then
     // catches up on anything published while no one was listening (e.g. a

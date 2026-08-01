@@ -39,11 +39,13 @@ export interface StorefrontHeaderProps {
 }
 
 export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderProps) {
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const isCheckout = pathname.startsWith(ROUTES.checkout);
   const { isScrolled, isHidden } = useScrollHeader({
     threshold: 36,
-    hideOnScrollDown: true,
+    // Auto-hide on checkout clips titles under the bar — keep it pinned there.
+    hideOnScrollDown: !isCheckout,
   });
-  const pathname = useRouterState({ select: (state) => state.location.pathname });
   const navigate = useNavigate();
   const isHome = pathname === ROUTES.home;
   const transparent = isHome && !isScrolled;

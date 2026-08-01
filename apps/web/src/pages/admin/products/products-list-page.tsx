@@ -1,4 +1,10 @@
-import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  useMutation,
+  useQueries,
+  useQuery,
+  useQueryClient,
+  type QueryClient,
+} from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useMemo, useState } from 'react';
 import {
@@ -14,7 +20,95 @@ import { ADMIN_ROUTES, QUERY_KEYS } from '@/constants';
 import { useAdminPermissions } from '@/hooks/admin';
 import { cn, formatCurrency, formatDate } from '@/lib/utils';
 import { normalizeProductStatusFilter } from '@/lib/product-status';
-import { inventoryApi, productsApi, productImportApi } from '@/services/sdk/admin';
+import {
+  inventoryApi,
+  productsApi,
+  productImportApi,
+  type AdminProduct,
+} from '@/services/sdk/admin';
+import type { PaginatedResult } from '@/types';
+
+type ProductListCache = PaginatedResult<AdminProduct>;
+type ProductListSnapshot = Array<[readonly unknown[], ProductListCache | undefined]>;
+
+const PRODUCT_LIST_KEY = ['admin', 'products', 'list'] as const;
+
+async function cancelProductListQueries(queryClient: QueryClient) {
+  await queryClient.cancelQueries({ queryKey: PRODUCT_LIST_KEY });
+}
+
+function snapshotProductLists(queryClient: QueryClient): ProductListSnapshot {
+  return queryClient.getQueriesData<ProductListCache>({ queryKey: PRODUCT_LIST_KEY });
+}
+
+function restoreProductLists(queryClient: QueryClient, snapshot: ProductListSnapshot) {
+  for (const [key, data] of snapshot) {
+    queryClient.setQueryData(key, data);
+  }
+}
+
+function removeIdsFromProductLists(queryClient: QueryClient, ids: string[]) {
+  const idSet = new Set(ids);
+  queryClient.setQueriesData<ProductListCache>({ queryKey: PRODUCT_LIST_KEY }, (old) => {
+    if (!old) return old;
+    const data = old.data.filter((row) => !idSet.has(row.id));
+    if (data.length === old.data.length) return old;
+    const removed = old.data.length - data.length;
+    const total = Math.max(0, old.meta.total - removed);
+    return {
+      ...old,
+      data,
+      meta: {
+        ...old.meta,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / (old.meta.limit || 1))),
+      },
+    };
+  });
+}
+
+function archiveIdsInProductLists(queryClient: QueryClient, ids: string[]) {
+  const idSet = new Set(ids);
+  const entries = queryClient.getQueriesData<ProductListCache>({ queryKey: PRODUCT_LIST_KEY });
+  for (const [queryKey, old] of entries) {
+    if (!old) continue;
+    const params = queryKey[3] as { status?: string } | undefined;
+    const statusFilter = typeof params?.status === 'string' ? params.status : '';
+    const hideArchived = Boolean(statusFilter && statusFilter !== 'archived');
+
+    if (hideArchived) {
+      const data = old.data.filter((row) => !idSet.has(row.id));
+      if (data.length === old.data.length) continue;
+      const removed = old.data.length - data.length;
+      const total = Math.max(0, old.meta.total - removed);
+      queryClient.setQueryData<ProductListCache>(queryKey, {
+        ...old,
+        data,
+        meta: {
+          ...old.meta,
+          total,
+          totalPages: Math.max(1, Math.ceil(total / (old.meta.limit || 1))),
+        },
+      });
+      continue;
+    }
+
+    let changed = false;
+    const data = old.data.map((row) => {
+      if (!idSet.has(row.id) || row.status === 'archived') return row;
+      changed = true;
+      return { ...row, status: 'archived' };
+    });
+    if (changed) {
+      queryClient.setQueryData<ProductListCache>(queryKey, { ...old, data });
+    }
+  }
+}
+
+function invalidateProductCaches(queryClient: QueryClient) {
+  void queryClient.invalidateQueries({ queryKey: ['admin', 'products'] });
+  void queryClient.invalidateQueries({ queryKey: ['products'] });
+}
 
 function productEditTo(productId: string) {
   return {
@@ -64,18 +158,26 @@ export function ProductsListPage() {
       {
         queryKey: QUERY_KEYS.adminProducts.list({ page: 1, limit: 1, summary: 'total' }),
         queryFn: () => productsApi.list({ page: 1, limit: 1 }),
+        staleTime: 60_000,
+        placeholderData: (prev) => prev,
       },
       {
         queryKey: QUERY_KEYS.adminProducts.list({ page: 1, limit: 1, status: 'active' }),
         queryFn: () => productsApi.list({ page: 1, limit: 1, status: 'active' }),
+        staleTime: 60_000,
+        placeholderData: (prev) => prev,
       },
       {
         queryKey: QUERY_KEYS.adminProducts.list({ page: 1, limit: 1, status: 'draft' }),
         queryFn: () => productsApi.list({ page: 1, limit: 1, status: 'draft' }),
+        staleTime: 60_000,
+        placeholderData: (prev) => prev,
       },
       {
         queryKey: QUERY_KEYS.adminInventory.items({ page: 1, limit: 1, lowStockOnly: true }),
         queryFn: () => inventoryApi.listItems({ page: 1, limit: 1, lowStockOnly: true }),
+        staleTime: 60_000,
+        placeholderData: (prev) => prev,
       },
     ],
   });
@@ -87,27 +189,52 @@ export function ProductsListPage() {
 
   const deleteMutation = useMutation({
     mutationFn: (ids: string[]) => productsApi.bulkDelete(ids),
-    onSuccess: () => {
-      setSelectedIds([]);
-      void queryClient.invalidateQueries({ queryKey: ['admin', 'products'] });
-      void queryClient.invalidateQueries({ queryKey: ['products'] });
+    onMutate: async (ids) => {
+      await cancelProductListQueries(queryClient);
+      const previous = snapshotProductLists(queryClient);
+      removeIdsFromProductLists(queryClient, ids);
+      setSelectedIds((current) => current.filter((id) => !ids.includes(id)));
+      return { previous };
+    },
+    onError: (_error, _ids, context) => {
+      if (context?.previous) restoreProductLists(queryClient, context.previous);
+    },
+    onSettled: () => {
+      invalidateProductCaches(queryClient);
     },
   });
 
   const archiveMutation = useMutation({
     mutationFn: (ids: string[]) => productsApi.bulkStatus(ids, 'archived'),
-    onSuccess: () => {
-      setSelectedIds([]);
-      void queryClient.invalidateQueries({ queryKey: ['admin', 'products'] });
-      void queryClient.invalidateQueries({ queryKey: ['products'] });
+    onMutate: async (ids) => {
+      await cancelProductListQueries(queryClient);
+      const previous = snapshotProductLists(queryClient);
+      archiveIdsInProductLists(queryClient, ids);
+      setSelectedIds((current) => current.filter((id) => !ids.includes(id)));
+      return { previous };
+    },
+    onError: (_error, _ids, context) => {
+      if (context?.previous) restoreProductLists(queryClient, context.previous);
+    },
+    onSettled: () => {
+      invalidateProductCaches(queryClient);
     },
   });
 
   const removeOneMutation = useMutation({
     mutationFn: (id: string) => productsApi.remove(id),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['admin', 'products'] });
-      void queryClient.invalidateQueries({ queryKey: ['products'] });
+    onMutate: async (id) => {
+      await cancelProductListQueries(queryClient);
+      const previous = snapshotProductLists(queryClient);
+      removeIdsFromProductLists(queryClient, [id]);
+      setSelectedIds((current) => current.filter((value) => value !== id));
+      return { previous };
+    },
+    onError: (_error, _id, context) => {
+      if (context?.previous) restoreProductLists(queryClient, context.previous);
+    },
+    onSettled: () => {
+      invalidateProductCaches(queryClient);
     },
   });
 

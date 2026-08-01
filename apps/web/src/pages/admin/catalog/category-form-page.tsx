@@ -89,6 +89,7 @@ export function CategoryFormPage({ categoryId }: { categoryId: string }) {
         filterFacetKeys: facetKeys,
       }),
     onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'cms', 'categories'] });
       void queryClient.invalidateQueries({ queryKey: ['cms', 'categories'] });
       toast.success('Category updated');
       void navigate({ to: ADMIN_ROUTES.filters, search: { tab: 'categories' } });
@@ -103,6 +104,7 @@ export function CategoryFormPage({ categoryId }: { categoryId: string }) {
     try {
       const updated = await cmsApi.categories.uploadImage(categoryId, file, form.getValues('name'));
       setPreviewUrl(updated.imageUrl ?? null);
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'cms', 'categories'] });
       void queryClient.invalidateQueries({ queryKey: ['cms', 'categories'] });
       toast.success('Category image updated');
     } catch (error) {

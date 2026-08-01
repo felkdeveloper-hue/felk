@@ -22,7 +22,7 @@ export function CustomerLayout() {
       <div className="bg-background flex min-h-screen flex-col">
         <ForceLightTheme />
         <StorefrontHeader />
-        <div className="safe-mobile-chrome mx-auto flex w-full max-w-none flex-1 flex-col gap-8 px-4 py-8 sm:px-6 md:px-8 lg:flex-row lg:gap-10 lg:px-10 lg:pb-10 xl:px-14 2xl:px-20">
+        <div className="safe-mobile-chrome mx-auto flex w-full max-w-none flex-1 flex-col gap-8 px-4 pb-8 pt-10 sm:px-6 sm:pt-12 md:px-8 lg:flex-row lg:gap-10 lg:px-10 lg:pb-10 lg:pt-14 xl:px-14 2xl:px-20">
           <aside className="lg:w-56 lg:shrink-0">
             <div className="border-border bg-card sticky top-28 rounded-xl border p-3 sm:p-4">
               <AccountNav />

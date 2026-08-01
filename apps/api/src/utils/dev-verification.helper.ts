@@ -7,26 +7,18 @@ export function isEmailDeliveryConfigured(): boolean {
 }
 
 /**
- * In dev, surface the raw code in the API response whenever the user can't
- * be expected to receive a real email — either SMTP isn't configured at all,
- * or the send attempt itself failed (wrong credentials, unreachable host,
- * etc). `delivered` should be the actual result of the send attempt.
+ * Never return OTPs to the client — codes must arrive by email only.
+ * Server logs still record delivery failures for ops debugging.
  */
 export function attachDevVerificationCode<T extends { message: string }>(
   payload: T,
-  code: string,
+  _code: string,
   delivered: boolean,
 ): T & { devVerificationCode?: string } {
-  if (!appConfig.app.isDev || delivered) {
-    return payload;
+  if (!delivered) {
+    logger.warn('Auth: verification email was not delivered — OTP not returned to client');
   }
-
-  logger.warn(
-    { code },
-    'Auth: verification email was not delivered — devVerificationCode returned instead',
-  );
-
-  return { ...payload, devVerificationCode: code };
+  return payload;
 }
 
 export function attachDevResetCode<T extends { message: string }>(

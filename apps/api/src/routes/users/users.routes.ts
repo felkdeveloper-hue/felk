@@ -2,6 +2,7 @@ import { Router, type Request } from 'express';
 import { PERMISSIONS } from '@/constants/permissions.js';
 import { authenticate, authorizeAny, validate } from '@/middlewares/index.js';
 import {
+  adminCreateUserSchema,
   adminSetPasswordSchema,
   adminUpdateUserSchema,
   adminUserIdParamsSchema,
@@ -10,6 +11,7 @@ import {
 } from '@/services/admin-user.service.js';
 import { asyncHandler } from '@/utils/async-handler.js';
 import { ApiResponse } from '@/utils/response/api-response.js';
+import { HTTP_STATUS } from '@/constants/http.js';
 
 const P = PERMISSIONS;
 
@@ -33,6 +35,16 @@ usersRouter.get(
   asyncHandler(async (req, res) => {
     const result = await adminUserService.list(req.query as never);
     ApiResponse.success(res, result.data, 'OK', 200, result.meta);
+  }),
+);
+
+usersRouter.post(
+  '/',
+  authorizeAny(P.USERS_CREATE, P.USERS_MANAGE),
+  validate({ body: adminCreateUserSchema }),
+  asyncHandler(async (req, res) => {
+    const result = await adminUserService.create(req.body, actor(req));
+    ApiResponse.success(res, result, 'User created', HTTP_STATUS.CREATED);
   }),
 );
 

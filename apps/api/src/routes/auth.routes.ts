@@ -17,6 +17,12 @@ import {
   resetPasswordSchema,
   verifyEmailSchema,
 } from '@/schemas/auth.schema.js';
+import {
+  checkoutCompleteSignupSchema,
+  checkoutEmailStatusSchema,
+  checkoutSendOtpSchema,
+  checkoutVerifyOtpSchema,
+} from '@/schemas/checkout-auth.schema.js';
 
 import { otpRouter } from '@/routes/otp.routes.js';
 
@@ -29,6 +35,29 @@ authRouter.use(otpRouter);
 authRouter.post('/register', validate({ body: registerSchema }), authController.register);
 
 authRouter.post('/login', validate({ body: loginSchema }), authController.login);
+
+/** Guest checkout inline auth — never leaves the checkout UI. */
+authRouter.post(
+  '/checkout/email-status',
+  validate({ body: checkoutEmailStatusSchema }),
+  authController.checkoutEmailStatus,
+);
+authRouter.post(
+  '/checkout/send-otp',
+  otpRateLimiter,
+  validate({ body: checkoutSendOtpSchema }),
+  authController.checkoutSendOtp,
+);
+authRouter.post(
+  '/checkout/verify-otp',
+  validate({ body: checkoutVerifyOtpSchema }),
+  authController.checkoutVerifyOtp,
+);
+authRouter.post(
+  '/checkout/complete-signup',
+  validate({ body: checkoutCompleteSignupSchema }),
+  authController.checkoutCompleteSignup,
+);
 
 authRouter.post('/refresh', validate({ body: refreshSchema }), authController.refresh);
 

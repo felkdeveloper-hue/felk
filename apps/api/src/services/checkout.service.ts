@@ -314,6 +314,20 @@ export class CheckoutService {
     return session;
   }
 
+  private filterBuiltToVariantIds(
+    built: Awaited<ReturnType<CheckoutService['buildLinesFromCart']>>,
+    variantIds: string[],
+  ) {
+    const allow = new Set(variantIds);
+    return {
+      ...built,
+      lines: built.lines.filter((line) => allow.has(line.variantId.toString())),
+      issues: built.issues.filter(
+        (issue) => !issue.variantId || allow.has(String(issue.variantId)),
+      ),
+    };
+  }
+
   async start(
     user: AuthenticatedUser,
     payload: {
@@ -324,10 +338,12 @@ export class CheckoutService {
       couponCode?: string;
       giftCardCode?: string;
       autoReserve?: boolean;
+      items?: Array<{ variantId: string; quantity: number }>;
     },
     actor: ActorMeta,
   ) {
     const customer = await customerService.ensureForUser(user, actor);
+    const buyNowVariantIds = payload.items?.map((item) => item.variantId) ?? [];
 
     const existing = await CheckoutSessionModel.findOne({
       customerId: customer._id,
@@ -345,15 +361,54 @@ export class CheckoutService {
       } else if (existing.reservationExpiresAt && existing.reservationExpiresAt <= new Date()) {
         await this.expireSession(existing, actor);
       } else {
-        throw ApiError.conflict(
-          'Active checkout session already exists',
-          { checkoutId: existing._id.toString(), checkoutToken: existing.checkoutToken },
-          'DUPLICATE_CHECKOUT',
-        );
+        // Replace any open session (Buy Now or cart) so "Proceed to checkout"
+        // always rebuilds from the current bag — never resumes a scoped Buy Now.
+        await this.cancel(existing.checkoutToken, user, actor);
       }
     }
 
-    const built = await this.buildLinesFromCart(customer._id.toString());
+    // Buy Now: ensure the clicked SKU is in the bag (without doubling qty if already there).
+    if (payload.items?.length) {
+      const cartView = await cartService.getCart({ customerId: customer._id.toString() });
+      const inCart = new Set(
+        (cartView.items as Array<{ variantId: Types.ObjectId | string }>).map((item) =>
+          String(item.variantId),
+        ),
+      );
+      for (const item of payload.items) {
+        if (!inCart.has(item.variantId)) {
+          await cartService.addItem(
+            { customerId: customer._id.toString() },
+            { variantId: item.variantId, quantity: item.quantity },
+            actor,
+          );
+        }
+      }
+    }
+
+    let built = await this.buildLinesFromCart(customer._id.toString());
+    if (buyNowVariantIds.length) {
+      built = this.filterBuiltToVariantIds(built, buyNowVariantIds);
+      const qtyByVariant = new Map(
+        (payload.items ?? []).map((item) => [item.variantId, item.quantity]),
+      );
+      built = {
+        ...built,
+        lines: built.lines.map((line) => {
+          const quantity = qtyByVariant.get(line.variantId.toString()) ?? line.quantity;
+          const unit = line.salePrice ?? line.unitPrice;
+          return {
+            ...line,
+            quantity,
+            lineSubtotal: Number((unit * quantity).toFixed(2)),
+          };
+        }),
+      };
+      if (!built.lines.length) {
+        throw ApiError.badRequest('Buy Now item is not available', undefined, 'CART_EMPTY');
+      }
+    }
+
     const hardErrors = built.issues.filter((i) => i.severity === 'error');
     if (hardErrors.length) {
       throw ApiError.unprocessable(
@@ -378,7 +433,6 @@ export class CheckoutService {
         : await this.loadAddressSnapshot(customer._id.toString(), billingAddressId);
 
     const timeout = CHECKOUT_RESERVATION_TTL_MINUTES;
-    const expiresAt = new Date(Date.now() + timeout * 60_000);
 
     let session = await CheckoutSessionModel.create({
       checkoutToken: newCheckoutToken(),
@@ -396,8 +450,11 @@ export class CheckoutService {
       giftCard: applyGiftCardPlaceholder(payload.giftCardCode),
       reservationIds: [],
       reservationTimeoutMinutes: timeout,
-      expiresAt,
+      // Session clock starts when Place Order reserves stock — not while browsing checkout.
+      reservationExpiresAt: null,
+      expiresAt: null,
       validationIssues: built.issues,
+      metadata: buyNowVariantIds.length ? { buyNowVariantIds } : {},
     });
 
     session = (await this.recalculate(session, {
@@ -416,9 +473,16 @@ export class CheckoutService {
       after: toPlain(session),
     });
 
-    if (payload.autoReserve !== false) {
-      // Lines were just built — skip a second cart rebuild inside reserve.
+    // Stock is reserved only at Place Order (payment create). Never hold inventory
+    // while the customer is still filling address / payment details.
+    if (payload.autoReserve === true) {
       return this.reserve(session._id.toString(), user, actor, { skipRebuild: true });
+    }
+
+    // Mark ready for the payment UI when address + lines exist — without a stock hold.
+    if (shippingAddress && session.lines.length > 0) {
+      session.status = CHECKOUT_STATUS.READY;
+      await session.save();
     }
 
     return this.toSummary(session);
@@ -468,7 +532,7 @@ export class CheckoutService {
     idOrToken: string,
     user: AuthenticatedUser,
     actor: ActorMeta,
-    opts?: { skipRebuild?: boolean },
+    opts?: { skipRebuild?: boolean; timeoutMinutes?: number },
   ) {
     const session = await this.getByIdOrToken(idOrToken);
     await this.assertOwner(session, user);
@@ -502,7 +566,10 @@ export class CheckoutService {
       session.lines = rebuilt.lines as never;
     }
 
-    const timeout = session.reservationTimeoutMinutes || CHECKOUT_RESERVATION_TTL_MINUTES;
+    const timeout =
+      opts?.timeoutMinutes ??
+      (session.reservationTimeoutMinutes || CHECKOUT_RESERVATION_TTL_MINUTES);
+    session.reservationTimeoutMinutes = timeout;
     const expiresAt = new Date(Date.now() + timeout * 60_000);
     const reservationIds: Types.ObjectId[] = [];
 
@@ -561,7 +628,10 @@ export class CheckoutService {
     const session = await this.getByIdOrToken(idOrToken);
     await this.assertOwner(session, user);
     await this.releaseReservations(session, actor, 'Checkout release');
-    session.status = CHECKOUT_STATUS.OPEN;
+    session.status =
+      session.shippingAddress && session.lines.length > 0
+        ? CHECKOUT_STATUS.READY
+        : CHECKOUT_STATUS.OPEN;
     session.reservationExpiresAt = null;
     await session.save();
 
@@ -610,7 +680,19 @@ export class CheckoutService {
     if (payload.shippingMethod) session.shippingMethod = payload.shippingMethod;
     if (payload.deliveryMethod) session.deliveryMethod = payload.deliveryMethod;
 
-    const rebuilt = await this.buildLinesFromCart(session.customerId.toString());
+    let rebuilt = await this.buildLinesFromCart(session.customerId.toString());
+    const buyNowVariantIds = Array.isArray(session.metadata?.buyNowVariantIds)
+      ? (session.metadata.buyNowVariantIds as string[])
+      : [];
+    // Keep Buy Now scope only when metadata still has variant ids.
+    // Full-bag refresh clears the filter so cart checkout shows every line.
+    if (buyNowVariantIds.length) {
+      rebuilt = this.filterBuiltToVariantIds(rebuilt, buyNowVariantIds);
+    } else if (session.metadata && 'buyNowVariantIds' in session.metadata) {
+      const nextMeta = { ...(session.metadata as Record<string, unknown>) };
+      delete nextMeta.buyNowVariantIds;
+      session.metadata = nextMeta;
+    }
     session.lines = rebuilt.lines.map((line) => {
       const prev = session.lines.find((l) => l.variantId.toString() === line.variantId.toString());
       return { ...line, reservationId: prev?.reservationId ?? null };
@@ -622,7 +704,17 @@ export class CheckoutService {
       giftCardCode: payload.giftCardCode,
     });
 
-    if (payload.extendReservation !== false && session.reservationIds?.length) {
+    // Promote to READY without holding stock once the customer has an address + lines.
+    if (
+      session.status === CHECKOUT_STATUS.OPEN &&
+      session.shippingAddress &&
+      session.lines.length > 0
+    ) {
+      session.status = CHECKOUT_STATUS.READY;
+    }
+
+    // Only extend when explicitly requested AND a payment-window hold already exists.
+    if (payload.extendReservation === true && session.reservationIds?.length) {
       const timeout = session.reservationTimeoutMinutes || CHECKOUT_RESERVATION_TTL_MINUTES;
       for (const id of session.reservationIds) {
         try {
@@ -673,6 +765,120 @@ export class CheckoutService {
     });
 
     return this.toSummary(session);
+  }
+
+  /**
+   * Hold stock for the payment window (Place Order). Idempotent when an active
+   * hold already exists — extends TTL instead of double-reserving.
+   */
+  async ensureReservedForPayment(
+    idOrToken: string,
+    user: AuthenticatedUser,
+    actor: ActorMeta,
+    timeoutMinutes: number = CHECKOUT_RESERVATION_TTL_MINUTES,
+  ) {
+    const session = await this.getByIdOrToken(idOrToken);
+    await this.assertOwner(session, user);
+
+    if (
+      [CHECKOUT_STATUS.CANCELLED, CHECKOUT_STATUS.EXPIRED, CHECKOUT_STATUS.COMPLETED].includes(
+        session.status as never,
+      )
+    ) {
+      throw ApiError.badRequest(`Cannot reserve checkout in status ${session.status}`);
+    }
+
+    const hasActiveHold =
+      Boolean(session.reservationIds?.length) &&
+      Boolean(session.reservationExpiresAt) &&
+      session.reservationExpiresAt! > new Date();
+
+    if (hasActiveHold) {
+      let extendFailed = false;
+      for (const id of session.reservationIds) {
+        try {
+          await reservationService.extend(id.toString(), actor, timeoutMinutes);
+        } catch {
+          extendFailed = true;
+          break;
+        }
+      }
+      if (!extendFailed) {
+        const expiresAt = new Date(Date.now() + timeoutMinutes * 60_000);
+        session.reservationTimeoutMinutes = timeoutMinutes;
+        session.reservationExpiresAt = expiresAt;
+        session.expiresAt = expiresAt;
+        session.status = CHECKOUT_STATUS.READY;
+        await session.save();
+        return this.toSummary(session);
+      }
+    }
+
+    return this.reserve(session._id.toString(), user, actor, { timeoutMinutes });
+  }
+
+  /**
+   * System-level release used when a payment fails/cancels (no customer JWT).
+   * Restores available inventory and returns the session to READY without a hold.
+   */
+  async releaseForPaymentFailure(checkoutId: string, note = 'Payment failed — release hold') {
+    const session = await CheckoutSessionModel.findById(checkoutId);
+    if (!session) return null;
+    if (
+      [CHECKOUT_STATUS.COMPLETED, CHECKOUT_STATUS.CANCELLED, CHECKOUT_STATUS.EXPIRED].includes(
+        session.status as never,
+      )
+    ) {
+      return this.toSummary(session);
+    }
+
+    await this.releaseReservations(session, {}, note);
+    session.status = CHECKOUT_STATUS.READY;
+    session.reservationExpiresAt = null;
+    await session.save();
+
+    await writeAuditLog({
+      action: CHECKOUT_AUDIT.RESERVATION_RELEASED,
+      resourceType: 'checkout_sessions',
+      resourceId: session._id.toString(),
+      metadata: { reason: note },
+    });
+
+    return this.toSummary(session);
+  }
+
+  /**
+   * Release payment-window holds whose TTL elapsed. Checkout stays READY so the
+   * customer can Place Order again (stock is no longer locked).
+   */
+  async expireDueSessions(actor: ActorMeta = {}) {
+    const due = await CheckoutSessionModel.find({
+      status: { $in: [CHECKOUT_STATUS.RESERVED, CHECKOUT_STATUS.READY] },
+      reservationExpiresAt: { $lte: new Date() },
+      reservationIds: { $exists: true, $not: { $size: 0 } },
+    }).limit(100);
+
+    let released = 0;
+    for (const session of due) {
+      try {
+        await this.releaseReservations(session, actor, 'Checkout reservation TTL expired');
+        session.status = CHECKOUT_STATUS.READY;
+        session.reservationExpiresAt = null;
+        await session.save();
+        await writeAuditLog({
+          action: CHECKOUT_AUDIT.RESERVATION_EXPIRED,
+          resourceType: 'checkout_sessions',
+          resourceId: session._id.toString(),
+          actorUserId: actor.userId,
+          ip: actor.ip,
+          requestId: actor.requestId,
+        });
+        released += 1;
+      } catch {
+        // continue
+      }
+    }
+    return { scanned: due.length, released };
   }
 
   private async releaseReservations(
@@ -727,14 +933,22 @@ export class CheckoutService {
     if (
       session.reservationExpiresAt &&
       session.reservationExpiresAt <= new Date() &&
+      session.reservationIds?.length &&
       [CHECKOUT_STATUS.RESERVED, CHECKOUT_STATUS.READY].includes(session.status as never)
     ) {
-      await this.expireSession(session, actor);
-      throw ApiError.badRequest(
-        'Checkout reservation expired',
-        { checkoutId: session._id.toString() },
-        'RESERVATION_EXPIRED',
-      );
+      // Soft-release the payment hold; keep checkout usable for a new Place Order.
+      await this.releaseReservations(session, actor, 'Checkout reservation TTL expired');
+      session.status = CHECKOUT_STATUS.READY;
+      session.reservationExpiresAt = null;
+      await session.save();
+      await writeAuditLog({
+        action: CHECKOUT_AUDIT.RESERVATION_EXPIRED,
+        resourceType: 'checkout_sessions',
+        resourceId: session._id.toString(),
+        actorUserId: actor.userId,
+        ip: actor.ip,
+        requestId: actor.requestId,
+      });
     }
   }
 
@@ -771,7 +985,13 @@ export class CheckoutService {
         discount: session.totals.discount,
         grandTotal: session.totals.grandTotal,
         currency: session.currency,
-        readyForPayment: session.status === CHECKOUT_STATUS.READY,
+        // Ready when addresses + lines exist. Stock hold happens later at Place Order.
+        readyForPayment:
+          [CHECKOUT_STATUS.OPEN, CHECKOUT_STATUS.READY, CHECKOUT_STATUS.RESERVED].includes(
+            session.status as never,
+          ) &&
+          Boolean(session.shippingAddress) &&
+          session.lines.length > 0,
         payment: {
           status: 'not_started',
           message: 'Payments are handled in a future phase',

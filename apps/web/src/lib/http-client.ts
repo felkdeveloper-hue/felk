@@ -205,6 +205,11 @@ httpClient.interceptors.response.use(
         return httpClient(originalRequest);
       }
 
+      // Checkout sessions require auth — a guest retry only doubles 401 noise/latency.
+      if (originalRequest.url?.includes('/checkout')) {
+        return Promise.reject(AppError.fromAxiosError(error));
+      }
+
       // Session is gone — drop the bad Bearer and retry as guest (guest cart token still sent).
       stripAuthorizationHeader(originalRequest);
       return httpClient(originalRequest);

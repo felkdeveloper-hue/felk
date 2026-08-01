@@ -127,7 +127,7 @@ export async function startCheckout(
   app: Application,
   auth: AuthHeaders,
   shippingAddressId?: string,
-  autoReserve = true,
+  autoReserve = false,
 ) {
   const res = await request(app).post(`${API}/checkout/start`).set(auth).send({
     shippingAddressId,
@@ -223,7 +223,7 @@ export async function runPurchaseFlow(
   const address = await addCustomerAddress(app, auth);
   const addressId = String(address.id ?? address._id);
   await addToCart(app, auth, catalog.variantId, 1);
-  const checkout = await startCheckout(app, auth, addressId, true);
+  const checkout = await startCheckout(app, auth, addressId, false);
   const payment = await createCodPayment(app, auth, checkout.checkoutToken);
   const { order, invoice } = await completeCodPaymentAndWaitForOrder(app, payment);
   return { catalog, addressId, checkout, payment, order, invoice };

@@ -32,11 +32,18 @@ export class CentralizedEmailService implements EmailService {
     return verifyEmailTransporter();
   }
 
-  async send(input: SendEmailInput): Promise<{ messageId: string }> {
-    return this.deliver(input);
+  async send(
+    input: SendEmailInput,
+    options?: { maxAttempts?: number },
+  ): Promise<{ messageId: string }> {
+    return this.deliver(input, 1, options?.maxAttempts ?? 2);
   }
 
-  private async deliver(input: SendEmailInput, attempt = 1): Promise<{ messageId: string }> {
+  private async deliver(
+    input: SendEmailInput,
+    attempt = 1,
+    maxAttempts = 2,
+  ): Promise<{ messageId: string }> {
     const transport = getEmailTransporter();
 
     if (!transport) {
@@ -69,9 +76,9 @@ export class CentralizedEmailService implements EmailService {
     } catch (err) {
       logger.error({ err, to, subject: input.subject, attempt }, 'EmailService: send failed');
 
-      if (attempt < 2) {
+      if (attempt < maxAttempts) {
         logger.info({ to, subject: input.subject }, 'EmailService: retrying send');
-        return this.deliver(input, attempt + 1);
+        return this.deliver(input, attempt + 1, maxAttempts);
       }
 
       throw err;
@@ -81,13 +88,17 @@ export class CentralizedEmailService implements EmailService {
   private async sendTemplate(
     to: string,
     template: { subject: string; html: string; text: string },
+    options?: { maxAttempts?: number },
   ) {
-    return this.send({
-      to,
-      subject: template.subject,
-      html: template.html,
-      text: template.text,
-    });
+    return this.send(
+      {
+        to,
+        subject: template.subject,
+        html: template.html,
+        text: template.text,
+      },
+      options,
+    );
   }
 
   async sendVerificationOTP(
@@ -97,7 +108,25 @@ export class CentralizedEmailService implements EmailService {
   ): Promise<{ messageId: string }> {
     const name = options?.name ?? 'there';
     const template = verificationTemplate(name, otp, options?.expiryMinutes ?? 10);
-    return this.sendTemplate(email, template);
+    return this.sendTemplate(email, template, { maxAttempts: 2 });
+  }
+
+  /**
+   * Queue OTP email without blocking the HTTP response. SMTP hangs must not
+   * stall checkout/auth — the OTP is already persisted for verify/resend.
+   */
+  enqueueVerificationOTP(
+    email: string,
+    otp: string,
+    options?: { name?: string; expiryMinutes?: number },
+  ): void {
+    void this.sendVerificationOTP(email, otp, options)
+      .then((result) => {
+        logger.info({ email, messageId: result.messageId }, 'OTP email queued/sent');
+      })
+      .catch((err) => {
+        logger.error({ err, email }, 'OTP email background send failed');
+      });
   }
 
   async sendWelcomeEmail(user: WelcomeUser): Promise<{ messageId: string }> {

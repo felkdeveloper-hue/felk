@@ -1,7 +1,7 @@
 import { ROUTES } from '@/constants/routes';
 import type { PaymentMethod, ShippingMethod } from '@/services/sdk';
 
-export type CheckoutStepId = 'information' | 'shipping' | 'payment' | 'review';
+export type CheckoutStepId = 'information' | 'payment' | 'review';
 
 export interface CheckoutStep {
   id: CheckoutStepId;
@@ -11,7 +11,6 @@ export interface CheckoutStep {
 
 export const CHECKOUT_STEPS: CheckoutStep[] = [
   { id: 'information', label: 'Information', path: ROUTES.checkout },
-  { id: 'shipping', label: 'Shipping', path: ROUTES.checkoutShipping },
   { id: 'payment', label: 'Payment', path: ROUTES.checkoutPayment },
   { id: 'review', label: 'Review', path: ROUTES.checkoutReview },
 ];
@@ -82,5 +81,5 @@ export const PAYMENT_METHOD_OPTIONS: PaymentMethodOption[] = [
   },
 ];
 
-/** Default reservation window when backend omits TTL metadata. */
-export const CHECKOUT_RESERVATION_TTL_MINUTES = 30;
+/** Payment-window reservation TTL when backend omits metadata (minutes). */
+export const CHECKOUT_RESERVATION_TTL_MINUTES = 10;

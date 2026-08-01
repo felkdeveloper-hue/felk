@@ -32,8 +32,8 @@ export const DELIVERY_METHOD = {
   PICKUP: 'pickup',
 } as const;
 
-/** Default checkout reservation window (minutes). */
-export const CHECKOUT_RESERVATION_TTL_MINUTES = 30;
+/** Payment-window reservation TTL (minutes). Stock is held only after Place Order. */
+export const CHECKOUT_RESERVATION_TTL_MINUTES = 10;
 
 export const CHECKOUT_AUDIT = {
   STARTED: 'checkout.started',
