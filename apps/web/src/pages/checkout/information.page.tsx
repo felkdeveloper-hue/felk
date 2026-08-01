@@ -82,6 +82,21 @@ export function CheckoutInformationPage() {
 
   const beginCheckout = async () => {
     let storeCart = useCartStore.getState().cart;
+    const guestCartToken = useCartStore.getState().guestCartToken;
+
+    // Prefer merging guest bag in the background of the UI — never block the modal on this.
+    if (guestCartToken) {
+      try {
+        const merged = await cartApi.merge(guestCartToken);
+        useCartStore.getState().setCart(merged);
+        useCartStore.getState().setGuestCartToken(null);
+        queryClient.setQueryData(QUERY_KEYS.cart.current(), merged);
+        storeCart = merged;
+      } catch {
+        /* keep local snapshot; start with explicit line items below */
+      }
+    }
+
     if (!storeCart?.items?.length) {
       try {
         const fresh = await cartApi.get();
@@ -115,11 +130,21 @@ export function CheckoutInformationPage() {
       addresses ?? queryClient.getQueryData<CustomerAddress[]>(QUERY_KEYS.customers.addresses());
     const defaultShipping = cachedAddresses?.find((address) => address.isDefaultShipping);
     const buyNowItems = useCheckoutStore.getState().buyNowItems;
+    const cartLineItems = storeCart.items
+      .filter((item) => Boolean(item.variantId))
+      .map((item) => ({
+        variantId: String(item.variantId),
+        quantity: item.quantity,
+      }));
     try {
       await startCheckout.mutateAsync({
         shippingAddressId: defaultShipping?.id,
         autoReserve: false,
-        ...(buyNowItems?.length ? { items: buyNowItems } : {}),
+        ...(buyNowItems?.length
+          ? { items: buyNowItems }
+          : cartLineItems.length
+            ? { items: cartLineItems }
+            : {}),
       });
       trackCommerceEvent('checkout_started');
     } catch (error) {
@@ -456,16 +481,37 @@ export function CheckoutInformationPage() {
           )}
         </section>
 
-        <div className="lg:sticky lg:top-24 lg:self-start">
+        <div className="space-y-4 lg:sticky lg:top-24 lg:self-start">
           {session ? (
             <CheckoutOrderSummary session={session} editable />
-          ) : guestCart?.totals ? (
-            <CartOrderSummary totals={guestCart.totals} validation={guestCart.validation} />
-          ) : sessionPending ? (
-            <div aria-busy="true">
-              <Skeleton className="h-64 w-full" />
-            </div>
-          ) : null}
+          ) : (
+            <>
+              {guestCart?.items?.length ? (
+                <div className="border-border bg-card divide-border space-y-0 overflow-hidden rounded-xl border">
+                  <div className="border-border border-b px-4 py-3">
+                    <h3 className="text-sm font-semibold">Your bag ({guestCart.items.length})</h3>
+                  </div>
+                  <div className="divide-border divide-y">
+                    {guestCart.items.map((item) => (
+                      <CartItemRow
+                        key={item.id}
+                        item={item}
+                        compact
+                        className="border-0 px-4 last:border-0 sm:px-5"
+                      />
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+              {guestCart?.totals ? (
+                <CartOrderSummary totals={guestCart.totals} validation={guestCart.validation} />
+              ) : sessionPending ? (
+                <div aria-busy="true">
+                  <Skeleton className="h-64 w-full" />
+                </div>
+              ) : null}
+            </>
+          )}
         </div>
       </div>
     </>

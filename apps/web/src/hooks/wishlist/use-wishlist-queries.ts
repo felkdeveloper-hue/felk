@@ -65,7 +65,14 @@ export function useIsInWishlist(productId?: string, variantId?: string) {
   );
 }
 
-type NormalizedWishlist = ReturnType<typeof normalizeWishlist>;
+type NormalizedWishlist = {
+  id: string;
+  name: string;
+  isDefault?: boolean;
+  shareToken?: string;
+  itemCount?: number;
+  items: EnrichedWishlistItem[];
+};
 
 function findCachedWishlist(
   queryClient: ReturnType<typeof useQueryClient>,
@@ -153,19 +160,48 @@ async function resolveDefaultWishlistId(wishlistId?: string): Promise<string> {
   return created.id;
 }
 
+type AddWishlistVars = {
+  productId: string;
+  variantId?: string;
+  wishlistId?: string;
+  productName?: string;
+  productSlug?: string;
+  thumbnailUrl?: string;
+  price?: EnrichedWishlistItem['price'];
+};
+
+function mergeWishlistEnrichment(
+  wishlist: NormalizedWishlist,
+  previous: NormalizedWishlist | undefined,
+  vars: AddWishlistVars,
+): NormalizedWishlist {
+  return {
+    ...wishlist,
+    items: wishlist.items.map((item) => {
+      if (item.productName && item.productName !== 'Saved' && item.thumbnailUrl) return item;
+      const fromPrev = previous?.items.find((entry) => entry.productId === item.productId);
+      const fromVars = vars.productId === item.productId ? vars : undefined;
+      return {
+        ...item,
+        productName:
+          item.productName && item.productName !== 'Saved'
+            ? item.productName
+            : (fromPrev?.productName ?? fromVars?.productName ?? item.productName),
+        productSlug: item.productSlug ?? fromPrev?.productSlug ?? fromVars?.productSlug,
+        thumbnailUrl: item.thumbnailUrl ?? fromPrev?.thumbnailUrl ?? fromVars?.thumbnailUrl,
+        price: item.price ?? fromPrev?.price ?? fromVars?.price,
+        variantTitle: item.variantTitle ?? fromPrev?.variantTitle,
+        variantSku: item.variantSku ?? fromPrev?.variantSku,
+      };
+    }),
+  };
+}
+
 export function useAddToWishlistMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({
-      productId,
-      variantId,
-      wishlistId,
-    }: {
-      productId: string;
-      variantId?: string;
-      wishlistId?: string;
-    }) => {
+    mutationFn: async ({ productId, variantId, wishlistId }: AddWishlistVars) => {
       const targetId = await resolveDefaultWishlistId(wishlistId);
       try {
         const updated = await customersApi.addWishlistItem(targetId, { productId, variantId });
@@ -178,7 +214,15 @@ export function useAddToWishlistMutation() {
         return normalizeWishlist(await customersApi.getWishlist(targetId));
       }
     },
-    onMutate: async ({ productId, variantId, wishlistId }) => {
+    onMutate: async ({
+      productId,
+      variantId,
+      wishlistId,
+      productName,
+      productSlug,
+      thumbnailUrl,
+      price,
+    }: AddWishlistVars) => {
       await queryClient.cancelQueries({ queryKey: QUERY_KEYS.customers.wishlists() });
       const cached = findCachedWishlist(queryClient, wishlistId);
       const key = cached?.key ?? QUERY_KEYS.customers.wishlist(wishlistId ?? 'default');
@@ -202,7 +246,10 @@ export function useAddToWishlistMutation() {
         id: `optimistic-${productId}-${variantId ?? 'any'}`,
         productId,
         variantId,
-        productName: 'Saved',
+        productName: productName ?? 'Product',
+        productSlug,
+        thumbnailUrl,
+        price,
       };
       queryClient.setQueryData(key, {
         ...base,
@@ -242,8 +289,11 @@ export function useAddToWishlistMutation() {
         queryClient.removeQueries({ queryKey: context.key });
       }
     },
-    onSuccess: (wishlist) => {
-      syncWishlistCaches(queryClient, wishlist);
+    onSuccess: (wishlist, variables, context) => {
+      syncWishlistCaches(
+        queryClient,
+        mergeWishlistEnrichment(wishlist, context?.previous, variables),
+      );
     },
   });
 }

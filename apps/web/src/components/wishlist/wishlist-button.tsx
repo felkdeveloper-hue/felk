@@ -86,7 +86,15 @@ export function WishlistButton({
     }
 
     addMutation.mutate(
-      { productId: product.id, variantId: resolvedVariantId, wishlistId },
+      {
+        productId: product.id,
+        variantId: resolvedVariantId,
+        wishlistId,
+        productName: product.name,
+        productSlug: product.slug,
+        thumbnailUrl: product.thumbnailUrl ?? product.hoverImageUrl,
+        price: product.salePrice ?? product.effectivePrice ?? product.price,
+      },
       {
         onSuccess: () => {
           setCartAnnouncement(`${product.name} added to wishlist`);

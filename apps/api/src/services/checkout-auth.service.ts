@@ -6,6 +6,7 @@ import { appConfig } from '@/config/app.config.js';
 import { logger } from '@/config/logger.js';
 import { EmailOtpModel } from '@/models/email-otp.model.js';
 import { UserModel } from '@/models/user.model.js';
+import type { RoleDocument } from '@/models/role.model.js';
 import { writeAuditLog } from '@/services/audit.service.js';
 import {
   authService,
@@ -23,6 +24,21 @@ import { assertRegisterPassword, hashPassword } from '@/utils/password.helper.js
 
 const CHECKOUT_SIGNUP_PURPOSE = 'checkout_signup' as const;
 const SIGNUP_TOKEN_TTL_SECONDS = 15 * 60;
+
+/**
+ * Guests never password-login (OTP / forgot-password only if converted).
+ * Skip argon2 hashing on the hot path — verify rejects this sentinel.
+ */
+const GUEST_PASSWORD_HASH_SENTINEL = 'guest-no-password';
+
+let cachedCustomerRole: RoleDocument | null = null;
+
+async function getCustomerRole() {
+  if (cachedCustomerRole) return cachedCustomerRole;
+  const role = await findRoleByKey(ROLES.CUSTOMER);
+  if (role) cachedCustomerRole = role;
+  return role;
+}
 
 type CheckoutSignupTokenPayload = {
   email: string;
@@ -264,22 +280,22 @@ export const checkoutAuthService = {
   /**
    * One-click guest checkout — no email/OTP/password.
    * Creates an ephemeral guest customer session; shopper only needs an address next.
+   * Optimized for <1s: no argon2, cached role, session before cart merge.
    */
   async continueAsGuest(
     input: { guestCartToken?: string },
     meta: AuthRequestMeta,
   ): Promise<AuthTokensResult & { rememberMe: boolean; message: string }> {
-    const role = await findRoleByKey(ROLES.CUSTOMER);
+    const role = await getCustomerRole();
     if (!role) {
       throw ApiError.internal('Customer role is not seeded', 'ROLE_MISSING');
     }
 
     const email = `guest-${randomUUID()}@guest.fe.lk`;
-    const passwordHash = await hashPassword(`${randomBytes(32).toString('hex')}Aa1!`);
 
     const user = await UserModel.create({
       email,
-      passwordHash,
+      passwordHash: GUEST_PASSWORD_HASH_SENTINEL,
       passwordHistory: [],
       firstName: 'Guest',
       lastName: 'Shopper',
@@ -292,40 +308,40 @@ export const checkoutAuthService = {
     });
 
     const { customerService } = await import('@/services/customer.service.js');
-    const customer = await customerService.ensureForUser(
-      {
-        id: user._id.toString(),
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        phone: user.phone,
-      },
-      {
-        userId: user._id.toString(),
-        ip: meta.ip,
-        userAgent: meta.userAgent,
-        requestId: meta.requestId,
-      },
-    );
+    const actor = {
+      userId: user._id.toString(),
+      ip: meta.ip,
+      userAgent: meta.userAgent,
+      requestId: meta.requestId,
+    };
 
-    if (input.guestCartToken) {
-      try {
-        const { cartService } = await import('@/services/cart.service.js');
-        await cartService.merge(customer._id.toString(), input.guestCartToken, {
-          userId: user._id.toString(),
-          ip: meta.ip,
-          userAgent: meta.userAgent,
-          requestId: meta.requestId,
-        });
-      } catch (err) {
-        logger.warn(
-          { err, email },
-          'Guest cart merge failed — continuing with empty/customer cart',
-        );
-      }
+    // Customer profile + JWT in parallel. Cart merge runs in the background so this
+    // endpoint stays under ~1s (guest bag stays local in the browser until then).
+    const [customer, tokens] = await Promise.all([
+      customerService.ensureForUser(
+        {
+          id: user._id.toString(),
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          phone: user.phone,
+        },
+        actor,
+      ),
+      authService.issueAuthSession(user._id.toString(), meta, true),
+    ]);
+
+    const guestCartToken = input.guestCartToken;
+    if (guestCartToken) {
+      void (async () => {
+        try {
+          const { cartService } = await import('@/services/cart.service.js');
+          await cartService.merge(customer._id.toString(), guestCartToken, actor);
+        } catch (err) {
+          logger.warn({ err, email }, 'Guest cart merge failed — client will retry with local bag');
+        }
+      })();
     }
-
-    const tokens = await authService.issueAuthSession(user._id.toString(), meta, true);
 
     void writeAuditLog({
       action: AUDIT_ACTIONS.USER_REGISTERED,

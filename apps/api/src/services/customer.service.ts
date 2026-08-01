@@ -110,9 +110,9 @@ export class CustomerService {
       return byEmail;
     }
 
-    const dbUser = await UserModel.findById(user.id);
     let code = generateReferralCode(user.email.split('@')[0]);
-    while (await CustomerModel.exists({ referralCode: code })) {
+    // Entropy in the code makes collisions rare — one retry is enough.
+    if (await CustomerModel.exists({ referralCode: code })) {
       code = generateReferralCode();
     }
 
@@ -122,8 +122,8 @@ export class CustomerService {
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
-        phone: user.phone ?? dbUser?.phone ?? null,
-        profilePhotoUrl: dbUser?.avatarUrl ?? null,
+        phone: user.phone ?? null,
+        profilePhotoUrl: null,
         status: CUSTOMER_STATUS.ACTIVE,
         referralCode: code,
         loyaltyTierKey: LOYALTY_TIER.SILVER,
@@ -139,7 +139,7 @@ export class CustomerService {
         },
       });
 
-      await writeAuditLog({
+      void writeAuditLog({
         action: CUSTOMER_AUDIT.CUSTOMER_CREATED,
         resourceType: 'customers',
         resourceId: customer._id.toString(),

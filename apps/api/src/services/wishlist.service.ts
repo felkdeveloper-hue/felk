@@ -1,11 +1,27 @@
 import { randomBytes } from 'node:crypto';
+import { Types } from 'mongoose';
 import { WishlistModel, WishlistItemModel } from '@/models/customer.models.js';
-import { ProductModel, ProductVariantModel } from '@/models/product.models.js';
+import { ProductModel, ProductVariantModel, ProductMediaModel } from '@/models/product.models.js';
 import { customerService } from '@/services/customer.service.js';
 import { writeAuditLog } from '@/services/audit.service.js';
 import type { ActorMeta } from '@/services/cms-crud.service.js';
 import { ApiError } from '@/utils/errors/api-error.js';
 import { CUSTOMER_AUDIT, WISHLIST_VISIBILITY } from '@/constants/customer.js';
+
+type LeanWishlistItem = {
+  _id: Types.ObjectId;
+  productId: Types.ObjectId;
+  variantId?: Types.ObjectId | null;
+  note?: string | null;
+  addedAt?: Date;
+};
+
+function mediaUrl(doc: { url?: string | null; thumbnailUrl?: string | null } | null | undefined) {
+  if (!doc) return null;
+  if (doc.url) return String(doc.url);
+  if (doc.thumbnailUrl) return String(doc.thumbnailUrl);
+  return null;
+}
 
 export class WishlistService {
   async list(customerId: string) {
@@ -13,6 +29,131 @@ export class WishlistService {
     return WishlistModel.find({ customerId, isDeleted: false }).sort({
       isDefault: -1,
       updatedAt: -1,
+    });
+  }
+
+  private async assertWishlistExists(customerId: string, wishlistId: string) {
+    const wishlist = await WishlistModel.findOne({
+      _id: wishlistId,
+      customerId,
+      isDeleted: false,
+    })
+      .select('_id')
+      .lean();
+    if (!wishlist) throw ApiError.notFound('Wishlist not found');
+  }
+
+  private async enrichItems(rawItems: LeanWishlistItem[]) {
+    if (rawItems.length === 0) return [];
+
+    const productIds = [...new Set(rawItems.map((item) => item.productId.toString()))];
+    const variantIds = [
+      ...new Set(
+        rawItems
+          .map((item) => item.variantId?.toString())
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+
+    const [products, variants, mediaRows] = await Promise.all([
+      ProductModel.find({ _id: { $in: productIds }, isDeleted: false })
+        .select('name slug status pricing')
+        .lean(),
+      variantIds.length
+        ? ProductVariantModel.find({ _id: { $in: variantIds }, isDeleted: false })
+            .select('sku title price thumbnailUrl productId')
+            .lean()
+        : Promise.resolve([]),
+      ProductMediaModel.find({
+        productId: { $in: productIds },
+        isDeleted: false,
+      })
+        .sort({ isPrimary: -1, priority: 1, createdAt: 1 })
+        .select('productId variantId url thumbnailUrl')
+        .lean(),
+    ]);
+
+    const productById = new Map(products.map((p) => [String(p._id), p]));
+    const variantById = new Map(variants.map((v) => [String(v._id), v]));
+
+    const mediaByVariant = new Map<string, string>();
+    const mediaByProduct = new Map<string, string>();
+    for (const row of mediaRows) {
+      const url = mediaUrl(row);
+      if (!url) continue;
+      const productKey = String(row.productId);
+      if (row.variantId) {
+        const variantKey = String(row.variantId);
+        if (!mediaByVariant.has(variantKey)) mediaByVariant.set(variantKey, url);
+      } else if (!mediaByProduct.has(productKey)) {
+        mediaByProduct.set(productKey, url);
+      }
+      if (!mediaByProduct.has(productKey)) mediaByProduct.set(productKey, url);
+    }
+
+    return rawItems.map((item) => {
+      const productId = item.productId.toString();
+      const variantId = item.variantId ? item.variantId.toString() : undefined;
+      const product = productById.get(productId);
+      const variant = variantId ? variantById.get(variantId) : undefined;
+
+      const thumbnailUrl =
+        (variantId ? mediaByVariant.get(variantId) : undefined) ??
+        (typeof variant?.thumbnailUrl === 'string' ? variant.thumbnailUrl : undefined) ??
+        mediaByProduct.get(productId) ??
+        null;
+
+      const pricing = product?.pricing as
+        { price?: number; currency?: string } | number | undefined;
+      const productPrice =
+        typeof pricing === 'number'
+          ? pricing
+          : typeof pricing?.price === 'number'
+            ? pricing.price
+            : 0;
+      const priceAmount = Number(variant?.price ?? productPrice ?? 0);
+      const currency =
+        typeof pricing === 'object' && typeof pricing?.currency === 'string'
+          ? pricing.currency
+          : 'LKR';
+
+      return {
+        id: item._id.toString(),
+        _id: item._id,
+        productId,
+        variantId: variantId ?? null,
+        note: item.note ?? null,
+        addedAt: item.addedAt,
+        productName: product?.name ?? null,
+        productSlug: product?.slug ?? null,
+        productStatus: product?.status ?? null,
+        variantSku: variant?.sku ?? null,
+        variantTitle: variant?.title ?? null,
+        thumbnailUrl,
+        price: priceAmount ? { amount: priceAmount, currency } : null,
+        // Keep nested shapes for older clients / FE normalize fallback.
+        product: product
+          ? {
+              id: productId,
+              _id: product._id,
+              name: product.name,
+              slug: product.slug,
+              status: product.status,
+              pricing: product.pricing,
+              thumbnailUrl,
+            }
+          : undefined,
+        variant: variant
+          ? {
+              id: variantId,
+              _id: variant._id,
+              sku: variant.sku,
+              title: variant.title,
+              price: variant.price,
+              thumbnailUrl: variant.thumbnailUrl ?? thumbnailUrl,
+            }
+          : undefined,
+      };
     });
   }
 
@@ -29,10 +170,14 @@ export class WishlistService {
       isDeleted: false,
     })
       .sort({ addedAt: -1 })
-      .populate('productId', 'name slug status pricing')
-      .populate('variantId', 'sku title price');
+      .select('productId variantId note addedAt')
+      .lean<LeanWishlistItem[]>();
 
-    return { ...wishlist.toObject(), items };
+    return {
+      ...wishlist.toObject(),
+      id: wishlist._id.toString(),
+      items: await this.enrichItems(items),
+    };
   }
 
   async create(customerId: string, payload: Record<string, unknown>, actor: ActorMeta) {
@@ -56,7 +201,7 @@ export class WishlistService {
       shareToken: null,
     });
 
-    await writeAuditLog({
+    void writeAuditLog({
       action: CUSTOMER_AUDIT.WISHLIST_CREATED,
       resourceType: 'wishlists',
       resourceId: wishlist._id.toString(),
@@ -76,7 +221,7 @@ export class WishlistService {
     payload: Record<string, unknown>,
     actor: ActorMeta,
   ) {
-    await this.getById(customerId, wishlistId);
+    await this.assertWishlistExists(customerId, wishlistId);
 
     if (payload.isDefault === true) {
       await WishlistModel.updateMany(
@@ -91,7 +236,7 @@ export class WishlistService {
       { new: true },
     );
 
-    await writeAuditLog({
+    void writeAuditLog({
       action: 'customers.wishlist_updated',
       resourceType: 'wishlists',
       resourceId: wishlistId,
@@ -123,7 +268,7 @@ export class WishlistService {
       { $set: { isDeleted: true, deletedAt: new Date() } },
     );
 
-    await writeAuditLog({
+    void writeAuditLog({
       action: CUSTOMER_AUDIT.WISHLIST_DELETED,
       resourceType: 'wishlists',
       resourceId: wishlistId,
@@ -143,12 +288,14 @@ export class WishlistService {
     payload: { productId: string; variantId?: string | null; note?: string },
     actor: ActorMeta,
   ) {
-    await this.getById(customerId, wishlistId);
+    await this.assertWishlistExists(customerId, wishlistId);
 
     const product = await ProductModel.findOne({
       _id: payload.productId,
       isDeleted: false,
-    });
+    })
+      .select('_id')
+      .lean();
     if (!product) throw ApiError.notFound('Product not found');
 
     if (payload.variantId) {
@@ -156,7 +303,9 @@ export class WishlistService {
         _id: payload.variantId,
         productId: payload.productId,
         isDeleted: false,
-      });
+      })
+        .select('_id')
+        .lean();
       if (!variant) throw ApiError.notFound('Variant not found for product');
     }
 
@@ -172,7 +321,7 @@ export class WishlistService {
 
       await WishlistModel.updateOne({ _id: wishlistId }, { $inc: { itemCount: 1 } });
 
-      await writeAuditLog({
+      void writeAuditLog({
         action: 'customers.wishlist_item_added',
         resourceType: 'wishlist_items',
         resourceId: item._id.toString(),
@@ -182,7 +331,6 @@ export class WishlistService {
         after: item.toObject() as Record<string, unknown>,
       });
 
-      // Return the full wishlist so clients can refresh heart/item state from one response.
       return this.getById(customerId, wishlistId);
     } catch (error) {
       if ((error as { code?: number }).code === 11000) {
@@ -193,7 +341,7 @@ export class WishlistService {
   }
 
   async removeItem(customerId: string, wishlistId: string, itemId: string, actor: ActorMeta) {
-    await this.getById(customerId, wishlistId);
+    await this.assertWishlistExists(customerId, wishlistId);
     const before = await WishlistItemModel.findOne({
       _id: itemId,
       wishlistId,
@@ -213,7 +361,7 @@ export class WishlistService {
       { $inc: { itemCount: -1 } },
     );
 
-    await writeAuditLog({
+    void writeAuditLog({
       action: 'customers.wishlist_item_removed',
       resourceType: 'wishlist_items',
       resourceId: itemId,
@@ -223,7 +371,6 @@ export class WishlistService {
       before: before.toObject() as Record<string, unknown>,
     });
 
-    // Return the full wishlist so clients can refresh heart/item state from one response.
     return this.getById(customerId, wishlistId);
   }
 
@@ -241,7 +388,7 @@ export class WishlistService {
     wishlist.visibility = WISHLIST_VISIBILITY.SHARED;
     await wishlist.save();
 
-    await writeAuditLog({
+    void writeAuditLog({
       action: 'customers.wishlist_share_enabled',
       resourceType: 'wishlists',
       resourceId: wishlistId,
@@ -271,13 +418,14 @@ export class WishlistService {
       wishlistId: wishlist._id,
       isDeleted: false,
     })
-      .populate('productId', 'name slug status pricing')
-      .populate('variantId', 'sku title price');
+      .sort({ addedAt: -1 })
+      .select('productId variantId note addedAt')
+      .lean<LeanWishlistItem[]>();
 
     return {
       name: wishlist.name,
       visibility: wishlist.visibility,
-      items,
+      items: await this.enrichItems(items),
     };
   }
 }

@@ -188,7 +188,15 @@ function ProductCardComponent({
     }
 
     addWishlist.mutate(
-      { productId: product.id, variantId: resolvedVariantId, wishlistId },
+      {
+        productId: product.id,
+        variantId: resolvedVariantId,
+        wishlistId,
+        productName: product.name,
+        productSlug: product.slug,
+        thumbnailUrl: product.thumbnailUrl ?? product.hoverImageUrl,
+        price: displayPrice,
+      },
       {
         onSuccess: () => {
           setCartAnnouncement(`${product.name} added to wishlist`);

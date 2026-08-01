@@ -107,20 +107,12 @@ export function CheckoutGuestAuthDialog({ open, onAuthenticated }: CheckoutGuest
     setGuestPending(true);
     try {
       const guestCartToken = useCartStore.getState().guestCartToken ?? undefined;
+      // Keep local bag + guest token — merge runs after modal closes (beginCheckout).
       const session = await authApi.checkoutContinueAsGuest(
         guestCartToken ? { guestCartToken } : undefined,
       );
       setSession(session);
-      useCartStore.getState().setGuestCartToken(null);
-      try {
-        const cart = await cartApi.get();
-        useCartStore.getState().setCart(cart);
-        queryClient.setQueryData(QUERY_KEYS.cart.current(), cart);
-      } catch {
-        /* bag already merged server-side */
-      }
       queryClient.setQueryData(QUERY_KEYS.customers.addresses(), []);
-      // Close modal — guest only needs to add a delivery address on the page.
       onAuthenticated();
     } catch (err) {
       setError(err);
