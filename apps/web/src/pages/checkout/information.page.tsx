@@ -47,7 +47,11 @@ export function CheckoutInformationPage() {
 
   const hasHydrated = useAuthStore((state) => state.hasHydrated);
   const accessToken = useAuthStore((state) => state.accessToken);
+  const authUser = useAuthStore((state) => state.user);
   const isAuthed = Boolean(accessToken);
+  const isGuestCheckout = Boolean(
+    authUser?.checkoutGuest === true || authUser?.email?.endsWith('@guest.fe.lk'),
+  );
   const guestCart = useCartStore((state) => state.cart);
 
   const billingSameAsShipping = useCheckoutStore((state) => state.billingSameAsShipping);
@@ -370,7 +374,9 @@ export function CheckoutInformationPage() {
             Customer information
           </h2>
           <p className="text-muted-foreground mt-1 text-sm">
-            Choose shipping and billing addresses from your saved profile.
+            {isGuestCheckout
+              ? 'Add your delivery address to continue — no sign-in required.'
+              : 'Choose shipping and billing addresses from your saved profile.'}
           </p>
 
           {!bootstrapError || session ? (
@@ -395,16 +401,19 @@ export function CheckoutInformationPage() {
                 label="Shipping address"
                 selectedId={shippingAddressId}
                 onSelect={setShippingAddressId}
+                preferInlineCreate={isGuestCheckout}
               />
 
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="billing-same-as-shipping"
-                  checked={billingSameAsShipping}
-                  onCheckedChange={(checked) => setBillingSameAsShipping(checked === true)}
-                />
-                <Label htmlFor="billing-same-as-shipping">Billing address same as shipping</Label>
-              </div>
+              {!isGuestCheckout || Boolean(shippingAddressId) ? (
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="billing-same-as-shipping"
+                    checked={billingSameAsShipping}
+                    onCheckedChange={(checked) => setBillingSameAsShipping(checked === true)}
+                  />
+                  <Label htmlFor="billing-same-as-shipping">Billing address same as shipping</Label>
+                </div>
+              ) : null}
 
               {!billingSameAsShipping ? (
                 <AddressPicker
@@ -447,15 +456,17 @@ export function CheckoutInformationPage() {
           )}
         </section>
 
-        {session ? (
-          <div className="lg:sticky lg:top-24 lg:self-start">
+        <div className="lg:sticky lg:top-24 lg:self-start">
+          {session ? (
             <CheckoutOrderSummary session={session} editable />
-          </div>
-        ) : sessionPending ? (
-          <div className="lg:sticky lg:top-24 lg:self-start" aria-busy="true">
-            <Skeleton className="h-64 w-full" />
-          </div>
-        ) : null}
+          ) : guestCart?.totals ? (
+            <CartOrderSummary totals={guestCart.totals} validation={guestCart.validation} />
+          ) : sessionPending ? (
+            <div aria-busy="true">
+              <Skeleton className="h-64 w-full" />
+            </div>
+          ) : null}
+        </div>
       </div>
     </>
   );

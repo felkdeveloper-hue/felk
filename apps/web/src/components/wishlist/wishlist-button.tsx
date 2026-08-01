@@ -54,24 +54,21 @@ export function WishlistButton({
 
     if (pending) return;
 
-    const wishlistId = wishlistQuery.data?.id;
+    const wishlistId = wishlistQuery.data?.id ?? 'default';
 
     if (active) {
-      if (!wishlistId) {
-        setCartAnnouncement('Wishlist is still loading. Try again in a moment.');
-        return;
-      }
       const item = wishlistQuery.data?.items.find(
         (entry) =>
           entry.productId === product.id &&
           (resolvedVariantId ? entry.variantId === resolvedVariantId : true),
       );
-      if (!item) {
-        setCartAnnouncement('Could not find that item in your wishlist.');
-        return;
-      }
       removeMutation.mutate(
-        { wishlistId, itemId: item.id },
+        {
+          wishlistId,
+          itemId: item?.id ?? `optimistic-${product.id}-${resolvedVariantId ?? 'any'}`,
+          productId: product.id,
+          variantId: resolvedVariantId,
+        },
         {
           onSuccess: () => {
             setCartAnnouncement(`${product.name} removed from wishlist`);
@@ -88,7 +85,6 @@ export function WishlistButton({
       return;
     }
 
-    // Add can create/resolve the default wishlist when the detail query is still warming up.
     addMutation.mutate(
       { productId: product.id, variantId: resolvedVariantId, wishlistId },
       {
@@ -107,20 +103,23 @@ export function WishlistButton({
   };
 
   return (
-    <motion.div whileTap={{ scale: 0.94 }}>
+    <motion.div whileTap={{ scale: 0.9 }}>
       <Button
         type="button"
-        variant={variant ?? (active ? 'default' : 'secondary')}
+        variant={variant ?? 'ghost'}
         size={iconOnly ? 'icon' : 'default'}
         aria-label={active ? 'Remove from wishlist' : 'Add to wishlist'}
         aria-pressed={active}
-        className={cn(className)}
+        className={cn(
+          className,
+          active
+            ? 'text-red-500 hover:text-red-600'
+            : 'text-muted-foreground hover:text-foreground',
+        )}
         onClick={handleClick}
-        loading={pending || (isAuthed && wishlistQuery.isLoading)}
-        disabled={pending || (isAuthed && wishlistQuery.isLoading)}
         {...props}
       >
-        <Heart className={cn('size-4', active && 'fill-current')} />
+        <Heart className={cn('size-4 transition-colors', active && 'fill-red-500 text-red-500')} />
         {!iconOnly ? (active ? 'Saved' : 'Save') : null}
       </Button>
     </motion.div>

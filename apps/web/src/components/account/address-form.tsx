@@ -50,7 +50,7 @@ const COUNTRY_OPTIONS = [
 export interface AddressFormProps {
   address?: CustomerAddress;
   onSubmit: (values: CustomerAddressInput) => void;
-  onCancel: () => void;
+  onCancel?: () => void;
   isSubmitting?: boolean;
 }
 
@@ -297,9 +297,11 @@ export function AddressForm({ address, onSubmit, onCancel, isSubmitting }: Addre
         </div>
 
         <div className="flex justify-end gap-2 pt-2">
-          <Button type="button" variant="outline" onClick={onCancel}>
-            Cancel
-          </Button>
+          {onCancel ? (
+            <Button type="button" variant="outline" onClick={onCancel}>
+              Cancel
+            </Button>
+          ) : null}
           <Button type="submit" loading={isSubmitting}>
             {address ? 'Save address' : 'Add address'}
           </Button>

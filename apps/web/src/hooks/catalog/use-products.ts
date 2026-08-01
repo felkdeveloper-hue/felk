@@ -1,7 +1,7 @@
-import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { QUERY_KEYS } from '@/constants/query-keys';
 import { PRODUCT_LIST_STALE_MS } from '@/lib/prefetch-catalog';
-import { productsApi } from '@/services/sdk';
+import { productsApi, type Product } from '@/services/sdk';
 import {
   applyClientCatalogFilters,
   catalogSearchToProductParams,
@@ -9,6 +9,30 @@ import {
   CATALOG_MAX_PRODUCTS,
   type CatalogSearchState,
 } from '@/utils/catalog';
+
+function findProductInListCache(
+  queryClient: ReturnType<typeof useQueryClient>,
+  slug: string,
+): Product | undefined {
+  const matches = queryClient.getQueriesData<{ data?: Product[] }>({
+    queryKey: QUERY_KEYS.products.all(),
+  });
+  for (const [, value] of matches) {
+    if (!value || typeof value !== 'object') continue;
+    if (Array.isArray((value as { data?: Product[] }).data)) {
+      const hit = (value as { data: Product[] }).data.find((product) => product.slug === slug);
+      if (hit) return hit;
+    }
+    // Infinite query pages
+    if (Array.isArray((value as { pages?: Array<{ data?: Product[] }> }).pages)) {
+      for (const page of (value as { pages: Array<{ data?: Product[] }> }).pages) {
+        const hit = page.data?.find((product) => product.slug === slug);
+        if (hit) return hit;
+      }
+    }
+  }
+  return undefined;
+}
 
 export function useProductsList(state: CatalogSearchState, options?: { enabled?: boolean }) {
   const apiParams = catalogSearchToProductParams(state);
@@ -65,11 +89,13 @@ export function useInfiniteProducts(state: CatalogSearchState, options?: { enabl
 }
 
 export function useProductDetail(slug: string) {
+  const queryClient = useQueryClient();
   return useQuery({
     queryKey: QUERY_KEYS.products.detail(slug),
     queryFn: () => productsApi.getBySlugOrId(slug),
     enabled: Boolean(slug),
     staleTime: 1000 * 60 * 5,
+    placeholderData: () => findProductInListCache(queryClient, slug),
   });
 }
 

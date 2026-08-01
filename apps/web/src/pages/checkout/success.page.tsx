@@ -119,6 +119,13 @@ export function CheckoutSuccessPage() {
               Reference: <span className="font-mono">{checkoutToken.slice(0, 12)}…</span>
             </p>
           ) : null}
+
+          {isConfirmed ? (
+            <p className="text-muted-foreground mt-3 text-xs">
+              Guest orders can be tracked with your order number and the phone on your delivery
+              address.
+            </p>
+          ) : null}
         </motion.div>
 
         {statusQuery.error && !isWaiting ? (

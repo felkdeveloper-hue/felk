@@ -1,7 +1,9 @@
 import { memo, useCallback, useRef, useState, type TouchEvent } from 'react';
 import { Link, useNavigate } from '@tanstack/react-router';
-import { Eye, Heart, Plus, Star } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import { Eye, Plus, Star } from 'lucide-react';
 import type { Product } from '@/services/sdk';
+import { productsApi } from '@/services/sdk';
 import { Image } from '@/components/media/image';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -17,7 +19,7 @@ import {
 } from '@/hooks/wishlist';
 import { useAuthStore } from '@/store';
 import { useUiStore } from '@/store/ui-store';
-import { ROUTES } from '@/constants';
+import { QUERY_KEYS, ROUTES } from '@/constants';
 import { resolveVariantId } from '@/utils/cart';
 import { productMetaFrom, trackCommerceEvent } from '@/lib/analytics';
 import { PriceDisplay } from './price-display';
@@ -47,6 +49,7 @@ function ProductCardComponent({
   sizes = '(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw',
 }: ProductCardProps) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const listingVariant = product.variants?.find(
     (variant) => variant.id === product.defaultVariantId,
   );
@@ -132,33 +135,37 @@ function ProductCardComponent({
     },
   };
 
+  const prefetchProduct = useCallback(() => {
+    void queryClient.prefetchQuery({
+      queryKey: QUERY_KEYS.products.detail(product.slug),
+      queryFn: () => productsApi.getBySlugOrId(product.slug),
+      staleTime: 1000 * 60 * 5,
+    });
+  }, [product.slug, queryClient]);
+
   const toggleWishlist = useCallback(() => {
     if (!isAuthed) {
       void navigate({ to: ROUTES.authLogin, search: { redirect: window.location.pathname } });
       return;
     }
 
-    const wishlistId = wishlistQuery.data?.id;
-
+    const wishlistId = wishlistQuery.data?.id ?? 'default';
     setHeartBurst(true);
     window.setTimeout(() => setHeartBurst(false), 220);
 
     if (isInWishlist) {
-      if (!wishlistId) {
-        setCartAnnouncement('Wishlist is still loading. Try again in a moment.');
-        return;
-      }
       const item = wishlistQuery.data?.items.find(
         (entry) =>
           entry.productId === product.id &&
           (resolvedVariantId ? entry.variantId === resolvedVariantId : true),
       );
-      if (!item) {
-        setCartAnnouncement('Could not find that item in your wishlist.');
-        return;
-      }
       removeWishlist.mutate(
-        { wishlistId, itemId: item.id },
+        {
+          wishlistId,
+          itemId: item?.id ?? `optimistic-${product.id}-${resolvedVariantId ?? 'any'}`,
+          productId: product.id,
+          variantId: resolvedVariantId,
+        },
         {
           onSuccess: () => {
             setCartAnnouncement(`${product.name} removed from wishlist`);
@@ -273,8 +280,15 @@ function ProductCardComponent({
           isList && 'flex gap-3 sm:gap-4',
           className,
         )}
-        onMouseEnter={() => setWantHover(true)}
-        onFocusCapture={() => setWantHover(true)}
+        onMouseEnter={() => {
+          setWantHover(true);
+          prefetchProduct();
+        }}
+        onFocusCapture={() => {
+          setWantHover(true);
+          prefetchProduct();
+        }}
+        onPointerDown={prefetchProduct}
       >
         <div
           className={cn(
@@ -378,7 +392,13 @@ function ProductCardComponent({
             <WishlistButton
               product={product}
               variant="ghost"
-              className="size-10 rounded-none border-0 bg-transparent text-white shadow-none hover:bg-transparent hover:text-white aria-pressed:text-red-500 aria-pressed:hover:text-red-500 [&_svg]:size-[1.15rem] [&_svg]:drop-shadow-[0_1px_3px_rgba(0,0,0,0.65)]"
+              className={cn(
+                'size-10 rounded-none border-0 bg-transparent shadow-none hover:bg-transparent [&_svg]:size-[1.15rem] [&_svg]:drop-shadow-[0_1px_3px_rgba(0,0,0,0.65)]',
+                'aria-pressed:fill-red-500 aria-pressed:text-red-500',
+                isInWishlist || heartBurst
+                  ? 'text-red-500 hover:text-red-500'
+                  : 'text-white hover:text-white',
+              )}
             />
           </div>
 
@@ -463,7 +483,12 @@ function ProductCardComponent({
             <WishlistButton
               product={product}
               variant="ghost"
-              className="text-muted-foreground hover:text-foreground -mr-1.5 -mt-0.5 hidden size-7 shrink-0 rounded-full lg:inline-flex"
+              className={cn(
+                '-mr-1.5 -mt-0.5 inline-flex size-8 shrink-0 rounded-full lg:size-7',
+                isInWishlist || heartBurst
+                  ? 'text-red-500 hover:text-red-600'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
             />
           </div>
 

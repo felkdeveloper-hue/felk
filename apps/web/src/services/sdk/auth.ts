@@ -157,4 +157,13 @@ export const authApi = {
     });
     return normalizeAuthSession(raw);
   },
+
+  /** One-click guest — no email/OTP; only address is needed next. */
+  async checkoutContinueAsGuest(payload?: { guestCartToken?: string }): Promise<AuthSession> {
+    const raw = await http.post<unknown>('/auth/checkout/continue-as-guest', payload ?? {}, {
+      skipAuthRefresh: true,
+      timeout: 20_000,
+    });
+    return normalizeAuthSession(raw);
+  },
 };

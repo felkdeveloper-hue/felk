@@ -21,8 +21,7 @@ import { cartApi } from '@/services/sdk/cart';
 import { QUERY_KEYS } from '@/constants/query-keys';
 import { AppError } from '@/lib/errors';
 
-type Step = 'email' | 'password' | 'otp' | 'create_password' | 'guest_details' | 'address';
-type Intent = 'account' | 'guest';
+type Step = 'email' | 'password' | 'otp' | 'create_password' | 'address';
 
 export interface CheckoutGuestAuthDialogProps {
   open: boolean;
@@ -31,14 +30,14 @@ export interface CheckoutGuestAuthDialogProps {
 
 function FirstOrderPromo() {
   return (
-    <div className="border-border from-muted/80 to-background bg-linear-to-br rounded-lg border px-4 py-3">
-      <p className="text-foreground text-sm font-semibold tracking-tight">
-        Create an account — save <span className="text-emerald-700">5%</span> on your first order
+    <div className="relative overflow-hidden rounded-xl border border-emerald-800/15 bg-[linear-gradient(135deg,#ecfdf5_0%,#f8faf9_55%,#ffffff_100%)] px-4 py-4">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-800">
+        Member perk
       </p>
-      <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
-        Every first order gets 5% off automatically. Sign up to keep your bag, addresses, and order
-        history in one place.
+      <p className="text-foreground mt-1.5 text-lg font-semibold tracking-tight">
+        Get <span className="text-emerald-700">5% off</span> your first order
       </p>
+      <p className="text-muted-foreground mt-1 text-sm">Sign in to unlock your welcome savings.</p>
     </div>
   );
 }
@@ -51,7 +50,6 @@ export function CheckoutGuestAuthDialog({ open, onAuthenticated }: CheckoutGuest
   const createAddress = useCreateAddressMutation();
 
   const [step, setStep] = useState<Step>('email');
-  const [intent, setIntent] = useState<Intent>('account');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [otp, setOtp] = useState('');
@@ -60,6 +58,7 @@ export function CheckoutGuestAuthDialog({ open, onAuthenticated }: CheckoutGuest
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
   const [pending, setPending] = useState(false);
+  const [guestPending, setGuestPending] = useState(false);
   const [error, setError] = useState<unknown>(null);
 
   const afterAuth = async () => {
@@ -103,30 +102,44 @@ export function CheckoutGuestAuthDialog({ open, onAuthenticated }: CheckoutGuest
     setStep('address');
   };
 
-  const sendOtpForEmail = async () => {
-    await authApi.checkoutSendOtp(email.trim());
-    setStep('otp');
+  const handleContinueAsGuest = async () => {
+    setError(null);
+    setGuestPending(true);
+    try {
+      const guestCartToken = useCartStore.getState().guestCartToken ?? undefined;
+      const session = await authApi.checkoutContinueAsGuest(
+        guestCartToken ? { guestCartToken } : undefined,
+      );
+      setSession(session);
+      useCartStore.getState().setGuestCartToken(null);
+      try {
+        const cart = await cartApi.get();
+        useCartStore.getState().setCart(cart);
+        queryClient.setQueryData(QUERY_KEYS.cart.current(), cart);
+      } catch {
+        /* bag already merged server-side */
+      }
+      queryClient.setQueryData(QUERY_KEYS.customers.addresses(), []);
+      // Close modal — guest only needs to add a delivery address on the page.
+      onAuthenticated();
+    } catch (err) {
+      setError(err);
+    } finally {
+      setGuestPending(false);
+    }
   };
 
-  const handleEmailContinue = async (nextIntent: Intent) => {
+  const handleEmailContinue = async () => {
     setError(null);
     setPending(true);
-    setIntent(nextIntent);
     try {
       const status = await authApi.checkoutEmailStatus(email.trim());
       if (status.exists && status.verified) {
-        if (nextIntent === 'guest') {
-          setError(
-            new AppError('This email already has an account. Sign in to continue.', {
-              code: 'EMAIL_EXISTS',
-              status: 409,
-            }),
-          );
-        }
         setStep('password');
         return;
       }
-      await sendOtpForEmail();
+      await authApi.checkoutSendOtp(email.trim());
+      setStep('otp');
     } catch (err) {
       setError(err);
     } finally {
@@ -162,7 +175,7 @@ export function CheckoutGuestAuthDialog({ open, onAuthenticated }: CheckoutGuest
         return;
       }
       setSignupToken(result.signupToken);
-      setStep(intent === 'guest' ? 'guest_details' : 'create_password');
+      setStep('create_password');
     } catch (err) {
       setError(err);
     } finally {
@@ -212,26 +225,6 @@ export function CheckoutGuestAuthDialog({ open, onAuthenticated }: CheckoutGuest
     }
   };
 
-  const handleCompleteGuest = async () => {
-    if (!signupToken) return;
-    setError(null);
-    setPending(true);
-    try {
-      const session = await authApi.checkoutCompleteGuest({
-        signupToken,
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        phone: phone.trim() || undefined,
-      });
-      setSession(session);
-      await afterAuth();
-    } catch (err) {
-      setError(err);
-    } finally {
-      setPending(false);
-    }
-  };
-
   const handleAddressSubmit = (values: CustomerAddressInput) => {
     setError(null);
     createAddress.mutate(
@@ -256,7 +249,6 @@ export function CheckoutGuestAuthDialog({ open, onAuthenticated }: CheckoutGuest
     setOtp('');
     setPassword('');
     setSignupToken(null);
-    setIntent('account');
     setStep('email');
   };
 
@@ -265,16 +257,14 @@ export function CheckoutGuestAuthDialog({ open, onAuthenticated }: CheckoutGuest
     password: 'Welcome back',
     otp: 'Verify your email',
     create_password: 'Create your account',
-    guest_details: 'Continue as guest',
     address: 'Shipping address',
   };
 
   const descriptions: Record<Step, string> = {
-    email: 'Enter your email to sign in, create an account, or continue as a guest.',
+    email: 'Enter your email to continue.',
     password: 'Enter your password to continue to checkout.',
     otp: 'Enter the verification code we sent to your email.',
-    create_password: 'Set a password to save your details — your first order includes 5% off.',
-    guest_details: 'Tell us who to deliver to. You can track this order with your email afterward.',
+    create_password: 'Almost there — finish your account to claim 5% off.',
     address: 'Add a shipping address to continue checkout.',
   };
 
@@ -304,7 +294,7 @@ export function CheckoutGuestAuthDialog({ open, onAuthenticated }: CheckoutGuest
         ) : null}
 
         {step === 'email' ? (
-          <div className="space-y-4">
+          <div className="space-y-5">
             <div className="space-y-2">
               <Label htmlFor="checkout-guest-email">Email</Label>
               <Input
@@ -316,31 +306,35 @@ export function CheckoutGuestAuthDialog({ open, onAuthenticated }: CheckoutGuest
                 placeholder="you@example.com"
               />
             </div>
-            <DialogFooter className="flex-col gap-2 sm:flex-col">
-              <Button
-                type="button"
-                className="w-full"
-                disabled={pending || !email.includes('@')}
-                loading={pending && intent === 'account'}
-                onClick={() => void handleEmailContinue('account')}
-              >
-                Continue
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full"
-                disabled={pending || !email.includes('@')}
-                loading={pending && intent === 'guest'}
-                onClick={() => void handleEmailContinue('guest')}
-              >
-                Continue as guest
-              </Button>
-            </DialogFooter>
-            <p className="text-muted-foreground text-center text-xs">
-              Guests still receive 5% off on a first order. Create an account anytime after
-              checkout.
-            </p>
+
+            <Button
+              type="button"
+              className="w-full bg-emerald-800 text-white hover:bg-emerald-900"
+              disabled={pending || guestPending || !email.includes('@')}
+              loading={pending}
+              onClick={() => void handleEmailContinue()}
+            >
+              Continue & save 5%
+            </Button>
+
+            <div className="relative flex items-center gap-3" role="separator" aria-label="or">
+              <div className="bg-border h-px flex-1" />
+              <span className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+                Or
+              </span>
+              <div className="bg-border h-px flex-1" />
+            </div>
+
+            <Button
+              type="button"
+              variant="ghost"
+              className="text-muted-foreground hover:text-foreground w-full font-normal"
+              disabled={pending || guestPending}
+              loading={guestPending}
+              onClick={() => void handleContinueAsGuest()}
+            >
+              Continue as guest
+            </Button>
           </div>
         ) : null}
 
@@ -410,7 +404,7 @@ export function CheckoutGuestAuthDialog({ open, onAuthenticated }: CheckoutGuest
                 type="button"
                 variant="ghost"
                 disabled={pending}
-                onClick={() => void handleEmailContinue(intent)}
+                onClick={() => void handleEmailContinue()}
               >
                 Resend code
               </Button>
@@ -466,7 +460,7 @@ export function CheckoutGuestAuthDialog({ open, onAuthenticated }: CheckoutGuest
                 onChange={(e) => setPassword(e.target.value)}
               />
             </div>
-            <DialogFooter className="flex-col gap-2 sm:flex-col">
+            <DialogFooter>
               <Button
                 type="button"
                 className="w-full"
@@ -475,83 +469,6 @@ export function CheckoutGuestAuthDialog({ open, onAuthenticated }: CheckoutGuest
                 onClick={() => void handleCompleteSignup()}
               >
                 Create account & continue
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                className="w-full"
-                disabled={pending || !signupToken}
-                onClick={() => setStep('guest_details')}
-              >
-                Prefer guest checkout instead
-              </Button>
-            </DialogFooter>
-          </div>
-        ) : null}
-
-        {step === 'guest_details' ? (
-          <div className="space-y-4">
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-              <span className="text-muted-foreground">{email}</span>
-              <Button
-                type="button"
-                variant="link"
-                className="text-foreground h-auto p-0 text-sm font-medium underline-offset-4"
-                onClick={handleChangeEmail}
-              >
-                Change email
-              </Button>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="checkout-guest-only-first">First name</Label>
-                <Input
-                  id="checkout-guest-only-first"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  autoComplete="given-name"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="checkout-guest-only-last">Last name</Label>
-                <Input
-                  id="checkout-guest-only-last"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                  autoComplete="family-name"
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="checkout-guest-only-phone">Phone (optional)</Label>
-              <Input
-                id="checkout-guest-only-phone"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                autoComplete="tel"
-              />
-            </div>
-            <DialogFooter className="flex-col gap-2 sm:flex-col">
-              <Button
-                type="button"
-                className="w-full"
-                disabled={pending || !firstName.trim() || !lastName.trim()}
-                loading={pending}
-                onClick={() => void handleCompleteGuest()}
-              >
-                Continue as guest
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                className="w-full"
-                disabled={pending}
-                onClick={() => {
-                  setIntent('account');
-                  setStep('create_password');
-                }}
-              >
-                Create an account instead
               </Button>
             </DialogFooter>
           </div>

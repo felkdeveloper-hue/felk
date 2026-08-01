@@ -89,26 +89,40 @@ export class OrderService {
     return this.toSummary(order);
   }
 
-  /** Public guest lookup — order number + email must match the customer on the order. */
-  async trackAsGuest(orderNumber: string, emailRaw: string) {
-    const email = normalizeEmail(emailRaw);
+  /** Public guest lookup — order number + email, or order number + shipping phone. */
+  async trackAsGuest(orderNumber: string, emailOrPhoneRaw: string) {
+    const lookup = emailOrPhoneRaw.trim();
     const order = await OrderModel.findOne({
       orderNumber: orderNumber.trim(),
       isDeleted: false,
     });
     if (!order) {
-      throw ApiError.notFound('Order not found for that email and order number');
+      throw ApiError.notFound('Order not found for that order number and email/phone');
     }
 
     const customer = await CustomerModel.findOne({
       _id: order.customerId,
       isDeleted: false,
     })
-      .select('email')
+      .select('email phone')
       .lean();
 
-    if (!customer || normalizeEmail(customer.email) !== email) {
-      throw ApiError.notFound('Order not found for that email and order number');
+    const digits = (value: string | null | undefined) => (value ?? '').replace(/\D/g, '');
+    const lookupDigits = digits(lookup);
+    const shippingPhone = digits(
+      String((order.shippingAddress as { phone?: string } | null)?.phone ?? ''),
+    );
+    const customerPhone = digits(customer?.phone);
+    const emailMatch =
+      Boolean(lookup.includes('@')) &&
+      Boolean(customer?.email) &&
+      normalizeEmail(lookup) === normalizeEmail(customer!.email);
+    const phoneMatch =
+      lookupDigits.length >= 7 &&
+      (lookupDigits === shippingPhone || lookupDigits === customerPhone);
+
+    if (!emailMatch && !phoneMatch) {
+      throw ApiError.notFound('Order not found for that order number and email/phone');
     }
 
     return {

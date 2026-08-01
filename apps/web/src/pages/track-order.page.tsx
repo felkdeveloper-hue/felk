@@ -61,7 +61,8 @@ export function TrackOrderPage() {
           <PackageSearch className="text-foreground mx-auto size-10" aria-hidden />
           <h1 className="mt-4 text-2xl font-semibold tracking-tight">Track your order</h1>
           <p className="text-muted-foreground mt-2 text-sm">
-            Enter the order number from your confirmation and the email used at checkout.
+            Enter your order number and the email on your account, or the phone number used on your
+            guest delivery address.
           </p>
         </div>
 
@@ -78,14 +79,13 @@ export function TrackOrderPage() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="track-order-email">Email</Label>
+            <Label htmlFor="track-order-email">Email or phone</Label>
             <Input
               id="track-order-email"
-              type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              autoComplete="email"
+              placeholder="you@example.com or 07XXXXXXXX"
+              autoComplete="tel"
               required
             />
           </div>

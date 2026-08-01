@@ -83,6 +83,7 @@ function sanitizeUser(user: UserDocument, permissions: string[] = []) {
     status: user.status,
     emailVerified: Boolean(user.emailVerifiedAt),
     permissions,
+    checkoutGuest: Boolean(user.metadata?.checkoutGuest),
   };
 }
 

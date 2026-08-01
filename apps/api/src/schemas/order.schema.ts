@@ -14,7 +14,8 @@ export const orderNumberParamsSchema = z.object({
 
 export const guestOrderTrackSchema = z.object({
   orderNumber: z.string().trim().min(3).max(64),
-  email: z.string().trim().email().max(255),
+  /** Account email, or the phone used on the guest shipping address. */
+  email: z.string().trim().min(5).max(255),
 });
 
 export const orderListQuerySchema = z.object({

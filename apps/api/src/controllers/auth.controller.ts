@@ -259,4 +259,30 @@ export const authController = {
       result.message,
     );
   }),
+
+  checkoutContinueAsGuest: asyncHandler(async (req, res) => {
+    const result = await checkoutAuthService.continueAsGuest(req.body ?? {}, meta(req));
+    setAuthCookies(res, {
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+      rememberMe: result.rememberMe,
+    });
+    void emitBusinessEvent({
+      eventId: crypto.randomUUID(),
+      name: 'signup',
+      userId: result.user?.id ?? null,
+      properties: { portal: 'customer', source: 'checkout_continue_as_guest' },
+    });
+    ApiResponse.created(
+      res,
+      {
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+        expiresIn: result.expiresIn,
+        tokenType: 'Bearer',
+        user: result.user,
+      },
+      result.message,
+    );
+  }),
 };

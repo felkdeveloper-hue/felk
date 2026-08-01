@@ -27,6 +27,7 @@ import {
   type ShippingMethod,
 } from '@/constants/checkout.js';
 import { ORDER_STATUS } from '@/constants/order-status.js';
+import { UserModel } from '@/models/user.model.js';
 import type { AuthenticatedUser } from '@/types/index.js';
 
 function toPlain(doc: { toObject: () => Record<string, unknown> }) {
@@ -290,7 +291,15 @@ export class CheckoutService {
       session.giftCard = applyGiftCardPlaceholder(opts.giftCardCode);
     }
 
-    // Auto 5% for every shopper on their first non-cancelled order.
+    // 5% first-order discount — signed-in accounts only (never guest checkout).
+    const isGuestCheckout =
+      Boolean((session.metadata as { isGuestCheckout?: boolean } | undefined)?.isGuestCheckout) ||
+      (session.userId
+        ? Boolean(
+            (await UserModel.findById(session.userId).select('metadata').lean())?.metadata
+              ?.checkoutGuest,
+          )
+        : true);
     const hasPriorOrder = await OrderModel.exists({
       customerId: session.customerId,
       isDeleted: false,
@@ -298,7 +307,7 @@ export class CheckoutService {
     });
     const couponCode = (session.coupon as { code?: string | null } | null)?.code ?? null;
     const couponAmount = Number((session.coupon as { amount?: number } | null)?.amount ?? 0);
-    if (!hasPriorOrder && subtotal > 0) {
+    if (!isGuestCheckout && !hasPriorOrder && subtotal > 0) {
       session.coupon = applyFirstOrderDiscount(subtotal);
     } else if (couponCode === FIRST_ORDER_DISCOUNT.CODE || (!couponAmount && !couponCode)) {
       session.coupon = applyCouponPlaceholder(opts?.couponCode);
@@ -450,6 +459,8 @@ export class CheckoutService {
         : await this.loadAddressSnapshot(customer._id.toString(), billingAddressId);
 
     const timeout = CHECKOUT_RESERVATION_TTL_MINUTES;
+    const starter = await UserModel.findById(user.id).select('metadata').lean();
+    const isGuestCheckout = Boolean(starter?.metadata?.checkoutGuest);
 
     let session = await CheckoutSessionModel.create({
       checkoutToken: newCheckoutToken(),
@@ -471,7 +482,10 @@ export class CheckoutService {
       reservationExpiresAt: null,
       expiresAt: null,
       validationIssues: built.issues,
-      metadata: buyNowVariantIds.length ? { buyNowVariantIds } : {},
+      metadata: {
+        ...(buyNowVariantIds.length ? { buyNowVariantIds } : {}),
+        ...(isGuestCheckout ? { isGuestCheckout: true } : {}),
+      },
     });
 
     session = (await this.recalculate(session, {

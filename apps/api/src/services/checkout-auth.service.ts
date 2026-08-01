@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import { AUTH_LIMITS, AUDIT_ACTIONS, USER_STATUS } from '@/constants/auth.js';
 import { ROLES } from '@/constants/roles.js';
@@ -262,8 +262,88 @@ export const checkoutAuthService = {
   },
 
   /**
-   * Guest checkout after email OTP — creates a customer session without a known password.
-   * Guest can track orders while signed in; they may claim the account later via forgot-password.
+   * One-click guest checkout — no email/OTP/password.
+   * Creates an ephemeral guest customer session; shopper only needs an address next.
+   */
+  async continueAsGuest(
+    input: { guestCartToken?: string },
+    meta: AuthRequestMeta,
+  ): Promise<AuthTokensResult & { rememberMe: boolean; message: string }> {
+    const role = await findRoleByKey(ROLES.CUSTOMER);
+    if (!role) {
+      throw ApiError.internal('Customer role is not seeded', 'ROLE_MISSING');
+    }
+
+    const email = `guest-${randomUUID()}@guest.fe.lk`;
+    const passwordHash = await hashPassword(`${randomBytes(32).toString('hex')}Aa1!`);
+
+    const user = await UserModel.create({
+      email,
+      passwordHash,
+      passwordHistory: [],
+      firstName: 'Guest',
+      lastName: 'Shopper',
+      phone: null,
+      roleId: role._id,
+      roleKey: ROLES.CUSTOMER,
+      status: USER_STATUS.ACTIVE,
+      emailVerifiedAt: new Date(),
+      metadata: { checkoutGuest: true },
+    });
+
+    const { customerService } = await import('@/services/customer.service.js');
+    const customer = await customerService.ensureForUser(
+      {
+        id: user._id.toString(),
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        phone: user.phone,
+      },
+      {
+        userId: user._id.toString(),
+        ip: meta.ip,
+        userAgent: meta.userAgent,
+        requestId: meta.requestId,
+      },
+    );
+
+    if (input.guestCartToken) {
+      try {
+        const { cartService } = await import('@/services/cart.service.js');
+        await cartService.merge(customer._id.toString(), input.guestCartToken, {
+          userId: user._id.toString(),
+          ip: meta.ip,
+          userAgent: meta.userAgent,
+          requestId: meta.requestId,
+        });
+      } catch (err) {
+        logger.warn(
+          { err, email },
+          'Guest cart merge failed — continuing with empty/customer cart',
+        );
+      }
+    }
+
+    const tokens = await authService.issueAuthSession(user._id.toString(), meta, true);
+
+    void writeAuditLog({
+      action: AUDIT_ACTIONS.USER_REGISTERED,
+      resourceType: 'user',
+      resourceId: user._id.toString(),
+      actorUserId: user._id.toString(),
+      metadata: { source: 'checkout_continue_as_guest', ip: meta.ip },
+    });
+
+    return {
+      ...tokens,
+      rememberMe: true,
+      message: 'Continuing as guest',
+    };
+  },
+
+  /**
+   * @deprecated Prefer continueAsGuest — kept for older clients that verified email OTP first.
    */
   async completeAsGuest(
     input: {

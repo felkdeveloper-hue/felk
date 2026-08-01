@@ -5,6 +5,8 @@ import { useCartStore } from '@/store/cart-store';
 import { useAuthStore } from '@/store';
 import { getDefaultWishlist, normalizeWishlist, type EnrichedWishlistItem } from '@/utils/wishlist';
 
+const WISHLIST_STALE_MS = 1000 * 60 * 10;
+
 function useIsAuthed() {
   return useAuthStore((state) => Boolean(state.accessToken && state.user));
 }
@@ -16,7 +18,7 @@ export function useWishlistsQuery() {
     queryKey: QUERY_KEYS.customers.wishlists(),
     queryFn: () => customersApi.listWishlists(),
     enabled: isAuthed,
-    staleTime: 1000 * 60,
+    staleTime: WISHLIST_STALE_MS,
   });
 }
 
@@ -37,7 +39,7 @@ export function useDefaultWishlistQuery() {
       return normalizeWishlist(full);
     },
     enabled: isAuthed && wishlistsQuery.isSuccess,
-    staleTime: 1000 * 30,
+    staleTime: WISHLIST_STALE_MS,
   });
 }
 
@@ -48,7 +50,7 @@ export function useWishlistItemCountQuery() {
     queryKey: QUERY_KEYS.customers.wishlists(),
     queryFn: () => customersApi.listWishlists(),
     enabled: isAuthed,
-    staleTime: 1000 * 60,
+    staleTime: WISHLIST_STALE_MS,
     select: (wishlists) =>
       wishlists.reduce((sum, wishlist) => sum + Number(wishlist.itemCount ?? 0), 0),
   });
@@ -79,7 +81,6 @@ function findCachedWishlist(
     if (wishlist) return { key, wishlist };
   }
 
-  // Detail keys are ['customers','me','wishlists', id] — pick any hydrated detail cache.
   const detailMatches = queryClient.getQueriesData<NormalizedWishlist>({
     predicate: (query) => {
       const key = query.queryKey;
@@ -108,6 +109,50 @@ function isFullWishlistPayload(payload: unknown, wishlistId: string): boolean {
   return id === wishlistId && Array.isArray(record.items);
 }
 
+function syncWishlistCaches(
+  queryClient: ReturnType<typeof useQueryClient>,
+  wishlist: NormalizedWishlist,
+) {
+  queryClient.setQueryData(QUERY_KEYS.customers.wishlist(wishlist.id), wishlist);
+  queryClient.setQueryData(QUERY_KEYS.customers.wishlist('default'), wishlist);
+  queryClient.setQueryData(QUERY_KEYS.customers.wishlists(), (prev) => {
+    if (!Array.isArray(prev)) {
+      return [
+        {
+          id: wishlist.id,
+          name: wishlist.name,
+          itemCount: wishlist.itemCount,
+          isDefault: true,
+        },
+      ];
+    }
+    const exists = prev.some((entry) => entry.id === wishlist.id);
+    if (!exists) {
+      return [
+        ...prev,
+        {
+          id: wishlist.id,
+          name: wishlist.name,
+          itemCount: wishlist.itemCount,
+          isDefault: true,
+        },
+      ];
+    }
+    return prev.map((entry) =>
+      entry.id === wishlist.id ? { ...entry, itemCount: wishlist.itemCount } : entry,
+    );
+  });
+}
+
+async function resolveDefaultWishlistId(wishlistId?: string): Promise<string> {
+  if (wishlistId && wishlistId !== 'default') return wishlistId;
+  const wishlists = await customersApi.listWishlists();
+  const existing = getDefaultWishlist(wishlists)?.id;
+  if (existing) return existing;
+  const created = await customersApi.createWishlist('My Wishlist');
+  return created.id;
+}
+
 export function useAddToWishlistMutation() {
   const queryClient = useQueryClient();
 
@@ -121,55 +166,71 @@ export function useAddToWishlistMutation() {
       variantId?: string;
       wishlistId?: string;
     }) => {
-      let targetId = wishlistId;
-      if (!targetId) {
-        const wishlists = await customersApi.listWishlists();
-        targetId = getDefaultWishlist(wishlists)?.id;
-        if (!targetId) {
-          const created = await customersApi.createWishlist('My Wishlist');
-          targetId = created.id;
+      const targetId = await resolveDefaultWishlistId(wishlistId);
+      try {
+        const updated = await customersApi.addWishlistItem(targetId, { productId, variantId });
+        if (isFullWishlistPayload(updated, targetId)) {
+          return normalizeWishlist(updated);
         }
+        return normalizeWishlist(await customersApi.getWishlist(targetId));
+      } catch {
+        // Already in wishlist or race — return current state.
+        return normalizeWishlist(await customersApi.getWishlist(targetId));
       }
-
-      const current = await customersApi.getWishlist(targetId);
-      const duplicate = current.items.some(
-        (item) =>
-          String(item.productId) === productId &&
-          (variantId ? String(item.variantId) === variantId : true),
-      );
-      if (duplicate) {
-        return normalizeWishlist(current);
-      }
-
-      const updated = await customersApi.addWishlistItem(targetId, { productId, variantId });
-      // Prefer a full wishlist payload; if the API still returns only an item, refetch.
-      if (isFullWishlistPayload(updated, targetId)) {
-        return normalizeWishlist(updated);
-      }
-      return normalizeWishlist(await customersApi.getWishlist(targetId));
     },
     onMutate: async ({ productId, variantId, wishlistId }) => {
       await queryClient.cancelQueries({ queryKey: QUERY_KEYS.customers.wishlists() });
       const cached = findCachedWishlist(queryClient, wishlistId);
-      if (!cached)
-        return {
-          previous: undefined as NormalizedWishlist | undefined,
-          key: undefined as readonly unknown[] | undefined,
-        };
-
-      const { key, wishlist: previous } = cached;
+      const key = cached?.key ?? QUERY_KEYS.customers.wishlist(wishlistId ?? 'default');
       await queryClient.cancelQueries({ queryKey: key });
 
+      const previous = cached?.wishlist;
+      const base: NormalizedWishlist = previous ?? {
+        id: wishlistId && wishlistId !== 'default' ? wishlistId : 'default',
+        name: 'My Wishlist',
+        items: [],
+        itemCount: 0,
+        isDefault: true,
+      };
+
+      const already = base.items.some(
+        (item) => item.productId === productId && (variantId ? item.variantId === variantId : true),
+      );
+      if (already) return { previous, key };
+
       const optimisticItem: EnrichedWishlistItem = {
-        id: `optimistic-${productId}`,
+        id: `optimistic-${productId}-${variantId ?? 'any'}`,
         productId,
         variantId,
-        productName: 'Adding…',
+        productName: 'Saved',
       };
       queryClient.setQueryData(key, {
-        ...previous,
-        items: [...previous.items, optimisticItem],
-        itemCount: previous.items.length + 1,
+        ...base,
+        items: [...base.items, optimisticItem],
+        itemCount: base.items.length + 1,
+      });
+      queryClient.setQueryData(QUERY_KEYS.customers.wishlist('default'), (prev) => {
+        if (prev) {
+          const list = prev as NormalizedWishlist;
+          if (
+            list.items.some(
+              (item) =>
+                item.productId === productId && (variantId ? item.variantId === variantId : true),
+            )
+          ) {
+            return list;
+          }
+          return {
+            ...list,
+            items: [...list.items, optimisticItem],
+            itemCount: list.items.length + 1,
+          };
+        }
+        return {
+          ...base,
+          items: [...base.items, optimisticItem],
+          itemCount: base.items.length + 1,
+        };
       });
 
       return { previous, key };
@@ -177,13 +238,12 @@ export function useAddToWishlistMutation() {
     onError: (_error, _variables, context) => {
       if (context?.previous && context.key) {
         queryClient.setQueryData(context.key, context.previous);
+      } else if (context?.key) {
+        queryClient.removeQueries({ queryKey: context.key });
       }
     },
     onSuccess: (wishlist) => {
-      queryClient.setQueryData(QUERY_KEYS.customers.wishlist(wishlist.id), wishlist);
-      // Keep the provisional 'default' detail cache in sync while list metadata refreshes.
-      queryClient.setQueryData(QUERY_KEYS.customers.wishlist('default'), wishlist);
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.customers.wishlists() });
+      syncWishlistCaches(queryClient, wishlist);
     },
   });
 }
@@ -192,25 +252,68 @@ export function useRemoveFromWishlistMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ wishlistId, itemId }: { wishlistId: string; itemId: string }) => {
-      const updated = await customersApi.removeWishlistItem(wishlistId, itemId);
-      if (isFullWishlistPayload(updated, wishlistId)) {
+    mutationFn: async ({
+      wishlistId,
+      itemId,
+      productId,
+      variantId,
+    }: {
+      wishlistId: string;
+      itemId: string;
+      productId?: string;
+      variantId?: string;
+    }) => {
+      // Optimistic-only ids never hit the API — resolve real id from cache/server.
+      let targetWishlistId = wishlistId === 'default' ? undefined : wishlistId;
+      let targetItemId = itemId;
+
+      if (!targetWishlistId || targetItemId.startsWith('optimistic-')) {
+        targetWishlistId = await resolveDefaultWishlistId(targetWishlistId);
+        const current = await customersApi.getWishlist(targetWishlistId);
+        const match = current.items.find(
+          (item) =>
+            item.id === itemId ||
+            (productId &&
+              String(item.productId) === productId &&
+              (variantId ? String(item.variantId) === variantId : true)),
+        );
+        if (!match) {
+          return normalizeWishlist(current);
+        }
+        targetItemId = String(match.id);
+      }
+
+      const updated = await customersApi.removeWishlistItem(targetWishlistId, targetItemId);
+      if (isFullWishlistPayload(updated, targetWishlistId)) {
         return normalizeWishlist(updated);
       }
-      return normalizeWishlist(await customersApi.getWishlist(wishlistId));
+      return normalizeWishlist(await customersApi.getWishlist(targetWishlistId));
     },
-    onMutate: async ({ wishlistId, itemId }) => {
+    onMutate: async ({ wishlistId, itemId, productId, variantId }) => {
       const cached = findCachedWishlist(queryClient, wishlistId);
       const key = cached?.key ?? QUERY_KEYS.customers.wishlist(wishlistId);
       await queryClient.cancelQueries({ queryKey: key });
       const previous = cached?.wishlist ?? queryClient.getQueryData<NormalizedWishlist>(key);
 
       if (previous) {
-        queryClient.setQueryData(key, {
-          ...previous,
-          items: previous.items.filter((item) => item.id !== itemId),
-          itemCount: Math.max(0, previous.items.length - 1),
+        const nextItems = previous.items.filter((item) => {
+          if (item.id === itemId) return false;
+          if (
+            productId &&
+            item.productId === productId &&
+            (variantId ? item.variantId === variantId : true)
+          ) {
+            return false;
+          }
+          return true;
         });
+        const next = {
+          ...previous,
+          items: nextItems,
+          itemCount: Math.max(0, nextItems.length),
+        };
+        queryClient.setQueryData(key, next);
+        queryClient.setQueryData(QUERY_KEYS.customers.wishlist('default'), next);
       }
 
       return { previous, key };
@@ -221,9 +324,7 @@ export function useRemoveFromWishlistMutation() {
       }
     },
     onSuccess: (wishlist) => {
-      queryClient.setQueryData(QUERY_KEYS.customers.wishlist(wishlist.id), wishlist);
-      queryClient.setQueryData(QUERY_KEYS.customers.wishlist('default'), wishlist);
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.customers.wishlists() });
+      syncWishlistCaches(queryClient, wishlist);
     },
   });
 }

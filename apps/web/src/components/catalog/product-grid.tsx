@@ -39,16 +39,12 @@ export function ProductGrid({
   return (
     <div data-virtual-ready className={cn(gridClassName(view, filtersOpen), className)}>
       {products.map((product, index) => (
-        <div
+        <ProductCard
           key={`${product.id}-${product.defaultVariantId ?? 'default'}`}
-          style={{
-            contentVisibility: 'auto',
-            // Reserve approximate card height so scrollbars stay stable while skipping offscreen work.
-            containIntrinsicSize: view === 'list' ? 'auto 160px' : 'auto 420px',
-          }}
-        >
-          <ProductCard product={product} layout={view} priority={index < 4} />
-        </div>
+          product={product}
+          layout={view}
+          priority={index < 8}
+        />
       ))}
     </div>
   );

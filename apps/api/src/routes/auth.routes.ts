@@ -20,6 +20,7 @@ import {
 import {
   checkoutCompleteGuestSchema,
   checkoutCompleteSignupSchema,
+  checkoutContinueAsGuestSchema,
   checkoutEmailStatusSchema,
   checkoutSendOtpSchema,
   checkoutVerifyOtpSchema,
@@ -63,6 +64,11 @@ authRouter.post(
   '/checkout/complete-guest',
   validate({ body: checkoutCompleteGuestSchema }),
   authController.checkoutCompleteGuest,
+);
+authRouter.post(
+  '/checkout/continue-as-guest',
+  validate({ body: checkoutContinueAsGuestSchema }),
+  authController.checkoutContinueAsGuest,
 );
 
 authRouter.post('/refresh', validate({ body: refreshSchema }), authController.refresh);

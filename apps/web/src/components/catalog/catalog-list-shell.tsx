@@ -128,12 +128,20 @@ export function CatalogListShell({
           onLoadMore();
         }
       },
-      // Keep page-2 prefetch from competing with the cold first LIST request.
-      { rootMargin: '120px 0px' },
+      // Prefetch the next page well before the user reaches the end.
+      { rootMargin: '900px 0px' },
     );
 
     observer.observe(node);
     return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, isLoading, onLoadMore, products.length]);
+
+  // Warm page 2 once the first page is painted (only while still on page 1).
+  useEffect(() => {
+    if (!onLoadMore || !hasNextPage || isFetchingNextPage || isLoading) return;
+    if (products.length === 0 || products.length > CATALOG_BATCH_SIZE) return;
+    const timer = window.setTimeout(() => onLoadMore(), 300);
+    return () => window.clearTimeout(timer);
   }, [hasNextPage, isFetchingNextPage, isLoading, onLoadMore, products.length]);
 
   const shown = products.length;
@@ -203,15 +211,14 @@ export function CatalogListShell({
             <ProductGrid products={products} view={state.view} filtersOpen={false} />
 
             {isFetchingNextPage ? (
-              <ProductGridSkeletonWrapper
-                view={state.view}
-                filtersOpen={false}
-                count={Math.min(CATALOG_BATCH_SIZE, Math.max(cappedTotal - shown, 4))}
-              />
+              <div className="text-muted-foreground flex items-center justify-center gap-2 py-6 text-xs uppercase tracking-widest">
+                <span className="bg-foreground/40 size-1.5 animate-pulse rounded-full" />
+                Loading more
+              </div>
             ) : null}
 
             {hasNextPage ? (
-              <div ref={loadMoreRef} className="h-8 w-full" aria-hidden />
+              <div ref={loadMoreRef} className="h-24 w-full" aria-hidden />
             ) : shown > 0 ? (
               <p className="text-muted-foreground pt-4 text-center text-xs uppercase tracking-widest">
                 Showing {shown}

@@ -27,3 +27,8 @@ export const checkoutCompleteGuestSchema = z.object({
   lastName: z.string().trim().min(1).max(80),
   phone: z.string().trim().min(7).max(32).optional(),
 });
+
+/** One-click guest checkout — no email/OTP; address collected on the information step. */
+export const checkoutContinueAsGuestSchema = z.object({
+  guestCartToken: z.string().trim().min(8).max(200).optional(),
+});

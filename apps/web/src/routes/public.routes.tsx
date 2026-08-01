@@ -74,6 +74,13 @@ export const productDetailRoute = createRoute({
     if (typeof search.color === 'string') result.color = search.color;
     return result;
   },
+  beforeLoad: ({ context, params }) => {
+    void context.queryClient.prefetchQuery({
+      queryKey: QUERY_KEYS.products.detail(params.slug),
+      queryFn: () => productsApi.getBySlugOrId(params.slug),
+      staleTime: 1000 * 60 * 5,
+    });
+  },
   component: ProductDetailPage,
 });
 

@@ -22,6 +22,8 @@ export interface AddressPickerProps {
   selectedId: string | null;
   onSelect: (addressId: string) => void;
   filter?: (address: CustomerAddress) => boolean;
+  /** When true and there are no addresses, show the form inline (guest checkout). */
+  preferInlineCreate?: boolean;
 }
 
 function formatAddressLine(address: CustomerAddress): string {
@@ -30,20 +32,34 @@ function formatAddressLine(address: CustomerAddress): string {
     .join(', ');
 }
 
-export function AddressPicker({ label, selectedId, onSelect, filter }: AddressPickerProps) {
+export function AddressPicker({
+  label,
+  selectedId,
+  onSelect,
+  filter,
+  preferInlineCreate = false,
+}: AddressPickerProps) {
   const { data: addresses, isLoading, error, refetch } = useAddressesQuery();
   const createMutation = useCreateAddressMutation();
   const [dialogOpen, setDialogOpen] = useState(false);
 
   const visible = (addresses ?? []).filter((address) => (filter ? filter(address) : true));
+  const showInlineCreate = preferInlineCreate && visible.length === 0;
 
   const handleCreate = (values: CustomerAddressInput) => {
-    createMutation.mutate(values, {
-      onSuccess: (created) => {
-        onSelect(created.id);
-        setDialogOpen(false);
+    createMutation.mutate(
+      {
+        ...values,
+        isDefaultShipping: true,
+        isDefaultBilling: true,
       },
-    });
+      {
+        onSuccess: (created) => {
+          onSelect(created.id);
+          setDialogOpen(false);
+        },
+      },
+    );
   };
 
   if (isLoading) {
@@ -58,6 +74,19 @@ export function AddressPicker({ label, selectedId, onSelect, filter }: AddressPi
 
   if (error) {
     return <AuthErrorAlert error={error} onRetry={() => refetch()} />;
+  }
+
+  if (showInlineCreate) {
+    return (
+      <div className="space-y-4">
+        <Label className="text-base font-medium">{label}</Label>
+        <p className="text-muted-foreground text-sm">
+          Enter your delivery details to continue — no account required.
+        </p>
+        {error ? <AuthErrorAlert error={error} onRetry={() => refetch()} /> : null}
+        <AddressForm onSubmit={handleCreate} isSubmitting={createMutation.isPending} />
+      </div>
+    );
   }
 
   return (
