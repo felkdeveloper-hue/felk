@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAddToCartMutation } from '@/hooks/cart';
 import { resolveVariantId } from '@/utils/cart';
@@ -32,6 +32,15 @@ function isProductOutOfStock(product: Product) {
   return product.inStock === false || product.status === 'out_of_stock';
 }
 
+function productUnitPrice(product: Product): number {
+  const sale = product.salePrice?.amount;
+  if (typeof sale === 'number' && sale > 0) return sale;
+  const effective = product.effectivePrice?.amount;
+  if (typeof effective === 'number' && effective > 0) return effective;
+  if (typeof product.price === 'number') return product.price;
+  return (product.price as { amount?: number } | undefined)?.amount ?? 0;
+}
+
 export function AddToCartButton({
   product,
   variantId,
@@ -47,6 +56,13 @@ export function AddToCartButton({
   const addMutation = useAddToCartMutation();
   const setCartAnnouncement = useUiStore((state) => state.setCartAnnouncement);
   const [optionsOpen, setOptionsOpen] = useState(false);
+  const [justAdded, setJustAdded] = useState(false);
+
+  useEffect(() => {
+    if (!justAdded) return;
+    const timer = window.setTimeout(() => setJustAdded(false), 1400);
+    return () => window.clearTimeout(timer);
+  }, [justAdded]);
 
   const resolvedVariantId = resolveVariantId(variantId, product);
   const outOfStock = isProductOutOfStock(product);
@@ -74,30 +90,40 @@ export function AddToCartButton({
     }
     if (!resolvedVariantId) return;
 
+    const unitPrice = productUnitPrice(product);
+
+    // Optimistic bag + badge update fires in onMutate — close / toast immediately.
     addMutation.mutate(
-      { variantId: resolvedVariantId, quantity },
       {
-        onSuccess: () => {
-          setCartAnnouncement(`${product.name} added to cart`);
-          toast.success(`${product.name} added to bag`);
-          const price =
-            typeof product.price === 'number'
-              ? product.price
-              : ((product.price as { amount?: number })?.amount ?? 0);
-          void trackingApi.addToCart(resolvedVariantId, product.name, 'LKR', price);
-          trackCommerceEvent(
-            'add_to_cart',
-            productMetaFrom(product, { variantId: resolvedVariantId, quantity }),
-          );
-          onAdded?.();
+        variantId: resolvedVariantId,
+        quantity,
+        optimistic: {
+          productId: product.id,
+          name: product.name,
+          unitPrice,
+          imageUrl: product.thumbnailUrl ?? product.hoverImageUrl,
+          productSlug: product.slug,
         },
+      },
+      {
         onError: (error) => {
+          setJustAdded(false);
           const message = AppError.isAppError(error) ? error.message : 'Unable to add item to cart';
           setCartAnnouncement(message);
           toast.error(message);
         },
       },
     );
+
+    setJustAdded(true);
+    setCartAnnouncement(`${product.name} added to cart`);
+    toast.success(`${product.name} added to bag`);
+    void trackingApi.addToCart(resolvedVariantId, product.name, 'LKR', unitPrice);
+    trackCommerceEvent(
+      'add_to_cart',
+      productMetaFrom(product, { variantId: resolvedVariantId, quantity }),
+    );
+    onAdded?.();
   };
 
   return (
@@ -105,11 +131,11 @@ export function AddToCartButton({
       <Button
         type="button"
         onClick={handleClick}
-        disabled={isDisabled}
-        loading={loading || (!outOfStock && addMutation.isPending)}
+        disabled={isDisabled || justAdded}
+        loading={Boolean(loading)}
         {...props}
       >
-        {outOfStock ? 'Out of stock' : label}
+        {outOfStock ? 'Out of stock' : justAdded ? 'Added' : label}
       </Button>
       {!skipOptionGate && !outOfStock ? (
         <SelectOptionsSheet product={product} open={optionsOpen} onOpenChange={setOptionsOpen} />

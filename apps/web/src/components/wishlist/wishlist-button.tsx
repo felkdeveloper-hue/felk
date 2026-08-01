@@ -1,8 +1,6 @@
 import type { MouseEvent } from 'react';
 import { Heart } from 'lucide-react';
-import { useNavigate } from '@tanstack/react-router';
 import { motion } from 'framer-motion';
-import { ROUTES } from '@/constants';
 import {
   useAddToWishlistMutation,
   useDefaultWishlistQuery,
@@ -31,7 +29,6 @@ export function WishlistButton({
   variant,
   ...props
 }: WishlistButtonProps) {
-  const navigate = useNavigate();
   const isAuthed = useAuthStore((state) => Boolean(state.accessToken && state.user));
   const resolvedVariantId = resolveVariantId(variantId, product);
   const isInWishlist = useIsInWishlist(product.id, resolvedVariantId);
@@ -47,14 +44,10 @@ export function WishlistButton({
     event.preventDefault();
     event.stopPropagation();
 
-    if (!isAuthed) {
-      navigate({ to: ROUTES.authLogin, search: { redirect: window.location.pathname } });
-      return;
-    }
-
     if (pending) return;
 
-    const wishlistId = wishlistQuery.data?.id ?? 'default';
+    const wishlistId = wishlistQuery.data?.id ?? (isAuthed ? 'default' : 'guest');
+    const price = product.salePrice ?? product.effectivePrice ?? product.price;
 
     if (active) {
       const item = wishlistQuery.data?.items.find(
@@ -65,7 +58,7 @@ export function WishlistButton({
       removeMutation.mutate(
         {
           wishlistId,
-          itemId: item?.id ?? `optimistic-${product.id}-${resolvedVariantId ?? 'any'}`,
+          itemId: item?.id ?? `guest-${product.id}-${resolvedVariantId ?? 'any'}`,
           productId: product.id,
           variantId: resolvedVariantId,
         },
@@ -93,7 +86,7 @@ export function WishlistButton({
         productName: product.name,
         productSlug: product.slug,
         thumbnailUrl: product.thumbnailUrl ?? product.hoverImageUrl,
-        price: product.salePrice ?? product.effectivePrice ?? product.price,
+        price,
       },
       {
         onSuccess: () => {

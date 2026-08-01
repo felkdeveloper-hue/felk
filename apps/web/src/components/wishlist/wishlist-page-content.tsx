@@ -1,6 +1,7 @@
 import { Link } from '@tanstack/react-router';
 import { motion } from 'framer-motion';
 import { HeartOff, ShoppingCart, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { ROUTES } from '@/constants';
 import {
   useDefaultWishlistQuery,
@@ -11,6 +12,8 @@ import type { EnrichedWishlistItem } from '@/utils/wishlist';
 import { Button } from '@/components/ui/button';
 import { Image } from '@/components/media/image';
 import { PriceDisplay } from '@/components/catalog/price-display';
+import { useUiStore } from '@/store/ui-store';
+import { AppError } from '@/lib/errors';
 
 export interface WishlistItemCardProps {
   wishlistId: string;
@@ -20,6 +23,9 @@ export interface WishlistItemCardProps {
 export function WishlistItemCard({ wishlistId, item }: WishlistItemCardProps) {
   const removeMutation = useRemoveFromWishlistMutation();
   const moveMutation = useMoveWishlistItemToCartMutation();
+  const setCartAnnouncement = useUiStore((state) => state.setCartAnnouncement);
+  const title = item.productName ?? 'Product';
+  const slug = item.productSlug ?? item.productId;
 
   return (
     <motion.article
@@ -31,29 +37,26 @@ export function WishlistItemCard({ wishlistId, item }: WishlistItemCardProps) {
     >
       <Link
         to="/products/$slug"
-        params={{ slug: item.productSlug ?? item.productId }}
+        params={{ slug }}
         search={{ variant: undefined }}
         className="block"
       >
-        <Image src={item.thumbnailUrl} alt={item.productName ?? 'Product'} aspectRatio="3/4" />
+        <Image src={item.thumbnailUrl} alt={title} aspectRatio="3/4" />
       </Link>
       <div className="space-y-3 p-4">
         <div>
           <h3 className="text-sm font-medium">
             <Link
               to="/products/$slug"
-              params={{ slug: item.productSlug ?? item.productId }}
+              params={{ slug }}
               search={{ variant: undefined }}
               className="hover:underline"
             >
-              {item.productName ?? 'Product'}
+              {title}
             </Link>
           </h3>
           {item.variantTitle ? (
             <p className="text-muted-foreground text-xs">{item.variantTitle}</p>
-          ) : null}
-          {item.variantSku ? (
-            <p className="text-muted-foreground text-xs">SKU: {item.variantSku}</p>
           ) : null}
         </div>
 
@@ -62,24 +65,50 @@ export function WishlistItemCard({ wishlistId, item }: WishlistItemCardProps) {
         ) : null}
 
         <div className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            size="sm"
-            className="flex-1"
-            onClick={() => moveMutation.mutate({ wishlistId, item })}
-            loading={moveMutation.isPending}
-            disabled={!item.variantId}
-          >
-            <ShoppingCart className="size-4" aria-hidden />
-            Move to cart
-          </Button>
+          {item.variantId ? (
+            <Button
+              type="button"
+              size="sm"
+              className="flex-1"
+              onClick={() => {
+                moveMutation.mutate(
+                  { wishlistId, item },
+                  {
+                    onError: (error) => {
+                      const message = AppError.isAppError(error)
+                        ? error.message
+                        : 'Unable to move item to cart';
+                      toast.error(message);
+                    },
+                  },
+                );
+                setCartAnnouncement(`${title} moved to cart`);
+                toast.success(`${title} moved to bag`);
+              }}
+            >
+              <ShoppingCart className="size-4" aria-hidden />
+              Move to cart
+            </Button>
+          ) : (
+            <Button type="button" size="sm" className="flex-1" asChild>
+              <Link to="/products/$slug" params={{ slug }} search={{ variant: undefined }}>
+                Select options
+              </Link>
+            </Button>
+          )}
           <Button
             type="button"
             size="sm"
             variant="outline"
             aria-label="Remove from wishlist"
-            onClick={() => removeMutation.mutate({ wishlistId, itemId: item.id })}
-            loading={removeMutation.isPending}
+            onClick={() =>
+              removeMutation.mutate({
+                wishlistId,
+                itemId: item.id,
+                productId: item.productId,
+                variantId: item.variantId,
+              })
+            }
           >
             <Trash2 className="size-4" />
           </Button>
@@ -92,7 +121,7 @@ export function WishlistItemCard({ wishlistId, item }: WishlistItemCardProps) {
 export function WishlistPageContent() {
   const wishlistQuery = useDefaultWishlistQuery();
 
-  if (wishlistQuery.isLoading) {
+  if (wishlistQuery.isLoading && !wishlistQuery.data) {
     return (
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" aria-busy="true">
         {Array.from({ length: 4 }).map((_, index) => (

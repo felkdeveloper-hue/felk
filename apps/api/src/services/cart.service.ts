@@ -444,25 +444,37 @@ export class CartService {
 
     const productIds = [...new Set(items.map((item) => item.productId.toString()))];
     const variantIds = [...new Set(items.map((item) => item.variantId.toString()))];
-    const [products, availableByVariant] = await Promise.all([
+    const [products, inventoryRows] = await Promise.all([
       ProductModel.find({ _id: { $in: productIds }, isDeleted: false })
         .select('slug')
         .lean(),
-      (async () => {
-        const map = new Map<string, number>();
-        await Promise.all(
-          variantIds.map(async (variantId) => {
-            map.set(variantId, await this.getAvailableStock(variantId));
-          }),
-        );
-        return map;
-      })(),
+      InventoryItemModel.find({
+        variantId: { $in: variantIds },
+        isDeleted: false,
+      })
+        .select('variantId available onHand reserved damaged')
+        .lean(),
     ]);
     const slugByProductId = new Map(products.map((product) => [String(product._id), product.slug]));
 
+    const availableByVariant = new Map<string, number>();
+    const trackedVariants = new Set<string>();
+    for (const row of inventoryRows) {
+      const key = String(row.variantId);
+      trackedVariants.add(key);
+      const sellable = computeAvailable(
+        Number(row.onHand ?? 0),
+        Number(row.reserved ?? 0),
+        Number(row.damaged ?? 0),
+      );
+      const qty = sellable > 0 ? sellable : Number(row.available ?? 0);
+      availableByVariant.set(key, (availableByVariant.get(key) ?? 0) + qty);
+    }
+
     return items.map((item) => {
-      const available = availableByVariant.get(item.variantId.toString()) ?? 0;
-      const tracked = available < CART_QTY.MAX;
+      const variantKey = item.variantId.toString();
+      const tracked = trackedVariants.has(variantKey);
+      const available = tracked ? (availableByVariant.get(variantKey) ?? 0) : CART_QTY.MAX;
       const inStock = !tracked || available >= item.quantity;
       const stockStatus = !tracked ? INVENTORY_STATUS.IN_STOCK : deriveStockStatus(available, 0, 0);
 
@@ -515,28 +527,34 @@ export class CartService {
 
   async buildView(
     cart: CartDocument,
-    options?: { validate?: boolean; guestCartToken?: string | null },
+    options?: {
+      validate?: boolean;
+      guestCartToken?: string | null;
+      /** Skip re-pricing every line (use after add/update when prices were just written). */
+      skipPricingRefresh?: boolean;
+    },
   ): Promise<CartView> {
-    const allItems = await CartItemModel.find({
+    let fresh = await CartItemModel.find({
       cartId: cart._id,
       isDeleted: false,
     }).sort({ updatedAt: -1 });
 
-    await Promise.all(
-      allItems.map(async (item) => {
-        if (item.location !== CART_ITEM_LOCATION.CART) return;
-        try {
-          await this.refreshItemPricing(item);
-        } catch {
-          // keep snapshot if catalog vanished; validation will flag
-        }
-      }),
-    );
-
-    const fresh = await CartItemModel.find({
-      cartId: cart._id,
-      isDeleted: false,
-    }).sort({ updatedAt: -1 });
+    if (!options?.skipPricingRefresh) {
+      await Promise.all(
+        fresh.map(async (item) => {
+          if (item.location !== CART_ITEM_LOCATION.CART) return;
+          try {
+            await this.refreshItemPricing(item);
+          } catch {
+            // keep snapshot if catalog vanished; validation will flag
+          }
+        }),
+      );
+      fresh = await CartItemModel.find({
+        cartId: cart._id,
+        isDeleted: false,
+      }).sort({ updatedAt: -1 });
+    }
 
     const items = fresh.filter((i) => i.location === CART_ITEM_LOCATION.CART);
     const saved = fresh.filter((i) => i.location === CART_ITEM_LOCATION.SAVED);
@@ -636,7 +654,7 @@ export class CartService {
       existing.lineSubtotal = Number((pricing.effectivePrice * nextQty).toFixed(2));
       await existing.save();
 
-      await writeAuditLog({
+      void writeAuditLog({
         action: CART_AUDIT.QUANTITY_CHANGED,
         resourceType: 'cart_items',
         resourceId: existing._id.toString(),
@@ -646,6 +664,7 @@ export class CartService {
         metadata: { cartId: cart._id.toString(), quantity: nextQty },
       });
     } else {
+      const thumbnailUrl = await this.resolveVariantThumbnail(variant, product._id);
       const item = await CartItemModel.create({
         cartId: cart._id,
         customerId: cart.customerId,
@@ -669,10 +688,10 @@ export class CartService {
         priceChanged: false,
         priceDifference: 0,
         lineSubtotal: Number((pricing.effectivePrice * quantity).toFixed(2)),
-        thumbnailUrl: await this.resolveVariantThumbnail(variant, product._id),
+        thumbnailUrl,
       });
 
-      await writeAuditLog({
+      void writeAuditLog({
         action: CART_AUDIT.ITEM_ADDED,
         resourceType: 'cart_items',
         resourceId: item._id.toString(),
@@ -686,7 +705,11 @@ export class CartService {
 
     cart.currency = variant.currency ?? cart.currency;
     await cart.save();
-    return this.buildView(cart, { guestCartToken: cart.guestToken });
+    // Prices/thumbnails just written — skip N× reprice that made ATC feel 2–4s.
+    return this.buildView(cart, {
+      guestCartToken: cart.guestToken,
+      skipPricingRefresh: true,
+    });
   }
 
   async updateItem(
@@ -721,7 +744,7 @@ export class CartService {
     item.quantity = payload.quantity;
     await this.refreshItemPricing(item);
 
-    await writeAuditLog({
+    void writeAuditLog({
       action: CART_AUDIT.QUANTITY_CHANGED,
       resourceType: 'cart_items',
       resourceId: itemId,
@@ -731,7 +754,10 @@ export class CartService {
       metadata: { quantity: payload.quantity, cartId: cart._id.toString() },
     });
 
-    return this.buildView(cart, { guestCartToken: cart.guestToken });
+    return this.buildView(cart, {
+      guestCartToken: cart.guestToken,
+      skipPricingRefresh: true,
+    });
   }
 
   async removeItem(
@@ -751,7 +777,7 @@ export class CartService {
     item.deletedAt = new Date();
     await item.save();
 
-    await writeAuditLog({
+    void writeAuditLog({
       action: CART_AUDIT.ITEM_REMOVED,
       resourceType: 'cart_items',
       resourceId: itemId,
@@ -762,7 +788,10 @@ export class CartService {
       metadata: { cartId: cart._id.toString() },
     });
 
-    return this.buildView(cart, { guestCartToken: cart.guestToken });
+    return this.buildView(cart, {
+      guestCartToken: cart.guestToken,
+      skipPricingRefresh: true,
+    });
   }
 
   async clear(

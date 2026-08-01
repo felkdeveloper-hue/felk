@@ -4,6 +4,7 @@ import { QUERY_KEYS } from '@/constants/query-keys';
 import {
   cartApi,
   type CartAddItemPayload,
+  type CartLineItem,
   type CartUpdateItemPayload,
   type CartView,
 } from '@/services/sdk';
@@ -12,6 +13,61 @@ import { useCartStore } from '@/store/cart-store';
 
 function syncCartToStore(cart: CartView | null) {
   useCartStore.getState().setCart(cart);
+}
+
+/** Client-only fields for instant bag UI — stripped before the API call. */
+export type CartAddItemInput = CartAddItemPayload & {
+  optimistic?: {
+    productId?: string;
+    name?: string;
+    unitPrice?: number;
+    imageUrl?: string;
+    productSlug?: string;
+    colorName?: string;
+    sizeName?: string;
+  };
+};
+
+function emptyCartView(): CartView {
+  return {
+    id: 'local',
+    items: [],
+    totals: {
+      subtotal: 0,
+      discount: 0,
+      tax: 0,
+      shipping: 0,
+      total: 0,
+      currency: 'LKR',
+      itemCount: 0,
+      totalQuantity: 0,
+    },
+  };
+}
+
+function readCartSnapshot(queryClient: ReturnType<typeof useQueryClient>): CartView {
+  return (
+    queryClient.getQueryData<CartView>(QUERY_KEYS.cart.current()) ??
+    useCartStore.getState().cart ??
+    emptyCartView()
+  );
+}
+
+function withTotals(items: CartLineItem[], previous: CartView): CartView {
+  const subtotal = items.reduce((sum, item) => sum + item.totalPrice, 0);
+  const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
+  return {
+    ...previous,
+    items,
+    totals: {
+      ...previous.totals,
+      subtotal,
+      total: subtotal + (previous.totals.shipping ?? 0) - (previous.totals.discount ?? 0),
+      itemCount: items.length,
+      totalQuantity,
+      currency: previous.totals.currency ?? 'LKR',
+    },
+  };
 }
 
 export function useCartQuery(options?: { enabled?: boolean }) {
@@ -51,49 +107,47 @@ export function useAddToCartMutation() {
   const setSyncing = useCartStore((state) => state.setSyncing);
 
   return useMutation({
-    mutationFn: (payload: CartAddItemPayload) => cartApi.addItem(payload),
+    mutationFn: ({ optimistic: _optimistic, ...payload }: CartAddItemInput) =>
+      cartApi.addItem(payload),
     onMutate: async (payload) => {
       setSyncing(true);
       await queryClient.cancelQueries({ queryKey: QUERY_KEYS.cart.current() });
-      const previous = queryClient.getQueryData<CartView>(QUERY_KEYS.cart.current());
+      const previous = readCartSnapshot(queryClient);
+      const qty = payload.quantity ?? 1;
+      const existing = previous.items.find((item) => item.variantId === payload.variantId);
 
-      if (previous) {
-        const existing = previous.items.find((item) => item.variantId === payload.variantId);
-        const nextItems = existing
-          ? previous.items.map((item) =>
-              item.variantId === payload.variantId
-                ? {
-                    ...item,
-                    quantity: item.quantity + (payload.quantity ?? 1),
-                    totalPrice: item.unitPrice * (item.quantity + (payload.quantity ?? 1)),
-                  }
-                : item,
-            )
-          : [
-              ...previous.items,
-              {
-                id: `optimistic-${payload.variantId}`,
-                productId: '',
-                variantId: payload.variantId,
-                name: 'Adding…',
-                quantity: payload.quantity ?? 1,
-                unitPrice: 0,
-                totalPrice: 0,
-              },
-            ];
+      const nextItems = existing
+        ? previous.items.map((item) =>
+            item.variantId === payload.variantId
+              ? {
+                  ...item,
+                  quantity: item.quantity + qty,
+                  totalPrice: item.unitPrice * (item.quantity + qty),
+                }
+              : item,
+          )
+        : [
+            ...previous.items,
+            {
+              id: `optimistic-${payload.variantId}`,
+              productId: payload.optimistic?.productId ?? '',
+              productSlug: payload.optimistic?.productSlug,
+              variantId: payload.variantId,
+              name: payload.optimistic?.name ?? 'Product',
+              quantity: qty,
+              unitPrice: payload.optimistic?.unitPrice ?? 0,
+              totalPrice: (payload.optimistic?.unitPrice ?? 0) * qty,
+              imageUrl: payload.optimistic?.imageUrl,
+              colorName: payload.optimistic?.colorName,
+              sizeName: payload.optimistic?.sizeName,
+              currency: previous.totals.currency ?? 'LKR',
+              inStock: true,
+            } satisfies CartLineItem,
+          ];
 
-        const optimistic = {
-          ...previous,
-          items: nextItems,
-          totals: {
-            ...previous.totals,
-            itemCount: nextItems.length,
-            totalQuantity: nextItems.reduce((sum, item) => sum + item.quantity, 0),
-          },
-        };
-        queryClient.setQueryData(QUERY_KEYS.cart.current(), optimistic);
-        syncCartToStore(optimistic);
-      }
+      const optimistic = withTotals(nextItems, previous);
+      queryClient.setQueryData(QUERY_KEYS.cart.current(), optimistic);
+      syncCartToStore(optimistic);
 
       return { previous };
     },
@@ -121,24 +175,20 @@ export function useUpdateCartItemMutation() {
     onMutate: async ({ itemId, payload }) => {
       setSyncing(true);
       await queryClient.cancelQueries({ queryKey: QUERY_KEYS.cart.current() });
-      const previous = queryClient.getQueryData<CartView>(QUERY_KEYS.cart.current());
+      const previous = readCartSnapshot(queryClient);
 
-      if (previous) {
-        const optimistic = {
-          ...previous,
-          items: previous.items.map((item) =>
-            item.id === itemId
-              ? {
-                  ...item,
-                  quantity: payload.quantity,
-                  totalPrice: item.unitPrice * payload.quantity,
-                }
-              : item,
-          ),
-        };
-        queryClient.setQueryData(QUERY_KEYS.cart.current(), optimistic);
-        syncCartToStore(optimistic);
-      }
+      const nextItems = previous.items.map((item) =>
+        item.id === itemId
+          ? {
+              ...item,
+              quantity: payload.quantity,
+              totalPrice: item.unitPrice * payload.quantity,
+            }
+          : item,
+      );
+      const optimistic = withTotals(nextItems, previous);
+      queryClient.setQueryData(QUERY_KEYS.cart.current(), optimistic);
+      syncCartToStore(optimistic);
 
       return { previous };
     },
@@ -165,16 +215,12 @@ export function useRemoveCartItemMutation() {
     onMutate: async (itemId) => {
       setSyncing(true);
       await queryClient.cancelQueries({ queryKey: QUERY_KEYS.cart.current() });
-      const previous = queryClient.getQueryData<CartView>(QUERY_KEYS.cart.current());
+      const previous = readCartSnapshot(queryClient);
 
-      if (previous) {
-        const optimistic = {
-          ...previous,
-          items: previous.items.filter((item) => item.id !== itemId),
-        };
-        queryClient.setQueryData(QUERY_KEYS.cart.current(), optimistic);
-        syncCartToStore(optimistic);
-      }
+      const nextItems = previous.items.filter((item) => item.id !== itemId);
+      const optimistic = withTotals(nextItems, previous);
+      queryClient.setQueryData(QUERY_KEYS.cart.current(), optimistic);
+      syncCartToStore(optimistic);
 
       return { previous };
     },

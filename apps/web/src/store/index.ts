@@ -4,6 +4,9 @@ export type { AuthStore } from './auth-store';
 export { useCartStore, selectCartItemCount } from './cart-store';
 export type { CartStore } from './cart-store';
 
+export { useWishlistStore, selectWishlistItemCount, toGuestWishlistView } from './wishlist-store';
+export type { WishlistStore, GuestWishlistItem } from './wishlist-store';
+
 export { useCheckoutStore } from './checkout-store';
 export type { CheckoutStore } from './checkout-store';
 

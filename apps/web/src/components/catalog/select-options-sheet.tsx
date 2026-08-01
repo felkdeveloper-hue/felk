@@ -249,12 +249,10 @@ export function SelectOptionsSheet({ product, open, onOpenChange }: SelectOption
       toast.error('Please select a size for this color');
       return;
     }
+    onOpenChange(false);
     buyNowMutation.mutate(
       { variantId: resolved, quantity },
       {
-        onSuccess: () => {
-          onOpenChange(false);
-        },
         onError: (error) => {
           toast.error(AppError.isAppError(error) ? error.message : 'Unable to start checkout');
         },

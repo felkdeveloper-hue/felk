@@ -1,5 +1,5 @@
 import { memo, useCallback, useRef, useState, type TouchEvent } from 'react';
-import { Link, useNavigate } from '@tanstack/react-router';
+import { Link } from '@tanstack/react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { Eye, Heart, Plus, Star } from 'lucide-react';
 import type { Product } from '@/services/sdk';
@@ -19,7 +19,7 @@ import {
 } from '@/hooks/wishlist';
 import { useAuthStore } from '@/store';
 import { useUiStore } from '@/store/ui-store';
-import { QUERY_KEYS, ROUTES } from '@/constants';
+import { QUERY_KEYS } from '@/constants';
 import { resolveVariantId } from '@/utils/cart';
 import { productMetaFrom, trackCommerceEvent } from '@/lib/analytics';
 import { PriceDisplay } from './price-display';
@@ -48,7 +48,6 @@ function ProductCardComponent({
   priority = false,
   sizes = '(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw',
 }: ProductCardProps) {
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const listingVariant = product.variants?.find(
     (variant) => variant.id === product.defaultVariantId,
@@ -149,12 +148,7 @@ function ProductCardComponent({
   }, [product.id, product.slug, queryClient]);
 
   const toggleWishlist = useCallback(() => {
-    if (!isAuthed) {
-      void navigate({ to: ROUTES.authLogin, search: { redirect: window.location.pathname } });
-      return;
-    }
-
-    const wishlistId = wishlistQuery.data?.id ?? 'default';
+    const wishlistId = wishlistQuery.data?.id ?? (isAuthed ? 'default' : 'guest');
     setHeartBurst(true);
     window.setTimeout(() => setHeartBurst(false), 220);
 
@@ -212,9 +206,9 @@ function ProductCardComponent({
     );
   }, [
     addWishlist,
+    displayPrice,
     isAuthed,
     isInWishlist,
-    navigate,
     product,
     removeWishlist,
     resolvedVariantId,

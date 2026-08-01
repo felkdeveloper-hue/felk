@@ -10,6 +10,7 @@ export const STORAGE_KEYS = {
   ui: 'fe.ui.state',
   notifications: 'fe.notifications.state',
   guestCartToken: 'fe.cart.guest-token',
+  wishlist: 'fe.wishlist.state',
 } as const;
 
 export type StorageKey = (typeof STORAGE_KEYS)[keyof typeof STORAGE_KEYS];
