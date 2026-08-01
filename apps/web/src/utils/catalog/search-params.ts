@@ -98,6 +98,7 @@ export function catalogSearchToProductParams(state: CatalogSearchState): Product
     sortBy: state.sortBy,
     sortOrder: state.sortOrder,
     q: state.q,
+    status: 'active',
     categoryId: state.categoryId,
     brandId: state.brandId,
     collectionId: state.collectionId,
