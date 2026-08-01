@@ -147,6 +147,11 @@ export function CheckoutSuccessPage() {
             </Button>
           )}
           <Button variant="outline" asChild>
+            <Link to={ROUTES.trackOrder} search={orderNumber ? { orderNumber } : undefined}>
+              Track order
+            </Link>
+          </Button>
+          <Button variant="ghost" asChild>
             <Link to={ROUTES.accountOrders}>View my orders</Link>
           </Button>
         </div>

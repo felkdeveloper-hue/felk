@@ -3,6 +3,7 @@ import { Types } from 'mongoose';
 import { OrderModel, type OrderItemSubdocument } from '@/models/order.models.js';
 import { PaymentModel, PaymentEventModel } from '@/models/payment.models.js';
 import { CheckoutSessionModel, type CheckoutSessionDocument } from '@/models/checkout.models.js';
+import { CustomerModel } from '@/models/customer.models.js';
 import { ProductModel, ProductVariantModel, ProductMediaModel } from '@/models/product.models.js';
 import { reservationService } from '@/services/reservation.service.js';
 import { invoiceService } from '@/services/invoice.service.js';
@@ -221,6 +222,23 @@ export async function handlePaymentSucceededEvent(payload: Record<string, unknow
       after: toPlain(order),
       metadata: { paymentId },
     });
+
+    try {
+      await CustomerModel.updateOne(
+        { _id: checkout.customerId, isDeleted: false },
+        {
+          $inc: {
+            orderCount: 1,
+            lifetimeValue: Number(checkout.totals.grandTotal ?? 0),
+          },
+        },
+      );
+    } catch (error) {
+      logger.warn(
+        { err: error, customerId: checkout.customerId.toString(), orderId: order._id.toString() },
+        'Failed to increment customer orderCount after order creation — continuing',
+      );
+    }
 
     await recordOrderTimeline({
       orderId: order._id.toString(),

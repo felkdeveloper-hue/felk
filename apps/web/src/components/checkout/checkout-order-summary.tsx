@@ -218,8 +218,11 @@ export function CheckoutOrderSummary({ session, editable = false }: CheckoutOrde
           <dd>{formatCurrency(displayTotals.subtotal, currency)}</dd>
         </div>
         {displayTotals.discount > 0 ? (
-          <div className="flex justify-between text-emerald-600">
-            <dt>Discount</dt>
+          <div className="flex justify-between text-emerald-700">
+            <dt>
+              {(typeof session.coupon?.message === 'string' && session.coupon.message) ||
+                (session.coupon?.code === 'FIRSTORDER5' ? '5% first-order discount' : 'Discount')}
+            </dt>
             <dd>-{formatCurrency(displayTotals.discount, currency)}</dd>
           </div>
         ) : null}

@@ -12,6 +12,7 @@ export { AboutPage } from './about.page';
 export { ContactPage } from './contact.page';
 export { PrivacyPage } from './privacy.page';
 export { TermsPage } from './terms.page';
+export { TrackOrderPage } from './track-order.page';
 export { NotFoundPage } from './not-found.page';
 export {
   AccountAddressesPage,

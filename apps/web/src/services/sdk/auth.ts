@@ -144,4 +144,17 @@ export const authApi = {
     });
     return normalizeAuthSession(raw);
   },
+
+  async checkoutCompleteGuest(payload: {
+    signupToken: string;
+    firstName: string;
+    lastName: string;
+    phone?: string;
+  }): Promise<AuthSession> {
+    const raw = await http.post<unknown>('/auth/checkout/complete-guest', payload, {
+      skipAuthRefresh: true,
+      timeout: 20_000,
+    });
+    return normalizeAuthSession(raw);
+  },
 };

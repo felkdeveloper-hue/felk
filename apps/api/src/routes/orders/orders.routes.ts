@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { PERMISSIONS } from '@/constants/permissions.js';
-import { authenticate, authorizeAny, validate } from '@/middlewares/index.js';
+import { authenticate, authorizeAny, authRateLimiter, validate } from '@/middlewares/index.js';
 import { actorFromRequest } from '@/services/cms-crud.service.js';
 import { orderService } from '@/services/order.service.js';
 import { returnService } from '@/services/return.service.js';
@@ -22,6 +22,20 @@ const exportPerms = [P.ORDERS_EXPORT] as const;
 const returnPerms = [P.ORDERS_RETURN_OWN, P.ORDERS_RETURN_MANAGE] as const;
 
 export const ordersRouter = Router();
+
+/** Guest / public order status — no JWT; requires order number + email. */
+ordersRouter.post(
+  '/guest-track',
+  authRateLimiter,
+  validate({ body: S.guestOrderTrackSchema }),
+  asyncHandler(async (req, res) => {
+    ApiResponse.success(
+      res,
+      await orderService.trackAsGuest(req.body.orderNumber, req.body.email),
+      'Order found',
+    );
+  }),
+);
 
 ordersRouter.get(
   '/export',

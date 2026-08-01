@@ -1,4 +1,5 @@
 import {
+  keepPreviousData,
   useMutation,
   useQueries,
   useQuery,
@@ -159,25 +160,25 @@ export function ProductsListPage() {
         queryKey: QUERY_KEYS.adminProducts.list({ page: 1, limit: 1, summary: 'total' }),
         queryFn: () => productsApi.list({ page: 1, limit: 1 }),
         staleTime: 60_000,
-        placeholderData: (prev) => prev,
+        placeholderData: keepPreviousData,
       },
       {
         queryKey: QUERY_KEYS.adminProducts.list({ page: 1, limit: 1, status: 'active' }),
         queryFn: () => productsApi.list({ page: 1, limit: 1, status: 'active' }),
         staleTime: 60_000,
-        placeholderData: (prev) => prev,
+        placeholderData: keepPreviousData,
       },
       {
         queryKey: QUERY_KEYS.adminProducts.list({ page: 1, limit: 1, status: 'draft' }),
         queryFn: () => productsApi.list({ page: 1, limit: 1, status: 'draft' }),
         staleTime: 60_000,
-        placeholderData: (prev) => prev,
+        placeholderData: keepPreviousData,
       },
       {
         queryKey: QUERY_KEYS.adminInventory.items({ page: 1, limit: 1, lowStockOnly: true }),
         queryFn: () => inventoryApi.listItems({ page: 1, limit: 1, lowStockOnly: true }),
         staleTime: 60_000,
-        placeholderData: (prev) => prev,
+        placeholderData: keepPreviousData,
       },
     ],
   });

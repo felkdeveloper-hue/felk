@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import { AUTH_LIMITS, AUDIT_ACTIONS, USER_STATUS } from '@/constants/auth.js';
 import { ROLES } from '@/constants/roles.js';
@@ -257,6 +258,120 @@ export const checkoutAuthService = {
       ...tokens,
       rememberMe: true,
       message: 'Account created',
+    };
+  },
+
+  /**
+   * Guest checkout after email OTP — creates a customer session without a known password.
+   * Guest can track orders while signed in; they may claim the account later via forgot-password.
+   */
+  async completeAsGuest(
+    input: {
+      signupToken: string;
+      firstName: string;
+      lastName: string;
+      phone?: string;
+    },
+    meta: AuthRequestMeta,
+  ): Promise<AuthTokensResult & { rememberMe: boolean; message: string }> {
+    const email = verifyCheckoutSignupToken(input.signupToken);
+
+    const verifiedOtp = await EmailOtpModel.findOne({
+      email,
+      verified: true,
+      purpose: CHECKOUT_SIGNUP_PURPOSE,
+    }).sort({ createdAt: -1 });
+
+    if (!verifiedOtp) {
+      throw ApiError.badRequest(
+        'Email verification required before continuing as guest',
+        undefined,
+        'OTP_REQUIRED',
+      );
+    }
+
+    const existing = await UserModel.findOne({ email, isDeleted: false });
+    if (existing?.emailVerifiedAt) {
+      throw ApiError.conflict(
+        'This email already has an account. Sign in to continue.',
+        undefined,
+        'EMAIL_EXISTS',
+      );
+    }
+
+    const role = await findRoleByKey(ROLES.CUSTOMER);
+    if (!role) {
+      throw ApiError.internal('Customer role is not seeded', 'ROLE_MISSING');
+    }
+
+    const passwordHash = await hashPassword(`${randomBytes(32).toString('hex')}Aa1!`);
+    const firstName = input.firstName.trim() || 'Guest';
+    const lastName = input.lastName.trim() || 'Shopper';
+    let user = existing;
+
+    if (user) {
+      user.passwordHash = passwordHash;
+      user.passwordHistory = [];
+      user.firstName = firstName;
+      user.lastName = lastName;
+      user.phone = input.phone ?? null;
+      user.roleId = role._id;
+      user.roleKey = ROLES.CUSTOMER;
+      user.status = USER_STATUS.ACTIVE;
+      user.emailVerifiedAt = user.emailVerifiedAt ?? new Date();
+      user.metadata = { ...(user.metadata ?? {}), checkoutGuest: true };
+      await user.save();
+    } else {
+      user = await UserModel.create({
+        email,
+        passwordHash,
+        passwordHistory: [],
+        firstName,
+        lastName,
+        phone: input.phone ?? null,
+        roleId: role._id,
+        roleKey: ROLES.CUSTOMER,
+        status: USER_STATUS.ACTIVE,
+        emailVerifiedAt: new Date(),
+        metadata: { checkoutGuest: true },
+      });
+    }
+
+    const { customerService } = await import('@/services/customer.service.js');
+    await customerService.ensureForUser(
+      {
+        id: user._id.toString(),
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        phone: user.phone,
+      },
+      {
+        userId: user._id.toString(),
+        ip: meta.ip,
+        userAgent: meta.userAgent,
+        requestId: meta.requestId,
+      },
+    );
+
+    await EmailOtpModel.deleteMany({ email, purpose: CHECKOUT_SIGNUP_PURPOSE });
+
+    const tokens = await authService.issueAuthSession(user._id.toString(), meta, true);
+
+    void writeAuditLog({
+      action: AUDIT_ACTIONS.USER_REGISTERED,
+      resourceType: 'user',
+      resourceId: user._id.toString(),
+      actorUserId: user._id.toString(),
+      metadata: { source: 'checkout_guest', ip: meta.ip },
+    });
+
+    logger.info({ userId: user._id.toString(), email }, 'Checkout guest session created');
+
+    return {
+      ...tokens,
+      rememberMe: true,
+      message: 'Continuing as guest',
     };
   },
 };

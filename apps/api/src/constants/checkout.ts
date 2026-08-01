@@ -35,6 +35,13 @@ export const DELIVERY_METHOD = {
 /** Payment-window reservation TTL (minutes). Stock is held only after Place Order. */
 export const CHECKOUT_RESERVATION_TTL_MINUTES = 10;
 
+/** Auto-applied for every customer with no prior paid/active orders. */
+export const FIRST_ORDER_DISCOUNT = {
+  CODE: 'FIRSTORDER5',
+  PERCENT: 5,
+  LABEL: '5% off your first order',
+} as const;
+
 export const CHECKOUT_AUDIT = {
   STARTED: 'checkout.started',
   RESERVATION_CREATED: 'checkout.reservation_created',

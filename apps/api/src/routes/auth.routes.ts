@@ -18,6 +18,7 @@ import {
   verifyEmailSchema,
 } from '@/schemas/auth.schema.js';
 import {
+  checkoutCompleteGuestSchema,
   checkoutCompleteSignupSchema,
   checkoutEmailStatusSchema,
   checkoutSendOtpSchema,
@@ -57,6 +58,11 @@ authRouter.post(
   '/checkout/complete-signup',
   validate({ body: checkoutCompleteSignupSchema }),
   authController.checkoutCompleteSignup,
+);
+authRouter.post(
+  '/checkout/complete-guest',
+  validate({ body: checkoutCompleteGuestSchema }),
+  authController.checkoutCompleteGuest,
 );
 
 authRouter.post('/refresh', validate({ body: refreshSchema }), authController.refresh);

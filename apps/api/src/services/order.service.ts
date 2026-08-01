@@ -5,6 +5,7 @@ import {
   OrderTimelineModel,
   type OrderDocument,
 } from '@/models/order.models.js';
+import { CustomerModel } from '@/models/customer.models.js';
 import { customerService } from '@/services/customer.service.js';
 import { invoiceService } from '@/services/invoice.service.js';
 import { recordOrderTimeline } from '@/services/order-timeline.service.js';
@@ -14,6 +15,7 @@ import { inventoryService } from '@/services/inventory.service.js';
 import { notifyOrderStatusChange } from '@/services/order-notification.service.js';
 import type { ActorMeta } from '@/services/cms-crud.service.js';
 import { ApiError } from '@/utils/errors/api-error.js';
+import { normalizeEmail } from '@/utils/email.helper.js';
 import { buildPaginationMeta, getPaginationSkip, parsePagination } from '@/utils/pagination.js';
 import {
   ORDER_STATUS,
@@ -85,6 +87,52 @@ export class OrderService {
     const order = await this.findByOrderNumber(orderNumber);
     await this.assertAccess(order, user);
     return this.toSummary(order);
+  }
+
+  /** Public guest lookup — order number + email must match the customer on the order. */
+  async trackAsGuest(orderNumber: string, emailRaw: string) {
+    const email = normalizeEmail(emailRaw);
+    const order = await OrderModel.findOne({
+      orderNumber: orderNumber.trim(),
+      isDeleted: false,
+    });
+    if (!order) {
+      throw ApiError.notFound('Order not found for that email and order number');
+    }
+
+    const customer = await CustomerModel.findOne({
+      _id: order.customerId,
+      isDeleted: false,
+    })
+      .select('email')
+      .lean();
+
+    if (!customer || normalizeEmail(customer.email) !== email) {
+      throw ApiError.notFound('Order not found for that email and order number');
+    }
+
+    return {
+      orderNumber: order.orderNumber,
+      status: order.status,
+      currency: order.currency,
+      totals: order.totals,
+      paymentMethod: order.paymentMethod,
+      items: order.items.map((item) => ({
+        name: item.name,
+        variantTitle: item.variantTitle,
+        quantity: item.quantity,
+        lineTotal: item.lineTotal,
+        images: item.images?.slice(0, 1) ?? [],
+      })),
+      shippingMethod: order.shippingMethod,
+      placedAt: order.placedAt ?? order.createdAt,
+      confirmedAt: order.confirmedAt,
+      packedAt: order.packedAt,
+      shippedAt: order.shippedAt,
+      deliveredAt: order.deliveredAt,
+      completedAt: order.completedAt,
+      cancelledAt: order.cancelledAt,
+    };
   }
 
   async list(

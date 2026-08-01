@@ -81,6 +81,7 @@ export const ROUTES = {
   checkoutCancel: '/checkout/cancel',
   /** @deprecated Use ROUTES.accountOrders */
   orders: '/account/orders',
+  trackOrder: '/track-order',
   about: '/about',
   contact: '/contact',
   privacy: '/privacy',

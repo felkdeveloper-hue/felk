@@ -43,6 +43,7 @@ import {
   productsRoute,
   searchRoute,
   termsRoute,
+  trackOrderRoute,
   wishlistRoute,
 } from './public.routes';
 import { rootRoute } from './root-route';
@@ -60,6 +61,7 @@ const publicRouteTree = publicLayoutRoute.addChildren([
   contactRoute,
   privacyRoute,
   termsRoute,
+  trackOrderRoute,
   legacyVerifyEmailRoute,
 ]);
 

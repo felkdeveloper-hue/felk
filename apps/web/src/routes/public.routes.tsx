@@ -21,6 +21,7 @@ import {
   ProductsPage,
   SearchPage,
   TermsPage,
+  TrackOrderPage,
   WishlistPage,
 } from '@/pages';
 import { publicLayoutRoute } from './layout-routes';
@@ -133,6 +134,18 @@ export const termsRoute = createRoute({
   getParentRoute: () => publicLayoutRoute,
   path: ROUTES.terms,
   component: TermsPage,
+});
+
+export const trackOrderRoute = createRoute({
+  getParentRoute: () => publicLayoutRoute,
+  path: ROUTES.trackOrder,
+  validateSearch: (search: Record<string, unknown>): { orderNumber?: string; email?: string } => {
+    const result: { orderNumber?: string; email?: string } = {};
+    if (typeof search.orderNumber === 'string') result.orderNumber = search.orderNumber;
+    if (typeof search.email === 'string') result.email = search.email;
+    return result;
+  },
+  component: TrackOrderPage,
 });
 
 /** Legacy email links from the API point to `/verify-email`. */

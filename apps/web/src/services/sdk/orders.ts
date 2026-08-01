@@ -208,4 +208,42 @@ export const ordersApi = {
     const raw = await http.get<unknown[]>(`/orders/${id}/returns`);
     return Array.isArray(raw) ? raw.map(normalizeReturn) : [];
   },
+
+  /** Public guest order lookup (order number + email). */
+  async trackGuest(orderNumber: string, email: string): Promise<GuestOrderTrackResult> {
+    return http.post<GuestOrderTrackResult>(
+      '/orders/guest-track',
+      { orderNumber, email },
+      { skipAuthRefresh: true },
+    );
+  },
 };
+
+export interface GuestOrderTrackResult {
+  orderNumber: string;
+  status: string;
+  currency: string;
+  totals: {
+    subtotal: number;
+    discount: number;
+    shipping: number;
+    tax: number;
+    grandTotal: number;
+  };
+  paymentMethod?: string | null;
+  items: Array<{
+    name: string;
+    variantTitle?: string | null;
+    quantity: number;
+    lineTotal: number;
+    images?: string[];
+  }>;
+  shippingMethod?: string | null;
+  placedAt?: string | null;
+  confirmedAt?: string | null;
+  packedAt?: string | null;
+  shippedAt?: string | null;
+  deliveredAt?: string | null;
+  completedAt?: string | null;
+  cancelledAt?: string | null;
+}

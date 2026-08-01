@@ -12,6 +12,11 @@ export const orderNumberParamsSchema = z.object({
   orderNumber: z.string().trim().min(1),
 });
 
+export const guestOrderTrackSchema = z.object({
+  orderNumber: z.string().trim().min(3).max(64),
+  email: z.string().trim().email().max(255),
+});
+
 export const orderListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).optional(),
   limit: z.coerce.number().int().min(1).max(100).optional(),
