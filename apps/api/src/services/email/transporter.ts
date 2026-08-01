@@ -1,8 +1,9 @@
 import nodemailer, { type Transporter } from 'nodemailer';
+import type SMTPTransport from 'nodemailer/lib/smtp-transport/index.js';
 import { appConfig } from '@/config/app.config.js';
 import { logger } from '@/config/logger.js';
 
-let transporter: Transporter | null = null;
+let transporter: Transporter<SMTPTransport.SentMessageInfo> | null = null;
 
 function resolveSmtpAuth(): { user: string; pass: string } | null {
   const user = (appConfig.email.user ?? appConfig.email.from)?.trim();
@@ -34,7 +35,7 @@ export function getEmailTransporter(): Transporter | null {
     const port = appConfig.email.port;
     const secure = appConfig.email.secure || port === 465;
 
-    transporter = nodemailer.createTransport({
+    const options: SMTPTransport.Options = {
       host: appConfig.email.host,
       port,
       secure,
@@ -46,13 +47,14 @@ export function getEmailTransporter(): Transporter | null {
       tls: {
         minVersion: 'TLSv1.2',
       },
-      // Avoid pooled sockets — Titan often drops idle connections → "Greeting never received".
-      pool: false,
       // Titan/shared SMTP can be slow from some networks; keep under client timeout.
+      // (Non-pooled transport is the default — avoids Titan idle "Greeting never received".)
       connectionTimeout: 15_000,
       greetingTimeout: 15_000,
       socketTimeout: 25_000,
-    });
+    };
+
+    transporter = nodemailer.createTransport(options);
   }
 
   return transporter;
