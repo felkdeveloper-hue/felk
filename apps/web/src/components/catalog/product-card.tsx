@@ -1,7 +1,7 @@
 import { memo, useCallback, useRef, useState, type TouchEvent } from 'react';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useQueryClient } from '@tanstack/react-query';
-import { Eye, Plus, Star } from 'lucide-react';
+import { Eye, Heart, Plus, Star } from 'lucide-react';
 import type { Product } from '@/services/sdk';
 import { productsApi } from '@/services/sdk';
 import { Image } from '@/components/media/image';
