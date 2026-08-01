@@ -80,12 +80,13 @@ export interface SelectOptionsSheetProps {
 
 export function SelectOptionsSheet({ product, open, onOpenChange }: SelectOptionsSheetProps) {
   const buyNowMutation = useBuyNowMutation();
-  const detailQuery = useProductById(open ? product.id : '');
+  const detailQuery = useProductById(open ? product.id : '', { initialProduct: product });
+  // Facets can load in the background — sheet should not wait on them.
   const { sizes, colors } = useCatalogFilterFacets({ enabled: open });
   const isMobile = useIsMobileSheet();
 
   const detail = detailQuery.data ?? product;
-  const variants = detail.variants ?? [];
+  const variants = detail.variants ?? product.variants ?? [];
 
   const [selectedVariantId, setSelectedVariantId] = useState<string | undefined>();
   const [selectedColorId, setSelectedColorId] = useState<string | undefined>();
@@ -261,8 +262,8 @@ export function SelectOptionsSheet({ product, open, onOpenChange }: SelectOption
     );
   };
 
-  const loading = open && detailQuery.isLoading && !detail.variants?.length;
   const stillNeedsOptions = needsOptionSelection(detail);
+  void detailQuery.isFetching;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -296,212 +297,201 @@ export function SelectOptionsSheet({ product, open, onOpenChange }: SelectOption
         </SheetHeader>
 
         <div className="flex flex-1 flex-col p-4 sm:p-5">
-          {loading ? (
-            <div className="grid gap-5 md:grid-cols-2" aria-busy="true">
-              <div className="bg-muted aspect-3/4 w-full animate-pulse" />
-              <div className="space-y-4">
-                <div className="bg-muted h-7 w-3/4 animate-pulse" />
-                <div className="bg-muted h-6 w-1/2 animate-pulse" />
-                <div className="bg-muted h-24 w-full animate-pulse" />
-              </div>
-            </div>
-          ) : (
-            <div className="grid items-start gap-6 md:grid-cols-2 md:gap-8">
-              {/* Left — product photos */}
-              <div className="space-y-3 md:sticky md:top-20">
-                {previewUrl ? (
-                  <div className="bg-muted overflow-hidden">
-                    <Image
-                      key={previewUrl}
-                      src={previewUrl}
-                      alt={detail.name}
-                      aspectRatio="3/4"
-                      className="w-full object-cover"
-                    />
-                  </div>
-                ) : (
-                  <div className="bg-muted aspect-3/4 w-full" />
-                )}
-                {gallery.length > 1 ? (
-                  <div className="flex gap-2 overflow-x-auto pb-1">
-                    {gallery.map((item) => {
-                      const active = item.url === previewUrl;
-                      return (
-                        <button
-                          key={item.id ?? item.url}
-                          type="button"
-                          aria-label="View product photo"
-                          aria-pressed={active}
-                          onClick={() => setActiveImageUrl(item.url)}
-                          className={cn(
-                            'bg-muted relative w-14 shrink-0 overflow-hidden border sm:w-16',
-                            active ? 'border-foreground border-2' : 'border-border',
-                          )}
-                        >
-                          <Image src={item.url} alt="" aspectRatio="3/4" className="object-cover" />
-                        </button>
-                      );
-                    })}
-                  </div>
-                ) : null}
-              </div>
-
-              {/* Right — size, color, cart actions */}
-              <div className="flex flex-col gap-5">
-                <div className="space-y-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <h2 className="font-display text-foreground text-lg font-bold uppercase leading-tight tracking-[0.04em] sm:text-xl">
-                      {detail.name}
-                    </h2>
-                    <WishlistButton
-                      product={detail}
-                      variantId={selectedVariantId}
-                      iconOnly
-                      variant="ghost"
-                      size="icon"
-                      className="text-muted-foreground hover:text-foreground -mr-1 mt-0.5 size-9 shrink-0"
-                    />
-                  </div>
-
-                  <PriceDisplay
-                    premium
-                    size="md"
-                    price={selectedVariant?.price ?? detail.price}
-                    salePrice={
-                      selectedVariant?.salePrice ?? detail.salePrice ?? detail.effectivePrice
-                    }
-                    compareAtPrice={selectedVariant?.compareAtPrice ?? detail.compareAtPrice}
-                    discountPercent={detail.discountPercent}
+          <div className="grid items-start gap-6 md:grid-cols-2 md:gap-8">
+            {/* Left — product photos */}
+            <div className="space-y-3 md:sticky md:top-20">
+              {previewUrl ? (
+                <div className="bg-muted overflow-hidden">
+                  <Image
+                    key={previewUrl}
+                    src={previewUrl}
+                    alt={detail.name}
+                    aspectRatio="3/4"
+                    className="w-full object-cover"
                   />
-                  <p className="text-muted-foreground text-xs">Shipping calculated at checkout.</p>
+                </div>
+              ) : (
+                <div className="bg-muted aspect-3/4 w-full" />
+              )}
+              {gallery.length > 1 ? (
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                  {gallery.map((item) => {
+                    const active = item.url === previewUrl;
+                    return (
+                      <button
+                        key={item.id ?? item.url}
+                        type="button"
+                        aria-label="View product photo"
+                        aria-pressed={active}
+                        onClick={() => setActiveImageUrl(item.url)}
+                        className={cn(
+                          'bg-muted relative w-14 shrink-0 overflow-hidden border sm:w-16',
+                          active ? 'border-foreground border-2' : 'border-border',
+                        )}
+                      >
+                        <Image src={item.url} alt="" aspectRatio="3/4" className="object-cover" />
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </div>
+
+            {/* Right — size, color, cart actions */}
+            <div className="flex flex-col gap-5">
+              <div className="space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <h2 className="font-display text-foreground text-lg font-bold uppercase leading-tight tracking-[0.04em] sm:text-xl">
+                    {detail.name}
+                  </h2>
+                  <WishlistButton
+                    product={detail}
+                    variantId={selectedVariantId}
+                    iconOnly
+                    variant="ghost"
+                    size="icon"
+                    className="text-muted-foreground hover:text-foreground -mr-1 mt-0.5 size-9 shrink-0"
+                  />
                 </div>
 
-                {hasSeparateSizeSelector && sizePromptVisible && !effectiveSizeId ? (
-                  <p
-                    role="status"
-                    className="border-foreground/20 bg-muted text-foreground border px-3 py-2.5 text-sm font-semibold"
-                  >
-                    Please select a size
-                  </p>
-                ) : null}
+                <PriceDisplay
+                  premium
+                  size="md"
+                  price={selectedVariant?.price ?? detail.price}
+                  salePrice={
+                    selectedVariant?.salePrice ?? detail.salePrice ?? detail.effectivePrice
+                  }
+                  compareAtPrice={selectedVariant?.compareAtPrice ?? detail.compareAtPrice}
+                  discountPercent={detail.discountPercent}
+                />
+                <p className="text-muted-foreground text-xs">Shipping calculated at checkout.</p>
+              </div>
 
-                {stillNeedsOptions ? (
-                  <>
-                    {hasColorSelector ? (
-                      <ProductColorSelector
-                        variants={variants}
-                        media={detail.media}
-                        selectedColorId={selectedColorId}
-                        onColorSelect={handleColorSelect}
-                        colorLabels={colorLabels}
-                        productName={detail.name}
-                        fallbackImageUrl={detail.thumbnailUrl ?? product.thumbnailUrl}
-                      />
-                    ) : null}
+              {hasSeparateSizeSelector && sizePromptVisible && !effectiveSizeId ? (
+                <p
+                  role="status"
+                  className="border-foreground/20 bg-muted text-foreground border px-3 py-2.5 text-sm font-semibold"
+                >
+                  Please select a size
+                </p>
+              ) : null}
 
-                    {hasSeparateSizeSelector ? (
-                      <ProductSizeSelector
-                        variants={variants}
-                        selectedColorId={selectedColorId}
-                        selectedSizeId={effectiveSizeId}
-                        onSizeSelect={handleSizeSelect}
-                        sizeLabels={sizeLabels}
-                      />
-                    ) : null}
+              {stillNeedsOptions ? (
+                <>
+                  {hasColorSelector ? (
+                    <ProductColorSelector
+                      variants={variants}
+                      media={detail.media}
+                      selectedColorId={selectedColorId}
+                      onColorSelect={handleColorSelect}
+                      colorLabels={colorLabels}
+                      productName={detail.name}
+                      fallbackImageUrl={detail.thumbnailUrl ?? product.thumbnailUrl}
+                    />
+                  ) : null}
 
-                    {!hasSeparateSizeSelector && !hasColorSelector && variants.length > 1 ? (
-                      <VariantSelector
-                        variants={variants}
-                        selectedId={selectedVariantId}
-                        onSelect={setSelectedVariantId}
-                        colorLabels={colorLabels}
-                        sizeLabels={sizeLabels}
-                      />
-                    ) : null}
-                  </>
-                ) : (
-                  <p className="text-muted-foreground text-sm">
-                    This product has a single option — add it to your bag below.
-                  </p>
-                )}
+                  {hasSeparateSizeSelector ? (
+                    <ProductSizeSelector
+                      variants={variants}
+                      selectedColorId={selectedColorId}
+                      selectedSizeId={effectiveSizeId}
+                      onSizeSelect={handleSizeSelect}
+                      sizeLabels={sizeLabels}
+                    />
+                  ) : null}
 
-                <div className="space-y-3 pt-1">
-                  <div className="flex items-stretch gap-3">
-                    <div className="border-border inline-flex h-12 items-center rounded-none border">
-                      <button
-                        type="button"
-                        aria-label="Decrease quantity"
-                        className="text-foreground hover:bg-muted flex h-full w-11 items-center justify-center transition-colors disabled:opacity-40"
-                        disabled={quantity <= 1}
-                        onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-                      >
-                        <Minus className="size-3.5" />
-                      </button>
-                      <span className="min-w-10 text-center text-sm font-semibold tabular-nums">
-                        {quantity}
-                      </span>
-                      <button
-                        type="button"
-                        aria-label="Increase quantity"
-                        className="text-foreground hover:bg-muted flex h-full w-11 items-center justify-center transition-colors"
-                        onClick={() => setQuantity((q) => Math.min(20, q + 1))}
-                      >
-                        <Plus className="size-3.5" />
-                      </button>
-                    </div>
+                  {!hasSeparateSizeSelector && !hasColorSelector && variants.length > 1 ? (
+                    <VariantSelector
+                      variants={variants}
+                      selectedId={selectedVariantId}
+                      onSelect={setSelectedVariantId}
+                      colorLabels={colorLabels}
+                      sizeLabels={sizeLabels}
+                    />
+                  ) : null}
+                </>
+              ) : (
+                <p className="text-muted-foreground text-sm">
+                  This product has a single option — add it to your bag below.
+                </p>
+              )}
 
-                    {canAdd ? (
-                      <AddToCartButton
-                        product={detail}
-                        variantId={cartVariantId}
-                        quantity={quantity}
-                        size="lg"
-                        variant="outline"
-                        className="border-foreground text-foreground hover:bg-foreground hover:text-background h-12 min-w-0 flex-1 rounded-none border bg-transparent font-bold uppercase tracking-[0.12em]"
-                        label="Add to cart"
-                        onAdded={() => onOpenChange(false)}
-                        skipOptionGate
-                      />
-                    ) : isSelectionOutOfStock && sizeReady ? (
-                      <button
-                        type="button"
-                        disabled
-                        className="border-border text-muted-foreground bg-muted/40 h-12 min-w-0 flex-1 cursor-not-allowed border text-sm font-bold uppercase tracking-[0.12em]"
-                      >
-                        Out of stock
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={handleBlockedAdd}
-                        className="border-foreground text-foreground hover:bg-muted h-12 min-w-0 flex-1 border bg-transparent text-sm font-bold uppercase tracking-[0.12em]"
-                      >
-                        Add to cart
-                      </button>
-                    )}
-                  </div>
-
-                  {!isSelectionOutOfStock || !sizeReady ? (
+              <div className="space-y-3 pt-1">
+                <div className="flex items-stretch gap-3">
+                  <div className="border-border inline-flex h-12 items-center rounded-none border">
                     <button
                       type="button"
-                      onClick={handleBuyNow}
-                      disabled={
-                        buyNowMutation.isPending ||
-                        detail.inStock === false ||
-                        detail.status === 'out_of_stock' ||
-                        isSelectionOutOfStock
-                      }
-                      className="bg-foreground text-background hover:bg-foreground/90 inline-flex h-12 w-full items-center justify-center rounded-none text-sm font-bold uppercase tracking-[0.14em] transition-colors disabled:opacity-50"
+                      aria-label="Decrease quantity"
+                      className="text-foreground hover:bg-muted flex h-full w-11 items-center justify-center transition-colors disabled:opacity-40"
+                      disabled={quantity <= 1}
+                      onClick={() => setQuantity((q) => Math.max(1, q - 1))}
                     >
-                      {buyNowMutation.isPending ? 'Please wait…' : 'Buy it now'}
+                      <Minus className="size-3.5" />
                     </button>
-                  ) : null}
+                    <span className="min-w-10 text-center text-sm font-semibold tabular-nums">
+                      {quantity}
+                    </span>
+                    <button
+                      type="button"
+                      aria-label="Increase quantity"
+                      className="text-foreground hover:bg-muted flex h-full w-11 items-center justify-center transition-colors"
+                      onClick={() => setQuantity((q) => Math.min(20, q + 1))}
+                    >
+                      <Plus className="size-3.5" />
+                    </button>
+                  </div>
+
+                  {canAdd ? (
+                    <AddToCartButton
+                      product={detail}
+                      variantId={cartVariantId}
+                      quantity={quantity}
+                      size="lg"
+                      variant="outline"
+                      className="border-foreground text-foreground hover:bg-foreground hover:text-background h-12 min-w-0 flex-1 rounded-none border bg-transparent font-bold uppercase tracking-[0.12em]"
+                      label="Add to cart"
+                      onAdded={() => onOpenChange(false)}
+                      skipOptionGate
+                    />
+                  ) : isSelectionOutOfStock && sizeReady ? (
+                    <button
+                      type="button"
+                      disabled
+                      className="border-border text-muted-foreground bg-muted/40 h-12 min-w-0 flex-1 cursor-not-allowed border text-sm font-bold uppercase tracking-[0.12em]"
+                    >
+                      Out of stock
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleBlockedAdd}
+                      className="border-foreground text-foreground hover:bg-muted h-12 min-w-0 flex-1 border bg-transparent text-sm font-bold uppercase tracking-[0.12em]"
+                    >
+                      Add to cart
+                    </button>
+                  )}
                 </div>
 
-                <ProductOffersSection />
+                {!isSelectionOutOfStock || !sizeReady ? (
+                  <button
+                    type="button"
+                    onClick={handleBuyNow}
+                    disabled={
+                      buyNowMutation.isPending ||
+                      detail.inStock === false ||
+                      detail.status === 'out_of_stock' ||
+                      isSelectionOutOfStock
+                    }
+                    className="bg-foreground text-background hover:bg-foreground/90 inline-flex h-12 w-full items-center justify-center rounded-none text-sm font-bold uppercase tracking-[0.14em] transition-colors disabled:opacity-50"
+                  >
+                    {buyNowMutation.isPending ? 'Please wait…' : 'Buy it now'}
+                  </button>
+                ) : null}
               </div>
+
+              <ProductOffersSection />
             </div>
-          )}
+          </div>
         </div>
       </SheetContent>
     </Sheet>

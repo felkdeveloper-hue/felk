@@ -1,15 +1,18 @@
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAddToCartMutation } from '@/hooks/cart';
 import { resolveVariantId } from '@/utils/cart';
 import { needsOptionSelection } from '@/utils/catalog/needs-option-selection';
 import { useUiStore } from '@/store/ui-store';
 import type { Product } from '@/services/sdk';
+import { productsApi } from '@/services/sdk';
 import { trackingApi } from '@/services/sdk/tracking';
 import { productMetaFrom, trackCommerceEvent } from '@/lib/analytics';
 import { Button, type ButtonProps } from '@/components/ui/button';
 import { SelectOptionsSheet } from '@/components/catalog/select-options-sheet';
 import { AppError } from '@/lib/errors';
 import { toast } from 'sonner';
+import { QUERY_KEYS } from '@/constants';
 
 export interface AddToCartButtonProps extends Omit<ButtonProps, 'onClick'> {
   product: Product;
@@ -40,6 +43,7 @@ export function AddToCartButton({
   skipOptionGate = false,
   ...props
 }: AddToCartButtonProps) {
+  const queryClient = useQueryClient();
   const addMutation = useAddToCartMutation();
   const setCartAnnouncement = useUiStore((state) => state.setCartAnnouncement);
   const [optionsOpen, setOptionsOpen] = useState(false);
@@ -49,13 +53,23 @@ export function AddToCartButton({
   const mustPickOptions = !skipOptionGate && !variantId && needsOptionSelection(product);
   const isDisabled = disabled || outOfStock || (!mustPickOptions && !resolvedVariantId);
 
+  const openOptionsSheet = () => {
+    queryClient.setQueryData(QUERY_KEYS.products.detail(product.id), (prev) => prev ?? product);
+    void queryClient.prefetchQuery({
+      queryKey: QUERY_KEYS.products.detail(product.id),
+      queryFn: () => productsApi.getById(product.id),
+      staleTime: 1000 * 60 * 5,
+    });
+    setOptionsOpen(true);
+  };
+
   const handleClick = () => {
     if (outOfStock) {
       toast.error('This item is out of stock');
       return;
     }
     if (mustPickOptions) {
-      setOptionsOpen(true);
+      openOptionsSheet();
       return;
     }
     if (!resolvedVariantId) return;

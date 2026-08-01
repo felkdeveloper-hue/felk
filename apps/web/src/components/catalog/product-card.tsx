@@ -141,7 +141,12 @@ function ProductCardComponent({
       queryFn: () => productsApi.getBySlugOrId(product.slug),
       staleTime: 1000 * 60 * 5,
     });
-  }, [product.slug, queryClient]);
+    void queryClient.prefetchQuery({
+      queryKey: QUERY_KEYS.products.detail(product.id),
+      queryFn: () => productsApi.getById(product.id),
+      staleTime: 1000 * 60 * 5,
+    });
+  }, [product.id, product.slug, queryClient]);
 
   const toggleWishlist = useCallback(() => {
     if (!isAuthed) {
@@ -267,6 +272,9 @@ function ProductCardComponent({
     event.preventDefault();
     event.stopPropagation();
     if (isSoldOut) return;
+    prefetchProduct();
+    // Seed detail cache so the sheet paints without waiting on the network.
+    queryClient.setQueryData(QUERY_KEYS.products.detail(product.id), (prev) => prev ?? product);
     setOptionsOpen(true);
   };
 

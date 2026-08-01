@@ -83,7 +83,6 @@ export function AddressPicker({
         <p className="text-muted-foreground text-sm">
           Enter your delivery details to continue — no account required.
         </p>
-        {error ? <AuthErrorAlert error={error} onRetry={() => refetch()} /> : null}
         <AddressForm onSubmit={handleCreate} isSubmitting={createMutation.isPending} />
       </div>
     );

@@ -335,6 +335,9 @@ export function CheckoutGuestAuthDialog({ open, onAuthenticated }: CheckoutGuest
             >
               Continue as guest
             </Button>
+            <p className="text-muted-foreground/70 text-center text-[11px] leading-relaxed">
+              If you log out manually, this guest session will not reopen.
+            </p>
           </div>
         ) : null}
 

@@ -10,28 +10,43 @@ import {
   type CatalogSearchState,
 } from '@/utils/catalog';
 
-function findProductInListCache(
+function forEachCachedProduct(
   queryClient: ReturnType<typeof useQueryClient>,
-  slug: string,
+  visit: (product: Product) => boolean,
 ): Product | undefined {
-  const matches = queryClient.getQueriesData<{ data?: Product[] }>({
+  const matches = queryClient.getQueriesData<unknown>({
     queryKey: QUERY_KEYS.products.all(),
   });
   for (const [, value] of matches) {
     if (!value || typeof value !== 'object') continue;
     if (Array.isArray((value as { data?: Product[] }).data)) {
-      const hit = (value as { data: Product[] }).data.find((product) => product.slug === slug);
-      if (hit) return hit;
+      for (const product of (value as { data: Product[] }).data) {
+        if (visit(product)) return product;
+      }
     }
-    // Infinite query pages
     if (Array.isArray((value as { pages?: Array<{ data?: Product[] }> }).pages)) {
       for (const page of (value as { pages: Array<{ data?: Product[] }> }).pages) {
-        const hit = page.data?.find((product) => product.slug === slug);
-        if (hit) return hit;
+        for (const product of page.data ?? []) {
+          if (visit(product)) return product;
+        }
       }
     }
   }
   return undefined;
+}
+
+function findProductInListCache(
+  queryClient: ReturnType<typeof useQueryClient>,
+  slug: string,
+): Product | undefined {
+  return forEachCachedProduct(queryClient, (product) => product.slug === slug);
+}
+
+function findProductInListCacheById(
+  queryClient: ReturnType<typeof useQueryClient>,
+  id: string,
+): Product | undefined {
+  return forEachCachedProduct(queryClient, (product) => product.id === id);
 }
 
 export function useProductsList(state: CatalogSearchState, options?: { enabled?: boolean }) {
@@ -99,12 +114,18 @@ export function useProductDetail(slug: string) {
   });
 }
 
-export function useProductById(id: string) {
+export function useProductById(id: string, options?: { initialProduct?: Product }) {
+  const queryClient = useQueryClient();
   return useQuery({
     queryKey: QUERY_KEYS.products.detail(id),
     queryFn: () => productsApi.getById(id),
     enabled: Boolean(id),
     staleTime: 1000 * 60 * 5,
+    // Paint from the card / list cache immediately; enrich when detail arrives.
+    placeholderData: () =>
+      queryClient.getQueryData<Product>(QUERY_KEYS.products.detail(id)) ??
+      options?.initialProduct ??
+      findProductInListCacheById(queryClient, id),
   });
 }
 
