@@ -165,6 +165,7 @@ export function SearchPage() {
         total={total}
         isLoading={query.isLoading}
         isError={query.isError}
+        isFetching={query.isFetching}
         isFetchingNextPage={query.isFetchingNextPage}
         hasNextPage={hasNextPage}
         onLoadMore={onLoadMore}

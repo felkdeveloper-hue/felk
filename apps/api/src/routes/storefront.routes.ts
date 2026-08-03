@@ -482,9 +482,11 @@ storefrontRouter.get(
       key: doc.key,
       label: doc.label,
       gender: doc.gender,
+      heroBannerUrl: doc.heroBannerUrl ?? '',
       columns: doc.columns ?? [],
       specials: doc.specials ?? [],
       featured: doc.featured ?? [],
+      homeCategories: doc.homeCategories ?? [],
       status: doc.status,
     });
   }),

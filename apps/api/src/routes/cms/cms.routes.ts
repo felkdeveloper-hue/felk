@@ -400,9 +400,11 @@ cmsRouter.put(
           key,
           label: body.label,
           gender: body.gender,
+          heroBannerUrl: body.heroBannerUrl ?? '',
           columns: body.columns,
           specials: body.specials,
           featured: body.featured ?? [],
+          homeCategories: body.homeCategories ?? [],
           status: body.status ?? 'active',
           isDeleted: false,
           deletedAt: null,
@@ -411,7 +413,7 @@ cmsRouter.put(
       { upsert: true, new: true, setDefaultsOnInsert: true },
     ).lean();
 
-    // Sync link banners onto matching category pages so PLP heroes pick them up.
+    // Sync link / homepage-tile images onto matching category pages.
     const bannerLinks = (body.columns ?? []).flatMap((column) =>
       (column.links ?? [])
         .filter((link) => !link.heading && link.slug?.trim() && link.bannerUrl?.trim())
@@ -427,8 +429,14 @@ cmsRouter.put(
           bannerUrl: String(link.bannerUrl ?? '').trim(),
         })),
     );
+    const homeTileImages = (body.homeCategories ?? [])
+      .filter((tile) => tile.slug?.trim() && tile.imageUrl?.trim())
+      .map((tile) => ({
+        slug: tile.slug.trim().toLowerCase(),
+        bannerUrl: tile.imageUrl.trim(),
+      }));
     await Promise.all(
-      bannerLinks
+      [...bannerLinks, ...homeTileImages]
         .filter((link) => link.slug && !link.slug.includes('/'))
         .map(async (link) => {
           await CategoryModel.updateOne(

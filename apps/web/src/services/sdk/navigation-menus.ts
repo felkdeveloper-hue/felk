@@ -5,7 +5,11 @@ import type {
   MegaMenuGender,
   MegaMenuTile,
 } from '@/constants/mega-menu-defaults';
-import { DEFAULT_MEGA_MENUS, isLegacyWomenMegaMenuColumns } from '@/constants/mega-menu-defaults';
+import {
+  DEFAULT_HOME_CATEGORIES,
+  DEFAULT_MEGA_MENUS,
+  isLegacyWomenMegaMenuColumns,
+} from '@/constants/mega-menu-defaults';
 
 /**
  * Mega-menu tiles saved from local Vite admin often persist `/src/assets/...`
@@ -86,12 +90,14 @@ function cloneDefaultMenu(key: MegaMenuGender): GenderMegaMenuConfig {
   const source = DEFAULT_MEGA_MENUS[key];
   return {
     ...source,
+    heroBannerUrl: source.heroBannerUrl,
     columns: source.columns.map((column) => ({
       ...column,
       links: column.links.map((link) => ({ ...link })),
     })),
     specials: source.specials.map((tile) => ({ ...tile })),
     featured: source.featured.map((tile) => ({ ...tile })),
+    homeCategories: (source.homeCategories ?? []).map((tile) => ({ ...tile })),
   };
 }
 
@@ -102,6 +108,7 @@ export const navigationMenusApi = {
       const columns = asColumns(raw.columns);
       const specials = asTiles(raw.specials);
       const featured = asTiles(raw.featured);
+      const homeCategories = asTiles(raw.homeCategories);
       const fallback = DEFAULT_MEGA_MENUS[key];
       // Keep CMS Specials / Shop the edit, but replace the old Topwear columns
       // with the owner catalog so a previously saved women menu does not hide it.
@@ -114,13 +121,28 @@ export const navigationMenusApi = {
           : columns.length
             ? columns
             : fallback.columns;
+
+      const rawHero = String(raw.heroBannerUrl ?? '').trim();
+      const heroBannerUrl = isUsableStorefrontImageUrl(rawHero)
+        ? rawHero
+        : (fallback.heroBannerUrl ?? '');
+
       return {
         key,
         label: String(raw.label ?? fallback.label),
         gender: key === 'women' || key === 'men' ? key : undefined,
+        heroBannerUrl,
         columns: resolvedColumns,
         specials: mergeTilesWithFallback(specials, fallback.specials),
         featured: mergeTilesWithFallback(featured, fallback.featured),
+        homeCategories: mergeTilesWithFallback(
+          homeCategories,
+          fallback.homeCategories?.length
+            ? fallback.homeCategories
+            : key === 'women'
+              ? DEFAULT_HOME_CATEGORIES
+              : [],
+        ),
       };
     } catch {
       return cloneDefaultMenu(key);

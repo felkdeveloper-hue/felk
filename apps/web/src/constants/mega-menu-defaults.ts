@@ -40,10 +40,41 @@ export type GenderMegaMenuConfig = {
   label: string;
   /** Optional gender shop context for women/men menus. */
   gender?: 'women' | 'men';
+  /** Hero banner for `/products?gender=…` main page. */
+  heroBannerUrl?: string;
   columns: MegaMenuColumn[];
   specials: MegaMenuTile[];
   featured: MegaMenuTile[];
+  /** Homepage “Categories” grid tiles (editable in admin). */
+  homeCategories?: MegaMenuTile[];
 };
+
+/** Default homepage Categories section tiles. */
+export const DEFAULT_HOME_CATEGORIES: MegaMenuTile[] = [
+  { label: 'New Arrival', slug: 'new-arrivals', imageUrl: newArrivalImage },
+  {
+    label: 'Jeans',
+    slug: 'jeans-denim',
+    imageUrl: jeansBanner,
+    imageClassName: 'object-[center_18%]',
+  },
+  {
+    label: 'Oversized',
+    slug: 'oversized',
+    imageUrl: oversizedBanner,
+    imageClassName: 'object-[78%_center]',
+  },
+  {
+    label: 'Corset',
+    slug: 'corset-tops',
+    imageUrl: corsetBanner,
+    imageClassName: 'object-[center_22%]',
+  },
+  { label: 'Hoodies', slug: 'hoodies', imageUrl: hoodieImage },
+  { label: 'Jackets', slug: 'jackets', imageUrl: jacketImage },
+  { label: 'Bags', slug: 'bags', imageUrl: bagsImage },
+  { label: 'Shoes', slug: 'shoes', imageUrl: shoesImage },
+];
 
 const SHARED_TOPWEAR: MegaMenuLink[] = [
   { label: 'Oversized', slug: 'oversized' },
@@ -136,6 +167,8 @@ export const DEFAULT_MEGA_MENUS: Record<NavigationMenuKey, GenderMegaMenuConfig>
     key: 'women',
     label: 'Women',
     gender: 'women',
+    heroBannerUrl: allTopwearBanner,
+    homeCategories: DEFAULT_HOME_CATEGORIES.map((tile) => ({ ...tile })),
     columns: WOMEN_CATEGORY_COLUMNS,
     specials: [
       { label: 'New Arrival', slug: 'new-arrivals', imageUrl: newArrivalImage },

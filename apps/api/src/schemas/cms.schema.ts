@@ -51,9 +51,11 @@ const megaMenuTileSchema = z.object({
 export const navigationMenuUpsertSchema = z.object({
   label: z.string().trim().min(1).max(120),
   gender: z.enum(['women', 'men', 'accessories']),
+  heroBannerUrl: z.string().trim().max(2000).optional().default(''),
   columns: z.array(megaMenuColumnSchema).max(8),
   specials: z.array(megaMenuTileSchema).max(24),
   featured: z.array(megaMenuTileSchema).max(24).optional().default([]),
+  homeCategories: z.array(megaMenuTileSchema).max(24).optional().default([]),
   status: z.enum(['draft', 'active', 'inactive', 'archived']).optional(),
 });
 

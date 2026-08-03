@@ -98,7 +98,9 @@ export function useInfiniteProducts(state: CatalogSearchState, options?: { enabl
     enabled: options?.enabled ?? true,
     staleTime: PRODUCT_LIST_STALE_MS,
     gcTime: 1000 * 60 * 30,
-    // Never keep previous category/search results — that made empty PLPs look full.
+    // Extra retries for cold starts / brief API blips — UI keeps skeleton until done.
+    retry: 2,
+    retryDelay: (attempt) => Math.min(800 * 2 ** attempt, 4_000),
   });
 }
 

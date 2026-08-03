@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { AdminPageHeader, AdminPanel, PageMotion } from '@/components/admin';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
+  DEFAULT_HOME_CATEGORIES,
   DEFAULT_MEGA_MENUS,
   isLegacyWomenMegaMenuColumns,
   type GenderMegaMenuConfig,
@@ -80,13 +81,26 @@ function normalizeConfig(
     });
   };
 
+  const rawHero = String(raw.heroBannerUrl ?? '').trim();
+  const heroBannerUrl =
+    rawHero && !rawHero.startsWith('/src/') && !rawHero.includes('/src/assets/')
+      ? rawHero
+      : String(fallback.heroBannerUrl ?? '');
+
+  const homeFallback =
+    fallback.homeCategories?.length || key !== 'women'
+      ? (fallback.homeCategories ?? [])
+      : DEFAULT_HOME_CATEGORIES;
+
   return {
     key,
     label: String(raw.label ?? fallback.label),
     gender: key === 'women' || key === 'men' ? key : undefined,
+    heroBannerUrl,
     columns: columns.length ? columns : fallback.columns,
     specials: mapTiles(raw.specials, fallback.specials),
     featured: mapTiles(raw.featured, fallback.featured),
+    homeCategories: mapTiles(raw.homeCategories, homeFallback),
   };
 }
 
@@ -94,8 +108,9 @@ function MegaMenuEditor({ menuKey }: { menuKey: MegaMenuGender }) {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pendingUpload, setPendingUpload] = useState<
-    | { kind: 'specials' | 'featured'; index: number }
+    | { kind: 'specials' | 'featured' | 'homeCategories'; index: number }
     | { kind: 'linkBanner'; columnIndex: number; linkIndex: number }
+    | { kind: 'heroBanner' }
     | null
   >(null);
   const [config, setConfig] = useState<GenderMegaMenuConfig>(() =>
@@ -117,6 +132,7 @@ function MegaMenuEditor({ menuKey }: { menuKey: MegaMenuGender }) {
       cmsApi.navigationMenus.upsert(menuKey, {
         label: config.label.trim() || DEFAULT_MEGA_MENUS[menuKey].label,
         gender: menuKey,
+        heroBannerUrl: config.heroBannerUrl?.trim() || '',
         columns: config.columns
           .map((col) => ({
             title: col.title.trim(),
@@ -146,11 +162,19 @@ function MegaMenuEditor({ menuKey }: { menuKey: MegaMenuGender }) {
             imageClassName: tile.imageClassName ?? null,
           }))
           .filter((tile) => tile.label && tile.slug),
+        homeCategories: (config.homeCategories ?? [])
+          .map((tile) => ({
+            label: tile.label.trim(),
+            slug: tile.slug.trim(),
+            imageUrl: tile.imageUrl.trim(),
+            imageClassName: tile.imageClassName ?? null,
+          }))
+          .filter((tile) => tile.label && tile.slug),
         status: 'active',
       }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['cms', 'navigation-menus', menuKey] });
-      void queryClient.invalidateQueries({ queryKey: ['storefront', 'navigation-menus', menuKey] });
+      void queryClient.invalidateQueries({ queryKey: ['storefront', 'navigation-menus'] });
       toast.success(`${config.label || menuKey} mega menu saved`);
     },
     onError: (error) => {
@@ -158,13 +182,21 @@ function MegaMenuEditor({ menuKey }: { menuKey: MegaMenuGender }) {
     },
   });
 
-  const uploadTileImage = async (file: File, kind: 'specials' | 'featured', index: number) => {
+  const uploadTileImage = async (
+    file: File,
+    kind: 'specials' | 'featured' | 'homeCategories',
+    index: number,
+  ) => {
     try {
-      const uploaded = await cmsApi.navigationMenus.uploadMedia(file, { kind: 'tile' });
+      const uploaded = await cmsApi.navigationMenus.uploadMedia(file, {
+        kind: kind === 'homeCategories' ? 'tile' : 'tile',
+      });
       setConfig((prev) => {
         const next = structuredClone(prev);
-        const current = next[kind][index] ?? emptyTile();
-        next[kind][index] = { ...current, imageUrl: uploaded.url };
+        const list = next[kind] ?? [];
+        const current = list[index] ?? emptyTile();
+        list[index] = { ...current, imageUrl: uploaded.url };
+        next[kind] = list;
         return next;
       });
       toast.success('Image uploaded');
@@ -189,6 +221,18 @@ function MegaMenuEditor({ menuKey }: { menuKey: MegaMenuGender }) {
     }
   };
 
+  const uploadHeroBanner = async (file: File) => {
+    try {
+      const uploaded = await cmsApi.navigationMenus.uploadMedia(file, { kind: 'banner' });
+      setConfig((prev) => ({ ...prev, heroBannerUrl: uploaded.url }));
+      toast.success('Main page banner uploaded');
+    } catch (error) {
+      toast.error(error instanceof AppError ? error.message : 'Upload failed');
+    }
+  };
+
+  const homeCategories = config.homeCategories ?? [];
+
   return (
     <div className="space-y-6">
       <AdminPanel title="Menu label">
@@ -199,15 +243,52 @@ function MegaMenuEditor({ menuKey }: { menuKey: MegaMenuGender }) {
           placeholder="Women"
         />
         <p className="mt-2 text-xs text-neutral-500">
-          Right field = storefront route. Examples:{' '}
-          <code className="rounded bg-black/5 px-1">all-topwear</code> →{' '}
-          <code className="rounded bg-black/5 px-1">/categories/all-topwear</code>,{' '}
-          <code className="rounded bg-black/5 px-1">jeans</code> → category page,{' '}
-          <code className="rounded bg-black/5 px-1">women</code> →{' '}
-          <code className="rounded bg-black/5 px-1">/products?gender=women</code>, or a full path
-          like <code className="rounded bg-black/5 px-1">/products?gender=women</code>. Edit the
-          route, Save mega menu, then refresh the shop.
+          Shown in the storefront nav. The main shop page for this gender is{' '}
+          <code className="rounded bg-black/5 px-1">/products?gender={menuKey}</code>.
         </p>
+
+        {(menuKey === 'women' || menuKey === 'men') && (
+          <div className="mt-4 space-y-3 border-t border-[var(--admin-line)] pt-4">
+            <p className="text-sm font-medium text-[var(--admin-ink)]">
+              {config.label || menuKey} main page banner
+            </p>
+            <p className="text-xs text-neutral-500">
+              Hero image on the {config.label || menuKey} shop page (
+              <code className="rounded bg-black/5 px-1">/products?gender={menuKey}</code>
+              ). Upload a wide banner (recommended ~2400×1200).
+            </p>
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="relative h-20 w-40 overflow-hidden rounded-lg border border-[var(--admin-line)] bg-[var(--admin-panel-soft)]">
+                {config.heroBannerUrl ? (
+                  <img src={config.heroBannerUrl} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <div className="flex h-full items-center justify-center text-[10px] text-neutral-500">
+                    No banner
+                  </div>
+                )}
+              </div>
+              <button
+                type="button"
+                className="admin-btn"
+                onClick={() => {
+                  setPendingUpload({ kind: 'heroBanner' });
+                  fileInputRef.current?.click();
+                }}
+              >
+                {config.heroBannerUrl ? 'Replace banner' : 'Upload banner'}
+              </button>
+              {config.heroBannerUrl ? (
+                <button
+                  type="button"
+                  className="admin-btn text-red-600"
+                  onClick={() => setConfig((prev) => ({ ...prev, heroBannerUrl: '' }))}
+                >
+                  Clear banner
+                </button>
+              ) : null}
+            </div>
+          </div>
+        )}
       </AdminPanel>
 
       <AdminPanel title="Link columns">
@@ -370,6 +451,104 @@ function MegaMenuEditor({ menuKey }: { menuKey: MegaMenuGender }) {
         </div>
       </AdminPanel>
 
+      {menuKey === 'women' ? (
+        <AdminPanel title="Homepage Categories tiles">
+          <p className="mb-4 text-xs text-neutral-500">
+            These images appear in the homepage Categories grid (New Arrival, Jeans, Oversized,
+            etc.). Change each picture individually, then save.
+          </p>
+          <div className="space-y-3">
+            {homeCategories.map((tile, index) => (
+              <div
+                key={`home-cat-${index}`}
+                className="grid gap-3 rounded-xl border border-[var(--admin-line)] p-4 sm:grid-cols-[5rem_1fr_1fr_auto]"
+              >
+                <div className="relative aspect-[3/4] overflow-hidden rounded-lg border border-[var(--admin-line)] bg-[var(--admin-panel-soft)]">
+                  {tile.imageUrl ? (
+                    <img src={tile.imageUrl} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-[10px] text-neutral-500">
+                      No image
+                    </div>
+                  )}
+                </div>
+                <input
+                  className={fieldClassName}
+                  placeholder="Label"
+                  value={tile.label}
+                  onChange={(event) => {
+                    const next = structuredClone(config);
+                    const list = next.homeCategories ?? [];
+                    const row = list[index];
+                    if (!row) return;
+                    row.label = event.target.value;
+                    next.homeCategories = list;
+                    setConfig(next);
+                  }}
+                />
+                <div>
+                  <input
+                    className={fieldClassName}
+                    placeholder="Route (e.g. jeans-denim)"
+                    value={tile.slug}
+                    onChange={(event) => {
+                      const next = structuredClone(config);
+                      const list = next.homeCategories ?? [];
+                      const row = list[index];
+                      if (!row) return;
+                      row.slug = event.target.value;
+                      next.homeCategories = list;
+                      setConfig(next);
+                    }}
+                  />
+                  {tile.slug.trim() ? (
+                    <p className="mt-1 text-[10px] text-neutral-500">
+                      Opens: {megaMenuHrefPreview(tile.slug, menuKey)}
+                    </p>
+                  ) : null}
+                </div>
+                <div className="flex flex-wrap gap-2 sm:col-span-4">
+                  <button
+                    type="button"
+                    className="admin-btn"
+                    onClick={() => {
+                      setPendingUpload({ kind: 'homeCategories', index });
+                      fileInputRef.current?.click();
+                    }}
+                  >
+                    {tile.imageUrl ? 'Replace image' : 'Upload image'}
+                  </button>
+                  <button
+                    type="button"
+                    className="admin-btn text-red-600"
+                    onClick={() =>
+                      setConfig((prev) => ({
+                        ...prev,
+                        homeCategories: (prev.homeCategories ?? []).filter((_, i) => i !== index),
+                      }))
+                    }
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ))}
+            <button
+              type="button"
+              className="admin-btn"
+              onClick={() =>
+                setConfig((prev) => ({
+                  ...prev,
+                  homeCategories: [...(prev.homeCategories ?? []), emptyTile()],
+                }))
+              }
+            >
+              + Add category tile
+            </button>
+          </div>
+        </AdminPanel>
+      ) : null}
+
       {(
         [
           ['specials', 'Specials (circular tiles)'],
@@ -470,7 +649,9 @@ function MegaMenuEditor({ menuKey }: { menuKey: MegaMenuGender }) {
         onChange={(event) => {
           const file = event.target.files?.[0];
           if (file && pendingUpload) {
-            if (pendingUpload.kind === 'linkBanner') {
+            if (pendingUpload.kind === 'heroBanner') {
+              void uploadHeroBanner(file);
+            } else if (pendingUpload.kind === 'linkBanner') {
               void uploadLinkBanner(file, pendingUpload.columnIndex, pendingUpload.linkIndex);
             } else {
               void uploadTileImage(file, pendingUpload.kind, pendingUpload.index);
@@ -507,7 +688,7 @@ export function MegaMenuPage() {
     <PageMotion>
       <AdminPageHeader
         title="Mega menu"
-        description="Edit Women and Men navigation columns (with per-section page banners), Specials tiles, and Shop the edit banners."
+        description="Edit Women/Men main page banners, homepage Categories tiles, navigation columns, Specials, and Shop the edit."
       />
       <Tabs defaultValue="women" className="space-y-6">
         <TabsList>

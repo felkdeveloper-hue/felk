@@ -152,6 +152,7 @@ export function CategoryDetailPage() {
           categoryQuery.isPending || (categoryReady && (query.isPending || query.isLoading))
         }
         isError={query.isError}
+        isFetching={query.isFetching}
         isFetchingNextPage={query.isFetchingNextPage}
         hasNextPage={hasNextPage}
         onLoadMore={onLoadMore}

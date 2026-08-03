@@ -20,6 +20,8 @@ export interface CatalogListShellProps {
   total?: number;
   isLoading: boolean;
   isError: boolean;
+  /** True while a retry/refetch is in flight — keep skeleton instead of flashing error. */
+  isFetching?: boolean;
   isFetchingNextPage?: boolean;
   hasNextPage?: boolean;
   onLoadMore?: () => void;
@@ -44,6 +46,7 @@ export function CatalogListShell({
   total,
   isLoading,
   isError,
+  isFetching = false,
   isFetchingNextPage = false,
   hasNextPage = false,
   onLoadMore,
@@ -197,14 +200,14 @@ export function CatalogListShell({
           </div>
         </div>
 
-        {/* Product grid */}
-        {isLoading ? (
+        {/* Product grid — never flash error while retrying or when we already have rows */}
+        {isLoading || (isError && isFetching && products.length === 0) ? (
           <ProductGridSkeletonWrapper
             view={state.view}
             filtersOpen={false}
             count={CATALOG_BATCH_SIZE}
           />
-        ) : isError ? (
+        ) : isError && products.length === 0 ? (
           <ProductGridError onRetry={onRetry} />
         ) : (
           <>

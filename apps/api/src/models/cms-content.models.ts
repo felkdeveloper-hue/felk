@@ -263,9 +263,13 @@ export const NavigationMenuModel = model(
       key: { type: String, required: true, trim: true },
       label: { type: String, required: true, trim: true },
       gender: { type: String, enum: ['women', 'men', 'accessories'], required: true },
+      /** Banner for `/products?gender=women|men` main shop page. */
+      heroBannerUrl: { type: String, default: '', trim: true },
       columns: { type: [megaMenuColumnSchema], default: [] },
       specials: { type: [megaMenuTileSchema], default: [] },
       featured: { type: [megaMenuTileSchema], default: [] },
+      /** Homepage Categories grid tiles. */
+      homeCategories: { type: [megaMenuTileSchema], default: [] },
       status: {
         type: String,
         enum: ['draft', 'active', 'inactive', 'archived'],

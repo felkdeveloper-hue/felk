@@ -1,36 +1,13 @@
+import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { Link } from '@tanstack/react-router';
 import { motion, useReducedMotion } from 'framer-motion';
-import bagsImage from '@/assets/images/Categories/Bags.png';
-import corsetImage from '@/assets/images/Categories/corset-banner-mobile.webp';
-import hoodieImage from '@/assets/images/Categories/Hoddiewomen.png';
-import jeansImage from '@/assets/images/Categories/jeans-banner-mobile.webp';
-import newArrivalImage from '@/assets/images/Categories/New Arrival.png';
-import oversizedImage from '@/assets/images/Categories/oversized-banner.webp';
-import shoesImage from '@/assets/images/Categories/Shoes.png';
-import jacketImage from '@/assets/images/Categories/WomenJacket.png';
 import { Section } from '@/components/common/section';
 import { Image } from '@/components/media/image';
-import { useCategoriesList } from '@/hooks/catalog/use-categories';
+import { DEFAULT_HOME_CATEGORIES } from '@/constants/mega-menu-defaults';
 import { cn } from '@/lib/utils';
-import type { Category } from '@/services/sdk';
+import { navigationMenusApi } from '@/services/sdk/navigation-menus';
 import { MotionItem, MotionReveal } from './motion-reveal';
-
-const FALLBACK_TILES = [
-  { slug: 'new-arrivals', name: 'New Arrival', image: newArrivalImage, objectClass: undefined },
-  { slug: 'jeans', name: 'Jeans', image: jeansImage, objectClass: 'object-[center_18%]' },
-  {
-    slug: 'oversized',
-    name: 'Oversized',
-    image: oversizedImage,
-    objectClass: 'object-[78%_center]',
-  },
-  { slug: 'corset', name: 'Corset', image: corsetImage, objectClass: 'object-[center_22%]' },
-  { slug: 'hoodies', name: 'Hoodies', image: hoodieImage, objectClass: undefined },
-  { slug: 'jackets', name: 'Jackets', image: jacketImage, objectClass: undefined },
-  { slug: 'bags', name: 'Bags', image: bagsImage, objectClass: undefined },
-  { slug: 'shoes', name: 'Shoes', image: shoesImage, objectClass: undefined },
-] as const;
 
 type HomeCategoryTile = {
   id: string;
@@ -40,34 +17,27 @@ type HomeCategoryTile = {
   objectClass?: string;
 };
 
-function resolveHomeTiles(apiCategories: Category[] | undefined): HomeCategoryTile[] {
-  const bySlug = new Map(
-    (apiCategories ?? [])
-      .filter((category) => !category.parentId && category.status !== 'archived')
-      .map((category) => [category.slug, category]),
-  );
-
-  // Always render the designed homepage grid with local images; wire up API
-  // ids/slugs when those categories exist so links stay valid.
-  return FALLBACK_TILES.map((tile) => {
-    const matched = bySlug.get(tile.slug);
-    return {
-      id: matched?.id ?? tile.slug,
-      slug: matched?.slug ?? tile.slug,
-      name: matched?.name ?? tile.name,
-      imageUrl: tile.image,
-      objectClass: tile.objectClass,
-    };
-  });
-}
-
 export function HomeCategoriesSection() {
   const reduceMotion = useReducedMotion();
-  const categoriesQuery = useCategoriesList();
-  const tiles = useMemo(
-    () => resolveHomeTiles(categoriesQuery.data?.data),
-    [categoriesQuery.data?.data],
-  );
+  const menuQuery = useQuery({
+    queryKey: ['storefront', 'navigation-menus', 'women', 'home-categories'],
+    queryFn: () => navigationMenusApi.getByKey('women'),
+    staleTime: 1000 * 60 * 10,
+  });
+
+  const tiles = useMemo((): HomeCategoryTile[] => {
+    const fromCms = menuQuery.data?.homeCategories?.filter(
+      (tile) => tile.label.trim() && tile.slug.trim(),
+    );
+    const source = fromCms?.length ? fromCms : DEFAULT_HOME_CATEGORIES;
+    return source.map((tile) => ({
+      id: tile.slug,
+      slug: tile.slug,
+      name: tile.label,
+      imageUrl: tile.imageUrl,
+      objectClass: tile.imageClassName ?? undefined,
+    }));
+  }, [menuQuery.data?.homeCategories]);
 
   if (!tiles.length) return null;
 
