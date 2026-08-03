@@ -62,10 +62,24 @@ const HERO_FALLBACKS: Record<string, HeroArt> = {
   },
 };
 
+/** Soft gradient backdrop when a category has no uploaded / curated banner. */
 const DEFAULT_HERO: HeroArt = {
-  desktop: allTopwearBanner,
-  bakedCopy: true,
-  objectClass: 'object-[70%_center]',
+  desktop:
+    'data:image/svg+xml,' +
+    encodeURIComponent(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+        <defs>
+          <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#1a1a1a"/>
+            <stop offset="55%" stop-color="#2c2c2c"/>
+            <stop offset="100%" stop-color="#111111"/>
+          </linearGradient>
+        </defs>
+        <rect width="1600" height="900" fill="url(#g)"/>
+      </svg>`,
+    ),
+  bakedCopy: false,
+  objectClass: 'object-center',
 };
 
 /** One sentence taglines per scope (only used when art has no baked copy). */
@@ -96,9 +110,11 @@ export interface CatalogCategoryHeroProps {
 }
 
 function resolveHeroArt(scopeKey?: string, imageUrl?: string | null): HeroArt {
+  // Prefer admin-uploaded category / mega-menu banners over baked campaign art.
+  const uploaded = imageUrl?.trim();
+  if (uploaded) return { desktop: uploaded, bakedCopy: false };
   const curated = scopeKey ? HERO_FALLBACKS[scopeKey] : undefined;
   if (curated) return curated;
-  if (imageUrl) return { desktop: imageUrl };
   return DEFAULT_HERO;
 }
 

@@ -1,4 +1,5 @@
 import { http } from '@/lib/http-client';
+import { AppError } from '@/lib/errors';
 import { mapList } from '@/utils/cms';
 import { normalizeCategory } from '@/utils/catalog/normalize';
 import type { ListQueryParams, PaginatedResult } from '@/types';
@@ -57,14 +58,26 @@ export const categoriesApi = {
   },
 
   async getBySlug(slug: string): Promise<Category | null> {
-    // Prefer the active list (usually already warm from bootstrap) over a
-    // separate `?q=` request that scanned 100 rows on every category PLP.
-    const result = await this.list({
-      status: 'active',
-      limit: 100,
-      sortBy: 'sortOrder',
-      sortOrder: 'asc',
-    });
-    return result.data.find((category) => category.slug === slug) ?? null;
+    const normalized = slug.trim().toLowerCase();
+    if (!normalized) return null;
+
+    // Exact slug lookup — never rely on a capped list page (heels etc. can be missing).
+    try {
+      const raw = await http.get<unknown>(
+        `/storefront/categories/by-slug/${encodeURIComponent(normalized)}`,
+      );
+      return normalizeCategory(raw);
+    } catch (error) {
+      if (AppError.isAppError(error) && error.isNotFound) return null;
+
+      // Fall back to the warm active list for offline/bootstrap edge cases.
+      const result = await this.list({
+        status: 'active',
+        limit: 500,
+        sortBy: 'sortOrder',
+        sortOrder: 'asc',
+      });
+      return result.data.find((category) => category.slug === normalized) ?? null;
+    }
   },
 };

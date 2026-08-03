@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { SlidersHorizontal } from 'lucide-react';
 import { Container } from '@/components/layout/container';
 import { useCatalogFilterFacets } from '@/hooks/catalog';
-import { CATALOG_BATCH_SIZE, CATALOG_MAX_PRODUCTS, type CatalogSearchState } from '@/utils/catalog';
+import { CATALOG_BATCH_SIZE, type CatalogSearchState } from '@/utils/catalog';
 import type { Product } from '@/services/sdk';
 import { CatalogFilterAndSortSheet } from './catalog-filter-sidebar';
 import { AppliedFilterChips, type AppliedFilterChip } from './applied-filter-chips';
@@ -28,6 +28,10 @@ export interface CatalogListShellProps {
   onClearFilters: () => void;
   /** Per-category filter section keys (Bonkers-style). */
   facetKeys?: string[];
+  /** Custom empty-state copy for category / search PLPs. */
+  emptyTitle?: string;
+  emptyDescription?: string;
+  emptyAction?: ReactNode;
 }
 
 export function CatalogListShell({
@@ -47,6 +51,9 @@ export function CatalogListShell({
   onSearchChange,
   onClearFilters,
   facetKeys,
+  emptyTitle,
+  emptyDescription,
+  emptyAction,
 }: CatalogListShellProps) {
   const [filtersOpen, setFiltersOpen] = useState(false);
   // Defer facet API fan-out until filters open (or chips need labels).
@@ -144,10 +151,7 @@ export function CatalogListShell({
     return () => window.clearTimeout(timer);
   }, [hasNextPage, isFetchingNextPage, isLoading, onLoadMore, products.length]);
 
-  const shown = products.length;
   const catalogTotal = typeof total === 'number' ? total : undefined;
-  const cappedTotal =
-    catalogTotal != null ? Math.min(catalogTotal, CATALOG_MAX_PRODUCTS) : CATALOG_MAX_PRODUCTS;
 
   return (
     <div className="pb-24 sm:pb-16 lg:pb-16">
@@ -169,8 +173,8 @@ export function CatalogListShell({
           </header>
         ) : null}
 
-        {/* Toolbar — desktop filter trigger + chips | product count */}
-        <div className="border-border/60 flex flex-wrap items-center justify-between gap-3 border-b pb-3 sm:pb-4">
+        {/* Toolbar — filter trigger + applied chips (no product count) */}
+        <div className="border-border/60 flex flex-wrap items-center gap-3 border-b pb-3 sm:pb-4">
           <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
             <CatalogFilterAndSortSheet
               state={state}
@@ -191,10 +195,6 @@ export function CatalogListShell({
               />
             ) : null}
           </div>
-
-          <p className="text-muted-foreground text-[10px] font-medium uppercase tracking-wider sm:text-xs">
-            {catalogTotal != null ? `${Math.min(catalogTotal, cappedTotal)} products` : null}
-          </p>
         </div>
 
         {/* Product grid */}
@@ -208,7 +208,14 @@ export function CatalogListShell({
           <ProductGridError onRetry={onRetry} />
         ) : (
           <>
-            <ProductGrid products={products} view={state.view} filtersOpen={false} />
+            <ProductGrid
+              products={products}
+              view={state.view}
+              filtersOpen={false}
+              emptyTitle={emptyTitle}
+              emptyDescription={emptyDescription}
+              emptyAction={emptyAction}
+            />
 
             {isFetchingNextPage ? (
               <div className="text-muted-foreground flex items-center justify-center gap-2 py-6 text-xs uppercase tracking-widest">
@@ -217,14 +224,7 @@ export function CatalogListShell({
               </div>
             ) : null}
 
-            {hasNextPage ? (
-              <div ref={loadMoreRef} className="h-24 w-full" aria-hidden />
-            ) : shown > 0 ? (
-              <p className="text-muted-foreground pt-4 text-center text-xs uppercase tracking-widest">
-                Showing {shown}
-                {catalogTotal != null ? ` of ${Math.min(catalogTotal, cappedTotal)}` : ''} products
-              </p>
-            ) : null}
+            {hasNextPage ? <div ref={loadMoreRef} className="h-24 w-full" aria-hidden /> : null}
           </>
         )}
       </Container>

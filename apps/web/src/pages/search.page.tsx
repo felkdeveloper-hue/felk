@@ -160,7 +160,6 @@ export function SearchPage() {
 
       <CatalogListShell
         title={state.q ? `Results for “${state.q}”` : 'Search products'}
-        description={total != null ? `${total} result${total === 1 ? '' : 's'}` : undefined}
         state={state}
         products={products}
         total={total}
@@ -172,6 +171,12 @@ export function SearchPage() {
         onRetry={() => void query.refetch()}
         onSearchChange={setSearch}
         onClearFilters={clearFilters}
+        emptyTitle={state.q ? `No products match “${state.q}”` : 'No products found'}
+        emptyDescription={
+          state.q
+            ? 'Try a related term (e.g. denim for jeans), or browse categories from the menu.'
+            : 'Try adjusting your filters or search terms.'
+        }
       />
     </>
   );

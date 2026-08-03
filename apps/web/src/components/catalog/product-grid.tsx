@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { Product } from '@/services/sdk';
 import { ProductGridSkeleton } from '@/components/feedback/skeletons';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -12,6 +13,9 @@ export interface ProductGridProps {
   /** When true, cap the grid at 4 columns so cards stay larger beside the sidebar. */
   filtersOpen?: boolean;
   className?: string;
+  emptyTitle?: string;
+  emptyDescription?: string;
+  emptyAction?: ReactNode;
 }
 
 function gridClassName(view: 'grid' | 'list', filtersOpen: boolean) {
@@ -26,14 +30,12 @@ export function ProductGrid({
   view = 'grid',
   filtersOpen = false,
   className,
+  emptyTitle = 'No products found',
+  emptyDescription = 'Try adjusting your filters or search terms.',
+  emptyAction,
 }: ProductGridProps) {
   if (!products.length) {
-    return (
-      <EmptyState
-        title="No products found"
-        description="Try adjusting your filters or search terms."
-      />
-    );
+    return <EmptyState title={emptyTitle} description={emptyDescription} action={emptyAction} />;
   }
 
   return (

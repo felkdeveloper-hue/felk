@@ -1,7 +1,10 @@
 import { useCallback, useMemo } from 'react';
-import { useNavigate, useParams } from '@tanstack/react-router';
+import { Link, useNavigate, useParams } from '@tanstack/react-router';
 import { Seo } from '@/components/common/seo';
 import { CatalogCategoryHero, CatalogListShell } from '@/components/catalog';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Button } from '@/components/ui/button';
+import { Container } from '@/components/layout/container';
 import { buildAbsoluteUrl, siteConfig } from '@/config';
 import { ROUTES } from '@/constants';
 import {
@@ -20,19 +23,24 @@ export function CategoryDetailPage() {
   const categoriesQuery = useCategoriesList();
 
   const { state, setSearch, clearFilters } = useCatalogSearchParams();
-  // Wait for categoryId before listing — avoids a wasted unfiltered products fetch
-  // that used to race the slug lookup and keep the grid in skeleton longer.
-  const mergedState = { ...state, categoryId: category?.id ?? state.categoryId };
+  // Only filter once the slug resolves — never reuse a stale categoryId from URL/search.
+  const mergedState = useMemo(
+    () => ({ ...state, categoryId: category?.id }),
+    [state, category?.id],
+  );
+  const categoryReady = Boolean(category?.id);
+  const categoryMissing = categoryQuery.isFetched && !category?.id && !categoryQuery.isError;
+
   const query = useInfiniteProducts(mergedState, {
-    enabled: Boolean(category?.id),
+    enabled: categoryReady,
   });
 
   const products = useMemo(
-    () => query.data?.pages.flatMap((page) => page.data) ?? [],
-    [query.data?.pages],
+    () => (categoryReady ? (query.data?.pages.flatMap((page) => page.data) ?? []) : []),
+    [categoryReady, query.data?.pages],
   );
 
-  const total = query.data?.pages[0]?.meta.total;
+  const total = categoryReady ? query.data?.pages[0]?.meta.total : 0;
   const hasNextPage = Boolean(query.hasNextPage);
 
   const onLoadMore = useCallback(() => {
@@ -91,6 +99,32 @@ export function CategoryDetailPage() {
   }, [clearFilters]);
 
   const heroTitle = category?.name ?? slug.replace(/-/g, ' ');
+  const prettyName = category?.name ?? slug.replace(/-/g, ' ');
+
+  if (categoryMissing) {
+    return (
+      <>
+        <Seo
+          title="Category unavailable"
+          description={`This category is not available at ${siteConfig.name}.`}
+          url={buildAbsoluteUrl(`/categories/${slug}`)}
+          noIndex
+        />
+        <CatalogCategoryHero title={prettyName} scopeKey={slug} />
+        <Container className="py-10">
+          <EmptyState
+            title={`Nothing here in ${prettyName}`}
+            description="This section isn’t available yet. Browse the full collection or try another category from the menu."
+            action={
+              <Button asChild variant="outline">
+                <Link to={ROUTES.products}>Browse all products</Link>
+              </Button>
+            }
+          />
+        </Container>
+      </>
+    );
+  }
 
   return (
     <>
@@ -114,7 +148,9 @@ export function CategoryDetailPage() {
         state={mergedState}
         products={products}
         total={total}
-        isLoading={categoryQuery.isPending || query.isPending || query.isLoading}
+        isLoading={
+          categoryQuery.isPending || (categoryReady && (query.isPending || query.isLoading))
+        }
         isError={query.isError}
         isFetchingNextPage={query.isFetchingNextPage}
         hasNextPage={hasNextPage}
@@ -123,6 +159,13 @@ export function CategoryDetailPage() {
         onSearchChange={onSearchChange}
         onClearFilters={onClearFilters}
         facetKeys={category?.filterFacetKeys}
+        emptyTitle={`No products in ${prettyName} yet`}
+        emptyDescription="We’re still adding pieces to this edit. Explore other categories or check back soon."
+        emptyAction={
+          <Button asChild variant="outline">
+            <Link to={ROUTES.products}>Continue shopping</Link>
+          </Button>
+        }
       />
     </>
   );

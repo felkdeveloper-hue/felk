@@ -114,9 +114,13 @@ export const cmsApi = {
     async upsert(key: string, payload: Record<string, unknown>): Promise<CmsResource> {
       return normalizeCmsResource(await http.put<unknown>(`/cms/navigation-menus/${key}`, payload));
     },
-    async uploadMedia(file: File): Promise<{ url: string; key?: string }> {
+    async uploadMedia(
+      file: File,
+      options?: { kind?: 'tile' | 'banner' },
+    ): Promise<{ url: string; key?: string }> {
       const form = new FormData();
       form.append('file', file);
+      form.append('kind', options?.kind ?? 'tile');
       return http.post<{ url: string; key?: string }>('/cms/navigation-menus/media', form);
     },
   },

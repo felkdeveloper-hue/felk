@@ -44,10 +44,12 @@ function asColumns(raw: unknown): MegaMenuColumn[] {
     const links = Array.isArray(record.links)
       ? record.links.map((link) => {
           const row = link as Record<string, unknown>;
+          const bannerUrl = String(row.bannerUrl ?? '').trim();
           return {
             label: String(row.label ?? ''),
             slug: String(row.slug ?? ''),
             ...(row.heading ? { heading: true as const } : {}),
+            ...(bannerUrl ? { bannerUrl } : {}),
           };
         })
       : [];

@@ -46,6 +46,7 @@ import { ApiResponse } from '@/utils/response/api-response.js';
 import { storeSettingUpsertSchema } from '@/schemas/cms.schema.js';
 import { singleImageUpload } from '@/utils/file-upload.helper.js';
 import { processImage } from '@/utils/image.helper.js';
+import { clearCacheByPrefix } from '@/utils/simple-cache.js';
 import { z } from 'zod';
 import { objectIdSchema } from '@/schemas/common.schema.js';
 import { randomUUID } from 'node:crypto';
@@ -349,9 +350,11 @@ cmsRouter.post(
     if (!req.file) {
       return ApiResponse.error(res, 'File is required', 400, 'FILE_REQUIRED');
     }
+    const kind = String(req.body?.kind ?? req.query?.kind ?? 'tile').toLowerCase();
+    const isBanner = kind === 'banner';
     const webp = await processImage(req.file.buffer, {
-      width: 1200,
-      height: 1200,
+      width: isBanner ? 2400 : 1200,
+      height: isBanner ? 1200 : 1200,
       quality: 85,
       format: 'webp',
     });
@@ -407,6 +410,46 @@ cmsRouter.put(
       },
       { upsert: true, new: true, setDefaultsOnInsert: true },
     ).lean();
+
+    // Sync link banners onto matching category pages so PLP heroes pick them up.
+    const bannerLinks = (body.columns ?? []).flatMap((column) =>
+      (column.links ?? [])
+        .filter((link) => !link.heading && link.slug?.trim() && link.bannerUrl?.trim())
+        .map((link) => ({
+          slug: (
+            link.slug
+              .trim()
+              .replace(/^\/?categories\//, '')
+              .split('?')[0] ?? ''
+          )
+            .trim()
+            .toLowerCase(),
+          bannerUrl: String(link.bannerUrl ?? '').trim(),
+        })),
+    );
+    await Promise.all(
+      bannerLinks
+        .filter((link) => link.slug && !link.slug.includes('/'))
+        .map(async (link) => {
+          await CategoryModel.updateOne(
+            { slug: link.slug, isDeleted: false },
+            {
+              $set: {
+                image: {
+                  url: link.bannerUrl,
+                  alt: `${link.slug} banner`,
+                },
+              },
+            },
+          );
+        }),
+    );
+    clearCacheByPrefix(
+      'storefront:category:',
+      'storefront:list:categories:',
+      'storefront:bootstrap',
+    );
+
     ApiResponse.success(res, { ...doc, id: String(doc?._id) }, 'Navigation menu saved');
   }),
 );

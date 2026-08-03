@@ -20,7 +20,7 @@ const fieldClassName =
   'w-full rounded-lg border border-[var(--admin-line)] bg-[var(--admin-panel-soft)] px-3 py-2 text-sm text-[var(--admin-ink)] outline-none transition-colors focus:border-[var(--admin-accent)]/50';
 
 function emptyLink(): MegaMenuLink {
-  return { label: '', slug: '' };
+  return { label: '', slug: '', bannerUrl: '' };
 }
 
 function emptyTile(): MegaMenuTile {
@@ -46,6 +46,7 @@ function normalizeConfig(
               label: String(link.label ?? ''),
               slug: String(link.slug ?? ''),
               ...(link.heading ? { heading: true as const } : {}),
+              bannerUrl: String(link.bannerUrl ?? ''),
             }))
           : [],
       }))
@@ -92,10 +93,11 @@ function normalizeConfig(
 function MegaMenuEditor({ menuKey }: { menuKey: MegaMenuGender }) {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [pendingUpload, setPendingUpload] = useState<{
-    kind: 'specials' | 'featured';
-    index: number;
-  } | null>(null);
+  const [pendingUpload, setPendingUpload] = useState<
+    | { kind: 'specials' | 'featured'; index: number }
+    | { kind: 'linkBanner'; columnIndex: number; linkIndex: number }
+    | null
+  >(null);
   const [config, setConfig] = useState<GenderMegaMenuConfig>(() =>
     structuredClone(DEFAULT_MEGA_MENUS[menuKey]),
   );
@@ -123,6 +125,7 @@ function MegaMenuEditor({ menuKey }: { menuKey: MegaMenuGender }) {
                 label: link.label.trim(),
                 slug: link.slug.trim(),
                 ...(link.heading ? { heading: true as const } : {}),
+                bannerUrl: link.bannerUrl?.trim() || '',
               }))
               .filter((link) => link.label && (link.heading || link.slug)),
           }))
@@ -155,9 +158,9 @@ function MegaMenuEditor({ menuKey }: { menuKey: MegaMenuGender }) {
     },
   });
 
-  const uploadImage = async (file: File, kind: 'specials' | 'featured', index: number) => {
+  const uploadTileImage = async (file: File, kind: 'specials' | 'featured', index: number) => {
     try {
-      const uploaded = await cmsApi.navigationMenus.uploadMedia(file);
+      const uploaded = await cmsApi.navigationMenus.uploadMedia(file, { kind: 'tile' });
       setConfig((prev) => {
         const next = structuredClone(prev);
         const current = next[kind][index] ?? emptyTile();
@@ -165,6 +168,22 @@ function MegaMenuEditor({ menuKey }: { menuKey: MegaMenuGender }) {
         return next;
       });
       toast.success('Image uploaded');
+    } catch (error) {
+      toast.error(error instanceof AppError ? error.message : 'Upload failed');
+    }
+  };
+
+  const uploadLinkBanner = async (file: File, columnIndex: number, linkIndex: number) => {
+    try {
+      const uploaded = await cmsApi.navigationMenus.uploadMedia(file, { kind: 'banner' });
+      setConfig((prev) => {
+        const next = structuredClone(prev);
+        const row = next.columns[columnIndex]?.links[linkIndex];
+        if (!row) return prev;
+        row.bannerUrl = uploaded.url;
+        return next;
+      });
+      toast.success('Section banner uploaded');
     } catch (error) {
       toast.error(error instanceof AppError ? error.message : 'Upload failed');
     }
@@ -192,6 +211,10 @@ function MegaMenuEditor({ menuKey }: { menuKey: MegaMenuGender }) {
       </AdminPanel>
 
       <AdminPanel title="Link columns">
+        <p className="mb-4 text-xs text-neutral-500">
+          Upload a page banner for each section (e.g. Long sleeves, Heels). It appears on that
+          category page after you save the mega menu.
+        </p>
         <div className="space-y-4">
           {config.columns.map((column, columnIndex) => (
             <div
@@ -224,56 +247,101 @@ function MegaMenuEditor({ menuKey }: { menuKey: MegaMenuGender }) {
                   Remove column
                 </button>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {column.links.map((link, linkIndex) => (
                   <div
                     key={`link-${columnIndex}-${linkIndex}`}
-                    className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]"
+                    className="rounded-lg border border-[var(--admin-line)] p-3"
                   >
-                    <input
-                      className={fieldClassName}
-                      placeholder="Label"
-                      value={link.label}
-                      onChange={(event) => {
-                        const next = structuredClone(config);
-                        const row = next.columns[columnIndex]?.links[linkIndex];
-                        if (!row) return;
-                        row.label = event.target.value;
-                        setConfig(next);
-                      }}
-                    />
-                    <div>
+                    <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
                       <input
                         className={fieldClassName}
-                        placeholder="Route (e.g. all-topwear)"
-                        value={link.slug}
+                        placeholder="Label"
+                        value={link.label}
                         onChange={(event) => {
                           const next = structuredClone(config);
                           const row = next.columns[columnIndex]?.links[linkIndex];
                           if (!row) return;
-                          row.slug = event.target.value;
+                          row.label = event.target.value;
                           setConfig(next);
                         }}
                       />
-                      {link.slug.trim() ? (
-                        <p className="mt-1 text-[10px] text-neutral-500">
-                          Opens: {megaMenuHrefPreview(link.slug, menuKey)}
-                        </p>
-                      ) : null}
+                      <div>
+                        <input
+                          className={fieldClassName}
+                          placeholder="Route (e.g. all-topwear)"
+                          value={link.slug}
+                          onChange={(event) => {
+                            const next = structuredClone(config);
+                            const row = next.columns[columnIndex]?.links[linkIndex];
+                            if (!row) return;
+                            row.slug = event.target.value;
+                            setConfig(next);
+                          }}
+                        />
+                        {link.slug.trim() ? (
+                          <p className="mt-1 text-[10px] text-neutral-500">
+                            Opens: {megaMenuHrefPreview(link.slug, menuKey)}
+                          </p>
+                        ) : null}
+                      </div>
+                      <button
+                        type="button"
+                        className="admin-btn text-red-600"
+                        onClick={() => {
+                          const next = structuredClone(config);
+                          const col = next.columns[columnIndex];
+                          if (!col) return;
+                          col.links = col.links.filter((_, i) => i !== linkIndex);
+                          setConfig(next);
+                        }}
+                      >
+                        Remove
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      className="admin-btn text-red-600"
-                      onClick={() => {
-                        const next = structuredClone(config);
-                        const col = next.columns[columnIndex];
-                        if (!col) return;
-                        col.links = col.links.filter((_, i) => i !== linkIndex);
-                        setConfig(next);
-                      }}
-                    >
-                      Remove
-                    </button>
+                    {!link.heading ? (
+                      <div className="mt-3 flex flex-wrap items-center gap-3">
+                        <div className="relative h-14 w-28 overflow-hidden rounded-md border border-[var(--admin-line)] bg-[var(--admin-panel-soft)]">
+                          {link.bannerUrl ? (
+                            <img
+                              src={link.bannerUrl}
+                              alt=""
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <div className="flex h-full items-center justify-center text-[10px] text-neutral-500">
+                              No banner
+                            </div>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          className="admin-btn"
+                          disabled={!link.slug.trim()}
+                          onClick={() => {
+                            setPendingUpload({ kind: 'linkBanner', columnIndex, linkIndex });
+                            fileInputRef.current?.click();
+                          }}
+                        >
+                          {link.bannerUrl ? 'Replace banner' : 'Upload banner'}
+                        </button>
+                        {link.bannerUrl ? (
+                          <button
+                            type="button"
+                            className="admin-btn text-red-600"
+                            onClick={() => {
+                              const next = structuredClone(config);
+                              const row = next.columns[columnIndex]?.links[linkIndex];
+                              if (!row) return;
+                              row.bannerUrl = '';
+                              setConfig(next);
+                            }}
+                          >
+                            Clear banner
+                          </button>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </div>
                 ))}
               </div>
@@ -402,7 +470,11 @@ function MegaMenuEditor({ menuKey }: { menuKey: MegaMenuGender }) {
         onChange={(event) => {
           const file = event.target.files?.[0];
           if (file && pendingUpload) {
-            void uploadImage(file, pendingUpload.kind, pendingUpload.index);
+            if (pendingUpload.kind === 'linkBanner') {
+              void uploadLinkBanner(file, pendingUpload.columnIndex, pendingUpload.linkIndex);
+            } else {
+              void uploadTileImage(file, pendingUpload.kind, pendingUpload.index);
+            }
           }
           setPendingUpload(null);
           event.target.value = '';
@@ -435,7 +507,7 @@ export function MegaMenuPage() {
     <PageMotion>
       <AdminPageHeader
         title="Mega menu"
-        description="Edit Women and Men navigation columns, Specials tiles, and Shop the edit banners — including images and category links."
+        description="Edit Women and Men navigation columns (with per-section page banners), Specials tiles, and Shop the edit banners."
       />
       <Tabs defaultValue="women" className="space-y-6">
         <TabsList>

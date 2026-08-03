@@ -23,10 +23,14 @@ export const CATALOG_SORT_OPTIONS = [
 ] as const;
 
 export const POPULAR_SEARCHES = [
-  'linen dress',
-  'tailored blazer',
-  'silk top',
+  'jeans',
+  'denim',
+  'tops',
+  'dresses',
+  'heels',
+  'hoodies',
   'new arrivals',
+  'oversized',
 ] as const;
 
 export const RECENT_SEARCHES_KEY = 'fe-platform:recent-searches';

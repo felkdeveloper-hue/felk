@@ -64,7 +64,6 @@ export function useProductsList(state: CatalogSearchState, options?: { enabled?:
     enabled: options?.enabled ?? true,
     staleTime: PRODUCT_LIST_STALE_MS,
     gcTime: 1000 * 60 * 30,
-    placeholderData: (previous) => previous,
   });
 }
 
@@ -99,7 +98,7 @@ export function useInfiniteProducts(state: CatalogSearchState, options?: { enabl
     enabled: options?.enabled ?? true,
     staleTime: PRODUCT_LIST_STALE_MS,
     gcTime: 1000 * 60 * 30,
-    placeholderData: (previous) => previous,
+    // Never keep previous category/search results — that made empty PLPs look full.
   });
 }
 

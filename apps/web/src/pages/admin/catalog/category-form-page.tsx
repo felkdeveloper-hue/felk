@@ -182,9 +182,10 @@ export function CategoryFormPage({ categoryId }: { categoryId: string }) {
           </div>
         </AdminPanel>
 
-        <AdminPanel title="Category image">
+        <AdminPanel title="Category image / page banner">
           <p className="mb-4 text-sm text-neutral-600 dark:text-neutral-400">
-            This image appears on the storefront homepage categories grid.
+            Used on the storefront category page hero banner and homepage categories grid. You can
+            also upload section banners from Mega menu → Link columns.
           </p>
           <div className="flex flex-wrap items-start gap-4">
             <div className="relative aspect-[3/4] w-40 overflow-hidden rounded-xl border border-[var(--admin-line)] bg-[var(--admin-panel-soft)]">

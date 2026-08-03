@@ -1,6 +1,7 @@
 import type { FilterQuery } from 'mongoose';
 import { Types } from 'mongoose';
 import { BaseRepository, type ListOptions } from '@/repositories/base.repository.js';
+import { CategoryModel } from '@/models/master-data.models.js';
 import {
   ProductModel,
   ProductVariantModel,
@@ -115,16 +116,23 @@ export class ProductRepository extends BaseRepository {
     }
     if (options.categoryId) {
       const categoryId = toObjectId(options.categoryId);
-      if (categoryId) {
-        // Match primary category OR any entry in categoryIds (use $and so other $or filters still work)
-        const categoryClause = {
-          $or: [{ categoryId }, { categoryIds: categoryId }],
-        };
-        if (Array.isArray(filter.$and)) {
-          (filter.$and as unknown[]).push(categoryClause);
-        } else {
-          filter.$and = [categoryClause];
-        }
+      if (!categoryId) {
+        // Invalid id must not silently fall through to an unfiltered catalog.
+        return { data: [], meta: buildPaginationMeta(0, page, limit) };
+      }
+      const categoryIds = await resolveCategoryAndDescendantIds(categoryId);
+      // Match primary category, categoryIds[], or subcategory — include children for parent PLPs.
+      const categoryClause = {
+        $or: [
+          { categoryId: { $in: categoryIds } },
+          { categoryIds: { $in: categoryIds } },
+          { subcategoryId: { $in: categoryIds } },
+        ],
+      };
+      if (Array.isArray(filter.$and)) {
+        (filter.$and as unknown[]).push(categoryClause);
+      } else {
+        filter.$and = [categoryClause];
       }
     }
     if (options.subcategoryId) {
@@ -235,6 +243,9 @@ export class ProductRepository extends BaseRepository {
       const q = options.q.trim();
       const looksLikeSku = /^[a-z0-9][a-z0-9_-]{2,40}$/i.test(q) && !/\s/.test(q);
 
+      // Related categories: "jeans" → jeans-denim, "heel" → heels, etc.
+      const relatedCategoryIds = await findRelatedCategoryIds(q);
+
       if (looksLikeSku) {
         // SKU / barcode / exact-ish codes: keep regex path (text index is poor for codes).
         const skuMatch = await ProductVariantModel.distinct('productId', {
@@ -254,11 +265,18 @@ export class ProductRepository extends BaseRepository {
           { tags: new RegExp(escapeRegex(q), 'i') },
           { searchKeywords: new RegExp(escapeRegex(q), 'i') },
           ...(skuMatch.length ? [{ _id: { $in: skuMatch } }] : []),
+          ...(relatedCategoryIds.length
+            ? [
+                { categoryId: { $in: relatedCategoryIds } },
+                { categoryIds: { $in: relatedCategoryIds } },
+                { subcategoryId: { $in: relatedCategoryIds } },
+              ]
+            : []),
         ];
       } else {
         // Keyword search: use the existing text index (name/shortDescription/tags/searchKeywords).
-        // Also OR in SKU hits via a cheap distinct — $text cannot live inside $or, so we
-        // resolve to an _id union when SKU matches exist; otherwise filter with $text alone.
+        // Also OR in SKU + related-category hits — $text cannot live inside $or, so we
+        // resolve to an _id union when extra matches exist; otherwise filter with $text alone.
         const skuMatch = await ProductVariantModel.distinct('productId', {
           isDeleted: false,
           $or: [
@@ -267,7 +285,24 @@ export class ProductRepository extends BaseRepository {
           ],
         });
 
-        if (skuMatch.length) {
+        let categoryProductIds: Types.ObjectId[] = [];
+        if (relatedCategoryIds.length) {
+          categoryProductIds = (
+            await ProductModel.find({
+              isDeleted: false,
+              $or: [
+                { categoryId: { $in: relatedCategoryIds } },
+                { categoryIds: { $in: relatedCategoryIds } },
+                { subcategoryId: { $in: relatedCategoryIds } },
+              ],
+            })
+              .select('_id')
+              .limit(500)
+              .lean()
+          ).map((row) => row._id as Types.ObjectId);
+        }
+
+        if (skuMatch.length || categoryProductIds.length) {
           const textHits = await ProductModel.find({
             ...filter,
             $text: { $search: q },
@@ -279,6 +314,7 @@ export class ProductRepository extends BaseRepository {
             ...new Set([
               ...textHits.map((row) => row._id.toString()),
               ...skuMatch.map((id) => id.toString()),
+              ...categoryProductIds.map((id) => id.toString()),
             ]),
           ].map((id) => new Types.ObjectId(id));
           if (!merged.length) {
@@ -347,6 +383,79 @@ function toObjectId(value?: string): Types.ObjectId | undefined {
   if (!value || typeof value !== 'string') return undefined;
   if (!Types.ObjectId.isValid(value)) return undefined;
   return new Types.ObjectId(value);
+}
+
+/** Include the category and every descendant under its path (e.g. all-tops → long-sleeves). */
+async function resolveCategoryAndDescendantIds(
+  categoryId: Types.ObjectId,
+): Promise<Types.ObjectId[]> {
+  const category = await CategoryModel.findOne({ _id: categoryId, isDeleted: false })
+    .select('_id path')
+    .lean();
+  if (!category) return [categoryId];
+
+  const path = typeof category.path === 'string' ? category.path : '';
+  if (!path) return [categoryId];
+
+  const descendants = await CategoryModel.find({
+    isDeleted: false,
+    path: new RegExp(`^${escapeRegex(path)}/`),
+  })
+    .select('_id')
+    .lean();
+
+  return [categoryId, ...descendants.map((row) => row._id as Types.ObjectId)];
+}
+
+/**
+ * Match categories by name/slug tokens so search "jeans" finds jeans-denim products.
+ * Also expands to descendant categories of any match.
+ */
+async function findRelatedCategoryIds(q: string): Promise<Types.ObjectId[]> {
+  const term = q.trim().toLowerCase();
+  if (term.length < 2) return [];
+
+  const tokens = term
+    .split(/[\s/_-]+/)
+    .map((part) => part.trim())
+    .filter((part) => part.length >= 2);
+  const patterns = [...new Set([term, ...tokens])].map(
+    (token) => new RegExp(escapeRegex(token), 'i'),
+  );
+
+  const matches = await CategoryModel.find({
+    isDeleted: false,
+    status: 'active',
+    $or: patterns.flatMap((pattern) => [{ name: pattern }, { slug: pattern }]),
+  })
+    .select('_id path')
+    .limit(40)
+    .lean();
+
+  if (!matches.length) return [];
+
+  const ids = new Map<string, Types.ObjectId>();
+  for (const match of matches) {
+    ids.set(String(match._id), match._id as Types.ObjectId);
+  }
+
+  const pathPrefixes = matches
+    .map((match) => (typeof match.path === 'string' ? match.path : ''))
+    .filter(Boolean);
+  if (pathPrefixes.length) {
+    const descendants = await CategoryModel.find({
+      isDeleted: false,
+      $or: pathPrefixes.map((path) => ({ path: new RegExp(`^${escapeRegex(path)}/`) })),
+    })
+      .select('_id')
+      .limit(200)
+      .lean();
+    for (const row of descendants) {
+      ids.set(String(row._id), row._id as Types.ObjectId);
+    }
+  }
+
+  return [...ids.values()];
 }
 
 export const productRepository = new ProductRepository();

@@ -23,10 +23,18 @@ export const categoryCreateSchema = z.object({
 
 export const categoryUpdateSchema = categoryCreateSchema.partial();
 
-const megaMenuLinkSchema = z.object({
-  label: z.string().trim().min(1).max(120),
-  slug: z.string().trim().min(1).max(120),
-});
+const megaMenuLinkSchema = z
+  .object({
+    label: z.string().trim().min(1).max(120),
+    /** Empty allowed for non-clickable column subheadings. */
+    slug: z.string().trim().max(120).optional().default(''),
+    heading: z.boolean().optional(),
+    bannerUrl: z.string().trim().max(2000).optional().default(''),
+  })
+  .refine((link) => link.heading || Boolean(link.slug?.trim()), {
+    message: 'Link requires a route slug unless it is a heading',
+    path: ['slug'],
+  });
 
 const megaMenuColumnSchema = z.object({
   title: z.string().trim().min(1).max(120),

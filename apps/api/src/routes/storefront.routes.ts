@@ -143,7 +143,13 @@ storefrontRouter.get(
       occasions,
     ] = await Promise.all([
       settingsService.getPublic(),
-      categoryService.list({ ...listBase, sortBy: 'sortOrder', sortOrder: 'asc' } as never),
+      // Category tree is larger than other facets — keep heels / leaf PLPs in bootstrap.
+      categoryService.list({
+        ...listBase,
+        limit: 500,
+        sortBy: 'sortOrder',
+        sortOrder: 'asc',
+      } as never),
       heroService.list({ ...listBase, limit: 10, sortBy: 'priority', sortOrder: 'desc' } as never),
       sectionService.list({
         ...listBase,
@@ -413,6 +419,36 @@ storefrontRouter.get(
 );
 
 publicList('/categories', 'categories', CategoryModel as Model<any>);
+
+storefrontRouter.get(
+  '/categories/by-slug/:slug',
+  asyncHandler(async (req, res) => {
+    const slug = decodeURIComponent(String(req.params.slug ?? ''))
+      .trim()
+      .toLowerCase();
+    if (!slug) {
+      throw ApiError.badRequest('Category slug is required');
+    }
+    const cacheKey = `storefront:category:slug:${slug}`;
+    const cached = getCached<unknown>(cacheKey);
+    if (cached) {
+      setPublicCache(res);
+      return ApiResponse.success(res, cached);
+    }
+    const category = await CategoryModel.findOne({
+      slug,
+      isDeleted: false,
+      status: 'active',
+    }).lean();
+    if (!category) {
+      throw ApiError.notFound('Category not found');
+    }
+    setCache(cacheKey, category, 120_000);
+    setPublicCache(res);
+    ApiResponse.success(res, category);
+  }),
+);
+
 publicList('/brands', 'brands', BrandModel as Model<any>);
 publicList('/collections', 'collections', CollectionModel as Model<any>);
 publicList('/colors', 'colors', ColorModel as Model<any>);

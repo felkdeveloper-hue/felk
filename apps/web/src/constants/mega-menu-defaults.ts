@@ -24,6 +24,8 @@ export type MegaMenuLink = {
   slug: string;
   /** Non-clickable subheading inside a column (e.g. Pants under Bottoms). */
   heading?: boolean;
+  /** Optional category page hero banner for this link. */
+  bannerUrl?: string;
 };
 export type MegaMenuColumn = { title: string; links: MegaMenuLink[] };
 export type MegaMenuTile = {

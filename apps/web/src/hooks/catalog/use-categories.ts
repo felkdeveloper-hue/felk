@@ -11,7 +11,8 @@ function findCategoryInListCache(
   const cached = queryClient.getQueryData<CategoriesListCache>(
     QUERY_KEYS.categories.list({ active: true }),
   );
-  return cached?.data.find((category) => category.slug === slug);
+  const normalized = slug.trim().toLowerCase();
+  return cached?.data.find((category) => category.slug.toLowerCase() === normalized);
 }
 
 export function useCategoryTree() {
@@ -26,7 +27,7 @@ export function useCategoriesList() {
   return useQuery({
     queryKey: QUERY_KEYS.categories.list({ active: true }),
     queryFn: () =>
-      categoriesApi.list({ status: 'active', limit: 100, sortBy: 'sortOrder', sortOrder: 'asc' }),
+      categoriesApi.list({ status: 'active', limit: 500, sortBy: 'sortOrder', sortOrder: 'asc' }),
     // Matches the bootstrap cache window. Forcing a refetch on every mount
     // discarded the prefetched list and added a blocking request on first load.
     staleTime: 1000 * 60 * 5,
@@ -35,21 +36,20 @@ export function useCategoriesList() {
 
 export function useCategoryBySlug(slug: string) {
   const queryClient = useQueryClient();
+  const normalized = slug.trim().toLowerCase();
 
   return useQuery({
-    queryKey: QUERY_KEYS.categories.detail(slug),
+    queryKey: QUERY_KEYS.categories.detail(normalized),
     queryFn: async () => {
-      // Bootstrap already seeds the active categories list — reuse it instead of
-      // a second `?q=slug` round-trip that blocked the product grid.
-      const fromList = findCategoryInListCache(queryClient, slug);
+      const fromList = findCategoryInListCache(queryClient, normalized);
       if (fromList) return fromList;
-      return categoriesApi.getBySlug(slug);
+      return categoriesApi.getBySlug(normalized);
     },
-    enabled: Boolean(slug),
+    enabled: Boolean(normalized),
     staleTime: 1000 * 60 * 10,
-    initialData: () => (slug ? findCategoryInListCache(queryClient, slug) : undefined),
-    initialDataUpdatedAt: () =>
-      queryClient.getQueryState(QUERY_KEYS.categories.list({ active: true }))?.dataUpdatedAt,
+    // Prefer exact slug API when cache miss — list is capped and can omit leaves.
+    placeholderData: () =>
+      normalized ? findCategoryInListCache(queryClient, normalized) : undefined,
   });
 }
 
@@ -80,7 +80,7 @@ export function useCatalogFilterFacets(options?: {
   const categories = useQuery({
     queryKey: QUERY_KEYS.categories.list({ active: true }),
     queryFn: () =>
-      categoriesApi.list({ status: 'active', limit: 100, sortBy: 'sortOrder', sortOrder: 'asc' }),
+      categoriesApi.list({ status: 'active', limit: 500, sortBy: 'sortOrder', sortOrder: 'asc' }),
     staleTime: 1000 * 60 * 5,
     refetchOnMount: false,
     enabled,
