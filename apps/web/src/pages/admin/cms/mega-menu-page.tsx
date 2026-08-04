@@ -53,12 +53,31 @@ function normalizeConfig(
       }))
     : fallback.columns;
 
-  const columns =
+  const baseColumns =
     key === 'women' && isLegacyWomenMegaMenuColumns(parsedColumns)
       ? structuredClone(fallback.columns)
       : parsedColumns.length
         ? parsedColumns
         : fallback.columns;
+
+  // Keep New Arrival under Co-ords even if an older CMS save omitted it.
+  const columns = baseColumns.map((column) => {
+    const title = column.title.trim().toLowerCase();
+    if (title !== 'co-ords' && title !== 'coords') return column;
+    const hasNewArrival = column.links.some(
+      (link) =>
+        link.slug === 'new-arrivals' || link.label.trim().toLowerCase().includes('new arrival'),
+    );
+    if (hasNewArrival) return column;
+    const links = [...column.links];
+    const matchingIdx = links.findIndex((link) => link.slug === 'matching-sets');
+    links.splice(matchingIdx >= 0 ? matchingIdx + 1 : 0, 0, {
+      label: 'New Arrival',
+      slug: 'new-arrivals',
+      bannerUrl: '',
+    });
+    return { ...column, links };
+  });
 
   const mapTiles = (tiles: unknown, fallbackTiles: MegaMenuTile[]): MegaMenuTile[] => {
     if (!Array.isArray(tiles)) return fallbackTiles;

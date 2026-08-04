@@ -75,7 +75,7 @@ export const PAYMENT_METHOD_OPTIONS: PaymentMethodOption[] = [
     id: 'cod',
     label: 'Cash on delivery',
     description: 'Pay in cash when your order arrives',
-    enabled: true,
+    enabled: false, // prepaid-only storefront — COD disabled site-wide
     logoSrc: '/payments/cod.svg',
     accent: '#C45C26',
   },

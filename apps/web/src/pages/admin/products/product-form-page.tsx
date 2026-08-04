@@ -65,7 +65,7 @@ const productSchema = z.object({
   warrantyAvailable: z.boolean().default(false),
   warrantyDetails: z.string().optional(),
   returnsCriteria: z.string().optional(),
-  paymentOption: z.enum(['cod', 'prepaid', 'both']).default('both'),
+  paymentOption: z.enum(['cod', 'prepaid', 'both']).default('prepaid'),
 });
 type ProductFormValues = z.infer<typeof productSchema>;
 
@@ -1439,8 +1439,9 @@ export function ProductFormPage({ productId }: { productId?: string }) {
       returnsAvailable: true,
       warrantyAvailable: false,
       warrantyDetails: '',
-      returnsCriteria: '7-day easy returns & instant refunds on eligible items.',
-      paymentOption: 'both',
+      returnsCriteria:
+        'No refunds. Exchanges are available; the customer covers all exchange shipping and related costs.',
+      paymentOption: 'prepaid',
     },
   });
 
@@ -1476,8 +1477,10 @@ export function ProductFormPage({ productId }: { productId?: string }) {
       warrantyAvailable: product.warrantyAvailable ?? false,
       warrantyDetails: product.warrantyDetails ?? '',
       returnsCriteria:
-        product.returnsCriteria ?? '7-day easy returns & instant refunds on eligible items.',
-      paymentOption: product.paymentOption ?? 'both',
+        product.returnsCriteria ??
+        'No refunds. Exchanges are available; the customer covers all exchange shipping and related costs.',
+      paymentOption:
+        product.paymentOption === 'cod' ? 'prepaid' : (product.paymentOption ?? 'prepaid'),
     });
     if (product.specifications?.length) setSpecRows(product.specifications);
     setSeoTitle(product.seoTitle ?? '');
@@ -1617,6 +1620,9 @@ export function ProductFormPage({ productId }: { productId?: string }) {
       'all-dresses',
       'co-ords',
       'all-footwear',
+      // Campaign roots — must stay assignable from the product editor.
+      'new-arrivals',
+      'oversized',
     ] as const;
     const OWNER_ROOT_SET = new Set<string>(OWNER_ROOT_SLUGS);
 
@@ -1682,10 +1688,10 @@ export function ProductFormPage({ productId }: { productId?: string }) {
     );
     if (ownerRoots.length) return ownerRoots;
 
-    // Fallback: any roots that look like the owner catalog, else all non-campaign roots.
+    // Fallback: prefer known owner/campaign roots, else every root category.
     const filtered = roots.filter((root) => OWNER_ROOT_SET.has(root.slug));
     if (filtered.length) return filtered;
-    return roots.filter((root) => !['new-arrivals', 'oversized'].includes(root.slug));
+    return roots;
   }, [categories]);
 
   const flatCategoryOptions = useMemo(
@@ -2166,15 +2172,15 @@ export function ProductFormPage({ productId }: { productId?: string }) {
               </Field>
             </SidebarCard>
 
-            {/* Returns & Payment */}
-            <SidebarCard title="Returns & payment" defaultOpen={false}>
+            {/* Exchanges & Payment */}
+            <SidebarCard title="Exchanges & payment" defaultOpen={false}>
               <PlacementToggle
-                label="Returns available"
+                label="Exchanges available"
                 checked={w.returnsAvailable ?? true}
                 onChange={(v) => setValue('returnsAvailable', v, { shouldDirty: true })}
               />
               {w.returnsAvailable ? (
-                <Field label="Returns policy text">
+                <Field label="Exchange policy text">
                   <input {...register('returnsCriteria')} className={fieldCls} />
                 </Field>
               ) : null}
@@ -2194,10 +2200,11 @@ export function ProductFormPage({ productId }: { productId?: string }) {
               ) : null}
               <Field label="Payment method">
                 <select {...register('paymentOption')} className={fieldCls}>
-                  <option value="both">COD + Online</option>
-                  <option value="prepaid">Online only</option>
-                  <option value="cod">Cash on delivery only</option>
+                  <option value="prepaid">Online prepaid only</option>
                 </select>
+                <p className="mt-1 text-[11px] text-neutral-500">
+                  This store accepts prepaid online payments only — COD is disabled.
+                </p>
               </Field>
             </SidebarCard>
 

@@ -22,7 +22,9 @@ export function ProductDeliveryCheck({
     }
   };
 
-  const codAvailable = paymentOption === 'cod' || paymentOption === 'both';
+  // Site-wide prepaid only — never show COD as available.
+  const codAvailable = false;
+  void paymentOption;
 
   return (
     <section aria-labelledby="delivery-check" className="space-y-3.5 lg:space-y-3">
@@ -94,7 +96,7 @@ export function ProductDeliveryCheck({
           ? paymentOption === 'cod'
             ? 'Cash on Delivery (COD) available'
             : 'COD & prepaid payment both available'
-          : 'Prepaid payment only — COD not available'}
+          : 'Prepaid payment only — pay online at checkout'}
       </div>
     </section>
   );

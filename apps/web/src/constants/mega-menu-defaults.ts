@@ -139,6 +139,7 @@ export const WOMEN_CATEGORY_COLUMNS: MegaMenuColumn[] = [
     title: 'Co-ords',
     links: [
       { label: 'Matching sets', slug: 'matching-sets' },
+      { label: 'New Arrival', slug: 'new-arrivals' },
       // Stacked under Co-ords to fill the empty column space; extra top gap via UI.
       { label: 'Footwear', slug: '', heading: true },
       { label: 'All footwear', slug: 'all-footwear' },

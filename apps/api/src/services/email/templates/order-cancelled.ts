@@ -19,7 +19,7 @@ export function orderCancelledTemplate(order: OrderEmailData): EmailTemplateResu
      ${emailGreeting(order.name)}
      ${emailParagraph(`Your order <strong>#${order.orderNumber}</strong> has been cancelled.`)}
      ${order.reason ? emailParagraph(`<strong>Reason:</strong> ${order.reason}`) : ''}
-     ${emailMuted('If any payment was taken, it will be refunded within 5–7 business days.')}
+     ${emailMuted('This store does not offer refunds. Contact support if you need help with an exchange.')}
      ${order.orderUrl ? ctaButton(order.orderUrl, 'View order') : ''}`,
     { title: 'Order Cancelled', preheader: `Order #${order.orderNumber} was cancelled.` },
   );

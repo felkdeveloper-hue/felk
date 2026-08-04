@@ -84,7 +84,20 @@ export function CategoryTreePicker({
   const [open, setOpen] = useState(false);
 
   const options = useMemo(() => {
-    if (nodes.length) return flattenTree(nodes);
+    const fromTree = nodes.length ? flattenTree(nodes) : [];
+    const seen = new Set(fromTree.map((option) => option.id));
+    // Merge flat API rows missing from the tree (e.g. campaign roots like new-arrivals).
+    const extras = flatOptions
+      .filter((row) => !seen.has(row.id))
+      .map((row) => ({
+        id: row.id,
+        name: row.name,
+        slug: row.slug,
+        parentId: row.parentId ?? null,
+        pathLabel: row.name,
+        parentIds: [] as string[],
+      }));
+    if (fromTree.length) return [...fromTree, ...extras];
     return flatOptions.map((row) => ({
       id: row.id,
       name: row.name,

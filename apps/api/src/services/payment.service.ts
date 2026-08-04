@@ -94,6 +94,14 @@ export class PaymentService {
     payload: { checkoutRef: string; method: PaymentMethod; returnUrl?: string; cancelUrl?: string },
     actor: ActorMeta,
   ) {
+    if (payload.method === PAYMENT_METHOD.COD) {
+      throw ApiError.badRequest(
+        'Cash on delivery is not available. Please pay online to complete your order.',
+        { method: payload.method },
+        'COD_DISABLED',
+      );
+    }
+
     const customer = await customerService.ensureForUser(user, actor);
     const checkout = await checkoutService.getByIdOrToken(payload.checkoutRef);
 

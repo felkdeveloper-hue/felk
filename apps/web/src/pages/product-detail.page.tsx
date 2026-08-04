@@ -365,8 +365,8 @@ export function ProductDetailPage() {
                   product.returnsAvailable
                     ? product.returnsCriteria ||
                       returnPolicy ||
-                      'Easy returns & instant refunds on eligible items.'
-                    : 'Returns are not available for this product.'
+                      'No refunds. Exchanges are available; the customer covers all exchange shipping and related costs.'
+                    : 'Exchanges and refunds are not available for this product.'
                 }
                 warrantyDetails={
                   product.warrantyAvailable

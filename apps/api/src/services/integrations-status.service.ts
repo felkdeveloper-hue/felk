@@ -83,7 +83,7 @@ export class IntegrationsStatusService {
         cod: {
           name: 'COD',
           configured: true,
-          enabled: true,
+          enabled: false,
         },
       },
       smtp: {

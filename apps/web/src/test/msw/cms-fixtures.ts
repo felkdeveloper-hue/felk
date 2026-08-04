@@ -258,7 +258,8 @@ export const cmsFixtures = {
     {
       id: 'faq_2',
       question: 'What is your return policy?',
-      answer: 'Returns are accepted within 30 days.',
+      answer:
+        'We do not offer refunds. Exchanges are available; the customer covers all exchange shipping costs.',
       status: 'active',
     },
   ],

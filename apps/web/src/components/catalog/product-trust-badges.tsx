@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { Banknote, Check, CreditCard, RefreshCcw, ShieldCheck, WalletCards, X } from 'lucide-react';
+import { Check, CreditCard, RefreshCcw, ShieldCheck, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export type ProductPaymentOption = 'cod' | 'prepaid' | 'both';
@@ -22,33 +22,14 @@ type TrustItem = {
   available: boolean;
 };
 
-function paymentItem(option: ProductPaymentOption): TrustItem {
-  if (option === 'cod') {
-    return {
-      key: 'payment',
-      icon: Banknote,
-      title: 'Cash on Delivery',
-      subtitle: 'Available',
-      detail: 'Pay when your order arrives',
-      available: true,
-    };
-  }
-  if (option === 'prepaid') {
-    return {
-      key: 'payment',
-      icon: CreditCard,
-      title: 'Prepaid Only',
-      subtitle: 'Online payment',
-      detail: 'COD is not available for this item',
-      available: true,
-    };
-  }
+function paymentItem(_option: ProductPaymentOption): TrustItem {
+  // Store is prepaid-only — never advertise COD on the storefront.
   return {
     key: 'payment',
-    icon: WalletCards,
-    title: 'COD & Prepaid',
-    subtitle: 'Available',
-    detail: 'Pay online or on delivery',
+    icon: CreditCard,
+    title: 'Prepaid Only',
+    subtitle: 'Online payment',
+    detail: 'All orders are paid online before dispatch',
     available: true,
   };
 }
@@ -65,14 +46,15 @@ export function ProductTrustBadges({
       ? {
           key: 'returns',
           icon: RefreshCcw,
-          title: 'Returns & Refunds',
-          subtitle: 'Available',
+          title: 'Exchanges',
+          subtitle: 'Customer-paid',
+          detail: 'No refunds. Customer covers exchange shipping costs.',
           available: true,
         }
       : {
           key: 'returns',
           icon: RefreshCcw,
-          title: 'Returns & Refunds',
+          title: 'Exchanges',
           subtitle: 'Not available',
           available: false,
         },

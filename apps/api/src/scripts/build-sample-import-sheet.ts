@@ -101,7 +101,7 @@ async function main() {
       seoDescription: 'Floral midi dress available in Hot Pink and Black, sizes S and M.',
       paymentOption: 'both',
       returnsAvailable: 'yes',
-      returnsCriteria: '7-day exchange if unused with tags',
+      returnsCriteria: 'No refunds. Exchanges available; customer covers exchange shipping costs.',
       warrantyAvailable: 'no',
       images: `${pinkDress}, ${pinkDress2}`,
     },

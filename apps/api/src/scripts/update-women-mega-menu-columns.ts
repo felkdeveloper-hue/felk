@@ -67,6 +67,7 @@ const WOMEN_CATEGORY_COLUMNS: MenuColumn[] = [
     title: 'Co-ords',
     links: [
       { label: 'Matching sets', slug: 'matching-sets' },
+      { label: 'New Arrival', slug: 'new-arrivals' },
       { label: 'Footwear', slug: '', heading: true },
       { label: 'All footwear', slug: 'all-footwear' },
       { label: 'Heels', slug: 'heels' },

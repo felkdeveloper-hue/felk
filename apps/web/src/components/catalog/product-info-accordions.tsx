@@ -52,9 +52,9 @@ export function ProductInfoAccordions({
             <div className="flex items-center gap-3 text-left">
               <RefreshCcw className="text-muted-foreground size-5 shrink-0" />
               <div>
-                <p className="font-semibold">Returns & Refunds</p>
+                <p className="font-semibold">Exchanges</p>
                 <p className="text-muted-foreground text-xs font-normal">
-                  Return and refund policy
+                  Exchange policy (no refunds)
                 </p>
               </div>
             </div>

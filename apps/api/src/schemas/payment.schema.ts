@@ -2,7 +2,14 @@ import { z } from 'zod';
 import { objectIdSchema } from '@/schemas/common.schema.js';
 import { PAYMENT_METHOD, PAYMENT_STATUS } from '@/constants/payment-status.js';
 
-const methodEnum = z.enum(Object.values(PAYMENT_METHOD) as [string, ...string[]]);
+/** Prepaid gateways only — COD is disabled site-wide. */
+const PREPAID_METHODS = [
+  PAYMENT_METHOD.PAYHERE,
+  PAYMENT_METHOD.KOKO,
+  PAYMENT_METHOD.MINTPAY,
+] as const;
+
+const methodEnum = z.enum(PREPAID_METHODS as unknown as [string, ...string[]]);
 
 export const paymentCreateSchema = z
   .object({

@@ -175,7 +175,8 @@ export function ProductPurchasePanel({
 
   const availabilityChips: { label: string }[] = [];
   if (product.warrantyAvailable) availabilityChips.push({ label: 'Warranty available' });
-  if (product.returnsAvailable) availabilityChips.push({ label: 'Returns & refunds available' });
+  if (product.returnsAvailable)
+    availabilityChips.push({ label: 'Exchanges available (customer-paid)' });
 
   const handleColorSelect = (colorId: string) => {
     const normalized = colorId || undefined;

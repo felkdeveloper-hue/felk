@@ -86,6 +86,24 @@ function mergeTilesWithFallback(
   });
 }
 
+/** Ensure Co-ords includes a clickable New Arrival link (CMS saves may omit it). */
+function ensureNewArrivalInCoords(columns: MegaMenuColumn[]): MegaMenuColumn[] {
+  return columns.map((column) => {
+    const title = column.title.trim().toLowerCase();
+    if (title !== 'co-ords' && title !== 'coords' && title !== 'co ords') return column;
+    const hasNewArrival = column.links.some(
+      (link) =>
+        link.slug === 'new-arrivals' || link.label.trim().toLowerCase().includes('new arrival'),
+    );
+    if (hasNewArrival) return column;
+    const links = [...column.links];
+    const matchingIdx = links.findIndex((link) => link.slug === 'matching-sets');
+    const insertAt = matchingIdx >= 0 ? matchingIdx + 1 : 0;
+    links.splice(insertAt, 0, { label: 'New Arrival', slug: 'new-arrivals' });
+    return { ...column, links };
+  });
+}
+
 function cloneDefaultMenu(key: MegaMenuGender): GenderMegaMenuConfig {
   const source = DEFAULT_MEGA_MENUS[key];
   return {
@@ -112,7 +130,7 @@ export const navigationMenusApi = {
       const fallback = DEFAULT_MEGA_MENUS[key];
       // Keep CMS Specials / Shop the edit, but replace the old Topwear columns
       // with the owner catalog so a previously saved women menu does not hide it.
-      const resolvedColumns =
+      const resolvedColumns = ensureNewArrivalInCoords(
         key === 'women' && isLegacyWomenMegaMenuColumns(columns)
           ? fallback.columns.map((column) => ({
               ...column,
@@ -120,7 +138,8 @@ export const navigationMenusApi = {
             }))
           : columns.length
             ? columns
-            : fallback.columns;
+            : fallback.columns,
+      );
 
       const rawHero = String(raw.heroBannerUrl ?? '').trim();
       const heroBannerUrl = isUsableStorefrontImageUrl(rawHero)

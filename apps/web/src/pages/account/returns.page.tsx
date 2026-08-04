@@ -16,9 +16,16 @@ export function AccountReturnsPage() {
 
   return (
     <>
-      <Seo title="Returns" description="View your return request history." noIndex />
+      <Seo
+        title="Exchanges"
+        description="View your exchange request history. No refunds — customer covers exchange costs."
+        noIndex
+      />
 
-      <AccountPageHeader title="Returns" description="Track return requests and their status." />
+      <AccountPageHeader
+        title="Exchanges"
+        description="No refunds. Track exchange requests here — customers cover exchange shipping costs."
+      />
 
       <div className="mb-6">
         <Button asChild variant="outline">
@@ -40,9 +47,9 @@ export function AccountReturnsPage() {
       {!returnsQuery.isLoading && returns.length === 0 ? (
         <div className="border-border rounded-xl border border-dashed p-10 text-center">
           <RotateCcw className="text-muted-foreground mx-auto size-10" aria-hidden />
-          <h2 className="mt-4 font-medium">No return requests</h2>
+          <h2 className="mt-4 font-medium">No exchange requests</h2>
           <p className="text-muted-foreground mt-2 text-sm">
-            Return requests for delivered orders will appear here.
+            Exchange requests for delivered orders will appear here. We do not offer refunds.
           </p>
           <Button asChild className="mt-4">
             <Link to={ROUTES.accountOrders}>View orders</Link>
