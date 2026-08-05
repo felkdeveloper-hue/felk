@@ -531,6 +531,29 @@ export class CheckoutService {
     ) {
       await this.ensureReservationNotExpired(session, { userId: user.id });
     }
+    // Heal OPEN sessions that already have address + lines (ready for Place Order).
+    if (
+      session.status === CHECKOUT_STATUS.OPEN &&
+      session.shippingAddress &&
+      session.lines.length > 0
+    ) {
+      session.status = CHECKOUT_STATUS.READY;
+      await session.save();
+    }
+    // Unpaid gateway redirects must not keep Available depressed. Release any
+    // leftover hold when the shopper returns to checkout (payment not confirmed).
+    if (
+      session.reservationIds?.length &&
+      [CHECKOUT_STATUS.OPEN, CHECKOUT_STATUS.READY, CHECKOUT_STATUS.RESERVED].includes(
+        session.status as never,
+      )
+    ) {
+      const released = await this.releaseForPaymentFailure(
+        session._id.toString(),
+        'Release unpaid hold when viewing checkout',
+      );
+      return released ?? this.toSummary(session);
+    }
     return this.toSummary(session);
   }
 
@@ -539,10 +562,60 @@ export class CheckoutService {
     await this.assertOwner(session, user);
     await this.assertMutable(session, actor);
 
-    const rebuilt = await this.buildLinesFromCart(session.customerId.toString());
-    session.lines = rebuilt.lines as never;
+    let rebuilt = await this.buildLinesFromCart(session.customerId.toString());
+    const buyNowVariantIds = Array.isArray(session.metadata?.buyNowVariantIds)
+      ? (session.metadata.buyNowVariantIds as string[])
+      : [];
+    if (buyNowVariantIds.length) {
+      rebuilt = this.filterBuiltToVariantIds(rebuilt, buyNowVariantIds);
+    }
+
+    // Credit back any active hold for THIS checkout so validate does not flag
+    // the shopper's own unpaid reservation as OUT_OF_STOCK.
+    const heldByVariant = new Map<string, number>();
+    const sessionHasHold = Boolean(session.reservationIds?.length);
+    for (const prev of session.lines ?? []) {
+      if (!prev.reservationId && !sessionHasHold) continue;
+      const key = prev.variantId.toString();
+      heldByVariant.set(key, (heldByVariant.get(key) ?? 0) + Number(prev.quantity ?? 0));
+    }
+    if (heldByVariant.size) {
+      rebuilt = {
+        ...rebuilt,
+        lines: rebuilt.lines.map((line) => {
+          const held = heldByVariant.get(line.variantId.toString()) ?? 0;
+          if (!held || line.warehouseId) return line;
+          // warehouseId was null only because available looked insufficient —
+          // restore using the prior line's warehouse when we own the hold.
+          const prev = session.lines.find(
+            (l) => l.variantId.toString() === line.variantId.toString(),
+          );
+          return prev?.warehouseId ? { ...line, warehouseId: prev.warehouseId } : line;
+        }),
+        issues: rebuilt.issues.filter((issue) => {
+          if (issue.code !== 'OUT_OF_STOCK' && issue.code !== 'INSUFFICIENT_STOCK') return true;
+          const vid = issue.variantId ? String(issue.variantId) : '';
+          return !vid || !heldByVariant.has(vid);
+        }),
+      };
+    }
+
+    // Preserve active reservation ids across rebuild.
+    session.lines = rebuilt.lines.map((line) => {
+      const prev = session.lines.find((l) => l.variantId.toString() === line.variantId.toString());
+      return { ...line, reservationId: prev?.reservationId ?? null };
+    }) as never;
     session.validationIssues = rebuilt.issues as unknown[];
     await this.recalculate(session);
+
+    if (
+      session.status === CHECKOUT_STATUS.OPEN &&
+      session.shippingAddress &&
+      session.lines.length > 0
+    ) {
+      session.status = CHECKOUT_STATUS.READY;
+    }
+
     await session.save();
 
     await writeAuditLog({
@@ -664,6 +737,7 @@ export class CheckoutService {
         ? CHECKOUT_STATUS.READY
         : CHECKOUT_STATUS.OPEN;
     session.reservationExpiresAt = null;
+    session.expiresAt = null;
     await session.save();
 
     await writeAuditLog({
@@ -866,6 +940,7 @@ export class CheckoutService {
     await this.releaseReservations(session, {}, note);
     session.status = CHECKOUT_STATUS.READY;
     session.reservationExpiresAt = null;
+    session.expiresAt = null;
     await session.save();
 
     await writeAuditLog({
@@ -971,6 +1046,7 @@ export class CheckoutService {
       await this.releaseReservations(session, actor, 'Checkout reservation TTL expired');
       session.status = CHECKOUT_STATUS.READY;
       session.reservationExpiresAt = null;
+      session.expiresAt = null;
       await session.save();
       await writeAuditLog({
         action: CHECKOUT_AUDIT.RESERVATION_EXPIRED,

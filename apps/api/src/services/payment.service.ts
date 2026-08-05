@@ -25,7 +25,7 @@ import {
   PAYMENT_METHOD,
   type PaymentMethod,
 } from '@/constants/payment-status.js';
-import { CHECKOUT_STATUS, CHECKOUT_RESERVATION_TTL_MINUTES } from '@/constants/checkout.js';
+import { CHECKOUT_STATUS } from '@/constants/checkout.js';
 import {
   PAYMENT_ATTEMPT_STATUS,
   PAYMENT_AUDIT,
@@ -129,14 +129,16 @@ export class PaymentService {
       );
     }
 
-    // Hold stock only when Place Order begins — never earlier in the funnel.
-    await checkoutService.ensureReservedForPayment(
-      checkout._id.toString(),
-      user,
-      actor,
-      CHECKOUT_RESERVATION_TTL_MINUTES,
-    );
-    const reservedCheckout = await checkoutService.getByIdOrToken(checkout._id.toString());
+    // Never hold inventory for unpaid gateway redirects. Stock is reserved+committed
+    // only after the gateway confirms payment (order creation). Release any leftover
+    // hold from older Place Order builds so Available/OOS recover immediately.
+    if (checkout.reservationIds?.length) {
+      await checkoutService.releaseForPaymentFailure(
+        checkout._id.toString(),
+        'Clear unpaid stock hold before gateway redirect',
+      );
+    }
+    const liveCheckout = await checkoutService.getByIdOrToken(checkout._id.toString());
 
     let payment = await PaymentModel.findOne({
       checkoutId: checkout._id,
@@ -163,8 +165,7 @@ export class PaymentService {
             const { redirectForm: _removed, ...rest } = payment.metadata;
             payment.metadata = rest;
           }
-          // Keep amount in sync with current reserved checkout totals.
-          payment.amount = reservedCheckout.totals.grandTotal;
+          payment.amount = liveCheckout.totals.grandTotal;
           await payment.save();
           return this.createAttempt(payment, customer, actor);
         }
@@ -174,7 +175,7 @@ export class PaymentService {
           // between create() and createAttempt()) — finish creating it now.
           if (payload.returnUrl) payment.returnUrl = payload.returnUrl;
           if (payload.cancelUrl) payment.cancelUrl = payload.cancelUrl;
-          payment.amount = reservedCheckout.totals.grandTotal;
+          payment.amount = liveCheckout.totals.grandTotal;
           await payment.save();
           return this.createAttempt(payment, customer, actor);
         }
@@ -197,6 +198,11 @@ export class PaymentService {
           return this.createAttempt(payment, customer, actor);
         }
 
+        // Mintpay needs a POST form with purchase_id — rebuild if missing.
+        if (payment.method === PAYMENT_METHOD.MINTPAY && !payment.metadata?.redirectForm) {
+          return this.createAttempt(payment, customer, actor);
+        }
+
         // Idempotent — same in-flight payment. For COD, still ensure order exists.
         await fulfillCodPaymentIfNeeded(payment);
         return {
@@ -204,38 +210,52 @@ export class PaymentService {
           redirectForm: payment.metadata?.redirectForm,
         };
       }
-      if (!RETRYABLE_STATUSES.includes(payment.status as never)) {
-        throw ApiError.conflict(
-          'A payment is already in progress for this checkout',
-          { paymentId: payment._id.toString(), status: payment.status },
-          'PAYMENT_IN_PROGRESS',
+
+      // Timed-out pending/processing OR failed/cancelled/expired → seamless retry.
+      // Shoppers should not see "use /payments/retry" after backing out of Mintpay/PayHere.
+      const isExpiredNonTerminal =
+        NON_TERMINAL_STATUSES.includes(payment.status as never) && payment.expiresAt <= new Date();
+      const isRetryable = RETRYABLE_STATUSES.includes(payment.status as never);
+      if (isRetryable || isExpiredNonTerminal) {
+        if (payload.returnUrl) payment.returnUrl = payload.returnUrl;
+        if (payload.cancelUrl) payment.cancelUrl = payload.cancelUrl;
+        // Mark timed-out attempts as expired so retryPayment accepts them.
+        if (isExpiredNonTerminal) {
+          payment.status = PAYMENT_STATUS.EXPIRED;
+          payment.failureReason = payment.failureReason ?? 'Payment attempt expired';
+        }
+        await payment.save();
+        return this.retryPayment(
+          user,
+          { paymentRef: payment._id.toString(), method: payload.method },
+          actor,
         );
       }
-      // Existing payment is terminal-failed/expired — guide the client to retry explicitly.
+
       throw ApiError.conflict(
-        'A previous payment attempt exists for this checkout — use /payments/retry',
+        'A payment is already in progress for this checkout',
         { paymentId: payment._id.toString(), status: payment.status },
-        'PAYMENT_RETRY_REQUIRED',
+        'PAYMENT_IN_PROGRESS',
       );
     }
 
     payment = await PaymentModel.create({
       referenceNumber: newReferenceNumber(),
-      checkoutId: reservedCheckout._id,
-      checkoutToken: reservedCheckout.checkoutToken,
+      checkoutId: liveCheckout._id,
+      checkoutToken: liveCheckout.checkoutToken,
       customerId: customer._id,
       userId: user.id,
       method: payload.method,
       status: PAYMENT_STATUS.PENDING,
-      amount: reservedCheckout.totals.grandTotal,
-      currency: reservedCheckout.currency,
+      amount: liveCheckout.totals.grandTotal,
+      currency: liveCheckout.currency,
       returnUrl:
         payload.returnUrl ??
-        `${appConfig.payment.returnUrl}?checkoutToken=${reservedCheckout.checkoutToken}`,
+        `${appConfig.payment.returnUrl}?checkoutToken=${liveCheckout.checkoutToken}`,
       cancelUrl:
         payload.cancelUrl ??
-        `${appConfig.payment.cancelUrl}?checkoutToken=${reservedCheckout.checkoutToken}`,
-      idempotencyKey: `${reservedCheckout._id.toString()}:${customer._id.toString()}:${randomUUID()}`,
+        `${appConfig.payment.cancelUrl}?checkoutToken=${liveCheckout.checkoutToken}`,
+      idempotencyKey: `${liveCheckout._id.toString()}:${customer._id.toString()}:${randomUUID()}`,
       attemptCount: 0,
       maxAttempts: appConfig.payment.maxRetryAttempts || PAYMENT_MAX_RETRY_ATTEMPTS,
       expiresAt: new Date(Date.now() + appConfig.payment.attemptTtlMinutes * 60_000),
@@ -260,7 +280,7 @@ export class PaymentService {
         currency: payment.currency,
         method: payment.method,
       },
-      { paymentId: payment._id.toString(), checkoutId: reservedCheckout._id.toString() },
+      { paymentId: payment._id.toString(), checkoutId: liveCheckout._id.toString() },
     );
 
     return this.createAttempt(payment, customer, actor);
@@ -309,17 +329,18 @@ export class PaymentService {
       );
     }
 
-    await checkoutService.ensureReservedForPayment(
-      checkout._id.toString(),
-      user,
-      actor,
-      CHECKOUT_RESERVATION_TTL_MINUTES,
-    );
-    const reservedCheckout = await checkoutService.getByIdOrToken(checkout._id.toString());
+    // No unpaid stock hold — deduct only after gateway confirms payment.
+    if (checkout.reservationIds?.length) {
+      await checkoutService.releaseForPaymentFailure(
+        checkout._id.toString(),
+        'Clear unpaid stock hold before payment retry',
+      );
+    }
+    const liveCheckout = await checkoutService.getByIdOrToken(checkout._id.toString());
 
     if (payload.method) payment.method = payload.method;
-    payment.amount = reservedCheckout.totals.grandTotal;
-    payment.currency = reservedCheckout.currency;
+    payment.amount = liveCheckout.totals.grandTotal;
+    payment.currency = liveCheckout.currency;
     payment.status = PAYMENT_STATUS.PENDING;
     payment.failureReason = null;
     payment.expiresAt = new Date(Date.now() + appConfig.payment.attemptTtlMinutes * 60_000);
@@ -467,13 +488,15 @@ export class PaymentService {
         message: attempt.errorMessage ?? 'Gateway session creation failed',
       });
 
-      // Gateway never started — do not leave stock locked.
-      void checkoutService
-        .releaseForPaymentFailure(
+      // Any leftover hold from older builds — restore Available immediately.
+      try {
+        await checkoutService.releaseForPaymentFailure(
           payment.checkoutId.toString(),
           'Gateway session creation failed — release hold',
-        )
-        .catch(() => {});
+        );
+      } catch {
+        /* already released */
+      }
 
       throw error;
     }
@@ -849,6 +872,16 @@ export class PaymentService {
         },
         { paymentId: payment._id.toString(), checkoutId: payment.checkoutId.toString() },
       );
+
+      // Restore Available immediately — do not wait solely on the event consumer.
+      try {
+        await checkoutService.releaseForPaymentFailure(
+          payment.checkoutId.toString(),
+          `Gateway reported ${newStatus} — release unpaid hold`,
+        );
+      } catch {
+        /* already released / no hold */
+      }
 
       // Send payment failed email (fire-and-forget)
       void (async () => {

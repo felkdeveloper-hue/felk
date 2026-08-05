@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { BadgeCheck, CreditCard, Lock, MapPin, Pencil, ShieldCheck, Truck } from 'lucide-react';
 import { Seo } from '@/components/common/seo';
@@ -14,11 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PAYMENT_METHOD_OPTIONS, SHIPPING_METHOD_OPTIONS } from '@/constants/checkout.constants';
 import { ROUTES } from '@/constants';
-import {
-  useCheckoutSessionQuery,
-  useRefreshCheckoutMutation,
-  useValidateCheckoutMutation,
-} from '@/hooks/checkout';
+import { useCheckoutSessionQuery, useRefreshCheckoutMutation } from '@/hooks/checkout';
 import { usePlaceOrderMutation } from '@/hooks/payment';
 import { setCheckoutPlacedFlag } from '@/utils/checkout-placed-flag';
 import { AppError } from '@/lib/errors';
@@ -133,12 +129,15 @@ export function CheckoutReviewPage() {
   const navigate = useNavigate();
   const checkoutToken = useCheckoutStore((state) => state.checkoutToken);
   const paymentMethod = useCheckoutStore((state) => state.selectedPaymentMethod);
+  const shippingAddressId = useCheckoutStore((state) => state.selectedShippingAddressId);
+  const billingAddressId = useCheckoutStore((state) => state.selectedBillingAddressId);
+  const billingSameAsShipping = useCheckoutStore((state) => state.billingSameAsShipping);
 
   const sessionQuery = useCheckoutSessionQuery();
-  const validateCheckout = useValidateCheckoutMutation();
   const refreshCheckout = useRefreshCheckoutMutation();
   const placeOrder = usePlaceOrderMutation();
   const session = sessionQuery.data;
+  const addressHealAttempted = useRef(false);
 
   const selectedPayment = paymentOption(paymentMethod);
   const isCod = paymentMethod === 'cod';
@@ -155,12 +154,30 @@ export function CheckoutReviewPage() {
     }
   }, [checkoutToken]);
 
+  // If the session lost its shipping snapshot (common after failed payment / stale
+  // checkout), re-attach the address the shopper already picked on Information.
   useEffect(() => {
-    if (session?.checkoutToken) {
-      validateCheckout.mutate(session.checkoutToken);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.checkoutToken]);
+    if (!session?.checkoutToken || session.shippingAddress || addressHealAttempted.current) return;
+    if (!shippingAddressId || refreshCheckout.isPending) return;
+    addressHealAttempted.current = true;
+    const billingId = billingSameAsShipping
+      ? shippingAddressId
+      : (billingAddressId ?? shippingAddressId);
+    refreshCheckout.mutate({
+      checkoutRef: session.checkoutToken,
+      payload: {
+        shippingAddressId,
+        billingAddressId: billingId ?? undefined,
+      },
+    });
+  }, [
+    session?.checkoutToken,
+    session?.shippingAddress,
+    shippingAddressId,
+    billingAddressId,
+    billingSameAsShipping,
+    refreshCheckout,
+  ]);
 
   const handlePlaceOrder = () => {
     if (!session?.checkoutToken || !paymentMethod) return;
@@ -208,9 +225,25 @@ export function CheckoutReviewPage() {
   };
 
   const placeOrderError = placeOrder.error;
-  const validationIssues = validateCheckout.data?.issues ?? session?.validationIssues;
-  const hasBlockingIssues = validationIssues?.some((issue) => issue.severity !== 'warning');
-  const canPlaceOrder = Boolean(paymentMethod && session?.readyForPayment) && !hasBlockingIssues;
+  // Soft warnings (price change, etc.) must not block Mintpay. Hard stock errors
+  // are re-checked by the payment API at Place Order.
+  const softIssues = (session?.validationIssues ?? []).filter(
+    (issue) => issue.severity === 'warning',
+  );
+  const hardIssues = (session?.validationIssues ?? []).filter(
+    (issue) =>
+      issue.severity !== 'warning' &&
+      issue.code !== 'OUT_OF_STOCK' &&
+      issue.code !== 'INSUFFICIENT_STOCK',
+  );
+  const isClosed = ['completed', 'cancelled', 'expired'].includes(String(session?.status ?? ''));
+  const hasShipTo = Boolean(session?.shippingAddress?.line1 || shippingAddressId);
+  const hasLines = Boolean(session?.lines?.length);
+  const isCheckoutReady = hasShipTo && hasLines && !isClosed;
+  const canPlaceOrder = Boolean(paymentMethod && isCheckoutReady) && hardIssues.length === 0;
+  const isHealingAddress =
+    Boolean(session && !session.shippingAddress && shippingAddressId) &&
+    (refreshCheckout.isPending || !addressHealAttempted.current);
 
   if (sessionQuery.isLoading) {
     return (
@@ -265,7 +298,7 @@ export function CheckoutReviewPage() {
               onExtend={handleExtend}
               isExtending={refreshCheckout.isPending}
             />
-            <CheckoutValidationAlert issues={validationIssues} />
+            <CheckoutValidationAlert issues={[...hardIssues, ...softIssues]} />
 
             <div className="grid gap-4 sm:grid-cols-2">
               {session.shippingAddress ? (
@@ -370,11 +403,15 @@ export function CheckoutReviewPage() {
               </Alert>
             ) : null}
 
-            {!session.readyForPayment ? (
+            {!isCheckoutReady && !isHealingAddress ? (
               <Alert role="status">
                 <AlertDescription>
-                  Checkout is not ready yet. Fix any issues above, or go back and refresh your
-                  details.
+                  {hasLines && !hasShipTo
+                    ? 'Add a shipping address before placing your order.'
+                    : 'Checkout is not ready yet. Go back and refresh your details.'}{' '}
+                  <Link to={ROUTES.checkout} className="underline underline-offset-2">
+                    Back to information
+                  </Link>
                 </AlertDescription>
               </Alert>
             ) : null}
@@ -384,8 +421,8 @@ export function CheckoutReviewPage() {
               backLabel="Back to payment"
               onNext={handlePlaceOrder}
               nextLabel={isCod ? 'Place order' : 'Place order & pay'}
-              nextDisabled={!canPlaceOrder}
-              isSubmitting={placeOrder.isPending}
+              nextDisabled={!canPlaceOrder || isHealingAddress}
+              isSubmitting={placeOrder.isPending || isHealingAddress}
             />
 
             <ul className="text-muted-foreground flex flex-wrap items-center gap-x-5 gap-y-2 px-1 text-xs sm:text-sm">

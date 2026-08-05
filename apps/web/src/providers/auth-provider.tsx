@@ -62,10 +62,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
           const defaultWishlist = getDefaultWishlist(wishlists);
           if (!defaultWishlist?.id) {
             const created = await customersApi.createWishlist('My Wishlist');
+            if (!created?.id) return null;
             const full = normalizeWishlist(await customersApi.getWishlist(created.id));
             queryClient.setQueryData(QUERY_KEYS.customers.wishlist(created.id), full);
             return full;
           }
+          if (!defaultWishlist.id) return null;
           const full = normalizeWishlist(await customersApi.getWishlist(defaultWishlist.id));
           queryClient.setQueryData(QUERY_KEYS.customers.wishlist(defaultWishlist.id), full);
           return full;

@@ -156,28 +156,42 @@ export async function handlePaymentSucceededEvent(payload: Record<string, unknow
       return;
     }
 
-    // Validate + commit reservations: convert the checkout's held stock into a permanent sale.
+    // Stock is deducted only after payment is verified: reserve then commit atomically.
+    // Older flows may already have an active reservationId on the line — commit that.
     const committedReservationIds: Types.ObjectId[] = [];
     for (const line of checkout.lines) {
-      if (!line.reservationId) {
-        logger.warn(
-          { paymentId, variantId: line.variantId.toString() },
-          'Checkout line has no reservation — committing without one',
-        );
-        continue;
-      }
       try {
+        let reservationId = line.reservationId?.toString() ?? null;
+        if (!reservationId) {
+          if (!line.warehouseId) {
+            throw new Error(`No warehouse for ${line.sku} — cannot deduct stock`);
+          }
+          const reservation = await reservationService.reserve(
+            {
+              warehouseId: line.warehouseId.toString(),
+              variantId: line.variantId.toString(),
+              quantity: line.quantity,
+              reason: 'order_fulfilment',
+              referenceType: 'payment',
+              referenceId: payment._id.toString(),
+              timeoutMinutes: 15,
+            },
+            SYSTEM_ACTOR,
+          );
+          reservationId = reservation._id.toString();
+          line.reservationId = reservation._id;
+        }
         await reservationService.commit(
-          line.reservationId.toString(),
+          reservationId,
           SYSTEM_ACTOR,
           `Order fulfilment for payment ${payment.referenceNumber}`,
         );
-        committedReservationIds.push(line.reservationId);
+        committedReservationIds.push(new Types.ObjectId(reservationId));
       } catch (error) {
-        // Do not create a paid order when stock commit fails for a reserved line.
+        // Do not create a paid order when stock deduction fails.
         logger.error(
-          { err: error, reservationId: line.reservationId.toString(), paymentId },
-          'Failed to commit reservation during order creation — aborting order',
+          { err: error, variantId: line.variantId.toString(), paymentId },
+          'Failed to deduct stock during order creation — aborting order',
         );
         throw error;
       }

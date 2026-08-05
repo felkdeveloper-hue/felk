@@ -112,7 +112,15 @@ export function normalizeCheckoutSession(raw: unknown): CheckoutSession {
           ? record.expiresAt.toISOString()
           : null,
     validationIssues: normalizeIssues(record.validationIssues),
-    readyForPayment: Boolean(summary.readyForPayment ?? record.status === 'ready'),
+    readyForPayment: (() => {
+      if (typeof summary.readyForPayment === 'boolean') return summary.readyForPayment;
+      if (typeof record.readyForPayment === 'boolean') return record.readyForPayment;
+      const status = String(record.status ?? '');
+      if (['completed', 'cancelled', 'expired'].includes(status)) return false;
+      const hasAddress = Boolean(record.shippingAddress);
+      const hasLines = Array.isArray(record.lines) && record.lines.length > 0;
+      return ['open', 'ready', 'reserved'].includes(status) && hasAddress && hasLines;
+    })(),
     valid: record.valid !== undefined ? Boolean(record.valid) : undefined,
     issues: record.issues ? normalizeIssues(record.issues) : undefined,
   };

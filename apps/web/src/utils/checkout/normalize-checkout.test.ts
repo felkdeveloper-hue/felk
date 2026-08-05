@@ -32,6 +32,27 @@ describe('normalizeCheckoutSession', () => {
     expect(session.totals.grandTotal).toBe(1200);
     expect(session.readyForPayment).toBe(true);
   });
+
+  it('treats open sessions with address + lines as ready when summary is missing', () => {
+    const session = normalizeCheckoutSession({
+      id: 'chk_2',
+      checkoutToken: 'token_open',
+      status: 'open',
+      currency: 'LKR',
+      shippingAddress: {
+        addressId: 'a1',
+        fullName: 'Felk',
+        line1: '123 Main',
+        city: 'Colombo',
+        postalCode: '00100',
+        country: 'LK',
+      },
+      lines: [{ productId: 'p1', variantId: 'v1', sku: 'SKU', title: 'Top', quantity: 1 }],
+      totals: { subtotal: 1000, discount: 0, shipping: 500, tax: 0, grandTotal: 1500 },
+    });
+
+    expect(session.readyForPayment).toBe(true);
+  });
 });
 
 describe('checkout expiry helpers', () => {

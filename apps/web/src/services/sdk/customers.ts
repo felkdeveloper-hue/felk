@@ -172,14 +172,28 @@ export const customersApi = {
   },
 
   listWishlists(): Promise<Wishlist[]> {
-    return http.get<Wishlist[]>('/customers/me/wishlists');
+    return http.get<Wishlist[]>('/customers/me/wishlists').then((rows) =>
+      (Array.isArray(rows) ? rows : []).map((row) => {
+        const record = row as Wishlist & { _id?: string };
+        return {
+          ...record,
+          id: String(record.id ?? record._id ?? ''),
+        };
+      }),
+    );
   },
 
   createWishlist(name: string): Promise<Wishlist> {
-    return http.post<Wishlist>('/customers/me/wishlists', { name });
+    return http.post<Wishlist>('/customers/me/wishlists', { name }).then((row) => {
+      const record = row as Wishlist & { _id?: string };
+      return { ...record, id: String(record.id ?? record._id ?? '') };
+    });
   },
 
   getWishlist(wishlistId: string): Promise<Wishlist> {
+    if (!wishlistId || wishlistId === 'undefined') {
+      return Promise.reject(new Error('Wishlist id is required'));
+    }
     return http.get<Wishlist>(`/customers/me/wishlists/${wishlistId}`);
   },
 

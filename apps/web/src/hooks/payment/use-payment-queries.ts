@@ -2,6 +2,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { buildAbsoluteUrl } from '@/config/site';
 import { ROUTES } from '@/constants';
 import { QUERY_KEYS } from '@/constants/query-keys';
+import { AppError } from '@/lib/errors';
 import {
   paymentsApi,
   type PaymentCreatePayload,
@@ -53,7 +54,6 @@ export function buildPaymentReturnUrls(checkoutToken: string) {
 }
 
 export function usePlaceOrderMutation() {
-  const createPayment = useCreatePaymentMutation();
   const setRedirecting = useCheckoutStore((state) => state.setRedirectingToGateway);
 
   return useMutation({
@@ -65,11 +65,20 @@ export function usePlaceOrderMutation() {
       method: PaymentMethod;
     }) => {
       const urls = buildPaymentReturnUrls(checkoutToken);
-      return createPayment.mutateAsync({
-        checkoutToken,
-        method,
-        ...urls,
-      });
+      try {
+        return await paymentsApi.create({
+          checkoutToken,
+          method,
+          ...urls,
+        });
+      } catch (error) {
+        // Older API builds throw this when a prior Mintpay/PayHere attempt failed.
+        // Seamless retry so shoppers are not stuck on "use /payments/retry".
+        if (AppError.isAppError(error) && error.code === 'PAYMENT_RETRY_REQUIRED') {
+          return paymentsApi.retry({ checkoutToken, method });
+        }
+        throw error;
+      }
     },
     onMutate: ({ method }) => {
       // Only gateways need the redirect overlay; COD navigates straight to success.
