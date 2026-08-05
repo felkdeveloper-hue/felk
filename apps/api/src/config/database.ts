@@ -252,7 +252,7 @@ class DatabaseManager {
       // Index repairs are for production/bootstrap. Skipping them in local
       // development makes API restarts after code changes much faster; Atlas
       // indexes are already maintained by the deployed API.
-      if (!appConfig.isDev) {
+      if (!appConfig.app.isDev) {
         await repairVariantBarcodeIndex().catch((error: unknown) => {
           logger.warn({ err: error }, 'Variant barcode index repair skipped');
         });
