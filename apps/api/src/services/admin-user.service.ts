@@ -1,4 +1,4 @@
-import { Types } from 'mongoose';
+import { type Types } from 'mongoose';
 import { z } from 'zod';
 import { AUDIT_ACTIONS, AUTH_LIMITS, USER_STATUS, type UserStatus } from '@/constants/auth.js';
 import { CART_STATUS } from '@/constants/cart.js';

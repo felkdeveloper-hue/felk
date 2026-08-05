@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { sweepPending, type RetrySweepDoc } from '@/services/retry-sweep.service.js';
 import type { Model } from 'mongoose';
 
