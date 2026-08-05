@@ -398,13 +398,16 @@ export class PaymentService {
           firstName: customer.firstName,
           lastName: customer.lastName,
           phone: customer.phone ?? undefined,
-          country: customer.country ?? undefined,
+          country: String(shipping.country ?? customer.country ?? 'LK'),
+          address: String(shipping.line1 ?? shipping.address1 ?? ''),
+          city: String(shipping.city ?? ''),
           customerId: payment.customerId.toString(),
           customerPhone: customer.phone ?? String(shipping.phone ?? ''),
           ip: actor.ip ?? '',
           deliveryStreet: String(shipping.line1 ?? shipping.address1 ?? ''),
           deliveryRegion: String(shipping.city ?? shipping.state ?? ''),
           deliveryPostcode: String(shipping.postalCode ?? shipping.postcode ?? ''),
+          deliveryCountry: String(shipping.country ?? 'LK'),
         },
       });
 

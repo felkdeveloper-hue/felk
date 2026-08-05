@@ -14,6 +14,7 @@ import {
   getHeader,
   parseWebhookPayload,
   rawBodyToString,
+  toPublicStorefrontUrl,
 } from '@/services/gateways/gateway.utils.js';
 import { ApiError } from '@/utils/errors/api-error.js';
 
@@ -38,35 +39,6 @@ function mintpayHosts() {
         api: 'https://dev.mintpay.lk/user-order/api/',
         login: 'https://dev.mintpay.lk/user-order/login/',
       };
-}
-
-/**
- * Mintpay's edge WAF returns HTML 403 when success/fail URLs use localhost.
- * Rewrite local callback URLs to a public HTTPS origin for the API payload only.
- */
-function toMintpayPublicUrl(rawUrl: string): string {
-  try {
-    const parsed = new URL(rawUrl);
-    const isLocal =
-      parsed.hostname === 'localhost' ||
-      parsed.hostname === '127.0.0.1' ||
-      parsed.hostname === '0.0.0.0' ||
-      parsed.hostname.endsWith('.local');
-    if (!isLocal && parsed.protocol === 'https:') return rawUrl;
-
-    const origin =
-      process.env.MINTPAY_PUBLIC_ORIGIN?.trim() ||
-      process.env.STOREFRONT_PUBLIC_URL?.trim() ||
-      appConfig.cors.origins.find((o) => o.startsWith('https://')) ||
-      'https://fashionedge.lk';
-    const publicOrigin = new URL(origin.endsWith('/') ? origin.slice(0, -1) : origin);
-    parsed.protocol = publicOrigin.protocol;
-    parsed.hostname = publicOrigin.hostname;
-    parsed.port = publicOrigin.port;
-    return parsed.toString();
-  } catch {
-    return rawUrl;
-  }
 }
 
 /** Mintpay customer_id: digits only, max 10 chars, and fits signed 32-bit int. */
@@ -133,8 +105,8 @@ export class MintpayGateway implements PaymentGateway {
       delivery_postcode: String(input.metadata?.deliveryPostcode ?? '00000'),
       cart_created_date: stamp,
       cart_updated_date: stamp,
-      success_url: toMintpayPublicUrl(input.returnUrl),
-      fail_url: toMintpayPublicUrl(input.cancelUrl),
+      success_url: toPublicStorefrontUrl(input.returnUrl),
+      fail_url: toPublicStorefrontUrl(input.cancelUrl),
       products: [
         {
           name: productLabel,
@@ -154,7 +126,9 @@ export class MintpayGateway implements PaymentGateway {
     let data: { message?: string; data?: string };
     try {
       const userAgent = `WordPress/6.4; ${
-        appConfig.cors.origins.find((o) => o.startsWith('https://')) ?? 'https://fashionedge.lk'
+        appConfig.cors.origins.find((o) => o.includes('fe.lk') && o.startsWith('https://')) ??
+        appConfig.email.shopUrl?.replace(/\/$/, '') ??
+        'https://fe.lk'
       }`;
       const result = await fetchWithRetry<{ message?: string; data?: string }>(
         hosts.api,
@@ -191,7 +165,7 @@ export class MintpayGateway implements PaymentGateway {
         status === 401 || /Invalid token/i.test(raw)
           ? 'Mintpay rejected the API token (401 Invalid token). Check MINTPAY_MERCHANT_SECRET for the correct live/sandbox environment.'
           : isHtmlForbidden
-            ? 'Mintpay blocked the request (HTML 403). Localhost return URLs are rejected — set MINTPAY_PUBLIC_ORIGIN to your public HTTPS storefront URL.'
+            ? 'Mintpay blocked the request (HTML 403). Localhost return URLs are rejected — set MINTPAY_PUBLIC_ORIGIN=https://fe.lk (or your live storefront HTTPS URL).'
             : status === 403
               ? 'Mintpay rejected the request (403). Check MINTPAY_MERCHANT_ID / MINTPAY_MERCHANT_SECRET and MINTPAY_MODE.'
               : 'Mintpay could not create a checkout session. Check merchant credentials and network access to app.mintpay.lk / dev.mintpay.lk.',

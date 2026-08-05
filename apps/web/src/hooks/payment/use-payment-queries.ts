@@ -47,9 +47,26 @@ export function useRetryPaymentMutation() {
 export function buildPaymentReturnUrls(checkoutToken: string) {
   const successPath = `${ROUTES.checkoutSuccess}?checkoutToken=${encodeURIComponent(checkoutToken)}`;
   const cancelPath = `${ROUTES.checkoutCancel}?checkoutToken=${encodeURIComponent(checkoutToken)}`;
+
+  // Gateways (Mintpay/PayHere) reject localhost callback URLs. When developing
+  // locally, send shoppers back to the live storefront cancel/success pages.
+  const configured = (import.meta.env.VITE_PAYMENT_RETURN_ORIGIN as string | undefined)?.trim();
+  let origin = configured?.replace(/\/$/, '') || '';
+  if (!origin && typeof window !== 'undefined') {
+    const host = window.location.hostname;
+    if (host === 'localhost' || host === '127.0.0.1' || host.endsWith('.local')) {
+      origin = 'https://fe.lk';
+    }
+  }
+  if (!origin) {
+    return {
+      returnUrl: buildAbsoluteUrl(successPath),
+      cancelUrl: buildAbsoluteUrl(cancelPath),
+    };
+  }
   return {
-    returnUrl: buildAbsoluteUrl(successPath),
-    cancelUrl: buildAbsoluteUrl(cancelPath),
+    returnUrl: `${origin}${successPath.startsWith('/') ? successPath : `/${successPath}`}`,
+    cancelUrl: `${origin}${cancelPath.startsWith('/') ? cancelPath : `/${cancelPath}`}`,
   };
 }
 

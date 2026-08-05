@@ -9,7 +9,11 @@ import type {
   PaymentSessionResult,
   WebhookVerificationInput,
 } from '@/services/interfaces/payment-gateway.service.js';
-import { getHeader, parseWebhookPayload } from '@/services/gateways/gateway.utils.js';
+import {
+  getHeader,
+  parseWebhookPayload,
+  toPublicStorefrontUrl,
+} from '@/services/gateways/gateway.utils.js';
 import { ApiError } from '@/utils/errors/api-error.js';
 
 /** PayHere notify status_code -> our verification status mapping. */
@@ -34,8 +38,16 @@ type OAuthTokenCache = { token: string; expiresAt: number };
 
 let oauthCache: OAuthTokenCache | null = null;
 
+function merchantId(): string {
+  return String(appConfig.payment.payhere.merchantId ?? '').trim();
+}
+
+function merchantSecret(): string {
+  return String(appConfig.payment.payhere.merchantSecret ?? '').trim();
+}
+
 function hashSecret(): string {
-  return md5Hex(appConfig.payment.payhere.merchantSecret);
+  return md5Hex(merchantSecret());
 }
 
 function baseUrl(): string {
@@ -50,8 +62,7 @@ function checkoutUrl(): string {
 
 /** PayHere merchant checkout hash: MD5(merchant_id + order_id + amount + currency + MD5(secret)). */
 function buildRequestHash(orderId: string, amount: string, currency: string): string {
-  const merchantId = appConfig.payment.payhere.merchantId;
-  return md5Hex(`${merchantId}${orderId}${amount}${currency}${hashSecret()}`);
+  return md5Hex(`${merchantId()}${orderId}${amount}${currency}${hashSecret()}`);
 }
 
 /** PayHere webhook signature: MD5(merchant_id + order_id + amount + currency + status_code + MD5(secret)). */
@@ -61,8 +72,22 @@ function buildNotifyHash(
   currency: string,
   statusCode: string,
 ): string {
-  const merchantId = appConfig.payment.payhere.merchantId;
-  return md5Hex(`${merchantId}${orderId}${amount}${currency}${statusCode}${hashSecret()}`);
+  return md5Hex(`${merchantId()}${orderId}${amount}${currency}${statusCode}${hashSecret()}`);
+}
+
+function publicNotifyUrl(): string {
+  const configured = String(appConfig.payment.payhere.notifyUrl ?? '').trim();
+  try {
+    const parsed = new URL(configured);
+    const isLocal =
+      parsed.hostname === 'localhost' ||
+      parsed.hostname === '127.0.0.1' ||
+      parsed.hostname === '0.0.0.0';
+    if (!isLocal && parsed.protocol === 'https:') return configured;
+  } catch {
+    /* fall through */
+  }
+  return 'https://api.fe.lk/api/v1/payments/webhooks/payhere';
 }
 
 function metaString(metadata: Record<string, unknown> | undefined, key: string): string {
@@ -162,54 +187,94 @@ export class PayHereGateway implements PaymentGateway {
   readonly name = PAYMENT_METHOD.PAYHERE;
 
   async createSession(input: CreatePaymentSessionInput): Promise<PaymentSessionResult> {
-    const amount = input.amount.toFixed(2);
-    const hash = buildRequestHash(input.orderId, amount, input.currency);
+    if (!merchantId() || !merchantSecret()) {
+      throw ApiError.badRequest(
+        'PayHere is not configured. Set PAYHERE_MERCHANT_ID and PAYHERE_MERCHANT_SECRET.',
+        undefined,
+        'PAYHERE_NOT_CONFIGURED',
+      );
+    }
+
+    const amount = Number(input.amount).toFixed(2);
+    const currency = String(input.currency || 'LKR').toUpperCase();
+    // PayHere order_id must be stable alphanumeric — strip anything odd.
+    const orderId =
+      String(input.orderId)
+        .replace(/[^A-Za-z0-9_-]/g, '')
+        .slice(0, 64) || input.orderId;
+    const hash = buildRequestHash(orderId, amount, currency);
     const { firstName, lastName } = splitCustomerName(input.customerEmail, input.metadata);
-    const notifyUrl = appConfig.payment.payhere.notifyUrl;
+    const notifyUrl = publicNotifyUrl();
+    const returnUrl = toPublicStorefrontUrl(input.returnUrl);
+    const cancelUrl = toPublicStorefrontUrl(input.cancelUrl);
+
+    const countryRaw =
+      metaString(input.metadata, 'country') ||
+      metaString(input.metadata, 'deliveryCountry') ||
+      'Sri Lanka';
+    const country =
+      countryRaw.toUpperCase() === 'LK' || countryRaw.toUpperCase() === 'LKA'
+        ? 'Sri Lanka'
+        : countryRaw;
 
     const fields: Record<string, string> = {
-      merchant_id: appConfig.payment.payhere.merchantId,
-      return_url: input.returnUrl,
-      cancel_url: input.cancelUrl,
+      merchant_id: merchantId(),
+      return_url: returnUrl,
+      cancel_url: cancelUrl,
       notify_url: notifyUrl,
-      order_id: input.orderId,
-      items: metaString(input.metadata, 'description') || `Order ${input.orderId}`,
-      currency: input.currency,
+      order_id: orderId,
+      items: (metaString(input.metadata, 'description') || `Order ${orderId}`).slice(0, 255),
+      currency,
       amount,
-      first_name: firstName,
-      last_name: lastName,
+      first_name: firstName.slice(0, 50),
+      last_name: lastName.slice(0, 50),
       email: input.customerEmail,
-      phone:
+      phone: (
         metaString(input.metadata, 'phone') ||
         metaString(input.metadata, 'customerPhone') ||
-        '0770000000',
-      address: metaString(input.metadata, 'address') || 'N/A',
-      city: metaString(input.metadata, 'city') || 'Colombo',
-      country: metaString(input.metadata, 'country') || 'Sri Lanka',
+        '0770000000'
+      ).slice(0, 20),
+      address: (
+        metaString(input.metadata, 'address') ||
+        metaString(input.metadata, 'deliveryStreet') ||
+        metaString(input.metadata, 'deliveryAddress') ||
+        'N/A'
+      ).slice(0, 100),
+      city: (
+        metaString(input.metadata, 'city') ||
+        metaString(input.metadata, 'deliveryRegion') ||
+        metaString(input.metadata, 'deliveryCity') ||
+        'Colombo'
+      ).slice(0, 50),
+      country: country.slice(0, 50),
       hash,
     };
 
-    const deliveryAddress = metaString(input.metadata, 'deliveryAddress');
-    if (deliveryAddress) fields.delivery_address = deliveryAddress;
-    const deliveryCity = metaString(input.metadata, 'deliveryCity');
-    if (deliveryCity) fields.delivery_city = deliveryCity;
-    const deliveryCountry = metaString(input.metadata, 'deliveryCountry');
-    if (deliveryCountry) fields.delivery_country = deliveryCountry;
+    const deliveryAddress =
+      metaString(input.metadata, 'deliveryAddress') || metaString(input.metadata, 'deliveryStreet');
+    if (deliveryAddress) fields.delivery_address = deliveryAddress.slice(0, 100);
+    const deliveryCity =
+      metaString(input.metadata, 'deliveryCity') || metaString(input.metadata, 'deliveryRegion');
+    if (deliveryCity) fields.delivery_city = deliveryCity.slice(0, 50);
+    const deliveryCountry = metaString(input.metadata, 'deliveryCountry') || country;
+    if (deliveryCountry) fields.delivery_country = deliveryCountry.slice(0, 50);
 
     logger.info(
       {
         gateway: 'payhere',
-        orderId: input.orderId,
+        orderId,
         amount,
-        currency: input.currency,
+        currency,
         mode: appConfig.payment.payhere.mode,
         notifyUrl,
+        returnUrl,
+        cancelUrl,
       },
       'PayHere: session created',
     );
 
     return {
-      gatewayPaymentId: input.orderId,
+      gatewayPaymentId: orderId,
       // Prefer POST form (official Checkout API). Frontend auto-submits redirectForm.
       redirectForm: {
         action: checkoutUrl(),
@@ -217,17 +282,19 @@ export class PayHereGateway implements PaymentGateway {
         fields,
       },
       raw: {
-        merchantId: appConfig.payment.payhere.merchantId,
+        merchantId: merchantId(),
         hash,
         mode: appConfig.payment.payhere.mode,
         notifyUrl,
+        returnUrl,
+        cancelUrl,
       },
     };
   }
 
   async verifyWebhook(input: WebhookVerificationInput) {
     const payload = parseWebhookPayload(input.rawBody);
-    const merchantId = String(payload.merchant_id ?? '');
+    const receivedMerchantId = String(payload.merchant_id ?? '');
     const orderId = String(payload.order_id ?? '');
     const payhereAmount = String(payload.payhere_amount ?? '');
     const payhereCurrency = String(payload.payhere_currency ?? '');
@@ -235,21 +302,21 @@ export class PayHereGateway implements PaymentGateway {
     const receivedSig = String(payload.md5sig ?? getHeader(input.headers, 'md5sig') ?? '');
 
     logger.info(
-      { gateway: 'payhere', orderId, statusCode, merchantId },
+      { gateway: 'payhere', orderId, statusCode, merchantId: receivedMerchantId },
       'PayHere: webhook received',
     );
 
-    if (!merchantId || !orderId || !statusCode || !receivedSig) {
+    if (!receivedMerchantId || !orderId || !statusCode || !receivedSig) {
       logger.warn({ gateway: 'payhere', orderId }, 'PayHere: webhook missing required fields');
       return { valid: false, payload };
     }
 
-    if (merchantId !== appConfig.payment.payhere.merchantId) {
+    if (receivedMerchantId !== merchantId()) {
       logger.warn(
         {
           gateway: 'payhere',
-          received: merchantId,
-          expected: appConfig.payment.payhere.merchantId,
+          received: receivedMerchantId,
+          expected: merchantId(),
         },
         'PayHere: merchant ID mismatch',
       );
