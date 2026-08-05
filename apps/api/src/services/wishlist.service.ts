@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { Types } from 'mongoose';
+import type { Types } from 'mongoose';
 import { WishlistModel, WishlistItemModel } from '@/models/customer.models.js';
 import { ProductModel, ProductVariantModel, ProductMediaModel } from '@/models/product.models.js';
 import { customerService } from '@/services/customer.service.js';

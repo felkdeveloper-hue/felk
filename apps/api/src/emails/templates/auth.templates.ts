@@ -1,5 +1,4 @@
 import {
-  ctaButton,
   emailGreeting,
   emailHeading,
   emailLayout,

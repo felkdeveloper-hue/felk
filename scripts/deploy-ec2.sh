@@ -32,15 +32,55 @@ else
   pnpm install --frozen-lockfile
 fi
 
+# Small EC2 instances OOM-kill `tsc` (exit 137). Ensure swap + free RAM first.
+ensure_swap() {
+  if swapon --show 2>/dev/null | grep -q .; then
+    echo "==> Swap already active"
+    return 0
+  fi
+  if [[ -f /swapfile ]]; then
+    echo "==> Enabling existing /swapfile"
+    sudo swapon /swapfile 2>/dev/null || true
+    return 0
+  fi
+  echo "==> Creating 2G swapfile (tsc needs headroom on small instances)"
+  sudo fallocate -l 2G /swapfile 2>/dev/null || sudo dd if=/dev/zero of=/swapfile bs=1M count=2048 status=none
+  sudo chmod 600 /swapfile
+  sudo mkswap /swapfile
+  sudo swapon /swapfile
+}
+
+ensure_swap || echo "WARNING: could not enable swap — build may OOM on small instances"
+
+echo "==> Pausing API during build to free RAM"
+API_WAS_RUNNING=0
+if command -v pm2 >/dev/null 2>&1; then
+  if pm2 describe api >/dev/null 2>&1; then
+    API_WAS_RUNNING=1
+    pm2 stop api 2>/dev/null || true
+  fi
+fi
+
+restore_api_on_fail() {
+  if [[ "${API_WAS_RUNNING}" -eq 1 ]] && command -v pm2 >/dev/null 2>&1; then
+    echo "==> Build failed — restarting previous API process"
+    pm2 restart api --update-env 2>/dev/null || pm2 start ecosystem.config.cjs 2>/dev/null || true
+  fi
+}
+trap restore_api_on_fail ERR
+
 echo "==> Building API"
+# Cap heap so Node competes less with the kernel OOM killer on 1–2GB boxes.
+export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=1536}"
 pnpm --filter @fe-platform/api build
+trap - ERR
 
 echo "==> Restarting process manager (zero-downtime preferred)"
 if command -v pm2 >/dev/null 2>&1; then
   if [[ -f ecosystem.config.cjs ]]; then
     if pm2 describe api >/dev/null 2>&1; then
       # Prefer graceful restart over delete so nginx does not 502 mid-deploy.
-      pm2 reload ecosystem.config.cjs --update-env || pm2 restart ecosystem.config.cjs --update-env
+      pm2 reload ecosystem.config.cjs --update-env || pm2 restart ecosystem.config.cjs --update-env || pm2 start ecosystem.config.cjs
     else
       pm2 delete fe-api 2>/dev/null || true
       pm2 delete felk-api 2>/dev/null || true

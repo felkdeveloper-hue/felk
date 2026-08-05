@@ -57,13 +57,6 @@ export async function getCheckoutAbandonAnalytics(filter: AnalyticsFilter) {
   };
   const byActor = new Map<string, State>();
 
-  const stepRank: Record<string, number> = {
-    checkout_started: 1,
-    checkout_shipping_reached: 2,
-    payment_page_reached: 3,
-    checkout_review_reached: 4,
-  };
-
   for (const e of events) {
     const key = actorKey(e);
     if (!key) continue;

@@ -1,4 +1,4 @@
-import type { Request, Response } from 'express';
+import type { Request } from 'express';
 import { otpService } from '@/services/otp.service.js';
 import { setAuthCookies, type AuthRequestMeta } from '@/services/auth.service.js';
 import { asyncHandler } from '@/utils/async-handler.js';

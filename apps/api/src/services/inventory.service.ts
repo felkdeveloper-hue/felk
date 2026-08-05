@@ -11,7 +11,7 @@ import {
   inventoryRepository,
   type InventoryListFilters,
 } from '@/repositories/inventory.repository.js';
-import { writeAuditLog, writeActivityLog } from '@/services/audit.service.js';
+import { writeAuditLog } from '@/services/audit.service.js';
 import type { ActorMeta } from '@/services/cms-crud.service.js';
 import { syncProductStockStatus } from '@/services/product.service.js';
 import { ApiError } from '@/utils/errors/api-error.js';

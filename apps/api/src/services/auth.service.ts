@@ -46,7 +46,7 @@ import {
   pushPasswordHistory,
   wasPasswordUsedRecently,
 } from '@/utils/password.helper.js';
-import { generateSecureToken, hashToken } from '@/utils/token.helper.js';
+import { hashToken } from '@/utils/token.helper.js';
 import { resolveCountryFromIp } from '@/services/platform-analytics/geoip.util.js';
 import { parseUserAgent } from '@/services/platform-analytics/ua-parser.util.js';
 

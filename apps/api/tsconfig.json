@@ -16,7 +16,14 @@
     "noEmit": false
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "src/**/*.test.ts", "src/test/**/*", "vitest.config.ts"],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "src/**/*.test.ts",
+    "src/test/**/*",
+    "vitest.config.ts",
+    "src/scripts/**/*"
+  ],
   "tsc-alias": {
     "resolveFullPaths": true,
     "resolveFullExtension": ".js"

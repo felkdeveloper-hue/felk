@@ -33,7 +33,7 @@ function pickColumns(all: ExportColumn[], selected?: string[]): ExportColumn[] {
   return filtered.length ? filtered : all;
 }
 
-function pageFilter(ctx: ExportFetchContext, defaultLimit = 100): AnalyticsFilter {
+function pageFilter(ctx: ExportFetchContext, _defaultLimit = 100): AnalyticsFilter {
   if (ctx.scope === 'page') {
     return {
       ...ctx.filter,
