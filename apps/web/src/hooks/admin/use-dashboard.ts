@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { ADMIN_REFETCH_MS } from '@/constants/admin-poll';
 import { QUERY_KEYS } from '@/constants';
 import {
   customersApi,
@@ -52,7 +53,7 @@ export function useDashboardStatsQuery() {
         recentPayments: payments.data,
       };
     },
-    staleTime: 15_000,
-    refetchInterval: 15_000,
+    staleTime: ADMIN_REFETCH_MS,
+    refetchInterval: ADMIN_REFETCH_MS,
   });
 }

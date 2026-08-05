@@ -9,9 +9,9 @@
     "pnpm": ">=9.0.0"
   },
   "scripts": {
-    "dev": "turbo run dev --filter=@fe-platform/web --filter=@fe-platform/api",
-    "dev:web": "turbo run dev --filter=@fe-platform/web",
-    "dev:api": "turbo run dev --filter=@fe-platform/api",
+    "dev": "node scripts/ensure-workspace-dist.mjs && turbo run dev --filter=@fe-platform/web --filter=@fe-platform/api --ui=stream",
+    "dev:web": "node scripts/ensure-workspace-dist.mjs && turbo run dev --filter=@fe-platform/web --ui=stream",
+    "dev:api": "node scripts/ensure-workspace-dist.mjs && turbo run dev --filter=@fe-platform/api --ui=stream",
     "build": "turbo run build",
     "build:web": "turbo run build --filter=@fe-platform/web",
     "build:api": "turbo run build --filter=@fe-platform/api",

@@ -1,9 +1,19 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
+import { Mail, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@fe-platform/ui';
 import { toast } from 'sonner';
 import { AdminErrorState, AdminPageHeader, AdminPanel, PageMotion } from '@/components/admin';
+import { InvoiceView } from '@/components/orders';
+import { Button as UiButton } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { ADMIN_ROUTES, QUERY_KEYS } from '@/constants';
 import {
   ORDER_STATUS_CONFIG,
@@ -84,6 +94,7 @@ export function OrderDetailPage({ orderId }: { orderId: string }) {
   const { orders: orderPerms } = useAdminPermissions();
   const [note, setNote] = useState('');
   const [nextStatus, setNextStatus] = useState('confirmed');
+  const [invoiceOpen, setInvoiceOpen] = useState(false);
 
   const detailQuery = useQuery({
     queryKey: QUERY_KEYS.adminOrders.detail(orderId),
@@ -103,7 +114,17 @@ export function OrderDetailPage({ orderId }: { orderId: string }) {
   const invoiceQuery = useQuery({
     queryKey: ['admin', 'orders', orderId, 'invoice'],
     queryFn: () => ordersApi.getInvoice(orderId),
-    enabled: false,
+    enabled: invoiceOpen,
+  });
+
+  const sendInvoiceMutation = useMutation({
+    mutationFn: () => ordersApi.sendInvoice(orderId),
+    onSuccess: (result) => {
+      toast.success(`Invoice emailed to ${result.email}`);
+    },
+    onError: (error) => {
+      toast.error(error instanceof AppError ? error.message : 'Unable to send invoice');
+    },
   });
 
   const statusMutation = useMutation({
@@ -365,19 +386,21 @@ export function OrderDetailPage({ orderId }: { orderId: string }) {
                 <dd>{order.createdAt ? formatDate(String(order.createdAt)) : '—'}</dd>
               </div>
             </dl>
-            <Button
-              variant="outline"
-              size="sm"
-              className="mt-4"
-              onClick={() => invoiceQuery.refetch()}
-            >
-              View invoice
-            </Button>
-            {invoiceQuery.data ? (
-              <pre className="mt-3 max-h-40 overflow-auto rounded bg-neutral-50 p-3 text-xs dark:bg-white/5">
-                {JSON.stringify(invoiceQuery.data, null, 2)}
-              </pre>
-            ) : null}
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" onClick={() => setInvoiceOpen(true)}>
+                View invoice
+              </Button>
+              {orderPerms.update ? (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => sendInvoiceMutation.mutate()}
+                  disabled={sendInvoiceMutation.isPending}
+                >
+                  {sendInvoiceMutation.isPending ? 'Sending…' : 'Send to customer'}
+                </Button>
+              ) : null}
+            </div>
           </AdminPanel>
 
           {orderPerms.update || orderPerms.cancel ? (
@@ -454,6 +477,55 @@ export function OrderDetailPage({ orderId }: { orderId: string }) {
           ) : null}
         </div>
       </div>
+
+      <Dialog open={invoiceOpen} onOpenChange={setInvoiceOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl print:max-h-none print:max-w-none print:overflow-visible print:border-0 print:p-0 print:shadow-none">
+          <DialogHeader className="print:hidden">
+            <DialogTitle>Invoice</DialogTitle>
+            <DialogDescription>
+              Download or print a copy, or email it to the customer.
+            </DialogDescription>
+          </DialogHeader>
+
+          {invoiceQuery.isLoading ? (
+            <div className="flex items-center justify-center gap-2 py-16 text-sm text-neutral-500">
+              <Loader2 className="size-4 animate-spin" aria-hidden />
+              Loading invoice…
+            </div>
+          ) : null}
+
+          {invoiceQuery.isError ? (
+            <div className="space-y-3 py-6 text-center">
+              <p className="text-sm text-red-600 dark:text-red-400">Unable to load invoice.</p>
+              <Button variant="outline" size="sm" onClick={() => invoiceQuery.refetch()}>
+                Retry
+              </Button>
+            </div>
+          ) : null}
+
+          {invoiceQuery.data ? (
+            <InvoiceView
+              invoice={invoiceQuery.data}
+              actions={
+                orderPerms.update ? (
+                  <UiButton
+                    variant="outline"
+                    onClick={() => sendInvoiceMutation.mutate()}
+                    disabled={sendInvoiceMutation.isPending}
+                  >
+                    {sendInvoiceMutation.isPending ? (
+                      <Loader2 className="size-4 animate-spin" aria-hidden />
+                    ) : (
+                      <Mail className="size-4" aria-hidden />
+                    )}
+                    {sendInvoiceMutation.isPending ? 'Sending…' : 'Send to customer'}
+                  </UiButton>
+                ) : null
+              }
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </PageMotion>
   );
 }

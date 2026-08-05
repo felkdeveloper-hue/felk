@@ -20,6 +20,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { QUERY_KEYS } from '@/constants';
+import { ADMIN_REFETCH_MS } from '@/constants/admin-poll';
 import { ADMIN_ROLE_OPTIONS, roleSummary } from '@/constants/admin-role-guide';
 import { useAdminPermissions } from '@/hooks/admin';
 import { AppError } from '@/lib/errors';
@@ -83,7 +84,7 @@ export function UsersListPage() {
   const query = useQuery({
     queryKey: QUERY_KEYS.adminUsers.list(params),
     queryFn: () => usersApi.list(params),
-    refetchInterval: 15_000,
+    refetchInterval: ADMIN_REFETCH_MS,
     refetchIntervalInBackground: false,
   });
 

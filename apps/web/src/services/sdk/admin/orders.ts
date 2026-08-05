@@ -1,5 +1,7 @@
 import { http } from '@/lib/http-client';
 import { normalizeId, normalizeList } from '@/lib/utils';
+import type { OrderInvoice } from '@/services/sdk';
+import { normalizeInvoice } from '@/utils/orders';
 import type { ListQueryParams, PaginatedResult } from '@/types';
 
 export interface AdminOrderAddress {
@@ -112,8 +114,15 @@ export const ordersApi = {
     return http.get<unknown[]>(`/orders/${id}/timeline`);
   },
 
-  async getInvoice(id: string): Promise<unknown> {
-    return http.get<unknown>(`/orders/${id}/invoice`);
+  async getInvoice(id: string): Promise<OrderInvoice> {
+    const raw = await http.get<unknown>(`/orders/${id}/invoice`);
+    return normalizeInvoice(raw);
+  },
+
+  async sendInvoice(id: string): Promise<{ sent: boolean; email: string; invoiceNumber: string }> {
+    return http.post<{ sent: boolean; email: string; invoiceNumber: string }>(
+      `/orders/${id}/invoice/send`,
+    );
   },
 
   async listReturns(id: string): Promise<unknown[]> {

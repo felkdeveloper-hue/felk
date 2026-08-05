@@ -6,6 +6,7 @@ import {
   type OrderDocument,
 } from '@/models/order.models.js';
 import { CustomerModel } from '@/models/customer.models.js';
+import { appConfig } from '@/config/app.config.js';
 import { customerService } from '@/services/customer.service.js';
 import { invoiceService } from '@/services/invoice.service.js';
 import { recordOrderTimeline } from '@/services/order-timeline.service.js';
@@ -13,6 +14,8 @@ import { publishOrderEvent } from '@/services/order-event-publisher.js';
 import { writeAuditLog } from '@/services/audit.service.js';
 import { inventoryService } from '@/services/inventory.service.js';
 import { notifyOrderStatusChange } from '@/services/order-notification.service.js';
+import { emailQueueService } from '@/services/email-queue.service.js';
+import { invoiceTemplate } from '@/services/email/templates/invoice.js';
 import type { ActorMeta } from '@/services/cms-crud.service.js';
 import { ApiError } from '@/utils/errors/api-error.js';
 import { normalizeEmail } from '@/utils/email.helper.js';
@@ -411,6 +414,64 @@ export class OrderService {
     const order = await this.findById(id);
     await this.assertAccess(order, user, ['orders.invoice', 'orders.view', 'orders.read']);
     return invoiceService.generate(order);
+  }
+
+  /** Staff-only: email the invoice link to the customer. */
+  async sendInvoice(id: string, user: AuthenticatedUser) {
+    this.assertStaffOnly(user, ['orders.invoice', 'orders.update', 'orders.view', 'orders.read']);
+    const order = await this.findById(id);
+    await this.assertAccess(order, user, ['orders.invoice', 'orders.view', 'orders.read']);
+
+    const invoice = await invoiceService.generate(order);
+    const customer = await CustomerModel.findById(order.customerId)
+      .select('email firstName lastName')
+      .lean();
+
+    if (!customer?.email) {
+      throw ApiError.badRequest('Customer email not found for this order');
+    }
+
+    const name =
+      customer.firstName?.trim() ||
+      (typeof order.shippingAddress?.fullName === 'string'
+        ? order.shippingAddress.fullName.split(' ')[0]
+        : '') ||
+      'there';
+    const orderUrl = `${appConfig.email.shopUrl}/account/orders/${order._id.toString()}/invoice`;
+    const template = invoiceTemplate({
+      email: customer.email,
+      name,
+      orderNumber: order.orderNumber,
+      invoiceNumber: invoice.invoiceNumber,
+      total: order.totals?.grandTotal,
+      currency: order.currency,
+      orderUrl,
+    });
+
+    await emailQueueService.enqueue({
+      to: customer.email,
+      subject: template.subject,
+      html: template.html,
+      text: template.text,
+      templateKey: 'order_invoice',
+    });
+
+    await writeAuditLog({
+      action: ORDER_AUDIT.INVOICE_SENT,
+      resourceType: 'orders',
+      resourceId: order._id.toString(),
+      actorUserId: user.id,
+      metadata: {
+        email: customer.email,
+        invoiceNumber: invoice.invoiceNumber,
+      },
+    });
+
+    return {
+      sent: true,
+      email: customer.email,
+      invoiceNumber: invoice.invoiceNumber,
+    };
   }
 
   toSummary(order: OrderDocument) {

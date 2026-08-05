@@ -1,10 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
+import { ADMIN_LIVE_REFETCH_MS, ADMIN_REFETCH_MS } from '@/constants/admin-poll';
 import { adminAnalyticsApi } from '@/services/sdk/admin';
 import type { AnalyticsFilter } from '@/services/sdk/admin';
 
-const STALE_TIME = 15_000; // keep admin views fresh without a manual reload
-const POLL_INTERVAL = 15_000;
-const LIVE_STALE = 8_000; // 8s for live visitors
+// Production keeps 15s / 8s; localhost polls less so Atlas round-trips don't freeze the UI.
+const STALE_TIME = ADMIN_REFETCH_MS;
+const POLL_INTERVAL = ADMIN_REFETCH_MS;
+const LIVE_STALE = ADMIN_LIVE_REFETCH_MS;
 
 export const analyticsKeys = {
   overview: (f: AnalyticsFilter) => ['analytics', 'overview', f] as const,

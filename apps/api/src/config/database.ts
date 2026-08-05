@@ -249,37 +249,42 @@ class DatabaseManager {
         );
       }
 
-      await repairVariantBarcodeIndex().catch((error: unknown) => {
-        logger.warn({ err: error }, 'Variant barcode index repair skipped');
-      });
-
-      await repairOtpTokenIndexes().catch((error: unknown) => {
-        logger.warn({ err: error }, 'OTP token index repair skipped');
-      });
-
-      await repairUserEmailIndex().catch((error: unknown) => {
-        logger.warn({ err: error }, 'User email index repair skipped');
-      });
-
-      // One-time rate bump: standard flat shipping 400 → 500 LKR.
-      void import('@/models/settings.models.js')
-        .then(({ ShippingZoneModel }) =>
-          ShippingZoneModel.updateMany(
-            { rate: 400, rateType: 'flat', isDeleted: false },
-            { $set: { rate: 500 } },
-          ),
-        )
-        .then((result) => {
-          if (result.modifiedCount > 0) {
-            logger.info(
-              { modifiedCount: result.modifiedCount },
-              'Updated flat shipping zones from LKR 400 to LKR 500',
-            );
-          }
-        })
-        .catch((error: unknown) => {
-          logger.warn({ err: error }, 'Shipping zone rate update skipped');
+      // Index repairs are for production/bootstrap. Skipping them in local
+      // development makes API restarts after code changes much faster; Atlas
+      // indexes are already maintained by the deployed API.
+      if (!appConfig.isDev) {
+        await repairVariantBarcodeIndex().catch((error: unknown) => {
+          logger.warn({ err: error }, 'Variant barcode index repair skipped');
         });
+
+        await repairOtpTokenIndexes().catch((error: unknown) => {
+          logger.warn({ err: error }, 'OTP token index repair skipped');
+        });
+
+        await repairUserEmailIndex().catch((error: unknown) => {
+          logger.warn({ err: error }, 'User email index repair skipped');
+        });
+
+        // One-time rate bump: standard flat shipping 400 → 500 LKR.
+        void import('@/models/settings.models.js')
+          .then(({ ShippingZoneModel }) =>
+            ShippingZoneModel.updateMany(
+              { rate: 400, rateType: 'flat', isDeleted: false },
+              { $set: { rate: 500 } },
+            ),
+          )
+          .then((result) => {
+            if (result.modifiedCount > 0) {
+              logger.info(
+                { modifiedCount: result.modifiedCount },
+                'Updated flat shipping zones from LKR 400 to LKR 500',
+              );
+            }
+          })
+          .catch((error: unknown) => {
+            logger.warn({ err: error }, 'Shipping zone rate update skipped');
+          });
+      }
 
       return connection;
     } catch (error) {

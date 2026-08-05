@@ -15,6 +15,7 @@ export const ORDER_AUDIT = {
   ORDER_CREATED: 'order.created',
   STATUS_CHANGED: 'order.status_changed',
   INVOICE_GENERATED: 'order.invoice_generated',
+  INVOICE_SENT: 'order.invoice_sent',
   CANCELLED: 'order.cancelled',
   NOTE_ADDED: 'order.note_added',
   RETURN_REQUESTED: 'order.return_requested',

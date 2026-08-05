@@ -18,6 +18,7 @@ const updatePerms = [P.ORDERS_UPDATE] as const;
 const cancelPerms = [P.ORDERS_CANCEL_OWN, P.ORDERS_CANCEL] as const;
 const notesPerms = [P.ORDERS_NOTES] as const;
 const invoicePerms = [P.ORDERS_INVOICE, P.ORDERS_READ_OWN, P.ORDERS_READ, P.ORDERS_VIEW] as const;
+const invoiceSendPerms = [P.ORDERS_INVOICE, P.ORDERS_UPDATE, P.ORDERS_VIEW, P.ORDERS_READ] as const;
 const exportPerms = [P.ORDERS_EXPORT] as const;
 const returnPerms = [P.ORDERS_RETURN_OWN, P.ORDERS_RETURN_MANAGE] as const;
 
@@ -191,6 +192,21 @@ ordersRouter.get(
   asyncHandler(async (req, res) => {
     if (!req.user) throw ApiError.unauthorized();
     ApiResponse.success(res, await orderService.getInvoice(String(req.params.id), req.user));
+  }),
+);
+
+ordersRouter.post(
+  '/:id/invoice/send',
+  authenticate,
+  authorizeAny(...invoiceSendPerms),
+  validate({ params: S.orderIdParamsSchema }),
+  asyncHandler(async (req, res) => {
+    if (!req.user) throw ApiError.unauthorized();
+    ApiResponse.success(
+      res,
+      await orderService.sendInvoice(String(req.params.id), req.user),
+      'Invoice sent to customer',
+    );
   }),
 );
 

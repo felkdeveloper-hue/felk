@@ -12,33 +12,38 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
-    VitePWA({
-      registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'offline.html', 'robots.txt'],
-      manifest: false,
-      workbox: {
-        navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/api\//],
-        globPatterns: ['**/*.{js,css,html,ico,svg,webmanifest,woff2}'],
-        runtimeCaching: [
-          {
-            urlPattern: ({ request }) => request.destination === 'document',
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'html-cache',
-              networkTimeoutSeconds: 5,
+    // PWA workbox is production-only — loading it in `vite` slows cold start/HMR.
+    ...(isProduction
+      ? [
+          VitePWA({
+            registerType: 'autoUpdate',
+            includeAssets: ['favicon.svg', 'offline.html', 'robots.txt'],
+            manifest: false,
+            workbox: {
+              navigateFallback: '/index.html',
+              navigateFallbackDenylist: [/^\/api\//],
+              globPatterns: ['**/*.{js,css,html,ico,svg,webmanifest,woff2}'],
+              runtimeCaching: [
+                {
+                  urlPattern: ({ request }) => request.destination === 'document',
+                  handler: 'NetworkFirst',
+                  options: {
+                    cacheName: 'html-cache',
+                    networkTimeoutSeconds: 5,
+                  },
+                },
+                {
+                  urlPattern: ({ request }) =>
+                    ['style', 'script', 'worker'].includes(request.destination),
+                  handler: 'StaleWhileRevalidate',
+                  options: { cacheName: 'static-resources' },
+                },
+              ],
             },
-          },
-          {
-            urlPattern: ({ request }) =>
-              ['style', 'script', 'worker'].includes(request.destination),
-            handler: 'StaleWhileRevalidate',
-            options: { cacheName: 'static-resources' },
-          },
-        ],
-      },
-      devOptions: { enabled: false },
-    }),
+            devOptions: { enabled: false },
+          }),
+        ]
+      : []),
   ],
   resolve: {
     alias: {
@@ -56,6 +61,19 @@ export default defineConfig({
         changeOrigin: true,
       },
     },
+    watch: {
+      ignored: [
+        '**/node_modules/**',
+        '**/.git/**',
+        '**/dist/**',
+        '**/.turbo/**',
+        '**/apps/api/**',
+        '**/coverage/**',
+      ],
+    },
+    warmup: {
+      clientFiles: ['./src/main.tsx', './src/App.tsx', './src/routes/**/*.{ts,tsx}'],
+    },
   },
   preview: {
     port: 5173,
@@ -65,6 +83,27 @@ export default defineConfig({
         changeOrigin: true,
       },
     },
+  },
+  optimizeDeps: {
+    include: [
+      'react',
+      'react-dom',
+      'react/jsx-runtime',
+      '@tanstack/react-query',
+      '@tanstack/react-router',
+      'axios',
+      'framer-motion',
+      'lucide-react',
+      'recharts',
+      'zod',
+      'zustand',
+      'socket.io-client',
+      'clsx',
+      'tailwind-merge',
+      'class-variance-authority',
+      'sonner',
+      'next-themes',
+    ],
   },
   build: {
     sourcemap: process.env.VITE_SOURCEMAP === 'true',
