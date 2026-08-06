@@ -60,7 +60,7 @@ export function toPublicStorefrontUrl(rawUrl: string): string {
     const origin =
       process.env.MINTPAY_PUBLIC_ORIGIN?.trim() ||
       process.env.STOREFRONT_PUBLIC_URL?.trim() ||
-      appConfig.email.shopUrl?.trim() ||
+      appConfig.email?.shopUrl?.trim() ||
       appConfig.cors.origins.find((o) => o.includes('fe.lk') && o.startsWith('https://')) ||
       appConfig.cors.origins.find((o) => o.startsWith('https://')) ||
       'https://fe.lk';
@@ -84,4 +84,68 @@ export function toPublicStorefrontUrl(rawUrl: string): string {
   } catch {
     return rawUrl;
   }
+}
+
+const MINTPAY_EMAIL_MAX_LEN = 40;
+const MINTPAY_SIGNED_INT_MAX = 2_147_483_647;
+
+/** Mintpay customer_id: digits only, max 10 chars, fits signed 32-bit int. */
+export function normalizeMintpayCustomerId(raw: unknown): string {
+  const digits = String(raw ?? '').replace(/\D/g, '');
+  const source =
+    digits.length > 0
+      ? digits
+      : (() => {
+          let hash = 0;
+          const s = String(raw ?? '0');
+          for (let i = 0; i < s.length; i++) hash = (hash * 31 + s.charCodeAt(i)) >>> 0;
+          return String(hash);
+        })();
+  const asInt = Number(source.slice(-10)) % MINTPAY_SIGNED_INT_MAX;
+  return String(asInt || 1);
+}
+
+/** Mintpay expects a local mobile number — digits only, 10 chars. */
+export function normalizeMintpayTelephone(raw: unknown): string {
+  let digits = String(raw ?? '').replace(/\D/g, '');
+  if (!digits) return '0771234567';
+  if (digits.startsWith('94') && digits.length >= 11) {
+    digits = `0${digits.slice(2)}`;
+  }
+  if (digits.length > 10) digits = digits.slice(-10);
+  if (digits.length < 10) digits = digits.padStart(10, '0');
+  return digits;
+}
+
+function mintpayShopEmailHost(): string {
+  try {
+    const url = appConfig.email?.shopUrl?.trim();
+    if (url) return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    /* use default */
+  }
+  return 'fe.lk';
+}
+
+/**
+ * Mintpay caps customer_email at 40 chars. One-click guest sessions use
+ * guest-{uuid}@guest.fe.lk (~55 chars) which their API rejects with HTTP 400.
+ */
+export function resolveMintpayEmail(
+  email: string,
+  metadata?: { customerId?: unknown; customerPhone?: unknown; phone?: unknown },
+): string {
+  const trimmed = email.trim();
+  if (trimmed.length <= MINTPAY_EMAIL_MAX_LEN && !trimmed.endsWith('@guest.fe.lk')) {
+    return trimmed;
+  }
+
+  const host = mintpayShopEmailHost();
+  const phoneDigits = String(metadata?.customerPhone ?? metadata?.phone ?? '').replace(/\D/g, '');
+  const id = normalizeMintpayCustomerId(metadata?.customerId ?? trimmed);
+  const local = phoneDigits.length >= 9 ? `g+${normalizeMintpayTelephone(phoneDigits)}` : `g+${id}`;
+  const candidate = `${local}@${host}`;
+  if (candidate.length <= MINTPAY_EMAIL_MAX_LEN) return candidate;
+  const maxLocal = MINTPAY_EMAIL_MAX_LEN - host.length - 1;
+  return `${local.slice(0, maxLocal)}@${host}`;
 }

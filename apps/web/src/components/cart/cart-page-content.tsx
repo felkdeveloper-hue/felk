@@ -9,6 +9,7 @@ import { AppError } from '@/lib/errors';
 import { consumePaymentFailedFlag, trackCommerceEvent } from '@/lib/analytics';
 import { formatCurrency } from '@/utils';
 import { customersApi } from '@/services/sdk';
+import { isGuestCheckoutUser } from '@/utils/auth/guest-checkout';
 import { CartItemRow } from '@/components/cart/cart-item-row';
 import { CartOrderSummary } from '@/components/cart/cart-order-summary';
 import { CartPromotionsPanel } from '@/components/cart/cart-promotions-panel';
@@ -48,15 +49,18 @@ export function CartPageContent() {
   const cartQuery = useCartQuery();
   const queryClient = useQueryClient();
   const hasHydrated = useAuthStore((state) => state.hasHydrated);
+  const authUser = useAuthStore((state) => state.user);
   const isAuthed = useAuthStore((state) => Boolean(state.accessToken && state.user));
+  const isGuestCheckout = isGuestCheckoutUser(authUser);
 
   const cart = cartQuery.data;
   const validation = cart?.validation;
   const checkoutBlocked = cart ? cartHasBlockingStockIssues(cart) : false;
 
-  // Warm addresses + checkout chunks before the shopper clicks through.
+  // Warm saved addresses for signed-in customers only — guest checkout uses inline
+  // address forms and stale tokens here caused noisy 401s on /customers/me/addresses.
   useEffect(() => {
-    if (!isAuthed || checkoutBlocked) return;
+    if (!hasHydrated || !isAuthed || isGuestCheckout || checkoutBlocked) return;
     void queryClient.prefetchQuery({
       queryKey: QUERY_KEYS.customers.addresses(),
       queryFn: () => customersApi.listAddresses(),
@@ -64,7 +68,7 @@ export function CartPageContent() {
     });
     void import('@/pages/checkout/information.page');
     void import('@/pages/checkout/payment.page');
-  }, [checkoutBlocked, isAuthed, queryClient]);
+  }, [checkoutBlocked, hasHydrated, isAuthed, isGuestCheckout, queryClient]);
 
   useEffect(() => {
     if (consumePaymentFailedFlag()) {

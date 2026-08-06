@@ -103,23 +103,7 @@ export class PaymentService {
     }
 
     const customer = await customerService.ensureForUser(user, actor);
-    const checkout = await checkoutService.getByIdOrToken(payload.checkoutRef);
-
-    if (checkout.customerId.toString() !== customer._id.toString()) {
-      throw ApiError.forbidden('You can only pay for your own checkout session');
-    }
-
-    if (
-      ![CHECKOUT_STATUS.OPEN, CHECKOUT_STATUS.READY, CHECKOUT_STATUS.RESERVED].includes(
-        checkout.status as never,
-      )
-    ) {
-      throw ApiError.badRequest(
-        `Checkout is not ready for payment (status: ${checkout.status})`,
-        { checkoutId: checkout._id.toString() },
-        'CHECKOUT_NOT_READY',
-      );
-    }
+    const checkout = await checkoutService.ensurePayableForPayment(payload.checkoutRef, user);
 
     if (!checkout.shippingAddress || !checkout.lines?.length) {
       throw ApiError.badRequest(
@@ -310,24 +294,10 @@ export class PaymentService {
       );
     }
 
-    const checkout = await CheckoutSessionModel.findOne({
-      _id: payment.checkoutId,
-      isDeleted: false,
-    });
-    if (!checkout) {
-      throw ApiError.notFound('Checkout session for this payment no longer exists');
-    }
-    if (
-      ![CHECKOUT_STATUS.OPEN, CHECKOUT_STATUS.READY, CHECKOUT_STATUS.RESERVED].includes(
-        checkout.status as never,
-      )
-    ) {
-      throw ApiError.badRequest(
-        `Checkout is not ready for payment (status: ${checkout.status})`,
-        { checkoutId: checkout._id.toString() },
-        'CHECKOUT_NOT_READY',
-      );
-    }
+    const checkout = await checkoutService.ensurePayableForPayment(
+      payment.checkoutId.toString(),
+      user,
+    );
 
     // No unpaid stock hold — deduct only after gateway confirms payment.
     if (checkout.reservationIds?.length) {

@@ -12,8 +12,11 @@ import type {
 } from '@/services/interfaces/payment-gateway.service.js';
 import {
   getHeader,
+  normalizeMintpayCustomerId,
+  normalizeMintpayTelephone,
   parseWebhookPayload,
   rawBodyToString,
+  resolveMintpayEmail,
   toPublicStorefrontUrl,
 } from '@/services/gateways/gateway.utils.js';
 import { ApiError } from '@/utils/errors/api-error.js';
@@ -43,19 +46,7 @@ function mintpayHosts() {
 
 /** Mintpay customer_id: digits only, max 10 chars, and fits signed 32-bit int. */
 function mintpayCustomerId(raw: unknown): string {
-  const digits = String(raw ?? '').replace(/\D/g, '');
-  const source =
-    digits.length > 0
-      ? digits
-      : (() => {
-          let hash = 0;
-          const s = String(raw ?? '0');
-          for (let i = 0; i < s.length; i++) hash = (hash * 31 + s.charCodeAt(i)) >>> 0;
-          return String(hash);
-        })();
-  // Their API 500s when customer_id exceeds signed 32-bit (2147483647).
-  const asInt = Number(source.slice(-10)) % 2147483647;
-  return String(asInt || 1);
+  return normalizeMintpayCustomerId(raw);
 }
 
 export class MintpayGateway implements PaymentGateway {
@@ -94,9 +85,9 @@ export class MintpayGateway implements PaymentGateway {
       discount: 0,
       // Mintpay: max 10 chars and digits only (alpha ObjectIds cause their API to 500).
       customer_id: mintpayCustomerId(input.metadata?.customerId ?? input.orderId),
-      customer_email: input.customerEmail,
-      customer_telephone: String(
-        input.metadata?.customerPhone ?? input.metadata?.phone ?? '0000000000',
+      customer_email: resolveMintpayEmail(input.customerEmail, input.metadata),
+      customer_telephone: normalizeMintpayTelephone(
+        input.metadata?.customerPhone ?? input.metadata?.phone ?? '0771234567',
       ),
       ip: String(input.metadata?.ip ?? '127.0.0.1'),
       x_forwarded_for: String(input.metadata?.ip ?? '127.0.0.1'),
@@ -127,7 +118,7 @@ export class MintpayGateway implements PaymentGateway {
     try {
       const userAgent = `WordPress/6.4; ${
         appConfig.cors.origins.find((o) => o.includes('fe.lk') && o.startsWith('https://')) ??
-        appConfig.email.shopUrl?.replace(/\/$/, '') ??
+        appConfig.email?.shopUrl?.replace(/\/$/, '') ??
         'https://fe.lk'
       }`;
       const result = await fetchWithRetry<{ message?: string; data?: string }>(
@@ -161,14 +152,19 @@ export class MintpayGateway implements PaymentGateway {
         'Mintpay: order API request failed',
       );
       const isHtmlForbidden = status === 403 && /<html[\s>]|403 Forbidden/i.test(raw);
+      const mintpayValidation =
+        status === 400 && /customer_email|Ensure this field/i.test(raw)
+          ? 'Mintpay rejected the customer email (max 40 characters). Guest checkout uses a shortened fe.lk alias automatically — redeploy the latest API if you still see this.'
+          : null;
       throw ApiError.badRequest(
         status === 401 || /Invalid token/i.test(raw)
           ? 'Mintpay rejected the API token (401 Invalid token). Check MINTPAY_MERCHANT_SECRET for the correct live/sandbox environment.'
-          : isHtmlForbidden
-            ? 'Mintpay blocked the request (HTML 403). Localhost return URLs are rejected — set MINTPAY_PUBLIC_ORIGIN=https://fe.lk (or your live storefront HTTPS URL).'
-            : status === 403
-              ? 'Mintpay rejected the request (403). Check MINTPAY_MERCHANT_ID / MINTPAY_MERCHANT_SECRET and MINTPAY_MODE.'
-              : 'Mintpay could not create a checkout session. Check merchant credentials and network access to app.mintpay.lk / dev.mintpay.lk.',
+          : (mintpayValidation ??
+              (isHtmlForbidden
+                ? 'Mintpay blocked the request (HTML 403). Localhost return URLs are rejected — set MINTPAY_PUBLIC_ORIGIN=https://fe.lk (or your live storefront HTTPS URL).'
+                : status === 403
+                  ? 'Mintpay rejected the request (403). Check MINTPAY_MERCHANT_ID / MINTPAY_MERCHANT_SECRET and MINTPAY_MODE.'
+                  : 'Mintpay could not create a checkout session. Check merchant credentials and network access to app.mintpay.lk / dev.mintpay.lk.')),
         { status, message: raw },
         'MINTPAY_SESSION_FAILED',
       );

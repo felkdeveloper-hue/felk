@@ -386,9 +386,28 @@ export class CheckoutService {
         await existing.save();
       } else if (existing.reservationExpiresAt && existing.reservationExpiresAt <= new Date()) {
         await this.expireSession(existing, actor);
+      } else if (!buyNowVariantIds.length) {
+        // Full-bag checkout: refresh the live session instead of cancel+recreate.
+        // Cancel+recreate orphans tokens still on payment/review (first Pay click fails).
+        const resumed = await this.refresh(
+          existing.checkoutToken,
+          user,
+          {
+            shippingAddressId: payload.shippingAddressId,
+            billingAddressId: payload.billingAddressId,
+            shippingMethod: payload.shippingMethod,
+            deliveryMethod: payload.deliveryMethod,
+            couponCode: payload.couponCode,
+            giftCardCode: payload.giftCardCode,
+          },
+          actor,
+        );
+        if (payload.autoReserve === true) {
+          return this.reserve(existing._id.toString(), user, actor, { skipRebuild: true });
+        }
+        return resumed;
       } else {
-        // Replace any open session (Buy Now or cart) so "Proceed to checkout"
-        // always rebuilds from the current bag — never resumes a scoped Buy Now.
+        // Buy Now — replace scoped session so lines match the clicked SKU.
         await this.cancel(existing.checkoutToken, user, actor);
       }
     }
@@ -517,6 +536,44 @@ export class CheckoutService {
     }
 
     return this.toSummary(session);
+  }
+
+  /**
+   * Ensure a checkout can accept payment. Reopens cancelled/expired sessions that
+   * still have lines + address and no order (stale token after start() raced).
+   */
+  async ensurePayableForPayment(idOrToken: string, user: AuthenticatedUser) {
+    const session = await this.getByIdOrToken(idOrToken);
+    await this.assertOwner(session, user);
+
+    if (
+      [CHECKOUT_STATUS.OPEN, CHECKOUT_STATUS.READY, CHECKOUT_STATUS.RESERVED].includes(
+        session.status as never,
+      )
+    ) {
+      return session;
+    }
+
+    if (
+      [CHECKOUT_STATUS.CANCELLED, CHECKOUT_STATUS.EXPIRED].includes(session.status as never) &&
+      session.shippingAddress &&
+      session.lines?.length
+    ) {
+      const alreadyOrdered = await OrderModel.exists({ checkoutId: session._id });
+      if (!alreadyOrdered) {
+        session.status = CHECKOUT_STATUS.READY;
+        session.reservationExpiresAt = null;
+        session.expiresAt = null;
+        await session.save();
+        return session;
+      }
+    }
+
+    throw ApiError.badRequest(
+      `Checkout is not ready for payment (status: ${session.status})`,
+      { checkoutId: session._id.toString(), status: session.status },
+      'CHECKOUT_NOT_READY',
+    );
   }
 
   async get(idOrToken: string, user: AuthenticatedUser) {

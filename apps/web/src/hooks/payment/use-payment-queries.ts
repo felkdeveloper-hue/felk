@@ -4,6 +4,7 @@ import { ROUTES } from '@/constants';
 import { QUERY_KEYS } from '@/constants/query-keys';
 import { AppError } from '@/lib/errors';
 import {
+  checkoutApi,
   paymentsApi,
   type PaymentCreatePayload,
   type PaymentMethod,
@@ -93,6 +94,17 @@ export function usePlaceOrderMutation() {
         // Seamless retry so shoppers are not stuck on "use /payments/retry".
         if (AppError.isAppError(error) && error.code === 'PAYMENT_RETRY_REQUIRED') {
           return paymentsApi.retry({ checkoutToken, method });
+        }
+        // Stale checkout token (cancelled by a duplicate /checkout/start) — restart once.
+        if (AppError.isAppError(error) && error.code === 'CHECKOUT_NOT_READY') {
+          const restarted = await checkoutApi.start({ autoReserve: false });
+          useCheckoutStore.getState().setCheckoutToken(restarted.checkoutToken);
+          const healedUrls = buildPaymentReturnUrls(restarted.checkoutToken);
+          return paymentsApi.create({
+            checkoutToken: restarted.checkoutToken,
+            method,
+            ...healedUrls,
+          });
         }
         throw error;
       }

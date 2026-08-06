@@ -27,6 +27,7 @@ import {
 } from '@/hooks/checkout';
 import { useAuthStore, useCartStore, useCheckoutStore } from '@/store';
 import { trackCommerceEvent } from '@/lib/analytics';
+import { isGuestCheckoutUser } from '@/utils/auth/guest-checkout';
 import { AppError } from '@/lib/errors';
 import { QUERY_KEYS } from '@/constants';
 import { cartApi, type CustomerAddress } from '@/services/sdk';
@@ -49,9 +50,7 @@ export function CheckoutInformationPage() {
   const accessToken = useAuthStore((state) => state.accessToken);
   const authUser = useAuthStore((state) => state.user);
   const isAuthed = Boolean(accessToken);
-  const isGuestCheckout = Boolean(
-    authUser?.checkoutGuest === true || authUser?.email?.endsWith('@guest.fe.lk'),
-  );
+  const isGuestCheckout = isGuestCheckoutUser(authUser);
   const guestCart = useCartStore((state) => state.cart);
 
   const billingSameAsShipping = useCheckoutStore((state) => state.billingSameAsShipping);

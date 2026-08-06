@@ -75,9 +75,11 @@ export function useCheckoutSessionQuery(checkoutRef?: string | null) {
     enabled: Boolean(ref && accessToken),
     staleTime: 1000 * 60,
     gcTime: 1000 * 60 * 10,
+    refetchOnMount: 'always',
     refetchOnWindowFocus: false,
     retry: false,
-    placeholderData: (previous) => previous,
+    placeholderData: (previous) =>
+      previous && !isClosedCheckoutSession(previous) ? previous : undefined,
   });
 }
 
