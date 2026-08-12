@@ -1,59 +1,95 @@
-import { createSign, randomBytes } from 'node:crypto';
+import { createSign, createVerify, randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { appConfig } from '@/config/app.config.js';
 import { logger } from '@/config/logger.js';
 import { PAYMENT_METHOD, PAYMENT_STATUS } from '@/constants/payment-status.js';
-import { hmacSha256Hex, safeCompare } from '@/utils/crypto.helper.js';
 import type {
   CreatePaymentSessionInput,
   PaymentGateway,
   PaymentSessionResult,
   WebhookVerificationInput,
 } from '@/services/interfaces/payment-gateway.service.js';
-import {
-  getHeader,
-  parseWebhookPayload,
-  rawBodyToString,
-} from '@/services/gateways/gateway.utils.js';
+import { parseWebhookPayload } from '@/services/gateways/gateway.utils.js';
 import { ApiError } from '@/utils/errors/api-error.js';
 
 const KOKO_STATUS_MAP: Record<string, string> = {
   approved: PAYMENT_STATUS.PAID,
   completed: PAYMENT_STATUS.PAID,
   success: PAYMENT_STATUS.PAID,
+  SUCCESS: PAYMENT_STATUS.PAID,
   pending: PAYMENT_STATUS.PROCESSING,
+  PENDING: PAYMENT_STATUS.PROCESSING,
   declined: PAYMENT_STATUS.FAILED,
   failed: PAYMENT_STATUS.FAILED,
+  FAILED: PAYMENT_STATUS.FAILED,
   cancelled: PAYMENT_STATUS.CANCELLED,
+  CANCELED: PAYMENT_STATUS.CANCELLED,
   expired: PAYMENT_STATUS.EXPIRED,
 };
 
-const PLUGIN_NAME = 'fe-platform';
-const PLUGIN_VERSION = '1.0.0';
+const PLUGIN_NAME = 'customapi';
+const PLUGIN_VERSION = '1';
 
-/** Real Paykoko hosts (from official WooCommerce plugin). */
 function kokoOrderCreateUrl(): string {
   return appConfig.payment.koko.mode === 'live'
     ? 'https://prodapi.paykoko.com/api/merchants/orderCreate'
     : 'https://qaapi.paykoko.com/api/merchants/orderCreate';
 }
 
+/**
+ * Load private key — supports both inline PEM content and a file path.
+ */
 function loadPrivateKey(): string | null {
-  const keyPath = appConfig.payment.koko.privateKeyPath;
-  if (!keyPath) return null;
+  const keyOrPath = appConfig.payment.koko.privateKeyPath;
+  if (!keyOrPath) return null;
+
+  if (keyOrPath.includes('-----BEGIN')) {
+    return keyOrPath.replace(/\\n/g, '\n').trim();
+  }
+
   try {
-    const absPath = resolve(process.cwd(), keyPath);
-    return readFileSync(absPath, 'utf8');
+    const absPath = resolve(process.cwd(), keyOrPath);
+    return readFileSync(absPath, 'utf8').trim();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Load Koko public key for verifying response/webhook signatures.
+ */
+function loadPublicKey(): string | null {
+  const keyOrPath = appConfig.payment.koko.publicKey;
+  if (!keyOrPath) return null;
+
+  if (keyOrPath.includes('-----BEGIN')) {
+    return keyOrPath.replace(/\\n/g, '\n').trim();
+  }
+
+  try {
+    const absPath = resolve(process.cwd(), keyOrPath);
+    return readFileSync(absPath, 'utf8').trim();
   } catch {
     return null;
   }
 }
 
 function buildRequestSignature(payload: string, privateKey: string): string {
-  const sign = createSign('RSA-SHA256');
+  const sign = createSign('SHA256');
   sign.update(payload);
   return sign.sign(privateKey, 'base64');
+}
+
+function verifyKokoSignature(data: string, signature: string, publicKey: string): boolean {
+  try {
+    const verifier = createVerify('SHA256');
+    verifier.update(data);
+    return verifier.verify(publicKey, signature, 'base64');
+  } catch (err) {
+    logger.warn({ err }, 'Koko: RSA signature verification error');
+    return false;
+  }
 }
 
 export class KokoGateway implements PaymentGateway {
@@ -93,7 +129,11 @@ export class KokoGateway implements PaymentGateway {
     const reference = `${merchantId.slice(0, 8)}${randomBytes(3).toString('hex')}-${input.orderId}`;
     const returnUrl = input.returnUrl;
     const cancelUrl = input.cancelUrl;
-    const responseUrl = String(input.metadata?.responseUrl ?? input.returnUrl);
+    const apiPublicUrl = (process.env.API_PUBLIC_URL ?? 'http://localhost:4000').replace(/\/$/, '');
+    const apiPrefix = process.env.API_PREFIX ?? '/api/v1';
+    const responseUrl = String(
+      input.metadata?.responseUrl ?? `${apiPublicUrl}${apiPrefix}/payments/webhooks/koko`,
+    );
 
     // Signing order must match Paykoko / official WooCommerce plugin exactly.
     const dataString =
@@ -158,34 +198,43 @@ export class KokoGateway implements PaymentGateway {
   }
 
   async verifyWebhook(input: WebhookVerificationInput) {
-    const signature = getHeader(input.headers, 'x-koko-signature');
-    if (!signature) {
-      logger.warn({ gateway: 'koko' }, 'Koko: webhook missing x-koko-signature header');
-      return { valid: false };
-    }
-
-    const expected = hmacSha256Hex(
-      appConfig.payment.koko.secretKey,
-      rawBodyToString(input.rawBody),
-    );
-    if (!safeCompare(expected, signature)) {
-      logger.warn({ gateway: 'koko' }, 'Koko: webhook HMAC signature mismatch');
-      return { valid: false };
-    }
-
     const payload = parseWebhookPayload(input.rawBody);
-    const status = String(payload.status ?? '').toLowerCase();
+    const orderId = String(payload.orderId ?? '');
+    const trnId = String(payload.trnId ?? '');
+    const status = String(payload.status ?? '');
+    const signature = String(payload.signature ?? '');
+
+    if (!orderId || !status) {
+      logger.warn({ gateway: 'koko' }, 'Koko: webhook missing orderId or status');
+      return { valid: false };
+    }
+
+    const publicKey = loadPublicKey();
+    if (publicKey && signature) {
+      const dataToVerify = orderId + trnId + status;
+      const isValid = verifyKokoSignature(dataToVerify, signature, publicKey);
+      if (!isValid) {
+        logger.warn({ gateway: 'koko', orderId }, 'Koko: RSA signature verification failed');
+        return { valid: false };
+      }
+    } else if (!publicKey) {
+      logger.warn(
+        { gateway: 'koko' },
+        'Koko: no public key configured (KOKO_PUBLIC_KEY), skipping signature verification',
+      );
+    }
+
     const mappedStatus = KOKO_STATUS_MAP[status] ?? PAYMENT_STATUS.FAILED;
 
     logger.info(
-      { gateway: 'koko', orderId: payload.orderId, status, mappedStatus },
-      'Koko: webhook verified',
+      { gateway: 'koko', orderId, trnId, status, mappedStatus },
+      'Koko: webhook processed',
     );
 
     return {
       valid: true,
-      gatewayTxnId: String(payload.transactionId ?? payload.ref ?? payload.trnId ?? ''),
-      orderId: String(payload.orderId ?? ''),
+      gatewayTxnId: trnId,
+      orderId,
       status: mappedStatus,
       amount: Number(payload.amount ?? 0),
       currency: String(payload.currency ?? ''),

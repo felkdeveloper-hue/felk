@@ -25,7 +25,7 @@ export function PaymentMethodSelector({ value, onChange, disabled }: PaymentMeth
       <RadioGroup
         value={value ?? undefined}
         onValueChange={(next) => onChange(next as PaymentMethod)}
-        className="grid gap-3 sm:grid-cols-2"
+        className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
       >
         {PAYMENT_METHOD_OPTIONS.filter((option) => option.enabled).map((option) => {
           const isSelected = value === option.id;

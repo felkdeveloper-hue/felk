@@ -59,7 +59,7 @@ export const PAYMENT_METHOD_OPTIONS: PaymentMethodOption[] = [
     id: 'koko',
     label: 'Koko',
     description: 'Buy now, pay later in installments',
-    enabled: false, // temporarily hidden — env/credentials not ready
+    enabled: true,
     logoSrc: '/payments/koko.svg',
     accent: '#6C2BD9',
   },
