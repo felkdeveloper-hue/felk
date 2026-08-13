@@ -103,6 +103,9 @@ const envSchema = z
     KOKO_PRIVATE_KEY_PATH: z.string().default('config/koko_private.pem'),
     KOKO_PUBLIC_KEY: z.string().optional(),
     KOKO_MODE: z.enum(['sandbox', 'live']).default('sandbox'),
+    /** Must match the plugin name Koko registered for this merchant (docs: customapi). */
+    KOKO_PLUGIN_NAME: z.string().min(1).default('customapi'),
+    KOKO_PLUGIN_VERSION: z.string().min(1).default('1'),
 
     MINTPAY_MERCHANT_ID: z.string().default('dev-mintpay-merchant-id'),
     MINTPAY_SECRET_KEY: z.string().default('dev-mintpay-secret-key'),

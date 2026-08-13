@@ -110,6 +110,8 @@ export const appConfig = {
       privateKeyPath: env.KOKO_PRIVATE_KEY_PATH,
       publicKey: env.KOKO_PUBLIC_KEY,
       mode: env.KOKO_MODE,
+      pluginName: env.KOKO_PLUGIN_NAME,
+      pluginVersion: env.KOKO_PLUGIN_VERSION,
     },
     mintpay: {
       merchantId: env.MINTPAY_MERCHANT_ID,

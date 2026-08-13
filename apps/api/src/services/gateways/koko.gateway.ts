@@ -32,19 +32,16 @@ const KOKO_STATUS_MAP: Record<string, string> = {
   expired: PAYMENT_STATUS.EXPIRED,
 };
 
-const PLUGIN_NAME = 'customapi';
-const PLUGIN_VERSION = '1';
+const PLUGIN_NAME = appConfig.payment.koko.pluginName || 'customapi';
+const PLUGIN_VERSION = appConfig.payment.koko.pluginVersion || '1';
 
 const PEM_BEGIN = /-----BEGIN [A-Z0-9 ]+-----/;
 const PEM_PRIVATE = /-----BEGIN (?:RSA )?PRIVATE KEY-----/;
 const PEM_PUBLIC = /-----BEGIN (?:RSA )?PUBLIC KEY-----/;
 
-/** QA (sandbox) never SMS-OTPs real Koko customers. Live storefront must use prodapi. */
+/** Only prodapi when KOKO_MODE=live. QA merchant IDs are not registered on production. */
 function useLiveKoko(): boolean {
-  if (process.env.KOKO_FORCE_SANDBOX === 'true') return false;
-  if (appConfig.payment.koko.mode === 'live') return true;
-  const api = process.env.API_PUBLIC_URL ?? '';
-  return /api\.fe\.lk/i.test(api);
+  return appConfig.payment.koko.mode === 'live';
 }
 
 function kokoOrderCreateUrl(): string {
