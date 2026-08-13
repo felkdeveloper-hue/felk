@@ -40,6 +40,10 @@ httpClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   config.headers = config.headers ?? new AxiosHeaders();
   if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
     config.headers.delete('Content-Type');
+    // Image / ZIP uploads need more than the default 30s (R2 + sharp).
+    if (config.timeout == null || config.timeout === 30_000) {
+      config.timeout = 120_000;
+    }
   }
   config.headers.set('X-Request-Id', requestId);
 

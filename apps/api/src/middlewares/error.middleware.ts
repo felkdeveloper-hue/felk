@@ -15,6 +15,31 @@ function errorMeta(req: Request) {
   };
 }
 
+/** Last-line defense: never send PEM / key material to the browser. */
+function sanitizeClientError(message: string): string {
+  return message
+    .replace(/-----BEGIN[\s\S]*?-----END [^-]+-----/g, '[REDACTED]')
+    .replace(/MII[A-Za-z0-9+/=]{20,}/g, '[REDACTED]');
+}
+
+function sanitizeDetails(details: unknown): unknown {
+  if (details == null) return details;
+  try {
+    const raw = JSON.stringify(details);
+    if (
+      raw.includes('BEGIN') ||
+      raw.includes('PRIVATE KEY') ||
+      raw.includes('PRIVATE_KEY') ||
+      /MII[A-Za-z0-9+/=]{20,}/.test(raw)
+    ) {
+      return undefined;
+    }
+  } catch {
+    return undefined;
+  }
+  return details;
+}
+
 export function notFoundHandler(req: Request, _res: Response, next: NextFunction): void {
   next(ApiError.notFound(`Cannot ${req.method} ${req.originalUrl}`));
 }
@@ -24,13 +49,24 @@ export function errorHandler(err: unknown, req: Request, res: Response, _next: N
   const meta = errorMeta(req);
 
   if (err instanceof ApiError) {
+    const safeMessage = sanitizeClientError(err.message);
     if (!err.isOperational || err.statusCode >= 500) {
-      logger.error({ err, requestId, correlationId: meta.correlationId }, err.message);
+      logger.error(
+        { err: { code: err.code }, requestId, correlationId: meta.correlationId },
+        safeMessage,
+      );
     } else {
-      logger.warn({ err: { code: err.code, message: err.message }, requestId }, err.message);
+      logger.warn({ err: { code: err.code, message: safeMessage }, requestId }, safeMessage);
     }
 
-    ApiResponse.error(res, err.message, err.statusCode, err.code, err.details, meta);
+    ApiResponse.error(
+      res,
+      sanitizeClientError(err.message),
+      err.statusCode,
+      err.code,
+      sanitizeDetails(err.details),
+      meta,
+    );
     return;
   }
 

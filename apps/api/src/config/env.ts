@@ -97,6 +97,9 @@ const envSchema = z
     KOKO_MERCHANT_ID: z.string().default('dev-koko-merchant-id'),
     KOKO_SECRET_KEY: z.string().default('dev-koko-secret-key'),
     KOKO_API_KEY: z.string().optional(),
+    /** Inline PEM (preferred on EC2). Supports literal \n from quoted .env values. */
+    KOKO_PRIVATE_KEY: z.string().optional(),
+    /** File path OR inline PEM (legacy). Prefer KOKO_PRIVATE_KEY or a real .pem path. */
     KOKO_PRIVATE_KEY_PATH: z.string().default('config/koko_private.pem'),
     KOKO_PUBLIC_KEY: z.string().optional(),
     KOKO_MODE: z.enum(['sandbox', 'live']).default('sandbox'),

@@ -106,6 +106,7 @@ export const appConfig = {
       merchantId: env.KOKO_MERCHANT_ID,
       secretKey: env.KOKO_SECRET_KEY,
       apiKey: env.KOKO_API_KEY,
+      privateKey: env.KOKO_PRIVATE_KEY,
       privateKeyPath: env.KOKO_PRIVATE_KEY_PATH,
       publicKey: env.KOKO_PUBLIC_KEY,
       mode: env.KOKO_MODE,

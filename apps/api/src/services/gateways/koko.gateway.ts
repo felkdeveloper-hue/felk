@@ -31,48 +31,92 @@ const KOKO_STATUS_MAP: Record<string, string> = {
 const PLUGIN_NAME = 'customapi';
 const PLUGIN_VERSION = '1';
 
+const PEM_BEGIN = /-----BEGIN [A-Z0-9 ]+-----/;
+const PEM_PRIVATE = /-----BEGIN (?:RSA )?PRIVATE KEY-----/;
+const PEM_PUBLIC = /-----BEGIN (?:RSA )?PUBLIC KEY-----/;
+
 function kokoOrderCreateUrl(): string {
   return appConfig.payment.koko.mode === 'live'
     ? 'https://prodapi.paykoko.com/api/merchants/orderCreate'
     : 'https://qaapi.paykoko.com/api/merchants/orderCreate';
 }
 
-/**
- * Load private key — supports both inline PEM content and a file path.
- */
-function loadPrivateKey(): string | null {
-  const keyOrPath = appConfig.payment.koko.privateKeyPath;
-  if (!keyOrPath) return null;
-
-  if (keyOrPath.includes('-----BEGIN')) {
-    return keyOrPath.replace(/\\n/g, '\n').trim();
+/** dotenv / systemd / quoted .env can leave literal \n, extra quotes, or spaces. */
+function normalizePem(raw: string): string {
+  let value = raw.trim();
+  if (
+    (value.startsWith('"') && value.endsWith('"')) ||
+    (value.startsWith("'") && value.endsWith("'"))
+  ) {
+    value = value.slice(1, -1).trim();
   }
+  value = value
+    .replace(/\\r\\n/g, '\n')
+    .replace(/\\n/g, '\n')
+    .replace(/\\r/g, '\n');
+  value = value.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  return value.trim();
+}
 
-  try {
-    const absPath = resolve(process.cwd(), keyOrPath);
-    return readFileSync(absPath, 'utf8').trim();
-  } catch {
-    return null;
+function looksLikePem(value: string, kind: 'private' | 'public' | 'any' = 'any'): boolean {
+  const normalized = normalizePem(value);
+  if (!PEM_BEGIN.test(normalized)) return false;
+  if (kind === 'private') return PEM_PRIVATE.test(normalized);
+  if (kind === 'public') return PEM_PUBLIC.test(normalized);
+  return true;
+}
+
+function readKeyFile(filePath: string): string | null {
+  const candidates = [resolve(process.cwd(), filePath), filePath];
+  for (const candidate of candidates) {
+    try {
+      const contents = readFileSync(candidate, 'utf8');
+      if (contents.trim()) return normalizePem(contents);
+    } catch {
+      /* try next */
+    }
   }
+  return null;
 }
 
 /**
- * Load Koko public key for verifying response/webhook signatures.
+ * Accepts inline PEM (KOKO_PRIVATE_KEY / accidentally pasted into PATH) or a file path.
+ * Never throws the key material.
  */
+function resolveKeyMaterial(
+  inline: string | undefined,
+  pathOrPem: string | undefined,
+  kind: 'private' | 'public',
+): string | null {
+  if (inline && looksLikePem(inline, kind === 'private' ? 'private' : 'any')) {
+    return normalizePem(inline);
+  }
+  if (inline && !looksLikePem(inline) && inline.length < 512) {
+    const fromInlinePath = readKeyFile(inline);
+    if (fromInlinePath && looksLikePem(fromInlinePath, kind === 'private' ? 'private' : 'any')) {
+      return fromInlinePath;
+    }
+  }
+
+  if (!pathOrPem) return null;
+
+  if (looksLikePem(pathOrPem, kind === 'private' ? 'private' : 'any')) {
+    return normalizePem(pathOrPem);
+  }
+
+  return readKeyFile(pathOrPem);
+}
+
+function loadPrivateKey(): string | null {
+  return resolveKeyMaterial(
+    appConfig.payment.koko.privateKey,
+    appConfig.payment.koko.privateKeyPath,
+    'private',
+  );
+}
+
 function loadPublicKey(): string | null {
-  const keyOrPath = appConfig.payment.koko.publicKey;
-  if (!keyOrPath) return null;
-
-  if (keyOrPath.includes('-----BEGIN')) {
-    return keyOrPath.replace(/\\n/g, '\n').trim();
-  }
-
-  try {
-    const absPath = resolve(process.cwd(), keyOrPath);
-    return readFileSync(absPath, 'utf8').trim();
-  } catch {
-    return null;
-  }
+  return resolveKeyMaterial(appConfig.payment.koko.publicKey, undefined, 'public');
 }
 
 function buildRequestSignature(payload: string, privateKey: string): string {
@@ -92,28 +136,28 @@ function verifyKokoSignature(data: string, signature: string, publicKey: string)
   }
 }
 
+const KOKO_UNAVAILABLE =
+  'Koko payment is temporarily unavailable. Please choose PayHere or Mintpay.';
+
 export class KokoGateway implements PaymentGateway {
   readonly name = PAYMENT_METHOD.KOKO;
 
   async createSession(input: CreatePaymentSessionInput): Promise<PaymentSessionResult> {
     const gatewayPaymentId = `koko_${input.orderId}_${randomBytes(4).toString('hex')}`;
-    const { apiKey, merchantId, privateKeyPath } = appConfig.payment.koko;
+    const { apiKey, merchantId } = appConfig.payment.koko;
 
-    if (!apiKey || !merchantId || merchantId === 'dev-koko-merchant-id' || !privateKeyPath) {
-      throw ApiError.badRequest(
-        'Koko is not configured. Set KOKO_MERCHANT_ID, KOKO_API_KEY, and KOKO_PRIVATE_KEY_PATH.',
-        undefined,
-        'KOKO_NOT_CONFIGURED',
-      );
+    if (!apiKey || !merchantId || merchantId === 'dev-koko-merchant-id') {
+      logger.error({ gateway: 'koko' }, 'Koko: merchant/API key not configured');
+      throw ApiError.badRequest(KOKO_UNAVAILABLE, undefined, 'KOKO_NOT_CONFIGURED');
     }
 
     const privateKey = loadPrivateKey();
     if (!privateKey) {
-      throw ApiError.badRequest(
-        `Koko private key not found at ${privateKeyPath}. Place the PEM file there or update KOKO_PRIVATE_KEY_PATH.`,
-        { privateKeyPath },
-        'KOKO_PRIVATE_KEY_MISSING',
+      logger.error(
+        { gateway: 'koko' },
+        'Koko: private key missing. Set KOKO_PRIVATE_KEY (PEM) or KOKO_PRIVATE_KEY_PATH to a .pem file.',
       );
+      throw ApiError.badRequest(KOKO_UNAVAILABLE, undefined, 'KOKO_PRIVATE_KEY_MISSING');
     }
 
     const amount = input.amount.toFixed(2);
@@ -153,7 +197,17 @@ export class KokoGateway implements PaymentGateway {
       apiKey +
       responseUrl;
 
-    const signature = buildRequestSignature(dataString, privateKey);
+    let signature: string;
+    try {
+      signature = buildRequestSignature(dataString, privateKey);
+    } catch (err) {
+      logger.error(
+        { gateway: 'koko', err: err instanceof Error ? err.message : 'sign_failed' },
+        'Koko: RSA private key is invalid and cannot sign the request',
+      );
+      throw ApiError.badRequest(KOKO_UNAVAILABLE, undefined, 'KOKO_PRIVATE_KEY_INVALID');
+    }
+
     const action = kokoOrderCreateUrl();
 
     logger.info(
@@ -244,3 +298,8 @@ export class KokoGateway implements PaymentGateway {
 }
 
 export const kokoGateway = new KokoGateway();
+
+/** Config presence only — never returns key material. */
+export function kokoPrivateKeyReady(): boolean {
+  return Boolean(loadPrivateKey());
+}

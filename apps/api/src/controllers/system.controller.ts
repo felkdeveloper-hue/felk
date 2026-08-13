@@ -32,8 +32,11 @@ export const healthController = {
       mode: appConfig.payment.payhere.mode,
     };
     const kokoCheck = {
-      ok: Boolean(appConfig.payment.koko.merchantId),
+      ok: Boolean(appConfig.payment.koko.merchantId && appConfig.payment.koko.apiKey),
       apiKeyConfigured: Boolean(appConfig.payment.koko.apiKey),
+      privateKeyConfigured: Boolean(
+        appConfig.payment.koko.privateKey || appConfig.payment.koko.privateKeyPath,
+      ),
     };
     const mintpayCheck = {
       ok: Boolean(appConfig.payment.mintpay.merchantId),

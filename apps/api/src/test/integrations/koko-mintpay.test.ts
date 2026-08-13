@@ -1,5 +1,7 @@
+import { generateKeyPairSync } from 'node:crypto';
 import { describe, it, expect, vi } from 'vitest';
 import { hmacSha256Hex } from '@/utils/crypto.helper.js';
+import { appConfig } from '@/config/app.config.js';
 
 vi.mock('@/config/app.config', () => ({
   appConfig: {
@@ -11,7 +13,9 @@ vi.mock('@/config/app.config', () => ({
         merchantId: 'koko-merchant',
         secretKey: 'koko-test-secret',
         apiKey: null,
+        privateKey: undefined,
         privateKeyPath: null,
+        publicKey: undefined,
         mode: 'sandbox',
       },
       mintpay: {
@@ -53,44 +57,92 @@ describe('Koko gateway', () => {
     ).rejects.toMatchObject({ code: 'KOKO_NOT_CONFIGURED' });
   });
 
-  it('returns valid=true with correct HMAC', async () => {
+  it('accepts Paykoko form callback when public key is not configured', async () => {
     const { KokoGateway } = await import('@/services/gateways/koko.gateway.js');
     const gateway = new KokoGateway();
-    const body = JSON.stringify({
+    const body = new URLSearchParams({
       orderId: 'ORD-001',
-      status: 'approved',
-      transactionId: 'TX1',
-      amount: 2000,
-      currency: 'LKR',
-    });
-    const sig = hmacSha256Hex('koko-test-secret', body);
+      trnId: 'TX1',
+      status: 'SUCCESS',
+    }).toString();
 
     const result = await gateway.verifyWebhook({
-      headers: { 'x-koko-signature': sig },
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
       rawBody: Buffer.from(body),
     });
 
     expect(result.valid).toBe(true);
     expect(result.status).toBe('paid');
+    expect(result.gatewayTxnId).toBe('TX1');
   });
 
-  it('returns valid=false with wrong HMAC', async () => {
+  it('returns valid=false when orderId or status is missing', async () => {
     const { KokoGateway } = await import('@/services/gateways/koko.gateway.js');
     const gateway = new KokoGateway();
-    const body = JSON.stringify({ orderId: 'ORD-001', status: 'approved' });
     const result = await gateway.verifyWebhook({
-      headers: { 'x-koko-signature': 'badsig' },
-      rawBody: Buffer.from(body),
+      headers: {},
+      rawBody: Buffer.from('status=SUCCESS'),
     });
     expect(result.valid).toBe(false);
   });
 
-  it('returns valid=false with missing signature header', async () => {
+  it('never puts PEM material in customer-facing errors', async () => {
     const { KokoGateway } = await import('@/services/gateways/koko.gateway.js');
     const gateway = new KokoGateway();
-    const body = JSON.stringify({ orderId: 'ORD-001', status: 'approved' });
-    const result = await gateway.verifyWebhook({ headers: {}, rawBody: Buffer.from(body) });
-    expect(result.valid).toBe(false);
+    try {
+      await gateway.createSession({
+        orderId: 'ORD-KOKO-001',
+        amount: 2000,
+        currency: 'LKR',
+        method: 'koko',
+        customerEmail: 'test@example.com',
+        returnUrl: 'https://example.com/return',
+        cancelUrl: 'https://example.com/cancel',
+        idempotencyKey: 'idem-koko-1',
+      });
+      throw new Error('expected createSession to reject');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      expect(message).not.toMatch(/BEGIN/);
+      expect(message).not.toMatch(/PRIVATE KEY/);
+      expect(message).not.toMatch(/MII/);
+    }
+  });
+
+  it('creates a signed Paykoko session from an inline PEM private key', async () => {
+    const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+    const pem = privateKey.export({ type: 'pkcs1', format: 'pem' }).toString();
+    const koko = appConfig.payment.koko as {
+      apiKey: string | null;
+      merchantId: string;
+      privateKey?: string;
+      privateKeyPath: string | null;
+    };
+    const previous = { ...koko };
+    koko.apiKey = 'test-api-key';
+    koko.merchantId = 'koko-merchant';
+    koko.privateKey = pem.replace(/\n/g, '\\n');
+    koko.privateKeyPath = pem;
+
+    try {
+      const { KokoGateway } = await import('@/services/gateways/koko.gateway.js');
+      const gateway = new KokoGateway();
+      const result = await gateway.createSession({
+        orderId: 'ORD-KOKO-LIVE',
+        amount: 6162,
+        currency: 'LKR',
+        method: 'koko',
+        customerEmail: 'test@example.com',
+        returnUrl: 'https://fe.lk/checkout/return',
+        cancelUrl: 'https://fe.lk/checkout/cancel',
+        idempotencyKey: 'idem-koko-live',
+      });
+      expect(result.redirectForm?.action).toContain('paykoko.com');
+      expect(String(result.redirectForm?.fields.signature ?? '')).toMatch(/^[A-Za-z0-9+/=]+$/);
+      expect(result.redirectForm?.fields._pluginName).toBe('customapi');
+    } finally {
+      Object.assign(koko, previous);
+    }
   });
 });
 
