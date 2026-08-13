@@ -4,6 +4,7 @@ import { HTTP_STATUS } from '@/constants/http.js';
 import { ApiResponse } from '@/utils/response/api-response.js';
 import { asyncHandler } from '@/utils/async-handler.js';
 import { emailService } from '@/services/email.service.js';
+import { kokoPrivateKeyReady } from '@/services/gateways/koko.gateway.js';
 
 const startedAt = Date.now();
 
@@ -34,9 +35,8 @@ export const healthController = {
     const kokoCheck = {
       ok: Boolean(appConfig.payment.koko.merchantId && appConfig.payment.koko.apiKey),
       apiKeyConfigured: Boolean(appConfig.payment.koko.apiKey),
-      privateKeyConfigured: Boolean(
-        appConfig.payment.koko.privateKey || appConfig.payment.koko.privateKeyPath,
-      ),
+      privateKeyLoaded: kokoPrivateKeyReady(),
+      build: 'inline-pem-v2',
     };
     const mintpayCheck = {
       ok: Boolean(appConfig.payment.mintpay.merchantId),
@@ -52,6 +52,7 @@ export const healthController = {
     const ready = mongo.ok;
     const payload = {
       status: ready ? 'ready' : 'not_ready',
+      pid: process.pid,
       uptime: process.uptime(),
       timestamp: new Date().toISOString(),
       version: appConfig.app.version,
