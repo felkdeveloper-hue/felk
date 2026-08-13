@@ -22,8 +22,8 @@ function sanitizeClientError(message: string): string {
     .replace(/MII[A-Za-z0-9+/=]{20,}/g, '[REDACTED]');
 }
 
-function sanitizeDetails(details: unknown): unknown {
-  if (details == null) return details;
+function sanitizeDetails(details: unknown): Record<string, unknown> | unknown[] | undefined {
+  if (details == null) return undefined;
   try {
     const raw = JSON.stringify(details);
     if (
@@ -37,7 +37,9 @@ function sanitizeDetails(details: unknown): unknown {
   } catch {
     return undefined;
   }
-  return details;
+  if (Array.isArray(details)) return details;
+  if (typeof details === 'object') return details as Record<string, unknown>;
+  return undefined;
 }
 
 export function notFoundHandler(req: Request, _res: Response, next: NextFunction): void {
