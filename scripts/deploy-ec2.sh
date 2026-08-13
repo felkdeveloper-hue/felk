@@ -18,6 +18,20 @@ fi
 
 cd "${APP_DIR}"
 
+echo "==> Freeing disk space (deploys fail when the volume is full)"
+df -h / | tail -1 || true
+pm2 flush 2>/dev/null || true
+rm -f "${HOME}/.pm2/logs/"*.log 2>/dev/null || true
+rm -f /tmp/felk-import-* /tmp/core* 2>/dev/null || true
+rm -rf "${APP_DIR}/.turbo" "${APP_DIR}/node_modules/.cache" "${APP_DIR}/apps/api/node_modules/.cache" 2>/dev/null || true
+if command -v pnpm >/dev/null 2>&1; then
+  pnpm store prune >/dev/null 2>&1 || true
+fi
+sudo journalctl --vacuum-size=50M >/dev/null 2>&1 || true
+sudo apt-get clean >/dev/null 2>&1 || true
+rm -f "${APP_DIR}/.git/index.lock" 2>/dev/null || true
+df -h / | tail -1 || true
+
 echo "==> Fetching latest code"
 git fetch origin "${BRANCH}"
 git checkout "${BRANCH}"
