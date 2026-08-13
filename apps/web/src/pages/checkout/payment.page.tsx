@@ -11,6 +11,10 @@ import {
 import { AuthErrorAlert } from '@/components/auth/auth-error-alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ROUTES } from '@/constants';
+import {
+  defaultCheckoutPaymentMethod,
+  isCheckoutPaymentEnabled,
+} from '@/constants/checkout.constants';
 import { useCheckoutSessionQuery, useRefreshCheckoutMutation } from '@/hooks/checkout';
 import { useCheckoutStore } from '@/store';
 import { trackCommerceEvent } from '@/lib/analytics';
@@ -38,8 +42,8 @@ export function CheckoutPaymentPage() {
   }, [checkoutToken]);
 
   useEffect(() => {
-    if (!paymentMethod) {
-      setPaymentMethod('payhere');
+    if (!isCheckoutPaymentEnabled(paymentMethod)) {
+      setPaymentMethod(defaultCheckoutPaymentMethod());
     }
   }, [paymentMethod, setPaymentMethod]);
 

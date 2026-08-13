@@ -4,6 +4,7 @@ import { Seo } from '@/components/common/seo';
 import { AuthErrorAlert } from '@/components/auth/auth-error-alert';
 import { Button } from '@/components/ui/button';
 import { ROUTES } from '@/constants';
+import { isCheckoutPaymentEnabled } from '@/constants/checkout.constants';
 import { useReleaseCheckoutMutation } from '@/hooks/checkout';
 import { useRetryPaymentMutation } from '@/hooks/payment';
 import { useCheckoutStore } from '@/store';
@@ -34,8 +35,8 @@ export function CheckoutCancelPage() {
   }, [checkoutToken, releaseCheckout]);
 
   const handleRetry = () => {
-    if (!checkoutToken || !paymentMethod) {
-      void navigate({ to: ROUTES.checkoutReview });
+    if (!checkoutToken || !paymentMethod || !isCheckoutPaymentEnabled(paymentMethod)) {
+      void navigate({ to: ROUTES.checkoutPayment });
       return;
     }
 

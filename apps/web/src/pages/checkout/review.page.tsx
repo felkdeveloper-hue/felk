@@ -12,7 +12,11 @@ import { AuthErrorAlert } from '@/components/auth/auth-error-alert';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PAYMENT_METHOD_OPTIONS, SHIPPING_METHOD_OPTIONS } from '@/constants/checkout.constants';
+import {
+  PAYMENT_METHOD_OPTIONS,
+  SHIPPING_METHOD_OPTIONS,
+  isCheckoutPaymentEnabled,
+} from '@/constants/checkout.constants';
 import { ROUTES } from '@/constants';
 import { useCheckoutSessionQuery, useRefreshCheckoutMutation } from '@/hooks/checkout';
 import { usePlaceOrderMutation } from '@/hooks/payment';
@@ -149,6 +153,12 @@ export function CheckoutReviewPage() {
   }, [checkoutToken, navigate, sessionQuery.isLoading]);
 
   useEffect(() => {
+    if (paymentMethod && !isCheckoutPaymentEnabled(paymentMethod)) {
+      void navigate({ to: ROUTES.checkoutPayment });
+    }
+  }, [navigate, paymentMethod]);
+
+  useEffect(() => {
     if (checkoutToken) {
       trackCommerceEvent('checkout_review_reached', null, { checkoutToken });
     }
@@ -181,6 +191,10 @@ export function CheckoutReviewPage() {
 
   const handlePlaceOrder = () => {
     if (!session?.checkoutToken || !paymentMethod) return;
+    if (!isCheckoutPaymentEnabled(paymentMethod)) {
+      void navigate({ to: ROUTES.checkoutPayment });
+      return;
+    }
 
     placeOrder.mutate(
       { checkoutToken: session.checkoutToken, method: paymentMethod },

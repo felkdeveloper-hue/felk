@@ -59,7 +59,7 @@ export const PAYMENT_METHOD_OPTIONS: PaymentMethodOption[] = [
     id: 'koko',
     label: 'Koko',
     description: 'Buy now, pay later in installments',
-    enabled: true,
+    enabled: false, // hidden until Koko production credentials are live
     logoSrc: '/payments/koko.svg',
     accent: '#6C2BD9',
   },
@@ -80,6 +80,15 @@ export const PAYMENT_METHOD_OPTIONS: PaymentMethodOption[] = [
     accent: '#C45C26',
   },
 ];
+
+export function isCheckoutPaymentEnabled(method: PaymentMethod | null | undefined): boolean {
+  if (!method) return false;
+  return PAYMENT_METHOD_OPTIONS.some((option) => option.id === method && option.enabled);
+}
+
+export function defaultCheckoutPaymentMethod(): PaymentMethod {
+  return PAYMENT_METHOD_OPTIONS.find((option) => option.enabled)?.id ?? 'payhere';
+}
 
 /** Payment-window reservation TTL when backend omits metadata (minutes). */
 export const CHECKOUT_RESERVATION_TTL_MINUTES = 10;
