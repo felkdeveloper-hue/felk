@@ -90,11 +90,28 @@ function resolveRefreshWaiters(token: string | null): void {
   refreshWaiters = [];
 }
 
-async function performRefresh(): Promise<string | null> {
-  const { refreshToken } = useAuthStore.getState();
+function accessTokenSecondsLeft(token: string | null): number {
+  if (!token) return 0;
+  try {
+    const [, payload] = token.split('.');
+    if (!payload) return 0;
+    const json = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
+    const exp = (JSON.parse(json) as { exp?: number }).exp ?? 0;
+    return Math.floor(exp - Date.now() / 1000);
+  } catch {
+    return 0;
+  }
+}
+
+async function doRefresh(): Promise<string | null> {
+  const existing = useAuthStore.getState();
+  if (accessTokenSecondsLeft(existing.accessToken) > 20) {
+    return existing.accessToken;
+  }
+
+  const { refreshToken, accessToken } = existing;
   if (!refreshToken) {
-    // Stale access token with no refresh — drop session so guest retries aren't re-authed.
-    if (useAuthStore.getState().accessToken) {
+    if (accessToken && accessTokenSecondsLeft(accessToken) <= 0) {
       useAuthStore.getState().clearSession();
     }
     return null;
@@ -103,14 +120,26 @@ async function performRefresh(): Promise<string | null> {
   try {
     const response = await axios.post<
       ApiSuccessBody<{ accessToken: string; refreshToken: string }>
-    >(`${env.apiUrl}/auth/refresh`, { refreshToken }, { withCredentials: true });
+    >(`${env.apiUrl}/auth/refresh`, { refreshToken }, { withCredentials: true, timeout: 15_000 });
     const { accessToken, refreshToken: nextRefreshToken } = response.data.data;
     useAuthStore.getState().setTokens({ accessToken, refreshToken: nextRefreshToken });
     return accessToken;
-  } catch {
-    useAuthStore.getState().clearSession();
+  } catch (error) {
+    const status = (error as AxiosError)?.response?.status;
+    // Keep the session on outages. Only drop it when the refresh token is actually rejected.
+    if (status === 401 || status === 403) {
+      useAuthStore.getState().clearSession();
+    }
     return null;
   }
+}
+
+async function performRefresh(): Promise<string | null> {
+  const locks = typeof navigator !== 'undefined' ? navigator.locks : undefined;
+  if (locks?.request) {
+    return locks.request('fe-auth-refresh', () => doRefresh());
+  }
+  return doRefresh();
 }
 
 function stripAuthorizationHeader(config: AxiosRequestConfig): void {

@@ -87,13 +87,25 @@ function sanitizeUser(user: UserDocument, permissions: string[] = []) {
   };
 }
 
+function cookieDomain(): string | undefined {
+  try {
+    const host = new URL(appConfig.email.shopUrl).hostname.replace(/^www\./, '');
+    if (host === 'fe.lk' || host.endsWith('.fe.lk')) return '.fe.lk';
+  } catch {
+    /* leave host-only */
+  }
+  return undefined;
+}
+
 function cookieOptions(maxAgeMs: number): CookieOptions {
+  const domain = cookieDomain();
   return {
     httpOnly: true,
     secure: appConfig.cookie.secure,
     sameSite: appConfig.cookie.sameSite,
     maxAge: maxAgeMs,
     path: '/',
+    ...(domain ? { domain } : {}),
   };
 }
 
@@ -110,11 +122,13 @@ export function setAuthCookies(
 }
 
 export function clearAuthCookies(res: Response): void {
+  const domain = cookieDomain();
   const options: CookieOptions = {
     httpOnly: true,
     secure: appConfig.cookie.secure,
     sameSite: appConfig.cookie.sameSite,
     path: '/',
+    ...(domain ? { domain } : {}),
   };
   res.clearCookie(AUTH_COOKIES.ACCESS, options);
   res.clearCookie(AUTH_COOKIES.REFRESH, options);

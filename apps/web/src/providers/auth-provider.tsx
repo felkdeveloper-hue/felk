@@ -4,6 +4,8 @@ import { authApi, customersApi } from '@/services/sdk';
 import { useAuthStore } from '@/store';
 import { normalizeAuthUser } from '@/utils/auth';
 import { QUERY_KEYS } from '@/constants/query-keys';
+import { STORAGE_KEYS } from '@/constants/storage-keys';
+import { AppError } from '@/lib/errors';
 import { getDefaultWishlist, normalizeWishlist } from '@/utils/wishlist';
 import {
   mergeGuestWishlistOnLogin,
@@ -44,10 +46,42 @@ export function AuthProvider({ children }: AuthProviderProps) {
     authApi
       .me()
       .then((user) => setUser(normalizeAuthUser(user)))
-      .catch(() => clearSession());
+      .catch((error) => {
+        // API blips / deploys / timeouts must not force a logout.
+        if (AppError.isAppError(error) && error.isUnauthorized) {
+          clearSession();
+        }
+      });
     // Only re-validate when the token identity changes, not on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasHydrated, accessToken]);
+
+  // Keep tokens in sync across tabs so refresh-token rotation does not log everyone out.
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== STORAGE_KEYS.authSession) return;
+      if (!event.newValue) {
+        useAuthStore.getState().clearSession();
+        return;
+      }
+      try {
+        const parsed = JSON.parse(event.newValue) as {
+          state?: { user?: unknown; accessToken?: string | null; refreshToken?: string | null };
+        };
+        const next = parsed.state;
+        if (!next) return;
+        useAuthStore.setState({
+          user: (next.user as ReturnType<typeof useAuthStore.getState>['user']) ?? null,
+          accessToken: next.accessToken ?? null,
+          refreshToken: next.refreshToken ?? null,
+        });
+      } catch {
+        /* ignore corrupt storage */
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
 
   // Prefetch server wishlist + merge any guest saves after sign-in.
   useEffect(() => {

@@ -10,7 +10,11 @@ import type {
   PaymentSessionResult,
   WebhookVerificationInput,
 } from '@/services/interfaces/payment-gateway.service.js';
-import { parseWebhookPayload } from '@/services/gateways/gateway.utils.js';
+import {
+  normalizeMintpayTelephone,
+  parseWebhookPayload,
+  toPublicStorefrontUrl,
+} from '@/services/gateways/gateway.utils.js';
 import { ApiError } from '@/utils/errors/api-error.js';
 
 const KOKO_STATUS_MAP: Record<string, string> = {
@@ -35,10 +39,25 @@ const PEM_BEGIN = /-----BEGIN [A-Z0-9 ]+-----/;
 const PEM_PRIVATE = /-----BEGIN (?:RSA )?PRIVATE KEY-----/;
 const PEM_PUBLIC = /-----BEGIN (?:RSA )?PUBLIC KEY-----/;
 
+/** QA (sandbox) never SMS-OTPs real Koko customers. Live storefront must use prodapi. */
+function useLiveKoko(): boolean {
+  if (process.env.KOKO_FORCE_SANDBOX === 'true') return false;
+  if (appConfig.payment.koko.mode === 'live') return true;
+  const api = process.env.API_PUBLIC_URL ?? '';
+  return /api\.fe\.lk/i.test(api);
+}
+
 function kokoOrderCreateUrl(): string {
-  return appConfig.payment.koko.mode === 'live'
+  return useLiveKoko()
     ? 'https://prodapi.paykoko.com/api/merchants/orderCreate'
     : 'https://qaapi.paykoko.com/api/merchants/orderCreate';
+}
+
+function kokoApiPublicUrl(): string {
+  const configured = (process.env.API_PUBLIC_URL ?? '').replace(/\/$/, '');
+  if (configured && !/localhost|127\.0\.0\.1/i.test(configured)) return configured;
+  if (useLiveKoko()) return 'https://api.fe.lk';
+  return 'http://localhost:4000';
 }
 
 /** dotenv / systemd / quoted .env can leave literal \n, extra quotes, or spaces. */
@@ -165,15 +184,16 @@ export class KokoGateway implements PaymentGateway {
     const email = input.customerEmail;
     const firstName = String(input.metadata?.firstName ?? 'Customer');
     const lastName = String(input.metadata?.lastName ?? '');
-    const mobile = String(input.metadata?.customerPhone ?? '');
+    const rawMobile = String(input.metadata?.customerPhone ?? input.metadata?.phone ?? '');
+    const mobile = rawMobile.replace(/\D/g, '') ? normalizeMintpayTelephone(rawMobile) : '';
     const description =
       typeof input.metadata?.description === 'string'
         ? input.metadata.description
         : `Order ${input.orderId}`;
     const reference = `${merchantId.slice(0, 8)}${randomBytes(3).toString('hex')}-${input.orderId}`;
-    const returnUrl = input.returnUrl;
-    const cancelUrl = input.cancelUrl;
-    const apiPublicUrl = (process.env.API_PUBLIC_URL ?? 'http://localhost:4000').replace(/\/$/, '');
+    const returnUrl = toPublicStorefrontUrl(input.returnUrl);
+    const cancelUrl = toPublicStorefrontUrl(input.cancelUrl);
+    const apiPublicUrl = kokoApiPublicUrl();
     const apiPrefix = process.env.API_PREFIX ?? '/api/v1';
     const responseUrl = String(
       input.metadata?.responseUrl ?? `${apiPublicUrl}${apiPrefix}/payments/webhooks/koko`,
@@ -214,8 +234,9 @@ export class KokoGateway implements PaymentGateway {
       {
         gateway: 'koko',
         orderId: input.orderId,
-        mode: appConfig.payment.koko.mode,
+        mode: useLiveKoko() ? 'live' : 'sandbox',
         action,
+        hasMobile: Boolean(mobile),
       },
       'Koko: checkout form prepared',
     );
@@ -247,7 +268,7 @@ export class KokoGateway implements PaymentGateway {
           signature,
         },
       },
-      raw: { reference, merchantId, mode: appConfig.payment.koko.mode },
+      raw: { reference, merchantId, mode: useLiveKoko() ? 'live' : 'sandbox' },
     };
   }
 
