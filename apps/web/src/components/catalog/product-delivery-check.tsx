@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Banknote, CreditCard, Truck } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { FIXED_SHIPPING_AMOUNT } from '@/constants/checkout.constants';
 import { cn } from '@/lib/utils';
 import type { ProductPaymentOption } from './product-trust-badges';
 
@@ -76,7 +77,9 @@ export function ProductDeliveryCheck({
         )}
       >
         <Truck className="text-muted-foreground size-4 shrink-0 lg:size-5 lg:text-sky-600 dark:lg:text-sky-300" />
-        Flat shipping LKR 500 island-wide
+        {FIXED_SHIPPING_AMOUNT > 0
+          ? `Flat shipping LKR ${FIXED_SHIPPING_AMOUNT} island-wide`
+          : 'Free shipping island-wide'}
       </div>
 
       <div
