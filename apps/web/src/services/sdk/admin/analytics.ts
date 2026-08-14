@@ -190,6 +190,7 @@ export interface GeoBreakdownData {
 export interface TrafficSourceRow {
   source: string;
   label: string;
+  channel?: string;
   count: number;
   pct: number;
 }

@@ -91,10 +91,10 @@ const widgets: WidgetDefinitionMeta[] = [
   },
   {
     id: 'traffic',
-    name: 'Traffic',
-    description: 'Traffic source mix',
+    name: 'Sources',
+    description: 'Where visitors come from — Instagram, ads, search, and more',
     category: 'acquisition',
-    defaultSize: { w: 4, h: 4, minW: 3, minH: 3 },
+    defaultSize: { w: 4, h: 5, minW: 3, minH: 3 },
     permissions: ['analytics.view'],
   },
   {

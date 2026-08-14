@@ -42,10 +42,10 @@ export const DASHBOARD_TEMPLATES: DashboardTemplateMeta[] = [
     widgets: [
       place('ops_orders', 0, 0, { w: 3, h: 2 }),
       place('visitors', 3, 0, { w: 3, h: 2 }),
-      place('live_activity', 6, 0, { w: 6, h: 2 }),
-      place('funnel', 0, 2, { w: 6, h: 5 }),
-      place('top_products', 6, 2, { w: 6, h: 5 }),
-      place('traffic', 0, 7, { w: 12, h: 4 }),
+      place('search', 6, 0, { w: 6, h: 2 }),
+      place('traffic', 0, 2, { w: 4, h: 5 }),
+      place('funnel', 4, 2, { w: 5, h: 5 }),
+      place('top_products', 9, 2, { w: 3, h: 5 }),
     ],
   },
   {
@@ -59,7 +59,8 @@ export const DASHBOARD_TEMPLATES: DashboardTemplateMeta[] = [
       place('wishlist', 9, 0),
       place('live_activity', 0, 3, { w: 6, h: 4 }),
       place('recent_activity', 6, 3, { w: 6, h: 5 }),
-      place('funnel', 0, 7, { w: 6, h: 5 }),
+      place('traffic', 0, 7, { w: 4, h: 5 }),
+      place('funnel', 4, 7, { w: 8, h: 5 }),
     ],
   },
   {

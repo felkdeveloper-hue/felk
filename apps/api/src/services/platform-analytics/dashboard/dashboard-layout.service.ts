@@ -43,6 +43,90 @@ function cloneWidgets(widgets: DashboardWidgetPlacement[]): DashboardWidgetPlace
   }));
 }
 
+function boxesOverlap(
+  a: { x: number; y: number; w: number; h: number },
+  b: { x: number; y: number; w: number; h: number },
+) {
+  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+}
+
+function layoutHasOverlap(widgets: DashboardWidgetPlacement[]) {
+  const visible = widgets.filter((widget) => !widget.hidden);
+  for (let i = 0; i < visible.length; i += 1) {
+    for (let j = i + 1; j < visible.length; j += 1) {
+      if (boxesOverlap(visible[i]!, visible[j]!)) return true;
+    }
+  }
+  return false;
+}
+
+/** Restore Funnel / Orders / Visitors / Top products if a prior Sources insert hid them. */
+function restoreCoreWidgets(
+  widgets: DashboardWidgetPlacement[],
+  roleKey: string,
+): { widgets: DashboardWidgetPlacement[]; changed: boolean } {
+  const template = getRoleDefaultWidgets(roleKey);
+  const keepLiveActivity = template.some((item) => item.widgetId === 'live_activity');
+  const swapped = keepLiveActivity
+    ? widgets
+    : widgets.map((widget) => {
+        if (widget.widgetId !== 'live_activity') return widget;
+        return {
+          ...widget,
+          widgetId: 'search',
+          i: widget.i.replace(/live_activity/g, 'search'),
+        };
+      });
+  const swappedLive = swapped.some(
+    (widget, index) => widget.widgetId === 'search' && widgets[index]?.widgetId === 'live_activity',
+  );
+  const visible = swapped.filter((widget) => !widget.hidden);
+  const missingCore = template.some(
+    (item) => !visible.some((widget) => widget.widgetId === item.widgetId),
+  );
+  if (!missingCore && !layoutHasOverlap(visible)) {
+    return { widgets: swapped, changed: swappedLive };
+  }
+
+  const firstById = new Map<string, DashboardWidgetPlacement>();
+  for (const widget of swapped) {
+    if (!firstById.has(widget.widgetId)) firstById.set(widget.widgetId, widget);
+  }
+
+  const usedIds = new Set<string>();
+  const restored = template.map((item, index) => {
+    usedIds.add(item.widgetId);
+    const existing = firstById.get(item.widgetId);
+    if (existing) {
+      return {
+        ...existing,
+        x: item.x,
+        y: item.y,
+        w: item.w,
+        h: item.h,
+        minW: item.minW,
+        minH: item.minH,
+        hidden: false,
+        collapsed: false,
+      };
+    }
+    return { ...item, i: `${item.widgetId}-restored-${index}` };
+  });
+
+  const extras = swapped.filter((widget) => !usedIds.has(widget.widgetId));
+  let extraY = restored.reduce((max, widget) => Math.max(max, widget.y + widget.h), 0);
+  for (const extra of extras) {
+    restored.push({
+      ...extra,
+      x: extra.hidden ? extra.x : 0,
+      y: extra.hidden ? extra.y : extraY,
+    });
+    if (!extra.hidden) extraY += extra.h || 3;
+  }
+
+  return { widgets: restored, changed: true };
+}
+
 function toPublic(doc: InstanceType<typeof DashboardLayoutModel>) {
   const layoutsObj: Record<string, DashboardLayoutSnapshot> = {};
   if (doc.layouts instanceof Map) {
@@ -96,7 +180,19 @@ async function ensureLayout(userId: string, roleKey: string) {
 
 export async function getDashboardLayout(userId: string, roleKey: string) {
   const doc = await ensureLayout(userId, roleKey);
-  return toPublic(doc);
+  const publicLayout = toPublic(doc);
+  const restored = restoreCoreWidgets(publicLayout.widgets, roleKey);
+  if (!restored.changed) return { ...publicLayout, widgets: restored.widgets };
+
+  const key = doc.activeKey || 'personal';
+  const current = snapshotFromMap(doc.layouts, key);
+  setSnapshot(doc, key, {
+    widgets: restored.widgets,
+    theme: current?.theme ?? {},
+    updatedAt: new Date(),
+  });
+  await doc.save();
+  return { ...toPublic(doc), widgets: restored.widgets };
 }
 
 export async function saveDashboardLayout(

@@ -40,6 +40,28 @@ const SOCIAL_PLATFORMS: Array<{ pattern: RegExp; label: string }> = [
   { pattern: /reddit\.com/i, label: 'Reddit' },
 ];
 
+/** UTM / campaign aliases — `ig` and `instagram` are the same source. */
+const SOURCE_ALIASES: Array<{ pattern: RegExp; label: string }> = [
+  { pattern: /^(ig|insta|instagram)$/i, label: 'Instagram' },
+  { pattern: /^(fb|facebook|meta)$/i, label: 'Facebook' },
+  { pattern: /^(tt|tiktok)$/i, label: 'TikTok' },
+  { pattern: /^(yt|youtube)$/i, label: 'YouTube' },
+  { pattern: /^(wa|whatsapp)$/i, label: 'WhatsApp' },
+  { pattern: /^(x|twitter)$/i, label: 'X (Twitter)' },
+  { pattern: /^(li|linkedin)$/i, label: 'LinkedIn' },
+  { pattern: /^(pin|pinterest)$/i, label: 'Pinterest' },
+  { pattern: /^(google|gads|adwords)$/i, label: 'Google' },
+];
+
+function canonicalSourceLabel(value: string | null | undefined): string | null {
+  const raw = value?.trim();
+  if (!raw) return null;
+  const alias = matchList(raw, SOURCE_ALIASES);
+  if (alias) return alias;
+  const fromHost = matchList(raw, SOCIAL_PLATFORMS) ?? matchList(raw, SEARCH_ENGINES);
+  return fromHost;
+}
+
 const AD_PLATFORMS: Array<{ pattern: RegExp; label: string }> = [
   { pattern: /google|adwords|gads/i, label: 'Google Ads' },
   { pattern: /facebook|instagram|meta/i, label: 'Meta Ads' },
@@ -130,6 +152,19 @@ export function classifyTrafficSource(opts: {
 
   if (utmSource) {
     const s = utmSource.toLowerCase();
+    const canonical = canonicalSourceLabel(s);
+    if (
+      canonical === 'Instagram' ||
+      canonical === 'Facebook' ||
+      canonical === 'TikTok' ||
+      canonical === 'YouTube' ||
+      canonical === 'WhatsApp' ||
+      canonical === 'X (Twitter)' ||
+      canonical === 'LinkedIn' ||
+      canonical === 'Pinterest'
+    ) {
+      return isPaidMedium(utmMedium) ? 'paid_search' : 'social';
+    }
     if (/google|bing|yahoo|duckduckgo/.test(s)) return 'organic_search';
     if (/facebook|instagram|twitter|linkedin|tiktok|pinterest|youtube|meta/.test(s)) {
       return isPaidMedium(utmMedium) ? 'paid_search' : 'social';
@@ -153,6 +188,7 @@ export function formatAttribution(opts: {
   const utmSourceNorm = utmSource?.trim() ?? '';
   const utmMediumNorm = utmMedium?.trim() ?? '';
   const campaign = utmCampaign?.trim() || null;
+  const canonicalUtm = canonicalSourceLabel(utmSourceNorm);
 
   // Paid ads (UTM takes priority)
   if (
@@ -162,6 +198,7 @@ export function formatAttribution(opts: {
   ) {
     const adLabel =
       matchList(`${utmSourceNorm} ${utmMediumNorm}`, AD_PLATFORMS) ??
+      canonicalUtm ??
       (utmSourceNorm ? titleCase(utmSourceNorm) : 'Paid ads');
     return {
       label: adLabel,
@@ -204,7 +241,7 @@ export function formatAttribution(opts: {
   }
   if (trafficSource === 'social' && utmSourceNorm) {
     return {
-      label: titleCase(utmSourceNorm),
+      label: canonicalUtm ?? titleCase(utmSourceNorm),
       channel: 'Social',
       detail: campaign || utmMediumNorm || null,
     };
@@ -218,7 +255,7 @@ export function formatAttribution(opts: {
     }
   }
   if (trafficSource === 'organic_search') {
-    const label = utmSourceNorm ? titleCase(utmSourceNorm) : 'Organic search';
+    const label = canonicalUtm ?? (utmSourceNorm ? titleCase(utmSourceNorm) : 'Organic search');
     return { label, channel: 'Organic search', detail: campaign || utmMediumNorm || null };
   }
 
@@ -233,7 +270,7 @@ export function formatAttribution(opts: {
 
   if (utmSourceNorm) {
     return {
-      label: titleCase(utmSourceNorm),
+      label: canonicalUtm ?? titleCase(utmSourceNorm),
       channel: titleCase(trafficSource.replace(/_/g, ' ')),
       detail: campaign || utmMediumNorm || null,
     };

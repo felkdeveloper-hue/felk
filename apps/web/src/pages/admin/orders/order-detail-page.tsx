@@ -204,6 +204,9 @@ export function OrderDetailPage({ orderId }: { orderId: string }) {
   const selectedStatus = allowedStatuses.includes(nextStatus)
     ? nextStatus
     : (allowedStatuses[0] ?? '');
+  const source = readRecord(order.source);
+  const sourceLabel = String(source.label ?? 'Unknown');
+  const sourceMeta = [source.channel, source.detail].filter(Boolean).join(' · ');
 
   const downloadInvoicePdf = async () => {
     try {
@@ -241,7 +244,18 @@ export function OrderDetailPage({ orderId }: { orderId: string }) {
         }
       />
 
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <AdminPanel>
+          <p className="text-xs uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+            Source
+          </p>
+          <p className="mt-2 font-medium">{sourceLabel}</p>
+          {sourceMeta ? (
+            <p className="text-muted-foreground mt-0.5 text-xs">{sourceMeta}</p>
+          ) : (
+            <p className="text-muted-foreground mt-0.5 text-xs">Where this customer arrived from</p>
+          )}
+        </AdminPanel>
         <AdminPanel>
           <p className="text-xs uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
             Status

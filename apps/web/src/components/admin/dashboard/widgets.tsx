@@ -251,24 +251,26 @@ const SearchWidget = memo(function SearchWidget({
       : 0;
   return (
     <WidgetFrame title="Search" href={ADMIN_ROUTES.analyticsSearch} collapsed={placement.collapsed}>
-      <div className="grid grid-cols-2 gap-2 text-sm">
-        <div>
-          <div className="text-muted-foreground text-xs">Searches</div>
-          <div className="text-lg font-semibold tabular-nums">{q.data.totals.searches}</div>
+      <div className="grid h-full min-h-0 grid-cols-[auto_1fr] gap-4">
+        <div className="grid grid-cols-2 content-start gap-x-4 gap-y-1 text-sm">
+          <div>
+            <div className="text-muted-foreground text-xs">Searches</div>
+            <div className="text-2xl font-semibold tabular-nums">{q.data.totals.searches}</div>
+          </div>
+          <div>
+            <div className="text-muted-foreground text-xs">Zero results</div>
+            <div className="text-2xl font-semibold tabular-nums">{zeroRate}%</div>
+          </div>
         </div>
-        <div>
-          <div className="text-muted-foreground text-xs">Zero results</div>
-          <div className="text-lg font-semibold tabular-nums">{zeroRate}%</div>
-        </div>
+        <ul className="min-h-0 space-y-1 overflow-auto text-xs">
+          {(q.data.keywords ?? []).slice(0, 4).map((k) => (
+            <li key={k.query} className="flex justify-between gap-2">
+              <span className="truncate">{k.query || '(empty)'}</span>
+              <span className="text-muted-foreground tabular-nums">{k.searches}</span>
+            </li>
+          ))}
+        </ul>
       </div>
-      <ul className="mt-3 space-y-1 text-xs">
-        {(q.data.keywords ?? []).slice(0, 4).map((k) => (
-          <li key={k.query} className="flex justify-between gap-2">
-            <span className="truncate">{k.query}</span>
-            <span className="text-muted-foreground tabular-nums">{k.searches}</span>
-          </li>
-        ))}
-      </ul>
     </WidgetFrame>
   );
 });
@@ -371,28 +373,52 @@ const TrafficWidget = memo(function TrafficWidget({
 }) {
   const q = useTrafficSources(periodFilter(placement.settings));
   if (q.isLoading) return <LoadingBlock />;
-  const rows = (q.data ?? []).slice(0, 6);
+  const rows = (q.data ?? []).slice(0, 8);
+  const top = rows[0];
   return (
     <WidgetFrame
-      title="Traffic"
+      title="Sources"
       href={ADMIN_ROUTES.analyticsTraffic}
       collapsed={placement.collapsed}
     >
       {!rows.length ? (
         <AnalyticsEmpty />
       ) : (
-        <ResponsiveContainer width="100%" height="100%" minHeight={140}>
-          <BarChart data={rows}>
-            <XAxis dataKey="source" tick={{ fontSize: 10 }} />
-            <YAxis tick={{ fontSize: 10 }} width={28} />
-            <Tooltip />
-            <Bar dataKey="count" radius={3}>
-              {rows.map((_, i) => (
-                <Cell key={i} fill={adminChartColor(i)} />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
+        <div className="flex h-full flex-col gap-3">
+          {top ? (
+            <div>
+              <p className="text-muted-foreground text-[10px] font-semibold uppercase tracking-[0.16em]">
+                Top source
+              </p>
+              <p className="mt-0.5 text-lg font-semibold leading-tight">{top.label}</p>
+              <p className="text-muted-foreground text-xs">
+                {top.pct}% of visitors
+                {top.channel ? ` · ${top.channel}` : ''}
+              </p>
+            </div>
+          ) : null}
+          <ul className="space-y-2.5">
+            {rows.map((row, index) => (
+              <li key={`${row.label}-${index}`}>
+                <div className="mb-1 flex items-center justify-between gap-2 text-sm">
+                  <span className="truncate font-medium">{row.label}</span>
+                  <span className="text-muted-foreground shrink-0 tabular-nums">
+                    {row.count} · {row.pct}%
+                  </span>
+                </div>
+                <div className="bg-muted h-1.5 overflow-hidden rounded-full">
+                  <div
+                    className="h-full rounded-full"
+                    style={{
+                      width: `${Math.max(row.pct, 2)}%`,
+                      backgroundColor: adminChartColor(index),
+                    }}
+                  />
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </WidgetFrame>
   );

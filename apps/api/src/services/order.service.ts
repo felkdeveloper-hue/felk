@@ -10,6 +10,7 @@ import { PaymentModel } from '@/models/payment.models.js';
 import { appConfig } from '@/config/app.config.js';
 import { customerService } from '@/services/customer.service.js';
 import { invoiceService } from '@/services/invoice.service.js';
+import { resolveOrderSource } from '@/services/order-source.service.js';
 import {
   renderOrderInvoicePdf,
   renderOrderShippingLabelPdf,
@@ -89,7 +90,11 @@ export class OrderService {
   async getById(id: string, user: AuthenticatedUser) {
     const order = await this.findById(id);
     await this.assertAccess(order, user);
-    return this.withReceivedAt(this.toSummary(order));
+    const [summary, source] = await Promise.all([
+      this.withReceivedAt(this.toSummary(order)),
+      resolveOrderSource(order),
+    ]);
+    return { ...summary, source };
   }
 
   async getByOrderNumber(orderNumber: string, user: AuthenticatedUser) {
@@ -596,6 +601,7 @@ export class OrderService {
       completedAt: order.completedAt,
       cancelledAt: order.cancelledAt,
       cancelReason: order.cancelReason,
+      metadata: order.metadata ?? {},
       createdAt: order.createdAt,
       updatedAt: order.updatedAt,
     };
