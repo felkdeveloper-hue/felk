@@ -17,6 +17,8 @@ import { writePaymentLog } from '@/services/payment-log.service.js';
 import { writeAuditLog } from '@/services/audit.service.js';
 import type { ActorMeta } from '@/services/cms-crud.service.js';
 import { appConfig } from '@/config/app.config.js';
+import { logger } from '@/config/logger.js';
+import { hmacSha256Hex, safeCompare } from '@/utils/crypto.helper.js';
 import { ApiError } from '@/utils/errors/api-error.js';
 import { buildPaginationMeta, getPaginationSkip, parsePagination } from '@/utils/pagination.js';
 import {
@@ -25,7 +27,6 @@ import {
   PAYMENT_METHOD,
   type PaymentMethod,
 } from '@/constants/payment-status.js';
-import { CHECKOUT_STATUS } from '@/constants/checkout.js';
 import {
   PAYMENT_ATTEMPT_STATUS,
   PAYMENT_AUDIT,
@@ -36,12 +37,21 @@ import {
   getHeader,
   parseWebhookPayload,
   rawBodyToString,
+  toPublicStorefrontUrl,
 } from '@/services/gateways/gateway.utils.js';
 import type { AuthenticatedUser } from '@/types/index.js';
 import { analyticsService } from '@/services/analytics/analytics.service.js';
 import { emailQueueService } from '@/services/email-queue.service.js';
 import { paymentSuccessfulEmail, paymentFailedEmail } from '@/emails/index.js';
-import { fulfillCodPaymentIfNeeded } from '@/services/order-payment-consumer.service.js';
+import {
+  fulfillCodPaymentIfNeeded,
+  handlePaymentSucceededEvent,
+} from '@/services/order-payment-consumer.service.js';
+import {
+  decodeMintpayBrowserHash,
+  mintpayFailHashMessage,
+  mintpaySuccessHashMessage,
+} from '@/services/gateways/mintpay.gateway.js';
 
 function toPlain(doc: { toObject: () => Record<string, unknown> }) {
   return doc.toObject();
@@ -392,8 +402,12 @@ export class PaymentService {
       payment.status = PAYMENT_STATUS.PROCESSING;
       payment.gatewayPaymentId = session.gatewayPaymentId;
       payment.redirectUrl = session.redirectUrl ?? null;
-      if (session.redirectForm) {
-        payment.metadata = { ...payment.metadata, redirectForm: session.redirectForm };
+      if (session.redirectForm || session.raw?.purchaseId) {
+        payment.metadata = {
+          ...payment.metadata,
+          ...(session.redirectForm ? { redirectForm: session.redirectForm } : {}),
+          ...(session.raw?.purchaseId ? { mintpayPurchaseId: String(session.raw.purchaseId) } : {}),
+        };
       }
       await payment.save();
 
@@ -505,8 +519,17 @@ export class PaymentService {
     });
     if (!payment) throw ApiError.notFound('No payment found for this checkout');
 
-    // Heal stuck COD checkouts where payment exists but order was never created.
+    // Heal stuck checkouts where payment is already verified but the order was never created.
     await fulfillCodPaymentIfNeeded(payment);
+    if (payment.status === PAYMENT_STATUS.PAID) {
+      await handlePaymentSucceededEvent({
+        paymentId: payment._id.toString(),
+        checkoutToken: payment.checkoutToken,
+        amount: payment.amount,
+        currency: payment.currency,
+        method: payment.method,
+      });
+    }
 
     const order = await OrderModel.findOne({ paymentId: payment._id });
 
@@ -667,10 +690,10 @@ export class PaymentService {
       return { ok: false, reason: 'invalid_signature' as const };
     }
 
-    const attempt = await PaymentAttemptModel.findOne({
-      gateway: gatewayKey,
-      gatewayPaymentId: verification.orderId,
-    });
+    const attempt = await this.findAttemptForGateway(
+      gatewayKey,
+      String(verification.orderId ?? ''),
+    );
 
     if (!attempt) {
       return this.failVerification(webhook, gatewayKey, 'unknown_order');
@@ -688,7 +711,9 @@ export class PaymentService {
     }
 
     const amountOk =
-      verification.amount === undefined || Math.abs(verification.amount - payment.amount) <= 0.01;
+      verification.amount === undefined ||
+      Number.isNaN(Number(verification.amount)) ||
+      Math.abs(Number(verification.amount) - payment.amount) <= 0.01;
     if (!amountOk) {
       return this.failVerification(webhook, gatewayKey, 'amount_mismatch', payment, true);
     }
@@ -787,6 +812,13 @@ export class PaymentService {
         },
         { paymentId: payment._id.toString(), checkoutId: payment.checkoutId.toString() },
       );
+      await handlePaymentSucceededEvent({
+        paymentId: payment._id.toString(),
+        checkoutToken: payment.checkoutToken,
+        amount: payment.amount,
+        currency: payment.currency,
+        method: payment.method,
+      });
 
       // Send payment success email (fire-and-forget)
       void (async () => {
@@ -892,6 +924,188 @@ export class PaymentService {
     });
 
     return { ok: true, status: newStatus };
+  }
+
+  /**
+   * Mintpay does not POST a signed IPN. The WooCommerce plugin confirms payment when
+   * Mintpay redirects the browser to success_url / fail_url with `orderId` + HMAC `hash`.
+   */
+  async handleMintpayBrowserReturn(
+    query: Record<string, unknown>,
+  ): Promise<{ ok: boolean; redirectUrl: string }> {
+    const orderId = String(query.orderId ?? query.order_id ?? '').trim();
+    const hash = String(query.hash ?? '').trim();
+    const fallbackSuccess = toPublicStorefrontUrl(
+      `${appConfig.email?.shopUrl ?? 'https://fe.lk'}/checkout/success`,
+    );
+    const fallbackCancel = toPublicStorefrontUrl(
+      `${appConfig.email?.shopUrl ?? 'https://fe.lk'}/checkout/cancel`,
+    );
+
+    if (!orderId || !hash) {
+      logger.warn({ gateway: 'mintpay', orderId }, 'Mintpay return missing orderId or hash');
+      return { ok: false, redirectUrl: fallbackCancel };
+    }
+
+    const attempt = await this.findAttemptForGateway(PAYMENT_METHOD.MINTPAY, orderId);
+    if (!attempt) {
+      logger.warn({ gateway: 'mintpay', orderId }, 'Mintpay return: unknown order');
+      return { ok: false, redirectUrl: fallbackCancel };
+    }
+
+    const payment = await PaymentModel.findOne({ _id: attempt.paymentId, isDeleted: false });
+    if (!payment) {
+      return { ok: false, redirectUrl: fallbackCancel };
+    }
+
+    const received = decodeMintpayBrowserHash(hash);
+    const expectedSuccess = hmacSha256Hex(
+      appConfig.payment.mintpay.secretKey,
+      mintpaySuccessHashMessage(orderId, payment.amount),
+    );
+    const expectedFail = hmacSha256Hex(
+      appConfig.payment.mintpay.secretKey,
+      mintpayFailHashMessage(orderId),
+    );
+    const successMatch = Boolean(received) && safeCompare(received, expectedSuccess);
+    const failMatch = Boolean(received) && safeCompare(received, expectedFail);
+
+    const successUrl = toPublicStorefrontUrl(payment.returnUrl || fallbackSuccess);
+    const cancelUrl = toPublicStorefrontUrl(payment.cancelUrl || fallbackCancel);
+
+    if (!successMatch && !failMatch) {
+      logger.warn({ gateway: 'mintpay', orderId }, 'Mintpay return: hash mismatch');
+      await writePaymentLog({
+        paymentId: payment._id.toString(),
+        action: 'webhook.verification_failed',
+        level: 'error',
+        message: 'Mintpay browser return hash mismatch',
+      });
+      return { ok: false, redirectUrl: cancelUrl };
+    }
+
+    if (failMatch && !successMatch) {
+      if (!PAYMENT_TERMINAL_SUCCESS_STATUSES.includes(payment.status as never)) {
+        payment.status = PAYMENT_STATUS.FAILED;
+        payment.failedAt = new Date();
+        payment.failureReason = 'Gateway reported status: failed';
+        await payment.save();
+        attempt.status = PAYMENT_ATTEMPT_STATUS.FAILED;
+        await attempt.save();
+        await publishPaymentEvent(
+          PAYMENT_EVENT_TYPE.PAYMENT_FAILED,
+          {
+            paymentId: payment._id.toString(),
+            checkoutToken: payment.checkoutToken,
+            status: PAYMENT_STATUS.FAILED,
+          },
+          { paymentId: payment._id.toString(), checkoutId: payment.checkoutId.toString() },
+        );
+        try {
+          await checkoutService.releaseForPaymentFailure(
+            payment.checkoutId.toString(),
+            'Mintpay fail_url return — release unpaid hold',
+          );
+        } catch {
+          /* already released */
+        }
+      }
+      return { ok: false, redirectUrl: cancelUrl };
+    }
+
+    if (payment.status !== PAYMENT_STATUS.PAID) {
+      payment.status = PAYMENT_STATUS.PAID;
+      payment.paidAt = payment.paidAt ?? new Date();
+      payment.failureReason = null;
+      const purchaseId =
+        typeof payment.metadata?.mintpayPurchaseId === 'string'
+          ? payment.metadata.mintpayPurchaseId
+          : undefined;
+      payment.metadata = {
+        ...payment.metadata,
+        ...(purchaseId ? { mintpayPurchaseId: purchaseId } : {}),
+        mintpayReturnOrderId: orderId,
+      };
+      await payment.save();
+      attempt.status = PAYMENT_ATTEMPT_STATUS.SUCCEEDED;
+      await attempt.save();
+
+      await writeAuditLog({
+        action: PAYMENT_AUDIT.PAYMENT_COMPLETED,
+        resourceType: 'payments',
+        resourceId: payment._id.toString(),
+        after: toPlain(payment),
+      });
+      await publishPaymentEvent(
+        PAYMENT_EVENT_TYPE.PAYMENT_SUCCEEDED,
+        {
+          paymentId: payment._id.toString(),
+          checkoutToken: payment.checkoutToken,
+          amount: payment.amount,
+          currency: payment.currency,
+          gatewayTxnId: purchaseId ?? orderId,
+        },
+        { paymentId: payment._id.toString(), checkoutId: payment.checkoutId.toString() },
+      );
+    }
+
+    await handlePaymentSucceededEvent({
+      paymentId: payment._id.toString(),
+      checkoutToken: payment.checkoutToken,
+      amount: payment.amount,
+      currency: payment.currency,
+      method: payment.method,
+    });
+
+    await writePaymentLog({
+      paymentId: payment._id.toString(),
+      action: 'webhook.processed',
+      message: 'Mintpay browser return verified — payment paid, order created',
+      metadata: { orderId },
+    });
+
+    return { ok: true, redirectUrl: successUrl };
+  }
+
+  private async findAttemptForGateway(gatewayKey: string, orderId: string) {
+    if (!orderId) return null;
+
+    const byGatewayId = await PaymentAttemptModel.findOne({
+      gateway: gatewayKey,
+      gatewayPaymentId: orderId,
+    }).sort({ createdAt: -1 });
+    if (byGatewayId) return byGatewayId;
+
+    const byRequestOrderId = await PaymentAttemptModel.findOne({
+      gateway: gatewayKey,
+      'requestPayload.orderId': orderId,
+    }).sort({ createdAt: -1 });
+    if (byRequestOrderId) return byRequestOrderId;
+
+    const baseRef = orderId.replace(/-A\d+$/i, '');
+    if (baseRef.startsWith('PAY-')) {
+      const payment = await PaymentModel.findOne({
+        referenceNumber: baseRef,
+        method: gatewayKey,
+        isDeleted: false,
+      });
+      if (payment) {
+        return PaymentAttemptModel.findOne({ paymentId: payment._id }).sort({ attemptNumber: -1 });
+      }
+    }
+
+    const byPurchaseId = await PaymentModel.findOne({
+      method: gatewayKey,
+      isDeleted: false,
+      $or: [{ gatewayPaymentId: orderId }, { 'metadata.mintpayPurchaseId': orderId }],
+    }).sort({ createdAt: -1 });
+    if (byPurchaseId) {
+      return PaymentAttemptModel.findOne({ paymentId: byPurchaseId._id }).sort({
+        attemptNumber: -1,
+      });
+    }
+
+    return null;
   }
 
   private async failVerification(

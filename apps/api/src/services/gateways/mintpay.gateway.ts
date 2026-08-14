@@ -1,4 +1,3 @@
-import { randomBytes } from 'node:crypto';
 import { appConfig } from '@/config/app.config.js';
 import { logger } from '@/config/logger.js';
 import { PAYMENT_METHOD, PAYMENT_STATUS } from '@/constants/payment-status.js';
@@ -17,7 +16,6 @@ import {
   parseWebhookPayload,
   rawBodyToString,
   resolveMintpayEmail,
-  toPublicStorefrontUrl,
 } from '@/services/gateways/gateway.utils.js';
 import { ApiError } from '@/utils/errors/api-error.js';
 
@@ -49,11 +47,65 @@ function mintpayCustomerId(raw: unknown): string {
   return normalizeMintpayCustomerId(raw);
 }
 
+/** PHP `sprintf("%.02f", round($amount, 2))` — used in WooCommerce return hashes. */
+export function mintpayAmountString(amount: number): string {
+  return (Math.round(Number(amount) * 100) / 100).toFixed(2);
+}
+
+/** HMAC hex then Base64, matching `base64_encode(hash_hmac('sha256', ...))`. */
+export function mintpayBrowserReturnHash(
+  message: string,
+  secretKey = appConfig.payment.mintpay.secretKey,
+): string {
+  return Buffer.from(hmacSha256Hex(secretKey, message), 'utf8').toString('base64');
+}
+
+export function mintpaySuccessHashMessage(
+  orderId: string,
+  amount: number,
+  merchantId = appConfig.payment.mintpay.merchantId,
+): string {
+  return `${merchantId}${mintpayAmountString(amount)}${orderId}`;
+}
+
+export function mintpayFailHashMessage(orderId: string): string {
+  return orderId;
+}
+
+export function decodeMintpayBrowserHash(hash: string): string {
+  try {
+    return Buffer.from(String(hash).replace(/ /g, '+'), 'base64').toString('utf8');
+  } catch {
+    return '';
+  }
+}
+
+function mintpayNotifyUrl(): string {
+  const configured = String(appConfig.payment.mintpay.notifyUrl ?? '').trim();
+  try {
+    const parsed = new URL(configured);
+    const isLocal =
+      parsed.hostname === 'localhost' ||
+      parsed.hostname === '127.0.0.1' ||
+      parsed.hostname === '0.0.0.0';
+    if (!isLocal && parsed.protocol === 'https:') return configured;
+  } catch {
+    /* fall through */
+  }
+  return 'https://api.fe.lk/api/v1/payments/webhooks/mintpay';
+}
+
+function mintpayBrowserReturnUrl(orderId: string, hash: string): string {
+  const url = new URL(mintpayNotifyUrl());
+  url.searchParams.set('orderId', orderId);
+  url.searchParams.set('hash', hash);
+  return url.toString();
+}
+
 export class MintpayGateway implements PaymentGateway {
   readonly name = PAYMENT_METHOD.MINTPAY;
 
   async createSession(input: CreatePaymentSessionInput): Promise<PaymentSessionResult> {
-    const gatewayPaymentId = `mintpay_${input.orderId}_${randomBytes(4).toString('hex')}`;
     const { merchantId, secretKey } = appConfig.payment.mintpay;
 
     if (
@@ -96,8 +148,15 @@ export class MintpayGateway implements PaymentGateway {
       delivery_postcode: String(input.metadata?.deliveryPostcode ?? '00000'),
       cart_created_date: stamp,
       cart_updated_date: stamp,
-      success_url: toPublicStorefrontUrl(input.returnUrl),
-      fail_url: toPublicStorefrontUrl(input.cancelUrl),
+      // WooCommerce plugin: Mintpay GETs these URLs with orderId+hash. No IPN webhook.
+      success_url: mintpayBrowserReturnUrl(
+        input.orderId,
+        mintpayBrowserReturnHash(mintpaySuccessHashMessage(input.orderId, input.amount)),
+      ),
+      fail_url: mintpayBrowserReturnUrl(
+        input.orderId,
+        mintpayBrowserReturnHash(mintpayFailHashMessage(input.orderId)),
+      ),
       products: [
         {
           name: productLabel,
@@ -195,14 +254,21 @@ export class MintpayGateway implements PaymentGateway {
     );
 
     return {
-      gatewayPaymentId: purchaseId || gatewayPaymentId,
+      // Store our attempt order id so the browser-return callback can look it up
+      // (PayHere does the same). Mintpay's purchase_id is kept in raw/metadata.
+      gatewayPaymentId: input.orderId,
       redirectUrl: hosts.login,
       redirectForm: {
         action: hosts.login,
         method: 'POST',
         fields: { purchase_id: purchaseId },
       },
-      raw: { purchaseId, merchantId, mode: appConfig.payment.mintpay.mode },
+      raw: {
+        purchaseId,
+        merchantId,
+        mode: appConfig.payment.mintpay.mode,
+        orderId: input.orderId,
+      },
     };
   }
 
@@ -225,19 +291,20 @@ export class MintpayGateway implements PaymentGateway {
     const payload = parseWebhookPayload(input.rawBody);
     const status = String(payload.status ?? '').toLowerCase();
     const mappedStatus = MINTPAY_STATUS_MAP[status] ?? PAYMENT_STATUS.FAILED;
+    const orderId = String(payload.orderId ?? payload.order_id ?? payload.purchase_id ?? '');
 
-    logger.info(
-      { gateway: 'mintpay', orderId: payload.orderId, status, mappedStatus },
-      'Mintpay: webhook verified',
-    );
+    logger.info({ gateway: 'mintpay', orderId, status, mappedStatus }, 'Mintpay: webhook verified');
+
+    const amountRaw = payload.amount ?? payload.total_price;
+    const amount = amountRaw === undefined || amountRaw === '' ? undefined : Number(amountRaw);
 
     return {
       valid: true,
-      gatewayTxnId: String(payload.transactionId ?? payload.ref ?? ''),
-      orderId: String(payload.orderId ?? ''),
+      gatewayTxnId: String(payload.transactionId ?? payload.ref ?? payload.purchase_id ?? ''),
+      orderId,
       status: mappedStatus,
-      amount: Number(payload.amount ?? 0),
-      currency: String(payload.currency ?? ''),
+      amount,
+      currency: String(payload.currency ?? payload.currency_code ?? ''),
       payload,
     };
   }

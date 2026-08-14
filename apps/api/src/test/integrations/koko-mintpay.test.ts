@@ -7,6 +7,7 @@ vi.mock('@/config/app.config', () => ({
   appConfig: {
     app: { version: '0.1.0' },
     cors: { origins: ['http://localhost:5173'] },
+    server: { apiPrefix: '/api/v1' },
     payment: {
       payhere: { merchantId: 'pm', merchantSecret: 'ps', mode: 'sandbox' },
       koko: {
@@ -22,6 +23,7 @@ vi.mock('@/config/app.config', () => ({
         merchantId: 'mintpay-merchant',
         secretKey: 'mintpay-test-secret',
         mode: 'sandbox',
+        notifyUrl: 'https://api.fe.lk/api/v1/payments/webhooks/mintpay',
       },
     },
   },
@@ -147,7 +149,8 @@ describe('Koko gateway', () => {
 });
 
 describe('Mintpay gateway', () => {
-  it('returns sandbox login form redirect', async () => {
+  it('returns sandbox login form redirect with hashed success/fail URLs', async () => {
+    const { fetchWithRetry } = await import('@/utils/http-retry.js');
     const { MintpayGateway } = await import('@/services/gateways/mintpay.gateway.js');
     const gateway = new MintpayGateway();
     const result = await gateway.createSession({
@@ -164,7 +167,38 @@ describe('Mintpay gateway', () => {
     expect(result.redirectUrl).toContain('dev.mintpay.lk');
     expect(result.redirectForm?.action).toContain('dev.mintpay.lk/user-order/login');
     expect(result.redirectForm?.fields.purchase_id).toBe('purchase-abc');
+    expect(result.gatewayPaymentId).toBe('ORD-MP-001');
     expect(result.raw?.mode).toBe('sandbox');
+    expect(result.raw?.purchaseId).toBe('purchase-abc');
+
+    const posted = vi.mocked(fetchWithRetry).mock.calls.at(-1);
+    const body = JSON.parse(
+      String((posted?.[1] as { body?: string } | undefined)?.body ?? '{}'),
+    ) as {
+      success_url?: string;
+      fail_url?: string;
+    };
+    expect(body.success_url).toContain('/payments/webhooks/mintpay');
+    expect(body.success_url).toContain('orderId=ORD-MP-001');
+    expect(body.success_url).toContain('hash=');
+    expect(body.fail_url).toContain('orderId=ORD-MP-001');
+  });
+
+  it('builds WooCommerce-compatible success and fail hashes', async () => {
+    const {
+      mintpaySuccessHashMessage,
+      mintpayFailHashMessage,
+      mintpayBrowserReturnHash,
+      decodeMintpayBrowserHash,
+    } = await import('@/services/gateways/mintpay.gateway.js');
+
+    const successMsg = mintpaySuccessHashMessage('PAY-ABC-A1', 11349);
+    expect(successMsg).toBe('mintpay-merchant11349.00PAY-ABC-A1');
+    const encoded = mintpayBrowserReturnHash(successMsg);
+    expect(decodeMintpayBrowserHash(encoded)).toBe(
+      hmacSha256Hex('mintpay-test-secret', successMsg),
+    );
+    expect(mintpayFailHashMessage('PAY-ABC-A1')).toBe('PAY-ABC-A1');
   });
 
   it('returns valid=true with correct HMAC', async () => {

@@ -83,8 +83,48 @@ function webhookHandler(gateway: string) {
 
 paymentsRouter.post('/webhooks/payhere', webhookHandler('payhere'));
 paymentsRouter.post('/webhooks/koko', webhookHandler('koko'));
-paymentsRouter.post('/webhooks/mintpay', webhookHandler('mintpay'));
 paymentsRouter.post('/webhooks/cod', webhookHandler('cod'));
+
+function mintpayQueryValue(value: unknown): string {
+  if (Array.isArray(value)) return String(value[0] ?? '');
+  return String(value ?? '');
+}
+
+function mintpayReturnParams(req: {
+  query?: Record<string, unknown>;
+  body?: unknown;
+}): Record<string, unknown> {
+  const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
+  return { ...(req.query ?? {}), ...(body as Record<string, unknown>) };
+}
+
+function isMintpayBrowserReturn(req: { query?: Record<string, unknown>; body?: unknown }): boolean {
+  const params = mintpayReturnParams(req);
+  const orderId = mintpayQueryValue(params.orderId || params.order_id);
+  const hash = mintpayQueryValue(params.hash);
+  return Boolean(orderId && hash);
+}
+
+const mintpayReturnHandler = asyncHandler(async (req, res) => {
+  const params = mintpayReturnParams(req as { query?: Record<string, unknown>; body?: unknown });
+  const result = await paymentService.handleMintpayBrowserReturn({
+    orderId: mintpayQueryValue(params.orderId || params.order_id),
+    hash: mintpayQueryValue(params.hash),
+  });
+  res.redirect(302, result.redirectUrl);
+});
+
+// Mintpay confirms via browser GET/POST to success_url (HMAC hash), not a JSON IPN.
+paymentsRouter.get('/webhooks/mintpay', mintpayReturnHandler);
+paymentsRouter.post(
+  '/webhooks/mintpay',
+  asyncHandler(async (req, res, next) => {
+    if (isMintpayBrowserReturn(req as { query?: Record<string, unknown>; body?: unknown })) {
+      return mintpayReturnHandler(req, res, next);
+    }
+    return webhookHandler('mintpay')(req, res, next);
+  }),
+);
 
 paymentsRouter.get(
   '/status/:checkoutToken',

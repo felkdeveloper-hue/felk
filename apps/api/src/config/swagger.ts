@@ -696,11 +696,20 @@ export const openApiSpec = {
       },
     },
     '/payments/webhooks/mintpay': {
+      get: {
+        tags: ['Payments'],
+        summary:
+          'Mintpay browser return — WooCommerce-style HMAC hash on query (orderId + hash), then redirect',
+        responses: {
+          302: { description: 'Redirect to storefront success or cancel page' },
+        },
+      },
       post: {
         tags: ['Payments'],
-        summary: 'Mintpay webhook — HMAC-SHA256 signed, idempotent',
+        summary: 'Mintpay callback — browser-return hash or optional JSON HMAC, then create order',
         responses: {
-          200: { description: 'Acknowledged' },
+          200: { description: 'Acknowledged (JSON IPN)' },
+          302: { description: 'Redirect when orderId+hash are present' },
           400: { description: 'Invalid signature' },
         },
       },

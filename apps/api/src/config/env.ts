@@ -111,6 +111,8 @@ const envSchema = z
     MINTPAY_SECRET_KEY: z.string().default('dev-mintpay-secret-key'),
     MINTPAY_MERCHANT_SECRET: z.string().optional(),
     MINTPAY_MODE: z.enum(['sandbox', 'live']).default('sandbox'),
+    /** Public API URL Mintpay redirects to after pay (WooCommerce-style hash callback). */
+    MINTPAY_NOTIFY_URL: z.string().optional(),
 
     COD_WEBHOOK_SECRET: z.string().default('dev-cod-webhook-secret'),
 

@@ -80,4 +80,6 @@ export {
   handlePaymentSucceededEvent,
   initOrderPaymentConsumer,
   catchUpUnconsumedPaymentEvents,
+  catchUpOrphanPaidGatewayPayments,
+  recoverConfirmedMintpayOrders,
 } from '@/services/order-payment-consumer.service.js';

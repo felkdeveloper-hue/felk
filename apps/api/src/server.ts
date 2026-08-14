@@ -7,6 +7,8 @@ import {
   initOrderPaymentConsumer,
   catchUpUnconsumedPaymentEvents,
   catchUpOrphanCodPayments,
+  catchUpOrphanPaidGatewayPayments,
+  recoverConfirmedMintpayOrders,
 } from '@/services/order-payment-consumer.service.js';
 import { startCronJobs } from '@/cron/index.js';
 import { resetEmailTransporter, verifyEmailTransporter } from '@/services/email/transporter.js';
@@ -82,6 +84,40 @@ async function bootstrap(): Promise<void> {
       })
       .catch((error) => {
         logger.error({ err: error }, 'COD catch-up scan failed');
+      });
+    catchUpOrphanPaidGatewayPayments()
+      .then(({ scanned, created }) => {
+        if (created > 0) {
+          logger.info(
+            { scanned, created },
+            'Paid-gateway catch-up: created orders from verified payments',
+          );
+        }
+      })
+      .catch((error) => {
+        logger.error({ err: error }, 'Paid-gateway catch-up scan failed');
+      });
+    recoverConfirmedMintpayOrders()
+      .then(({ scanned, recovered }) => {
+        const created = recovered.filter((row) => row.orderNumber);
+        if (created.length > 0) {
+          logger.info(
+            {
+              scanned,
+              created: created.length,
+              orders: created.map((row) => ({
+                referenceNumber: row.referenceNumber,
+                orderNumber: row.orderNumber,
+                itemCount: row.items.length,
+                amount: row.amount,
+              })),
+            },
+            'Mintpay recovery: created missing orders from confirmed purchases',
+          );
+        }
+      })
+      .catch((error) => {
+        logger.error({ err: error }, 'Mintpay confirmed-order recovery failed');
       });
   } catch (error) {
     logger.warn({ err: error }, 'MongoDB unavailable — starting in degraded mode');

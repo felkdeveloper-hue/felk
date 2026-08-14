@@ -117,6 +117,9 @@ export const appConfig = {
       merchantId: env.MINTPAY_MERCHANT_ID,
       secretKey: env.MINTPAY_MERCHANT_SECRET ?? env.MINTPAY_SECRET_KEY,
       mode: env.MINTPAY_MODE,
+      notifyUrl:
+        env.MINTPAY_NOTIFY_URL ??
+        `${env.API_PUBLIC_URL.replace(/\/$/, '')}${env.API_PREFIX}/payments/webhooks/mintpay`,
     },
     cod: {
       webhookSecret: env.COD_WEBHOOK_SECRET,

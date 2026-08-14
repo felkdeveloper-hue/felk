@@ -1,45 +1,32 @@
 # Mintpay Integration
 
-> BNPL (Buy Now Pay Later) gateway with sandbox/live mode switching.
+> BNPL (Buy Now Pay Later) gateway. Confirmation matches the official WooCommerce plugin.
 
 ## Configuration
 
 ```env
 MINTPAY_MERCHANT_ID=your_merchant_id
-MINTPAY_MERCHANT_SECRET=your_secret       # used for API call + webhook HMAC
+MINTPAY_MERCHANT_SECRET=your_secret       # API Token header + return-hash HMAC
 MINTPAY_MODE=sandbox                      # sandbox | live
+MINTPAY_NOTIFY_URL=https://api.fe.lk/api/v1/payments/webhooks/mintpay
 ```
 
 `MINTPAY_SECRET_KEY` is a legacy alias for `MINTPAY_MERCHANT_SECRET` — both are supported.
 
 ## How It Works
 
-### With credentials configured
+Mintpay does **not** send a JSON IPN with `X-Mintpay-Signature`. The official plugin confirms payment when Mintpay **redirects the browser** to `success_url` / `fail_url`.
 
-1. Server POSTs to Mintpay's checkout session API (`sandbox.api.mintpay.lk` or `api.mintpay.lk`).
-2. Request body is HMAC-SHA256 signed with `MINTPAY_MERCHANT_SECRET`.
-3. Mintpay returns a `checkoutUrl`/`sessionId`.
-4. Customer is redirected to Mintpay-hosted checkout.
-5. Mintpay POSTs a webhook to `POST /api/v1/payments/webhooks/mintpay`.
+1. Server POSTs the cart to `https://app.mintpay.lk/user-order/api/` (live) or `https://dev.mintpay.lk/user-order/api/` (sandbox) with `Authorization: Token <secret>`.
+2. Mintpay returns a `purchase_id`. The shopper is POSTed to the Mintpay login page with that id.
+3. `success_url` / `fail_url` point at `GET /api/v1/payments/webhooks/mintpay?orderId=<PAY-…-A1>&hash=<base64(hmac)>`.
+4. Success hash = `HMAC-SHA256(secret, merchant_id + amount + order_id)` (hex, then Base64), same as WooCommerce.
+5. Fail hash = `HMAC-SHA256(secret, order_id)`.
+6. Our API verifies the hash, marks the payment paid, **creates the order**, then 302s to the storefront success page.
 
-### Fallback mode
+Admin orders are created only after this verified return (or a catch-up of an already-paid payment).
 
-If the secret key is the dev default or API call fails, the gateway falls back to a deterministic redirect URL.
-
-## Mode Switching
-
-| `MINTPAY_MODE` | API Base                            | Checkout Base                             |
-| -------------- | ----------------------------------- | ----------------------------------------- |
-| `sandbox`      | `https://sandbox.api.mintpay.lk/v1` | `https://sandbox.checkout.mintpay.lk/pay` |
-| `live`         | `https://api.mintpay.lk/v1`         | `https://checkout.mintpay.lk/pay`         |
-
-## Webhook
-
-Mintpay calls `POST /api/v1/payments/webhooks/mintpay`.
-
-Verification: `HMAC-SHA256(secret_key, raw_body)` must equal `X-Mintpay-Signature` header.
-
-Status mapping:
+## Status mapping (optional JSON IPN, if Mintpay ever posts one)
 
 | Mintpay status        | Platform status |
 | --------------------- | --------------- |
@@ -49,23 +36,11 @@ Status mapping:
 | `cancelled`           | `cancelled`     |
 | `expired`             | `expired`       |
 
-## Sandbox Setup
-
-1. Register at Mintpay sandbox portal and obtain credentials.
-2. Set `MINTPAY_MODE=sandbox`, `MINTPAY_MERCHANT_ID`, `MINTPAY_MERCHANT_SECRET`.
-3. Use ngrok for local webhook testing.
-
-## Production Setup
-
-1. Complete Mintpay KYC and obtain live credentials.
-2. Set `MINTPAY_MODE=live`.
-3. Configure webhook URL in Mintpay dashboard: `https://yourdomain.com/api/v1/payments/webhooks/mintpay`.
-4. Set `PRODUCTION_STRICT=true` to block dev defaults.
-
 ## Troubleshooting
 
-| Issue                           | Cause                 | Fix                                       |
-| ------------------------------- | --------------------- | ----------------------------------------- |
-| Fallback redirect in production | Secret is dev default | Set `MINTPAY_MERCHANT_SECRET`             |
-| Webhook `invalid_signature`     | Key mismatch          | Verify key in Mintpay dashboard           |
-| Wrong checkout URLs             | Mode set incorrectly  | Verify `MINTPAY_MODE=live` for production |
+| Issue                                    | Cause                                     | Fix                                                                 |
+| ---------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------- |
+| Paid in Mintpay portal, missing in admin | Return URL never hit / old webhook design | Redeploy this return-hash flow; run Mintpay order recovery catch-up |
+| `unknown_order` on return                | `orderId` not matching payment attempt    | Lookup uses `PAY-…-A1`, purchase id, and payment reference          |
+| HTML 403 creating session                | Localhost return URLs / WAF               | Set `API_PUBLIC_URL=https://api.fe.lk`                              |
+| 401 Invalid token                        | Wrong live/sandbox secret                 | Check `MINTPAY_MERCHANT_SECRET` and `MINTPAY_MODE`                  |

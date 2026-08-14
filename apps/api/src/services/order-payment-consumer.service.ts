@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { Types } from 'mongoose';
 import { OrderModel, type OrderItemSubdocument } from '@/models/order.models.js';
-import { PaymentModel, PaymentEventModel } from '@/models/payment.models.js';
+import { PaymentModel, PaymentEventModel, PaymentAttemptModel } from '@/models/payment.models.js';
 import { CheckoutSessionModel, type CheckoutSessionDocument } from '@/models/checkout.models.js';
 import { CustomerModel } from '@/models/customer.models.js';
 import { ProductModel, ProductVariantModel, ProductMediaModel } from '@/models/product.models.js';
@@ -17,7 +17,7 @@ import { logger } from '@/config/logger.js';
 import { ORDER_STATUS } from '@/constants/order-status.js';
 import { ORDER_AUDIT, ORDER_EVENT_TYPE, CONSUMED_PAYMENT_EVENT_TYPES } from '@/constants/order.js';
 import { CHECKOUT_AUDIT, CHECKOUT_STATUS } from '@/constants/checkout.js';
-import { PAYMENT_METHOD } from '@/constants/payment-status.js';
+import { PAYMENT_METHOD, PAYMENT_STATUS } from '@/constants/payment-status.js';
 import { PAYMENT_EVENT_TYPE } from '@/constants/payment.js';
 import { publishPaymentEvent } from '@/services/payment-event-publisher.js';
 import type { PaymentDocument } from '@/models/payment.models.js';
@@ -159,6 +159,7 @@ export async function handlePaymentSucceededEvent(payload: Record<string, unknow
     // Stock is deducted only after payment is verified: reserve then commit atomically.
     // Older flows may already have an active reservationId on the line — commit that.
     const committedReservationIds: Types.ObjectId[] = [];
+    let stockWarning: string | null = null;
     for (const line of checkout.lines) {
       try {
         let reservationId = line.reservationId?.toString() ?? null;
@@ -188,12 +189,12 @@ export async function handlePaymentSucceededEvent(payload: Record<string, unknow
         );
         committedReservationIds.push(new Types.ObjectId(reservationId));
       } catch (error) {
-        // Do not create a paid order when stock deduction fails.
+        stockWarning =
+          'One or more items could not be deducted from stock. Review inventory before packing.';
         logger.error(
           { err: error, variantId: line.variantId.toString(), paymentId },
-          'Failed to deduct stock during order creation — aborting order',
+          'Failed to deduct stock during order creation — creating paid order anyway',
         );
-        throw error;
       }
     }
 
@@ -258,7 +259,9 @@ export async function handlePaymentSucceededEvent(payload: Record<string, unknow
       orderId: order._id.toString(),
       event: 'created',
       status: ORDER_STATUS.PENDING,
-      note: 'Order created from a verified payment',
+      note: stockWarning
+        ? `Order created from a verified payment. ${stockWarning}`
+        : 'Order created from a verified payment',
     });
 
     try {
@@ -431,4 +434,114 @@ export async function catchUpUnconsumedPaymentEvents(): Promise<{
   }
 
   return { scanned: events.length, created };
+}
+
+/**
+ * Paid gateway payments that never produced an order (webhook race, restart, Mintpay return).
+ */
+export async function catchUpOrphanPaidGatewayPayments(): Promise<{
+  scanned: number;
+  created: number;
+}> {
+  const payments = await PaymentModel.find({
+    method: { $in: [PAYMENT_METHOD.MINTPAY, PAYMENT_METHOD.PAYHERE, PAYMENT_METHOD.KOKO] },
+    status: PAYMENT_STATUS.PAID,
+    isDeleted: false,
+  })
+    .sort({ createdAt: -1 })
+    .limit(200);
+
+  let created = 0;
+  for (const payment of payments) {
+    const exists = await OrderModel.exists({ paymentId: payment._id });
+    if (exists) continue;
+    await handlePaymentSucceededEvent({
+      paymentId: payment._id.toString(),
+      checkoutToken: payment.checkoutToken,
+      amount: payment.amount,
+      currency: payment.currency,
+      method: payment.method,
+    });
+    const nowExists = await OrderModel.exists({ paymentId: payment._id });
+    if (nowExists) created += 1;
+  }
+
+  return { scanned: payments.length, created };
+}
+
+/** Confirmed Mintpay merchant-portal purchases that never reached our order table. */
+const CONFIRMED_MINTPAY_PURCHASE_IDS = ['2975188', '2983159'] as const;
+const CONFIRMED_MINTPAY_REF_PREFIXES = ['PAY-MS0OUJZP', 'PAY-MSOOUJZP', 'PAY-MSRU476F'] as const;
+
+export async function recoverConfirmedMintpayOrders(): Promise<{
+  scanned: number;
+  recovered: Array<{
+    referenceNumber: string;
+    orderNumber: string | null;
+    items: string[];
+    amount: number;
+  }>;
+}> {
+  const prefixRegex = new RegExp(`^(${CONFIRMED_MINTPAY_REF_PREFIXES.join('|')})`);
+  const attempts = await PaymentAttemptModel.find({
+    gateway: PAYMENT_METHOD.MINTPAY,
+    gatewayPaymentId: { $in: [...CONFIRMED_MINTPAY_PURCHASE_IDS] },
+  }).select('paymentId');
+  const attemptPaymentIds = attempts.map((a) => a.paymentId);
+
+  const payments = await PaymentModel.find({
+    method: PAYMENT_METHOD.MINTPAY,
+    isDeleted: false,
+    $or: [
+      { _id: { $in: attemptPaymentIds } },
+      { gatewayPaymentId: { $in: [...CONFIRMED_MINTPAY_PURCHASE_IDS] } },
+      { 'metadata.mintpayPurchaseId': { $in: [...CONFIRMED_MINTPAY_PURCHASE_IDS] } },
+      { referenceNumber: prefixRegex },
+    ],
+  }).sort({ createdAt: -1 });
+
+  const recovered: Array<{
+    referenceNumber: string;
+    orderNumber: string | null;
+    items: string[];
+    amount: number;
+  }> = [];
+
+  for (const payment of payments) {
+    if (payment.status !== PAYMENT_STATUS.PAID) {
+      payment.status = PAYMENT_STATUS.PAID;
+      payment.paidAt = payment.paidAt ?? new Date();
+      payment.failureReason = null;
+      await payment.save();
+      await publishPaymentEvent(
+        PAYMENT_EVENT_TYPE.PAYMENT_SUCCEEDED,
+        {
+          paymentId: payment._id.toString(),
+          checkoutToken: payment.checkoutToken,
+          amount: payment.amount,
+          currency: payment.currency,
+          method: payment.method,
+        },
+        { paymentId: payment._id.toString(), checkoutId: payment.checkoutId.toString() },
+      );
+    }
+
+    await handlePaymentSucceededEvent({
+      paymentId: payment._id.toString(),
+      checkoutToken: payment.checkoutToken,
+      amount: payment.amount,
+      currency: payment.currency,
+      method: payment.method,
+    });
+
+    const order = await OrderModel.findOne({ paymentId: payment._id });
+    recovered.push({
+      referenceNumber: payment.referenceNumber,
+      orderNumber: order?.orderNumber ?? null,
+      items: (order?.items ?? []).map((item) => `${item.name} × ${item.quantity}`),
+      amount: payment.amount,
+    });
+  }
+
+  return { scanned: payments.length, recovered };
 }
