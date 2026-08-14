@@ -567,7 +567,7 @@ export async function recoverConfirmedMintpayOrders(): Promise<{
 }
 
 /** Koko payments that succeeded on Paykoko but never created an FE order. */
-const CONFIRMED_KOKO_REF_PREFIXES = ['PAY-MSSW5LLR-712AF7'] as const;
+const CONFIRMED_KOKO_REF_PREFIXES = ['PAY-MSSW5LLR-712AF7', 'PAY-MSSW5LLR'] as const;
 
 export async function recoverConfirmedKokoOrders(): Promise<{
   scanned: number;
@@ -577,29 +577,27 @@ export async function recoverConfirmedKokoOrders(): Promise<{
     items: string[];
     amount: number;
   }>;
+  scannedReferences: string[];
 }> {
   const since = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
-  const prefixRegex = new RegExp(`^(${CONFIRMED_KOKO_REF_PREFIXES.join('|')})`, 'i');
+  const prefixRegex = new RegExp(`(${CONFIRMED_KOKO_REF_PREFIXES.join('|')})`, 'i');
+  const recentAttempts = await PaymentAttemptModel.find({
+    gateway: PAYMENT_METHOD.KOKO,
+    createdAt: { $gte: since },
+  })
+    .select('paymentId')
+    .lean();
   const payments = await PaymentModel.find({
     method: PAYMENT_METHOD.KOKO,
     isDeleted: false,
     $or: [
-      {
-        createdAt: { $gte: since },
-        status: {
-          $in: [
-            PAYMENT_STATUS.PENDING,
-            PAYMENT_STATUS.PROCESSING,
-            PAYMENT_STATUS.FAILED,
-            PAYMENT_STATUS.PAID,
-          ],
-        },
-      },
+      { createdAt: { $gte: since } },
+      { _id: { $in: recentAttempts.map((row) => row.paymentId) } },
       { referenceNumber: prefixRegex },
     ],
   })
     .sort({ createdAt: -1 })
-    .limit(50);
+    .limit(100);
 
   const { kokoGateway } = await import('@/services/gateways/koko.gateway.js');
   const recovered: Array<{
@@ -671,5 +669,9 @@ export async function recoverConfirmedKokoOrders(): Promise<{
     });
   }
 
-  return { scanned: payments.length, recovered };
+  return {
+    scanned: payments.length,
+    recovered,
+    scannedReferences: payments.map((payment) => `${payment.referenceNumber}:${payment.status}`),
+  };
 }

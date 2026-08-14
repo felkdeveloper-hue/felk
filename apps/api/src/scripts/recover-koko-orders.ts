@@ -16,6 +16,7 @@ console.log(
     {
       scanned: result.scanned,
       recovered: result.recovered,
+      scannedReferences: result.scannedReferences,
     },
     null,
     2,

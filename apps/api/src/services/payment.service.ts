@@ -514,12 +514,12 @@ export class PaymentService {
 
   /** Public, checkoutToken-scoped status probe used by gateway return pages. */
   async getStatusByCheckoutToken(checkoutToken: string) {
-    let payment = await PaymentModel.findOne({ checkoutToken, isDeleted: false }).sort({
+    const payment = await PaymentModel.findOne({ checkoutToken, isDeleted: false }).sort({
       createdAt: -1,
     });
     if (!payment) throw ApiError.notFound('No payment found for this checkout');
 
-    payment = await this.reconcilePendingKokoPayment(payment);
+    await this.reconcilePendingKokoPayment(payment);
 
     // Heal stuck checkouts where payment is already verified but the order was never created.
     await fulfillCodPaymentIfNeeded(payment);

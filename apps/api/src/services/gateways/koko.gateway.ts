@@ -22,7 +22,7 @@ import {
   toPublicStorefrontUrl,
 } from '@/services/gateways/gateway.utils.js';
 import { ApiError } from '@/utils/errors/api-error.js';
-import { fetchWithRetry } from '@/utils/http-retry.js';
+import { fetchWithRetry, HttpRetryError } from '@/utils/http-retry.js';
 
 const KOKO_STATUS_MAP: Record<string, string> = {
   approved: PAYMENT_STATUS.PAID,
@@ -41,6 +41,7 @@ const KOKO_STATUS_MAP: Record<string, string> = {
 
 const PLUGIN_NAME = appConfig.payment.koko.pluginName || 'customapi';
 const PLUGIN_VERSION = appConfig.payment.koko.pluginVersion || '1';
+const ORDER_VIEW_PLUGIN_VERSIONS = [...new Set([PLUGIN_VERSION, '1', '1.0.1'])];
 
 const PEM_BEGIN = /-----BEGIN [A-Z0-9 ]+-----/;
 const PEM_PRIVATE = /-----BEGIN (?:RSA )?PRIVATE KEY-----/;
@@ -199,6 +200,27 @@ function isKokoSuccessStatus(status: string): boolean {
   return mapped === PAYMENT_STATUS.PAID;
 }
 
+function kokoOrderIdCandidates(orderId: string, referenceNumber?: string): string[] {
+  const ids = new Set<string>();
+  const add = (value?: string) => {
+    const trimmed = value?.trim();
+    if (trimmed) ids.add(trimmed);
+  };
+  add(orderId);
+  add(referenceNumber);
+  const bases = [orderId, referenceNumber].filter(Boolean).map((value) =>
+    String(value)
+      .replace(/-A\d+$/i, '')
+      .replace(/-AI$/i, ''),
+  );
+  for (const base of bases) {
+    add(base);
+    add(`${base}-A1`);
+    add(`${base}-AI`);
+  }
+  return [...ids];
+}
+
 function flattenKokoView(raw: unknown): Record<string, unknown> {
   if (!raw || typeof raw !== 'object') return {};
   const record = raw as Record<string, unknown>;
@@ -328,7 +350,10 @@ export class KokoGateway implements PaymentGateway {
     };
   }
 
-  async queryOrderView(orderId: string): Promise<{
+  async queryOrderView(
+    orderId: string,
+    pluginVersion = PLUGIN_VERSION,
+  ): Promise<{
     orderId: string;
     trnId: string;
     status: string;
@@ -338,7 +363,7 @@ export class KokoGateway implements PaymentGateway {
     const privateKey = loadPrivateKey();
     if (!apiKey || !merchantId || !privateKey) return null;
 
-    const dataString = merchantId + PLUGIN_NAME + PLUGIN_VERSION + orderId + apiKey;
+    const dataString = merchantId + PLUGIN_NAME + pluginVersion + orderId + apiKey;
     let signature: string;
     try {
       signature = buildRequestSignature(dataString, privateKey);
@@ -355,7 +380,7 @@ export class KokoGateway implements PaymentGateway {
       api_key: apiKey,
       _orderId: orderId,
       _pluginName: PLUGIN_NAME,
-      _pluginVersion: PLUGIN_VERSION,
+      _pluginVersion: pluginVersion,
       signature,
     });
 
@@ -370,29 +395,44 @@ export class KokoGateway implements PaymentGateway {
       const trnId = kokoCallbackField(payload, 'trnId', 'trn_id', 'transactionId');
       const status = kokoCallbackField(payload, 'status', 'paymentStatus');
       if (!status) {
-        logger.warn({ gateway: 'koko', orderId }, 'Koko: orderView returned no status');
+        logger.warn(
+          { gateway: 'koko', orderId, pluginVersion },
+          'Koko: orderView returned no status',
+        );
         return null;
       }
       return { orderId: viewedOrderId || orderId, trnId, status };
     } catch (err) {
-      logger.warn(
-        { gateway: 'koko', orderId, err: err instanceof Error ? err.message : 'orderView_failed' },
-        'Koko: orderView request failed',
-      );
+      const message = err instanceof Error ? err.message : 'orderView_failed';
+      const notExists = message.includes('OnlineOrderView.order.notExists');
+      if (!notExists) {
+        logger.warn(
+          { gateway: 'koko', orderId, pluginVersion, err: message },
+          'Koko: orderView request failed',
+        );
+      }
+      if (err instanceof HttpRetryError && notExists) return null;
+      if (notExists) return null;
       return null;
     }
   }
 
   async verifyTransaction(orderId: string) {
-    const viewed = await this.queryOrderView(orderId);
-    if (!viewed) return null;
-    const mappedStatus =
-      KOKO_STATUS_MAP[viewed.status] ?? KOKO_STATUS_MAP[viewed.status.toUpperCase()];
-    if (!mappedStatus) return null;
-    return {
-      status: mappedStatus,
-      gatewayTxnId: viewed.trnId || undefined,
-    };
+    const ids = kokoOrderIdCandidates(orderId);
+    for (const candidate of ids) {
+      for (const pluginVersion of ORDER_VIEW_PLUGIN_VERSIONS) {
+        const viewed = await this.queryOrderView(candidate, pluginVersion);
+        if (!viewed) continue;
+        const mappedStatus =
+          KOKO_STATUS_MAP[viewed.status] ?? KOKO_STATUS_MAP[viewed.status.toUpperCase()];
+        if (!mappedStatus) continue;
+        return {
+          status: mappedStatus,
+          gatewayTxnId: viewed.trnId || undefined,
+        };
+      }
+    }
+    return null;
   }
 
   async verifyWebhook(input: WebhookVerificationInput) {
