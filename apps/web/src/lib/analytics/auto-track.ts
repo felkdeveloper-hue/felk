@@ -16,6 +16,7 @@ import {
   setPendingSession,
   buildVisitorPayload,
 } from './collector';
+import { captureUtmParams } from './utm';
 
 let currentPath: string | null = null;
 let pageEnterTime: number = Date.now();
@@ -226,6 +227,7 @@ export function setup() {
   if (isSetup || typeof window === 'undefined') return;
   isSetup = true;
 
+  captureUtmParams();
   setupEngagementTracking();
 
   document.addEventListener('scroll', onScroll, { passive: true });

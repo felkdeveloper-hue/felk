@@ -24,6 +24,7 @@ export const ADMIN_ROUTES = {
   finance: '/admin/finance',
   reports: '/admin/reports',
   users: '/admin/users',
+  userDetail: '/admin/users/$userId',
   roles: '/admin/roles',
   settings: '/admin/settings',
   audit: '/admin/audit',

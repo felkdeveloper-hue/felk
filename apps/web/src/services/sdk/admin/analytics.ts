@@ -70,6 +70,8 @@ export interface VisitorRow {
   _id: string;
   visitorId: string;
   userId?: string | null;
+  customerName?: string | null;
+  customerEmail?: string | null;
   geo: {
     country?: string | null;
     countryCode?: string | null;
@@ -85,7 +87,12 @@ export interface VisitorRow {
   };
   referrer?: string | null;
   utmSource?: string | null;
+  utmMedium?: string | null;
+  utmCampaign?: string | null;
   trafficSource: string;
+  sourceLabel?: string;
+  sourceChannel?: string;
+  sourceDetail?: string | null;
   firstSeenAt: string;
   lastSeenAt: string;
   totalVisits: number;

@@ -1,7 +1,7 @@
 import { type Types } from 'mongoose';
 import { z } from 'zod';
 import { AUDIT_ACTIONS, AUTH_LIMITS, USER_STATUS, type UserStatus } from '@/constants/auth.js';
-import { CART_STATUS } from '@/constants/cart.js';
+import { CART_STATUS, CART_ITEM_LOCATION } from '@/constants/cart.js';
 import { ORDER_STATUS } from '@/constants/order-status.js';
 import { ROLES, type RoleKey } from '@/constants/roles.js';
 import {
@@ -296,6 +296,110 @@ export class AdminUserService {
     });
 
     return { data, meta: buildPaginationMeta(total, page, limit) };
+  }
+
+  async getById(userId: string) {
+    const user = await UserModel.findOne({ _id: userId, isDeleted: false })
+      .select('+passwordHash +googleId')
+      .lean();
+    if (!user) {
+      throw ApiError.notFound('User not found', 'USER_NOT_FOUND');
+    }
+
+    const customer = await CustomerModel.findOne({ userId: user._id, isDeleted: false }).lean();
+    const customerIdStr = customer ? String(customer._id) : undefined;
+
+    let cartItems: Array<{
+      id: string;
+      title: string;
+      quantity: number;
+      currentPrice: number;
+      currency: string;
+      colorName?: string | null;
+      sizeName?: string | null;
+      thumbnailUrl?: string | null;
+      updatedAt?: Date;
+    }> = [];
+
+    let orders: Array<{
+      id: string;
+      orderNumber: string;
+      status: string;
+      grandTotal: number;
+      currency: string;
+      itemCount: number;
+      placedAt?: Date;
+      createdAt?: Date;
+    }> = [];
+
+    if (customer) {
+      const cart = await CartModel.findOne({
+        customerId: customer._id,
+        status: CART_STATUS.ACTIVE,
+        isDeleted: false,
+      }).lean();
+
+      if (cart) {
+        const items = await CartItemModel.find({
+          cartId: cart._id,
+          location: CART_ITEM_LOCATION.CART,
+          isDeleted: false,
+        })
+          .sort({ updatedAt: -1 })
+          .lean();
+
+        cartItems = items.map((item) => ({
+          id: String(item._id),
+          title: item.title,
+          quantity: item.quantity,
+          currentPrice: item.currentPrice,
+          currency: item.currency,
+          colorName: item.colorName,
+          sizeName: item.sizeName,
+          thumbnailUrl: item.thumbnailUrl,
+          updatedAt: item.updatedAt,
+        }));
+      }
+
+      const orderDocs = await OrderModel.find({
+        customerId: customer._id,
+        isDeleted: false,
+      })
+        .sort({ createdAt: -1 })
+        .limit(50)
+        .lean();
+
+      orders = orderDocs.map((order) => {
+        const totals = (order.totals ?? {}) as {
+          grandTotal?: number;
+          currency?: string;
+          totalQuantity?: number;
+        };
+        const items = Array.isArray(order.items) ? order.items : [];
+        return {
+          id: String(order._id),
+          orderNumber: order.orderNumber,
+          status: order.status,
+          grandTotal: Number(totals.grandTotal ?? 0),
+          currency: String(totals.currency ?? order.currency ?? 'LKR'),
+          itemCount: Number(totals.totalQuantity ?? items.length),
+          placedAt: order.placedAt ?? undefined,
+          createdAt: order.createdAt,
+        };
+      });
+    }
+
+    const purchasedItemCount = orders.reduce((sum, order) => sum + order.itemCount, 0);
+
+    return {
+      ...mapUserRow(user, {
+        customerId: customerIdStr,
+        cartItemCount: cartItems.reduce((sum, item) => sum + item.quantity, 0),
+        purchasedItemCount,
+      }),
+      cartItems,
+      orders,
+    };
   }
 
   private async getActiveUser(userId: string) {

@@ -1,3 +1,4 @@
+import { Link } from '@tanstack/react-router';
 import { AdminErrorState, AdminPageHeader, PageMotion, DataTable } from '@/components/admin';
 import {
   AnalyticsExportButton,
@@ -5,37 +6,78 @@ import {
   TableSkeleton,
 } from '@/components/admin/analytics';
 import { useAnalyticsVisitors, useAnalyticsFilters } from '@/hooks/admin';
+import { ADMIN_ROUTES } from '@/constants';
 import type { VisitorRow } from '@/services/sdk/admin';
 import type { DataTableColumn } from '@/components/admin';
 import { formatDate } from '@/lib/utils';
 
+function formatLocation(row: VisitorRow): string {
+  const parts = [row.geo.city, row.geo.region, row.geo.country ?? row.geo.countryCode].filter(
+    Boolean,
+  );
+  return parts.join(', ') || '—';
+}
+
 const columns: DataTableColumn<VisitorRow>[] = [
+  {
+    id: 'customer',
+    header: 'User',
+    cell: (row) =>
+      row.customerName || row.customerEmail ? (
+        <div>
+          {row.customerName ? <p className="text-sm font-medium">{row.customerName}</p> : null}
+          {row.customerEmail ? (
+            <p className="text-muted-foreground text-xs">{row.customerEmail}</p>
+          ) : null}
+          {row.userId ? (
+            <Link
+              to={ADMIN_ROUTES.userDetail}
+              params={{ userId: row.userId }}
+              className="text-primary mt-0.5 inline-block text-[10px] underline-offset-2 hover:underline"
+            >
+              View profile
+            </Link>
+          ) : null}
+        </div>
+      ) : (
+        <span className="text-muted-foreground text-xs">Guest</span>
+      ),
+  },
   {
     id: 'visitorId',
     header: 'Visitor ID',
     cell: (row) => (
-      <span className="text-muted-foreground font-mono text-xs">{row.visitorId.slice(0, 8)}…</span>
+      <span className="text-muted-foreground font-mono text-xs" title={row.visitorId}>
+        {row.visitorId.slice(0, 8)}…
+      </span>
     ),
   },
   {
     id: 'geo',
     header: 'Location',
-    cell: (row) => [row.geo.city, row.geo.country].filter(Boolean).join(', ') || '—',
+    cell: (row) => <span className="text-sm">{formatLocation(row)}</span>,
+  },
+  {
+    id: 'source',
+    header: 'Source',
+    cell: (row) => (
+      <div className="max-w-[14rem]">
+        <p className="text-sm font-medium">{row.sourceLabel ?? row.trafficSource}</p>
+        <p className="text-muted-foreground text-[11px]">
+          {row.sourceChannel ?? 'Unknown channel'}
+        </p>
+        {row.sourceDetail ? (
+          <p className="text-muted-foreground mt-0.5 truncate text-[10px]" title={row.sourceDetail}>
+            {row.sourceDetail}
+          </p>
+        ) : null}
+      </div>
+    ),
   },
   {
     id: 'device',
     header: 'Device',
     cell: (row) => [row.device.browser, row.device.type].filter(Boolean).join(' / ') || '—',
-  },
-  {
-    id: 'device.os',
-    header: 'OS',
-    cell: (row) => row.device.os ?? '—',
-  },
-  {
-    id: 'trafficSource',
-    header: 'Source',
-    cell: (row) => <span className="capitalize">{row.trafficSource.replace('_', ' ')}</span>,
   },
   {
     id: 'totalVisits',
@@ -69,7 +111,7 @@ export function AnalyticsVisitorsPage() {
     <PageMotion>
       <AdminPageHeader
         title="Visitors"
-        description="Every visitor tracked by the platform."
+        description="Track where visitors come from, who they are when logged in, and what device they use."
         actions={<AnalyticsExportButton reportType="visitors" filter={filter} allowPageScope />}
       />
 
@@ -77,7 +119,7 @@ export function AnalyticsVisitorsPage() {
         filter={filter}
         onChange={setFilter}
         onClear={clearFilters}
-        visible={['period', 'userId', 'device', 'browser', 'country', 'city', 'trafficSource']}
+        visible={['period', 'q', 'userId', 'device', 'browser', 'country', 'city', 'trafficSource']}
       />
 
       {query.isError ? (

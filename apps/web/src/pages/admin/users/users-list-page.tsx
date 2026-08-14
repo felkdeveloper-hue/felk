@@ -1,4 +1,5 @@
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Link } from '@tanstack/react-router';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import {
@@ -20,6 +21,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { QUERY_KEYS } from '@/constants';
+import { ADMIN_ROUTES } from '@/constants/routes';
 import { ADMIN_REFETCH_MS } from '@/constants/admin-poll';
 import { ADMIN_ROLE_OPTIONS, roleSummary } from '@/constants/admin-role-guide';
 import { useAdminPermissions } from '@/hooks/admin';
@@ -402,6 +404,13 @@ export function UsersListPage() {
             header: 'Actions',
             cell: (row) => (
               <div className="flex flex-wrap items-center justify-end gap-1">
+                <Link
+                  to={ADMIN_ROUTES.userDetail}
+                  params={{ userId: row.id }}
+                  className={cn(actionBtn, actionSecondary)}
+                >
+                  View
+                </Link>
                 {userPerms.update ? (
                   <button
                     type="button"

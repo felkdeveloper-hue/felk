@@ -21,6 +21,34 @@ export interface AdminUserRow {
   createdAt?: string;
 }
 
+export interface AdminUserCartItem {
+  id: string;
+  title: string;
+  quantity: number;
+  currentPrice: number;
+  currency: string;
+  colorName?: string | null;
+  sizeName?: string | null;
+  thumbnailUrl?: string | null;
+  updatedAt?: string;
+}
+
+export interface AdminUserOrderSummary {
+  id: string;
+  orderNumber: string;
+  status: string;
+  grandTotal: number;
+  currency: string;
+  itemCount: number;
+  placedAt?: string;
+  createdAt?: string;
+}
+
+export interface AdminUserDetail extends AdminUserRow {
+  cartItems: AdminUserCartItem[];
+  orders: AdminUserOrderSummary[];
+}
+
 function normalizeUser(raw: unknown): AdminUserRow {
   const record = raw as Record<string, unknown>;
   const hasPassword = Boolean(record.hasPassword);
@@ -79,6 +107,44 @@ export const usersApi = {
   async list(params?: UserListParams): Promise<PaginatedResult<AdminUserRow>> {
     const result = await http.getPaginated<unknown>('/users', { params });
     return { ...result, data: normalizeList(result.data, normalizeUser) };
+  },
+
+  async getById(userId: string): Promise<AdminUserDetail> {
+    const raw = await http.get<unknown>(`/users/${userId}`);
+    const record = raw as Record<string, unknown>;
+    const base = normalizeUser(record);
+    const cartItems = Array.isArray(record.cartItems)
+      ? record.cartItems.map((item) => {
+          const row = item as Record<string, unknown>;
+          return {
+            id: String(row.id ?? ''),
+            title: String(row.title ?? ''),
+            quantity: Number(row.quantity ?? 0),
+            currentPrice: Number(row.currentPrice ?? 0),
+            currency: String(row.currency ?? 'LKR'),
+            colorName: typeof row.colorName === 'string' ? row.colorName : null,
+            sizeName: typeof row.sizeName === 'string' ? row.sizeName : null,
+            thumbnailUrl: typeof row.thumbnailUrl === 'string' ? row.thumbnailUrl : null,
+            updatedAt: typeof row.updatedAt === 'string' ? row.updatedAt : undefined,
+          };
+        })
+      : [];
+    const orders = Array.isArray(record.orders)
+      ? record.orders.map((item) => {
+          const row = item as Record<string, unknown>;
+          return {
+            id: String(row.id ?? ''),
+            orderNumber: String(row.orderNumber ?? ''),
+            status: String(row.status ?? ''),
+            grandTotal: Number(row.grandTotal ?? 0),
+            currency: String(row.currency ?? 'LKR'),
+            itemCount: Number(row.itemCount ?? 0),
+            placedAt: typeof row.placedAt === 'string' ? row.placedAt : undefined,
+            createdAt: typeof row.createdAt === 'string' ? row.createdAt : undefined,
+          };
+        })
+      : [];
+    return { ...base, cartItems, orders };
   },
 
   async create(payload: AdminCreateUserPayload): Promise<AdminUserRow> {

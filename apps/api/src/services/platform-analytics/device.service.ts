@@ -18,7 +18,7 @@ function toPct(items: Array<{ _id: string | null; count: number }>): Breakdown[]
 }
 
 export async function getDeviceBreakdown(filter: AnalyticsFilter) {
-  const match = buildVisitorMatch(filter);
+  const match = await buildVisitorMatch(filter);
 
   const [deviceTypes, browsers, operatingSystems] = await Promise.all([
     VisitorModel.aggregate<{ _id: string | null; count: number }>([

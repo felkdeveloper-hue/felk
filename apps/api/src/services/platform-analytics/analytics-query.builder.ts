@@ -1,5 +1,6 @@
 import { Types, type FilterQuery } from 'mongoose';
 import { ProductModel } from '@/models/product.models.js';
+import { UserModel } from '@/models/user.model.js';
 import type { AnalyticsFilter } from '@/schemas/analytics/index.js';
 import { resolveDateRange, type DateRange } from './date-range.util.js';
 
@@ -122,7 +123,10 @@ export function buildPageViewMatch(filter: AnalyticsFilter, range?: DateRange): 
   return match;
 }
 
-export function buildVisitorMatch(filter: AnalyticsFilter, range?: DateRange): MongoMatch {
+export async function buildVisitorMatch(
+  filter: AnalyticsFilter,
+  range?: DateRange,
+): Promise<MongoMatch> {
   const r = range ?? resolveDateRange(filter);
   const match: MongoMatch = { lastSeenAt: { $gte: r.from, $lte: r.to } };
   if (filter.country) match['geo.countryCode'] = filter.country;
@@ -131,6 +135,61 @@ export function buildVisitorMatch(filter: AnalyticsFilter, range?: DateRange): M
   if (filter.browser) match['device.browser'] = { $regex: filter.browser, $options: 'i' };
   if (filter.userId) match['userId'] = asObjectId(filter.userId);
   if (filter.trafficSource) match['trafficSource'] = filter.trafficSource;
+
+  if (filter.q) {
+    const q = filter.q.trim();
+    const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const escaped = escapeRegex(q);
+    const regex = new RegExp(escaped, 'i');
+    const tokens = q.split(/\s+/).filter(Boolean);
+    const tokenClauses = tokens.map((token) => {
+      const tokenRegex = new RegExp(escapeRegex(token), 'i');
+      return {
+        $or: [{ email: tokenRegex }, { firstName: tokenRegex }, { lastName: tokenRegex }],
+      };
+    });
+
+    const users = await UserModel.find({
+      isDeleted: false,
+      $or: [
+        { email: regex },
+        { firstName: regex },
+        { lastName: regex },
+        {
+          $expr: {
+            $regexMatch: {
+              input: {
+                $trim: {
+                  input: {
+                    $concat: [{ $ifNull: ['$firstName', ''] }, ' ', { $ifNull: ['$lastName', ''] }],
+                  },
+                },
+              },
+              regex: escaped,
+              options: 'i',
+            },
+          },
+        },
+        ...(tokens.length > 1 ? [{ $and: tokenClauses }] : []),
+      ],
+    })
+      .select('_id')
+      .limit(50)
+      .lean();
+    const userIds = users.map((user) => user._id);
+    match['$or'] = [
+      { visitorId: regex },
+      { referrer: regex },
+      { utmSource: regex },
+      { utmMedium: regex },
+      { utmCampaign: regex },
+      { 'geo.city': regex },
+      { 'geo.country': regex },
+      { 'geo.countryCode': regex },
+      ...(userIds.length ? [{ userId: { $in: userIds } }] : []),
+    ];
+  }
+
   return match;
 }
 

@@ -48,6 +48,16 @@ usersRouter.post(
   }),
 );
 
+usersRouter.get(
+  '/:userId',
+  authorizeAny(P.USERS_READ, P.USERS_MANAGE),
+  validate({ params: adminUserIdParamsSchema }),
+  asyncHandler(async (req, res) => {
+    const result = await adminUserService.getById(String(req.params.userId));
+    ApiResponse.success(res, result);
+  }),
+);
+
 usersRouter.patch(
   '/:userId',
   authorizeAny(P.USERS_UPDATE, P.USERS_LOCK, P.USERS_MANAGE),

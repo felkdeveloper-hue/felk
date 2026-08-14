@@ -41,6 +41,84 @@ export function resolveGeo(req: Request): GeoData {
   };
 }
 
+/**
+ * Best-effort geo from IP when CDN headers are absent (e.g. bare EC2).
+ * Never throws; uses ip-api.com with a short timeout and in-memory cache.
+ */
+export async function resolveGeoFromIp(ip: string | undefined): Promise<GeoData | null> {
+  const country = await resolveCountryFromIp(ip);
+  if (!country) return null;
+
+  if (!ip || isPrivateOrLocalIp(ip)) {
+    return {
+      country: country.country,
+      countryCode: country.countryCode,
+      region: null,
+      city: null,
+      timezone: null,
+    };
+  }
+
+  const key = anonymizeIp(ip);
+  const cached = geoCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.geo;
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 2500);
+  try {
+    const url = `http://ip-api.com/json/${encodeURIComponent(ip.replace(/^::ffff:/, ''))}?fields=status,country,countryCode,city,regionName,timezone`;
+    const res = await fetch(url, { signal: controller.signal });
+    if (!res.ok)
+      return {
+        country: country.country,
+        countryCode: country.countryCode,
+        region: null,
+        city: null,
+        timezone: null,
+      };
+    const data = (await res.json()) as {
+      status?: string;
+      country?: string;
+      countryCode?: string;
+      city?: string;
+      regionName?: string;
+      timezone?: string;
+    };
+    if (data.status !== 'success' || !data.countryCode) {
+      return {
+        country: country.country,
+        countryCode: country.countryCode,
+        region: null,
+        city: null,
+        timezone: null,
+      };
+    }
+    const geo: GeoData = {
+      country: data.country ?? data.countryCode,
+      countryCode: data.countryCode,
+      region: data.regionName ?? null,
+      city: data.city ?? null,
+      timezone: data.timezone ?? null,
+    };
+    geoCache.set(key, { geo, expiresAt: Date.now() + COUNTRY_CACHE_TTL_MS });
+    return geo;
+  } catch {
+    return {
+      country: country.country,
+      countryCode: country.countryCode,
+      region: null,
+      city: null,
+      timezone: null,
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+const geoCache = new Map<string, { geo: GeoData; expiresAt: number }>();
+
 function isPrivateOrLocalIp(ip: string): boolean {
   const clean = ip.replace(/^::ffff:/, '');
   return (

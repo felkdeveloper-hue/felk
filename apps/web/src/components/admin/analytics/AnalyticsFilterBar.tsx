@@ -421,7 +421,7 @@ export function AnalyticsFilterBar({
               <Input
                 className={inputClass}
                 value={filter.q ?? ''}
-                placeholder="Session / path search"
+                placeholder="Name, email, visitor ID, source…"
                 onChange={(e) => onChange({ q: e.target.value || undefined })}
               />
             </Field>

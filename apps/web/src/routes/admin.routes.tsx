@@ -28,6 +28,9 @@ const ProductFormPage = lazy(() =>
 const UsersListPage = lazy(() =>
   import('@/pages/admin/users/users-list-page').then((m) => ({ default: m.UsersListPage })),
 );
+const UserDetailPage = lazy(() =>
+  import('@/pages/admin/users/user-detail-page').then((m) => ({ default: m.UserDetailPage })),
+);
 const CollectionsPage = lazy(() =>
   import('@/pages/admin/catalog/catalog-pages').then((m) => ({ default: m.CollectionsPage })),
 );
@@ -332,9 +335,26 @@ const adminUsersRoute = createRoute({
   path: 'users',
   component: () => (
     <AdminPermissionRoute permissions={[PERMISSIONS.USERS_READ, PERMISSIONS.USERS_MANAGE]}>
-      <UsersListPage />
+      <Suspense fallback={<AdminLazyFallback />}>
+        <UsersListPage />
+      </Suspense>
     </AdminPermissionRoute>
   ),
+});
+
+const adminUserDetailRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: 'users/$userId',
+  component: function AdminUserDetailRoute() {
+    const { userId } = adminUserDetailRoute.useParams();
+    return (
+      <AdminPermissionRoute permissions={[PERMISSIONS.USERS_READ, PERMISSIONS.USERS_MANAGE]}>
+        <Suspense fallback={<AdminLazyFallback />}>
+          <UserDetailPage userId={userId} />
+        </Suspense>
+      </AdminPermissionRoute>
+    );
+  },
 });
 
 const adminRolesRoute = createRoute({
@@ -719,6 +739,7 @@ export const adminRouteTree = adminLayoutRoute.addChildren([
   adminFinanceRoute,
   adminReportsRoute,
   adminUsersRoute,
+  adminUserDetailRoute,
   adminRolesRoute,
   adminSettingsRoute,
   adminIntegrationsRoute,

@@ -13,7 +13,7 @@ const SOURCE_LABELS: Record<string, string> = {
 };
 
 export async function getTrafficSources(filter: AnalyticsFilter) {
-  const match = buildVisitorMatch(filter);
+  const match = await buildVisitorMatch(filter);
 
   const results = await VisitorModel.aggregate<{ _id: string; count: number }>([
     { $match: match },

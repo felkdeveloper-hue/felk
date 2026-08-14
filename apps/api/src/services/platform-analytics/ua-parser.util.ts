@@ -76,44 +76,4 @@ function detectOs(ua: string): { os: string | null; osVersion: string | null } {
   return { os: null, osVersion: null };
 }
 
-/**
- * Classify traffic source from referrer + UTM params.
- */
-export function classifyTrafficSource(opts: {
-  referrer?: string | null;
-  utmSource?: string | null;
-  utmMedium?: string | null;
-}): string {
-  const { referrer, utmSource, utmMedium } = opts;
-
-  if (utmMedium) {
-    const m = utmMedium.toLowerCase();
-    if (m === 'cpc' || m === 'ppc' || m === 'paid') return 'paid_search';
-    if (m === 'email') return 'email';
-    if (m === 'social') return 'social';
-    if (m === 'affiliate') return 'referral';
-    if (m === 'display') return 'display';
-  }
-
-  if (utmSource) {
-    const s = utmSource.toLowerCase();
-    if (/google|bing|yahoo|duckduckgo/.test(s)) return 'organic_search';
-    if (/facebook|instagram|twitter|linkedin|tiktok|pinterest|youtube/.test(s)) return 'social';
-    if (s === 'email') return 'email';
-  }
-
-  if (!referrer) return 'direct';
-
-  try {
-    const url = new URL(referrer);
-    const host = url.hostname.replace(/^www\./, '');
-    if (/google\.|bing\.|yahoo\.|duckduckgo\./.test(host)) return 'organic_search';
-    if (
-      /facebook\.|instagram\.|twitter\.|t\.co|linkedin\.|tiktok\.|pinterest\.|youtube\./.test(host)
-    )
-      return 'social';
-    return 'referral';
-  } catch {
-    return 'direct';
-  }
-}
+export { classifyTrafficSource } from './source-attribution.util.js';

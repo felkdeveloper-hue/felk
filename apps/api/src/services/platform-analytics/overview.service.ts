@@ -36,8 +36,8 @@ export async function getOverview(filter: AnalyticsFilter): Promise<OverviewData
   const range = resolveDateRange(filter);
   const prev = getComparisonRange(range);
 
-  const visitorCur = buildVisitorMatch(filter, range);
-  const visitorPrev = buildVisitorMatch(filter, prev);
+  const visitorCur = await buildVisitorMatch(filter, range);
+  const visitorPrev = await buildVisitorMatch(filter, prev);
   const sessionCur = buildSessionMatch(filter, range);
   const sessionPrev = buildSessionMatch(filter, prev);
   const pageCur = buildPageViewMatch(filter, range);

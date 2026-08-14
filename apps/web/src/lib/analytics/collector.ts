@@ -1,3 +1,5 @@
+import { getPersistedUtm } from './utm';
+
 const ENDPOINT = `${import.meta.env.VITE_API_URL ?? '/api/v1'}/analytics/collect`;
 const FLUSH_INTERVAL_MS = 5_000;
 const MAX_QUEUE_SIZE = 50;
@@ -91,20 +93,21 @@ function getUtmParam(key: string): string | null {
 
 async function send(payload: CollectPayload): Promise<void> {
   const body = JSON.stringify(payload);
-  if (navigator.sendBeacon) {
-    const blob = new Blob([body], { type: 'application/json' });
-    navigator.sendBeacon(ENDPOINT, blob);
-    return;
-  }
   try {
     await fetch(ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body,
       keepalive: true,
+      credentials: 'include',
     });
+    return;
   } catch {
-    /* tracking errors must never surface */
+    /* fall through to beacon */
+  }
+  if (navigator.sendBeacon) {
+    const blob = new Blob([body], { type: 'application/json' });
+    navigator.sendBeacon(ENDPOINT, blob);
   }
 }
 
@@ -177,6 +180,7 @@ export function stopFlushInterval(): void {
 }
 
 export function buildVisitorPayload(visitorId: string): VisitorPayload {
+  const utm = getPersistedUtm();
   return {
     visitorId,
     device: {
@@ -185,10 +189,10 @@ export function buildVisitorPayload(visitorId: string): VisitorPayload {
       language: navigator.language ?? null,
     },
     referrer: document.referrer || null,
-    utmSource: getUtmParam('utm_source'),
-    utmMedium: getUtmParam('utm_medium'),
-    utmCampaign: getUtmParam('utm_campaign'),
-    utmTerm: getUtmParam('utm_term'),
-    utmContent: getUtmParam('utm_content'),
+    utmSource: utm?.utmSource ?? getUtmParam('utm_source'),
+    utmMedium: utm?.utmMedium ?? getUtmParam('utm_medium'),
+    utmCampaign: utm?.utmCampaign ?? getUtmParam('utm_campaign'),
+    utmTerm: utm?.utmTerm ?? getUtmParam('utm_term'),
+    utmContent: utm?.utmContent ?? getUtmParam('utm_content'),
   };
 }

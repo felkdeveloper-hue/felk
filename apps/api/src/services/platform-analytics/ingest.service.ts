@@ -9,8 +9,36 @@ import type {
   PageViewPayload,
   EventPayload,
 } from '@/schemas/analytics/index.js';
-import { resolveGeo, anonymizeIp } from './geoip.util.js';
-import { parseUserAgent, classifyTrafficSource } from './ua-parser.util.js';
+import { resolveGeo, anonymizeIp, resolveGeoFromIp } from './geoip.util.js';
+import { parseUserAgent } from './ua-parser.util.js';
+import { classifyTrafficSource, isIgnoredReferrer } from './source-attribution.util.js';
+import type { GeoData } from '@/models/analytics/index.js';
+
+function hasAttributionSignal(payload: VisitorPayload): boolean {
+  const referrer = payload.referrer?.trim() || null;
+  const meaningfulReferrer = Boolean(referrer) && !isIgnoredReferrer(referrer);
+  return Boolean(
+    payload.utmSource?.trim() ||
+    payload.utmMedium?.trim() ||
+    payload.utmCampaign?.trim() ||
+    meaningfulReferrer,
+  );
+}
+
+function mergeGeo(existing: GeoData | null | undefined, incoming: GeoData): GeoData {
+  const prev = existing ?? {};
+  return {
+    country: prev.country ?? incoming.country ?? null,
+    countryCode: prev.countryCode ?? incoming.countryCode ?? null,
+    region: prev.region ?? incoming.region ?? null,
+    city: prev.city ?? incoming.city ?? null,
+    timezone: prev.timezone ?? incoming.timezone ?? null,
+  };
+}
+
+function geoIsEmpty(geo: GeoData): boolean {
+  return !geo.country && !geo.countryCode && !geo.city && !geo.region;
+}
 
 function hashIp(ip: string | undefined): string {
   return createHash('sha256').update(anonymizeIp(ip)).digest('hex').slice(0, 32);
@@ -24,7 +52,12 @@ async function upsertVisitor(
   const ua = req.headers['user-agent'];
   const ip = req.ip;
   const parsedDevice = parseUserAgent(ua);
-  const geo = payload.geo ?? resolveGeo(req);
+  let geo = payload.geo ?? resolveGeo(req);
+  if (geoIsEmpty(geo)) {
+    const fromIp = await resolveGeoFromIp(ip);
+    if (fromIp) geo = mergeGeo(geo, fromIp);
+  }
+
   const trafficSource = classifyTrafficSource({
     referrer: payload.referrer,
     utmSource: payload.utmSource,
@@ -37,6 +70,23 @@ async function upsertVisitor(
     type: payload.device?.type ?? parsedDevice.type,
   };
 
+  const attributionUpdate = hasAttributionSignal(payload)
+    ? {
+        referrer: payload.referrer ?? null,
+        utmSource: payload.utmSource ?? null,
+        utmMedium: payload.utmMedium ?? null,
+        utmCampaign: payload.utmCampaign ?? null,
+        utmTerm: payload.utmTerm ?? null,
+        utmContent: payload.utmContent ?? null,
+        trafficSource,
+      }
+    : {};
+
+  const existing = await VisitorModel.findOne({ visitorId: payload.visitorId })
+    .select('geo')
+    .lean();
+  const mergedGeo = mergeGeo(existing?.geo as GeoData | undefined, geo);
+
   await VisitorModel.findOneAndUpdate(
     { visitorId: payload.visitorId },
     {
@@ -45,10 +95,6 @@ async function upsertVisitor(
         ipHash: hashIp(ip),
         firstSeenAt: new Date(),
         isReturning: false,
-      },
-      $set: {
-        geo,
-        device,
         referrer: payload.referrer ?? null,
         utmSource: payload.utmSource ?? null,
         utmMedium: payload.utmMedium ?? null,
@@ -56,7 +102,12 @@ async function upsertVisitor(
         utmTerm: payload.utmTerm ?? null,
         utmContent: payload.utmContent ?? null,
         trafficSource,
+      },
+      $set: {
+        geo: mergedGeo,
+        device,
         lastSeenAt: new Date(),
+        ...attributionUpdate,
         ...(userId ? { userId } : {}),
       },
       $inc: { totalVisits: 1 },
@@ -79,6 +130,10 @@ async function upsertSession(
   const ua = req.headers['user-agent'];
   const parsedDevice = parseUserAgent(ua);
   const geo = resolveGeo(req);
+  const visitorDoc = await VisitorModel.findOne({ visitorId: payload.visitorId })
+    .select('trafficSource')
+    .lean();
+  const sessionTrafficSource = visitorDoc?.trafficSource ?? 'direct';
 
   await SessionModel.findOneAndUpdate(
     { sessionId: payload.sessionId },
@@ -91,6 +146,7 @@ async function upsertSession(
         browser: parsedDevice.browser ?? null,
         os: parsedDevice.os ?? null,
         country: geo.countryCode ?? null,
+        trafficSource: sessionTrafficSource,
         entryPage: payload.entryPage ?? null,
         isActive: true,
         isBounce: true,

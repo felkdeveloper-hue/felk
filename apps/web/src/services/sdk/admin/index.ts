@@ -35,7 +35,7 @@ export { customersApi } from './customers';
 export type { AdminCustomer } from './customers';
 
 export { usersApi } from './users';
-export type { AdminUserRow, UserListParams } from './users';
+export type { AdminUserRow, AdminUserDetail, UserListParams } from './users';
 
 export { auditApi } from './audit';
 export type { AuditListParams, AuditLogRow } from './audit';

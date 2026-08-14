@@ -3,7 +3,7 @@ import type { AnalyticsFilter } from '@/schemas/analytics/index.js';
 import { buildVisitorMatch } from './analytics-query.builder.js';
 
 export async function getGeoBreakdown(filter: AnalyticsFilter) {
-  const match = buildVisitorMatch(filter);
+  const match = await buildVisitorMatch(filter);
 
   const [countries, cities] = await Promise.all([
     VisitorModel.aggregate([
