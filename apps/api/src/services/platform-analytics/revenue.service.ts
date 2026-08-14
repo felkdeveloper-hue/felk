@@ -84,7 +84,7 @@ export async function getRevenueDashboard(filter: AnalyticsFilter) {
 
   const allOrders = (await OrderModel.find(fetchMatch)
     .select('totals.grandTotal userId paymentId paidAt placedAt createdAt items')
-    .lean()) as LeanOrder[];
+    .lean()) as unknown as LeanOrder[];
 
   const receivedByPayment = await receivedAtByPaymentId(allOrders);
   const receivedOf = (order: LeanOrder) =>

@@ -401,7 +401,8 @@ export class AdminUserService {
           .lean();
         const byId = new Map(payments.map((payment) => [String(payment._id), payment]));
         orders = orders.map((row) => {
-          const received = paymentReceivedAt(byId.get(row.paymentId) ?? {}) ?? orderReceivedAt(row);
+          const paymentId = row.paymentId ?? '';
+          const received = paymentReceivedAt(byId.get(paymentId) ?? {}) ?? orderReceivedAt(row);
           return received
             ? { ...row, paidAt: received, placedAt: received, createdAt: row.createdAt }
             : row;

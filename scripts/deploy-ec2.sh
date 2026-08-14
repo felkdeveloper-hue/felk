@@ -149,4 +149,8 @@ done
 health_elapsed=$(( $(date +%s) - health_started_at ))
 echo "WARNING: health check failed at ${HEALTH_URL} after ${health_elapsed}s (last HTTP ${http_code:-none})"
 pm2 logs --lines 40 --nostream || true
+if command -v pm2 >/dev/null 2>&1; then
+  echo "==> Health failed — attempting to keep an API process listening"
+  pm2 restart api --update-env 2>/dev/null || pm2 start ecosystem.config.cjs 2>/dev/null || true
+fi
 exit 1

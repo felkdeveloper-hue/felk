@@ -523,8 +523,8 @@ export class OrderService {
       receivedAt?: Date;
     },
   >(summary: T): Promise<T> {
-    const [enriched] = await this.withReceivedAtMany([summary]);
-    return enriched;
+    const enriched = (await this.withReceivedAtMany([summary]))[0];
+    return enriched ?? summary;
   }
 
   private async withReceivedAtMany<

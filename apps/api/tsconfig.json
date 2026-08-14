@@ -13,7 +13,8 @@
     "verbatimModuleSyntax": false,
     "declaration": false,
     "declarationMap": false,
-    "noEmit": false
+    "noEmit": false,
+    "noEmitOnError": true
   },
   "include": ["src/**/*"],
   "exclude": [
