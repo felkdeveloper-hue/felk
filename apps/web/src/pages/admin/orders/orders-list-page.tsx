@@ -153,6 +153,24 @@ export function OrdersListPage() {
             ),
           },
           {
+            id: 'source',
+            header: 'Source',
+            cell: (row) => (
+              <div className="min-w-[7rem]">
+                <p className="font-medium">{row.source?.label ?? 'Unknown'}</p>
+                {row.source?.channel && row.source.channel !== row.source.label ? (
+                  <p className="text-muted-foreground mt-0.5 line-clamp-1 text-xs">
+                    {row.source.channel}
+                  </p>
+                ) : row.source?.detail ? (
+                  <p className="text-muted-foreground mt-0.5 line-clamp-1 text-xs">
+                    {row.source.detail}
+                  </p>
+                ) : null}
+              </div>
+            ),
+          },
+          {
             id: 'status',
             header: 'Status',
             cell: (row) => <StatusBadge status={row.status} />,

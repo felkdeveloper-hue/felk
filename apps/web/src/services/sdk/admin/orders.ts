@@ -32,6 +32,11 @@ export interface AdminOrder {
   placedAt?: string;
   paidAt?: string;
   receivedAt?: string;
+  source?: {
+    label: string;
+    channel: string;
+    detail?: string | null;
+  };
 }
 
 function asIsoDate(value: unknown): string | undefined {
@@ -80,6 +85,20 @@ function normalizeOrder(raw: unknown): AdminOrder {
     placedAt: asIsoDate(record.placedAt),
     paidAt: asIsoDate(record.paidAt),
     receivedAt: asIsoDate(record.receivedAt),
+    source: normalizeSource(record.source),
+  };
+}
+
+function normalizeSource(raw: unknown): AdminOrder['source'] {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const record = raw as Record<string, unknown>;
+  const label = typeof record.label === 'string' ? record.label.trim() : '';
+  if (!label) return undefined;
+  return {
+    label,
+    channel: typeof record.channel === 'string' && record.channel ? record.channel : 'Unknown',
+    detail:
+      typeof record.detail === 'string' ? record.detail : record.detail === null ? null : undefined,
   };
 }
 

@@ -10,7 +10,11 @@ import { PaymentModel } from '@/models/payment.models.js';
 import { appConfig } from '@/config/app.config.js';
 import { customerService } from '@/services/customer.service.js';
 import { invoiceService } from '@/services/invoice.service.js';
-import { resolveOrderSource } from '@/services/order-source.service.js';
+import {
+  resolveOrderSource,
+  resolveOrderSources,
+  UNKNOWN_ORDER_SOURCE,
+} from '@/services/order-source.service.js';
 import {
   renderOrderInvoicePdf,
   renderOrderShippingLabelPdf,
@@ -205,8 +209,13 @@ export class OrderService {
       OrderModel.countDocuments(filter),
     ]);
 
+    const summaries = await this.withReceivedAtMany(items.map((o) => this.toSummary(o)));
+    const sources = await resolveOrderSources(items);
     return {
-      items: await this.withReceivedAtMany(items.map((o) => this.toSummary(o))),
+      items: summaries.map((summary, index) => ({
+        ...summary,
+        source: sources.get(String(items[index]!._id)) ?? UNKNOWN_ORDER_SOURCE,
+      })),
       meta: buildPaginationMeta(total, page, limit),
     };
   }
