@@ -83,6 +83,15 @@ const SHARED_TOPWEAR: MegaMenuLink[] = [
 
 const SHARED_BOTTOMWEAR: MegaMenuLink[] = [{ label: 'Jeans', slug: 'jeans-denim' }];
 
+/** Footwear block stacked under Co-ords (see WOMEN_CATEGORY_COLUMNS). */
+export const COORDS_FOOTWEAR_LINKS: MegaMenuLink[] = [
+  { label: 'Footwear', slug: '', heading: true },
+  { label: 'All footwear', slug: 'all-footwear' },
+  { label: 'Heels', slug: 'heels' },
+  { label: 'Slippers', slug: 'slippers' },
+  { label: 'Shoes', slug: 'shoes' },
+];
+
 /** Women text columns from the owner catalog — Specials / Shop the edit stay separate. */
 export const WOMEN_CATEGORY_COLUMNS: MegaMenuColumn[] = [
   {
@@ -140,15 +149,45 @@ export const WOMEN_CATEGORY_COLUMNS: MegaMenuColumn[] = [
     links: [
       { label: 'Matching sets', slug: 'matching-sets' },
       { label: 'New Arrival', slug: 'new-arrivals' },
-      // Stacked under Co-ords to fill the empty column space; extra top gap via UI.
-      { label: 'Footwear', slug: '', heading: true },
-      { label: 'All footwear', slug: 'all-footwear' },
-      { label: 'Heels', slug: 'heels' },
-      { label: 'Slippers', slug: 'slippers' },
-      { label: 'Shoes', slug: 'shoes' },
+      ...COORDS_FOOTWEAR_LINKS,
     ],
   },
 ];
+
+function isCoordsColumn(title: string): boolean {
+  const normalized = title.trim().toLowerCase();
+  return normalized === 'co-ords' || normalized === 'coords' || normalized === 'co ords';
+}
+
+/** Ensure Co-ords has New Arrival + Footwear when older CMS saves omit them. */
+export function ensureWomenCoordsExtras(columns: MegaMenuColumn[]): MegaMenuColumn[] {
+  return columns.map((column) => {
+    if (!isCoordsColumn(column.title)) return column;
+
+    let links = [...column.links];
+
+    const hasNewArrival = links.some(
+      (link) =>
+        link.slug === 'new-arrivals' || link.label.trim().toLowerCase().includes('new arrival'),
+    );
+    if (!hasNewArrival) {
+      const matchingIdx = links.findIndex((link) => link.slug === 'matching-sets');
+      links.splice(matchingIdx >= 0 ? matchingIdx + 1 : 0, 0, {
+        label: 'New Arrival',
+        slug: 'new-arrivals',
+      });
+    }
+
+    const hasFootwearHeading = links.some(
+      (link) => link.heading && link.label.trim().toLowerCase() === 'footwear',
+    );
+    if (!hasFootwearHeading) {
+      links = [...links, ...COORDS_FOOTWEAR_LINKS.map((link) => ({ ...link }))];
+    }
+
+    return { ...column, links };
+  });
+}
 
 /** True when a saved women menu still uses the old Topwear / Bottomwear / Winterwear columns. */
 export function isLegacyWomenMegaMenuColumns(columns: MegaMenuColumn[]): boolean {

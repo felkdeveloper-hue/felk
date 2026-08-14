@@ -2,10 +2,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { AdminPageHeader, AdminPanel, PageMotion } from '@/components/admin';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   DEFAULT_HOME_CATEGORIES,
   DEFAULT_MEGA_MENUS,
+  ensureWomenCoordsExtras,
   isLegacyWomenMegaMenuColumns,
   type GenderMegaMenuConfig,
   type MegaMenuColumn,
@@ -14,6 +16,7 @@ import {
   type MegaMenuTile,
 } from '@/constants/mega-menu-defaults';
 import { AppError } from '@/lib/errors';
+import { cn } from '@/lib/utils';
 import { cmsApi } from '@/services/sdk/admin';
 import { megaMenuHrefPreview } from '@/utils/mega-menu-links';
 
@@ -22,6 +25,10 @@ const fieldClassName =
 
 function emptyLink(): MegaMenuLink {
   return { label: '', slug: '', bannerUrl: '' };
+}
+
+function emptyHeading(): MegaMenuLink {
+  return { label: '', slug: '', heading: true };
 }
 
 function emptyTile(): MegaMenuTile {
@@ -60,24 +67,7 @@ function normalizeConfig(
         ? parsedColumns
         : fallback.columns;
 
-  // Keep New Arrival under Co-ords even if an older CMS save omitted it.
-  const columns = baseColumns.map((column) => {
-    const title = column.title.trim().toLowerCase();
-    if (title !== 'co-ords' && title !== 'coords') return column;
-    const hasNewArrival = column.links.some(
-      (link) =>
-        link.slug === 'new-arrivals' || link.label.trim().toLowerCase().includes('new arrival'),
-    );
-    if (hasNewArrival) return column;
-    const links = [...column.links];
-    const matchingIdx = links.findIndex((link) => link.slug === 'matching-sets');
-    links.splice(matchingIdx >= 0 ? matchingIdx + 1 : 0, 0, {
-      label: 'New Arrival',
-      slug: 'new-arrivals',
-      bannerUrl: '',
-    });
-    return { ...column, links };
-  });
+  const columns = key === 'women' ? ensureWomenCoordsExtras(baseColumns) : baseColumns;
 
   const mapTiles = (tiles: unknown, fallbackTiles: MegaMenuTile[]): MegaMenuTile[] => {
     if (!Array.isArray(tiles)) return fallbackTiles;
@@ -312,8 +302,10 @@ function MegaMenuEditor({ menuKey }: { menuKey: MegaMenuGender }) {
 
       <AdminPanel title="Link columns">
         <p className="mb-4 text-xs text-neutral-500">
-          Upload a page banner for each section (e.g. Long sleeves, Heels). It appears on that
-          category page after you save the mega menu.
+          Use <strong>Bold subheading</strong> for section labels inside a column (e.g. Pants,
+          Skirts, Footwear) — they appear as bold uppercase text with no link. Regular links need a
+          route slug. Upload a page banner for each linked section; it appears on that category page
+          after you save.
         </p>
         <div className="space-y-4">
           {config.columns.map((column, columnIndex) => (
@@ -351,12 +343,47 @@ function MegaMenuEditor({ menuKey }: { menuKey: MegaMenuGender }) {
                 {column.links.map((link, linkIndex) => (
                   <div
                     key={`link-${columnIndex}-${linkIndex}`}
-                    className="rounded-lg border border-[var(--admin-line)] p-3"
+                    className={cn(
+                      'rounded-lg border p-3',
+                      link.heading
+                        ? 'border-[var(--admin-accent)]/30 bg-[var(--admin-accent)]/5'
+                        : 'border-[var(--admin-line)]',
+                    )}
                   >
+                    <div className="mb-2 flex items-center gap-2">
+                      <Checkbox
+                        id={`heading-${columnIndex}-${linkIndex}`}
+                        checked={Boolean(link.heading)}
+                        onCheckedChange={(checked) => {
+                          const next = structuredClone(config);
+                          const row = next.columns[columnIndex]?.links[linkIndex];
+                          if (!row) return;
+                          if (checked) {
+                            row.heading = true;
+                            row.slug = '';
+                            row.bannerUrl = '';
+                          } else {
+                            delete row.heading;
+                          }
+                          setConfig(next);
+                        }}
+                      />
+                      <label
+                        htmlFor={`heading-${columnIndex}-${linkIndex}`}
+                        className="cursor-pointer text-xs font-medium text-[var(--admin-ink)]"
+                      >
+                        Bold subheading
+                        {link.heading ? (
+                          <span className="ml-1.5 font-normal text-neutral-500">
+                            — not clickable, no route
+                          </span>
+                        ) : null}
+                      </label>
+                    </div>
                     <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
                       <input
                         className={fieldClassName}
-                        placeholder="Label"
+                        placeholder={link.heading ? 'Subheading label (e.g. Pants)' : 'Label'}
                         value={link.label}
                         onChange={(event) => {
                           const next = structuredClone(config);
@@ -371,15 +398,16 @@ function MegaMenuEditor({ menuKey }: { menuKey: MegaMenuGender }) {
                           className={fieldClassName}
                           placeholder="Route (e.g. all-topwear)"
                           value={link.slug}
+                          disabled={Boolean(link.heading)}
                           onChange={(event) => {
                             const next = structuredClone(config);
                             const row = next.columns[columnIndex]?.links[linkIndex];
-                            if (!row) return;
+                            if (!row || row.heading) return;
                             row.slug = event.target.value;
                             setConfig(next);
                           }}
                         />
-                        {link.slug.trim() ? (
+                        {!link.heading && link.slug.trim() ? (
                           <p className="mt-1 text-[10px] text-neutral-500">
                             Opens: {megaMenuHrefPreview(link.slug, menuKey)}
                           </p>
@@ -445,17 +473,30 @@ function MegaMenuEditor({ menuKey }: { menuKey: MegaMenuGender }) {
                   </div>
                 ))}
               </div>
-              <button
-                type="button"
-                className="admin-btn mt-3"
-                onClick={() => {
-                  const next = structuredClone(config);
-                  next.columns[columnIndex]?.links.push(emptyLink());
-                  setConfig(next);
-                }}
-              >
-                + Add link
-              </button>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className="admin-btn"
+                  onClick={() => {
+                    const next = structuredClone(config);
+                    next.columns[columnIndex]?.links.push(emptyLink());
+                    setConfig(next);
+                  }}
+                >
+                  + Add link
+                </button>
+                <button
+                  type="button"
+                  className="admin-btn"
+                  onClick={() => {
+                    const next = structuredClone(config);
+                    next.columns[columnIndex]?.links.push(emptyHeading());
+                    setConfig(next);
+                  }}
+                >
+                  + Add subheading
+                </button>
+              </div>
             </div>
           ))}
           <button
