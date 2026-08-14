@@ -61,7 +61,7 @@ export function formatOrderDocumentAddress(address: OrderDocumentAddress): strin
 }
 
 export function formatCurrencyLkr(amount: number, currency = 'LKR'): string {
-  const formatted = new Intl.NumberFormat('en-LK', {
+  const formatted = new Intl.NumberFormat('en-US', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(amount);

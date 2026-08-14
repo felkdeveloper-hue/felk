@@ -2,7 +2,6 @@ import type { ReactNode } from 'react';
 import { Download, Printer } from 'lucide-react';
 import type { OrderInvoice } from '@/services/sdk';
 import { ordersApi } from '@/services/sdk/admin';
-import { formatCurrency, formatDate } from '@/utils/format';
 import { printInvoiceDocument } from '@/utils/orders/print-invoice';
 import { Button } from '@/components/ui/button';
 
@@ -13,14 +12,33 @@ export interface InvoiceViewProps {
 }
 
 function formatPaymentMethod(method: string) {
-  return method.replace(/_/g, ' ').toUpperCase();
+  const label = method.replace(/_/g, ' ').trim();
+  if (label.toLowerCase() === 'cod') return 'CASH ON DELIVERY';
+  return label.toUpperCase();
+}
+
+function formatMoney(amount: number, currency = 'LKR', withCode = true) {
+  const value = new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+  return withCode ? `${currency} ${value}` : value;
+}
+
+function formatRegistryDate(value?: string) {
+  if (!value) return '—';
+  return new Date(value).toLocaleDateString('en-US', {
+    month: 'numeric',
+    day: 'numeric',
+    year: 'numeric',
+  });
 }
 
 function AddressBlock({ address }: { address: NonNullable<OrderInvoice['shippingAddress']> }) {
   return (
-    <div className="space-y-0.5 text-[13px] leading-snug text-neutral-800">
-      <p className="text-[15px] font-semibold text-neutral-950">{address.fullName}</p>
-      <p>{address.line1}</p>
+    <div className="mt-2 space-y-0.5 text-[13px] leading-[1.55] text-[#6B7280]">
+      <p className="text-[16px] font-bold leading-snug text-[#111]">{address.fullName}</p>
+      {address.line1 ? <p>{address.line1}</p> : null}
       {address.line2 ? <p>{address.line2}</p> : null}
       <p>{[address.city, address.state, address.postalCode].filter(Boolean).join(', ')}</p>
       {address.country ? <p>{address.country}</p> : null}
@@ -40,7 +58,7 @@ export function InvoiceView({ invoice, actions }: InvoiceViewProps) {
   const handlePrint = () => printInvoiceDocument(invoice);
 
   return (
-    <article className="invoice-print-root overflow-hidden rounded-xl border border-neutral-200 bg-white text-neutral-950 shadow-sm">
+    <article className="invoice-print-root overflow-hidden rounded-sm border border-neutral-200 bg-white text-[#111] shadow-sm">
       <div className="flex flex-wrap items-center justify-end gap-2 border-b border-neutral-100 px-5 py-2.5 print:hidden">
         <Button variant="outline" size="sm" onClick={() => void handleDownloadPdf()}>
           <Download className="size-4" aria-hidden />
@@ -53,144 +71,153 @@ export function InvoiceView({ invoice, actions }: InvoiceViewProps) {
         {actions}
       </div>
 
-      <div className="invoice-sheet px-6 py-6">
-        <header className="flex items-start justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <div className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-[#D1FAE5] text-lg font-bold lowercase tracking-tight">
-              fe.
-            </div>
+      <div className="invoice-sheet mx-auto min-h-[1123px] w-full max-w-[794px] bg-white px-[52px] py-[48px] font-sans">
+        <header className="flex items-start justify-between gap-6">
+          <div className="flex items-center gap-3.5">
+            <p className="font-display text-[34px] font-extrabold uppercase leading-none tracking-[-0.06em] text-[#111]">
+              FE
+            </p>
             <div>
-              <p className="text-[18px] font-bold tracking-tight text-neutral-950">FASHION EDGE</p>
-              <p className="text-[10px] uppercase tracking-[0.18em] text-neutral-400">
+              <p className="text-[20px] font-extrabold uppercase leading-none tracking-[0.02em] text-[#111]">
+                Fashion Edge
+              </p>
+              <p className="mt-1.5 text-[10px] uppercase tracking-[0.16em] text-[#9CA3AF]">
                 14A Kotugodella st, Kandy
               </p>
             </div>
           </div>
-          <span className="rounded-md bg-[#000B26] px-3 py-1.5 text-[9px] font-semibold uppercase tracking-[0.16em] text-white">
+          <span className="rounded-full bg-[#000B26] px-4 py-2 text-[9px] font-semibold uppercase tracking-[0.18em] text-white">
             Official order manifest
           </span>
         </header>
 
-        <div className="mt-5 grid grid-cols-2 gap-4 text-[11px] uppercase tracking-[0.14em] text-neutral-400">
+        <div className="mt-10 flex items-end justify-between gap-6">
           <div>
-            <p>Invoice registry</p>
-            <p className="mt-1 text-[15px] font-semibold normal-case tracking-normal text-neutral-950">
+            <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-[#9CA3AF]">
+              Invoice registry
+            </p>
+            <p className="mt-1.5 text-[22px] font-extrabold leading-none tracking-tight text-[#111]">
               {invoice.orderNumber}
             </p>
           </div>
           <div className="text-right">
-            <p>Registry date</p>
-            <p className="mt-1 text-[15px] font-semibold normal-case tracking-normal text-neutral-950">
-              {invoice.issuedAt ? formatDate(invoice.issuedAt) : '—'}
+            <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-[#9CA3AF]">
+              Registry date
+            </p>
+            <p className="mt-1.5 text-[16px] font-bold leading-none text-[#111]">
+              {formatRegistryDate(invoice.issuedAt)}
             </p>
           </div>
         </div>
 
-        <div className="my-4 border-t border-neutral-950" />
+        <div className="mt-5 border-t-[1.5px] border-[#111]" />
 
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="mt-6 grid grid-cols-2 gap-10">
           <div>
-            <h2 className="text-[10px] font-semibold uppercase tracking-[0.18em] text-neutral-400">
+            <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-[#9CA3AF]">
               Recipient
-            </h2>
+            </p>
             {recipient ? (
-              <div className="mt-2">
-                <AddressBlock address={recipient} />
-              </div>
+              <AddressBlock address={recipient} />
             ) : (
-              <p className="mt-2 text-sm text-neutral-500">—</p>
+              <p className="mt-2 text-sm text-[#9CA3AF]">—</p>
             )}
           </div>
           <div>
-            <h2 className="text-[10px] font-semibold uppercase tracking-[0.18em] text-neutral-400">
+            <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-[#9CA3AF]">
               Payment details
-            </h2>
-            <div className="mt-2 space-y-1 text-sm">
+            </p>
+            <div className="mt-2 space-y-1 text-[13px]">
               <p>
-                <span className="text-neutral-400">Method: </span>
-                <span className="font-semibold uppercase">
+                <span className="uppercase tracking-wide text-[#9CA3AF]">Method: </span>
+                <span className="font-bold uppercase tracking-wide text-[#111]">
                   {formatPaymentMethod(invoice.paymentMethod)}
                 </span>
               </p>
               <p>
-                <span className="text-neutral-400">Status: </span>
-                <span className="font-semibold uppercase">Success</span>
-              </p>
-              <p className="break-all font-mono text-[11px] text-neutral-500">
-                {invoice.paymentReference}
+                <span className="uppercase tracking-wide text-[#9CA3AF]">Status: </span>
+                <span className="font-bold uppercase tracking-wide text-[#111]">Success</span>
               </p>
             </div>
           </div>
         </div>
 
-        <div className="mt-6 overflow-hidden rounded-sm border border-neutral-200">
-          <div className="grid grid-cols-[1fr_72px_120px] bg-neutral-100 px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-neutral-700">
+        <div className="mt-10">
+          <div className="grid grid-cols-[1fr_72px_140px] pb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-[#111]">
             <span>Article description</span>
             <span className="text-center">Qty</span>
             <span className="text-right">Amount</span>
           </div>
+          <div className="border-t border-[#111]" />
           {invoice.items.map((item) => (
             <div
               key={`${item.sku}-${item.name}`}
-              className="grid grid-cols-[1fr_72px_120px] border-t border-neutral-100 px-4 py-3 text-sm"
+              className="grid grid-cols-[1fr_72px_140px] items-start border-b border-[#E5E7EB] py-4"
             >
               <div>
-                <p className="font-semibold uppercase tracking-wide text-neutral-950">
+                <p className="text-[13px] font-bold uppercase tracking-wide text-[#111]">
                   {item.name}
                 </p>
                 {item.variantTitle ? (
-                  <p className="mt-0.5 text-[11px] uppercase tracking-wide text-neutral-400">
+                  <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-[#9CA3AF]">
                     {item.variantTitle}
                   </p>
                 ) : null}
               </div>
-              <p className="text-center tabular-nums">{item.quantity}</p>
-              <p className="text-right font-medium tabular-nums">
-                {formatCurrency(item.lineTotal, invoice.currency)}
+              <p className="text-center text-[13px] font-bold tabular-nums">{item.quantity}</p>
+              <p className="text-right text-[13px] font-bold tabular-nums">
+                {formatMoney(item.lineTotal, invoice.currency)}
               </p>
             </div>
           ))}
         </div>
 
-        <div className="mt-6 flex justify-end">
-          <div className="w-full max-w-xs rounded-xl bg-[#EEF2FF] px-5 py-4">
-            <div className="space-y-2 text-sm">
+        <div className="mt-8 flex justify-end">
+          <div className="w-[260px] rounded-xl bg-[#F3F4F6] px-5 py-4">
+            <div className="space-y-2.5 text-[11px]">
               <div className="flex justify-between gap-4">
-                <span className="text-neutral-400">Subtotal</span>
-                <span className="tabular-nums">
-                  {formatCurrency(invoice.totals.subtotal, invoice.currency)}
+                <span className="font-medium uppercase tracking-[0.12em] text-[#9CA3AF]">
+                  Subtotal
+                </span>
+                <span className="font-bold tabular-nums text-[#111]">
+                  {formatMoney(invoice.totals.subtotal, invoice.currency, false)}
                 </span>
               </div>
               <div className="flex justify-between gap-4">
-                <span className="text-neutral-400">Logistics</span>
-                <span className="tabular-nums">
-                  {formatCurrency(invoice.totals.shipping, invoice.currency)}
+                <span className="font-medium uppercase tracking-[0.12em] text-[#9CA3AF]">
+                  Logistics
+                </span>
+                <span className="font-bold tabular-nums text-[#111]">
+                  {formatMoney(invoice.totals.shipping, invoice.currency, false)}
                 </span>
               </div>
               {discount > 0 ? (
                 <div className="flex justify-between gap-4">
-                  <span className="text-neutral-400">Discount</span>
-                  <span className="tabular-nums">
-                    −{formatCurrency(discount, invoice.currency)}
+                  <span className="font-medium uppercase tracking-[0.12em] text-[#9CA3AF]">
+                    Discount
+                  </span>
+                  <span className="font-bold tabular-nums text-[#111]">
+                    −{formatMoney(discount, invoice.currency, false)}
                   </span>
                 </div>
               ) : null}
             </div>
             <div className="my-3 border-t border-[#000B26]" />
-            <div className="flex items-end justify-between gap-4">
-              <span className="text-sm font-bold uppercase tracking-wide">Settlement</span>
-              <span className="text-xl font-extrabold tabular-nums tracking-tight">
-                {formatCurrency(invoice.totals.grandTotal, invoice.currency)}
+            <div className="flex items-end justify-between gap-3">
+              <span className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-[#000B26]">
+                Settlement
+              </span>
+              <span className="text-[18px] font-extrabold tabular-nums leading-none text-[#000B26]">
+                {formatMoney(invoice.totals.grandTotal, invoice.currency)}
               </span>
             </div>
           </div>
         </div>
 
-        <footer className="mt-8 border-t border-neutral-200 pt-4 text-center">
-          <p className="text-[10px] uppercase tracking-[0.18em] text-neutral-400">
+        <footer className="mt-16 text-center">
+          <p className="text-[9px] uppercase tracking-[0.22em] text-[#C4C4C4]">
             Fashion Edge • Curated modern essentials
           </p>
-          <p className="mt-1 font-mono text-[11px] text-neutral-300">{invoice.invoiceNumber}</p>
         </footer>
       </div>
     </article>

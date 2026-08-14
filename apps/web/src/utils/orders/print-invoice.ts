@@ -1,5 +1,4 @@
 import type { OrderInvoice } from '@/services/sdk';
-import { formatCurrency, formatDate } from '@/utils/format';
 
 function escapeHtml(value: string): string {
   return value
@@ -12,507 +11,346 @@ function escapeHtml(value: string): string {
 
 function formatPaymentMethod(method: string) {
   const label = method.replace(/_/g, ' ').trim();
-  if (label.toLowerCase() === 'cod') return 'Cash on Delivery';
-  return label.replace(/\b\w/g, (c) => c.toUpperCase());
+  if (label.toLowerCase() === 'cod') return 'CASH ON DELIVERY';
+  return label.toUpperCase();
+}
+
+function formatMoney(amount: number, currency = 'LKR', withCode = true) {
+  const value = new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+  return withCode ? `${currency} ${value}` : value;
+}
+
+function formatRegistryDate(value?: string) {
+  if (!value) return '—';
+  return new Date(value).toLocaleDateString('en-US', {
+    month: 'numeric',
+    day: 'numeric',
+    year: 'numeric',
+  });
 }
 
 function addressHtml(address: NonNullable<OrderInvoice['billingAddress']>): string {
   const lines = [
-    `<strong>${escapeHtml(address.fullName)}</strong>`,
-    escapeHtml(address.line1),
-    address.line2 ? escapeHtml(address.line2) : '',
-    escapeHtml([address.city, address.state, address.postalCode].filter(Boolean).join(', ')),
-    address.country ? escapeHtml(address.country) : '',
-    address.phone ? `Tel: ${escapeHtml(address.phone)}` : '',
+    `<div class="name">${escapeHtml(address.fullName)}</div>`,
+    address.line1 ? `<div>${escapeHtml(address.line1)}</div>` : '',
+    address.line2 ? `<div>${escapeHtml(address.line2)}</div>` : '',
+    `<div>${escapeHtml([address.city, address.state, address.postalCode].filter(Boolean).join(', '))}</div>`,
+    address.country ? `<div>${escapeHtml(address.country)}</div>` : '',
+    address.phone ? `<div>${escapeHtml(address.phone)}</div>` : '',
   ].filter(Boolean);
 
-  return lines.map((line) => `<div>${line}</div>`).join('');
+  return lines.join('');
 }
 
-/** Opens a clean one-page invoice document and triggers the browser print dialog. */
+/** Opens a one-page invoice matching the Fashion Edge order-manifest layout. */
 export function printInvoiceDocument(invoice: OrderInvoice): void {
-  const billTo = invoice.billingAddress ?? invoice.shippingAddress;
-  const shipTo = invoice.shippingAddress ?? invoice.billingAddress;
+  const recipient = invoice.shippingAddress ?? invoice.billingAddress;
   const discount = Number(invoice.totals.discount ?? 0);
-  const issued = invoice.issuedAt ? formatDate(invoice.issuedAt) : '—';
-  const itemCount = invoice.items.reduce((sum, item) => sum + Number(item.quantity ?? 0), 0);
+  const issued = formatRegistryDate(invoice.issuedAt);
 
   const itemRows = invoice.items
-    .map((item) => {
-      const unit = item.quantity > 0 ? item.lineTotal / item.quantity : item.price;
-      return `
+    .map(
+      (item) => `
       <tr>
         <td>
           <div class="item-name">${escapeHtml(item.name)}</div>
-          <div class="item-sku">SKU ${escapeHtml(item.sku)}</div>
+          ${item.variantTitle ? `<div class="item-meta">${escapeHtml(item.variantTitle)}</div>` : ''}
         </td>
-        <td class="right mono">${escapeHtml(formatCurrency(unit, invoice.currency))}</td>
         <td class="center">${item.quantity}</td>
-        <td class="right mono">${escapeHtml(formatCurrency(item.lineTotal, invoice.currency))}</td>
-      </tr>`;
-    })
+        <td class="right">${escapeHtml(formatMoney(item.lineTotal, invoice.currency))}</td>
+      </tr>`,
+    )
     .join('');
 
   const discountRow =
     discount > 0
-      ? `<div class="row"><span>Discount</span><span>−${escapeHtml(formatCurrency(discount, invoice.currency))}</span></div>`
+      ? `<div class="row"><span>Discount</span><span>−${escapeHtml(formatMoney(discount, invoice.currency, false))}</span></div>`
       : '';
 
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Invoice ${escapeHtml(invoice.invoiceNumber)}</title>
+  <title>Invoice ${escapeHtml(invoice.orderNumber)}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
   <style>
-    @page {
-      size: A4;
-      margin: 10mm;
-    }
-
+    @page { size: A4; margin: 0; }
     * { box-sizing: border-box; }
-
     html, body {
       margin: 0;
       padding: 0;
-      width: 100%;
       background: #fff;
       color: #111;
       font-family: Figtree, ui-sans-serif, system-ui, sans-serif;
-      font-size: 12.5px;
-      line-height: 1.45;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
-
     .sheet {
-      width: 100%;
-      min-height: 277mm;
-      height: 277mm;
-      display: grid;
-      /* Grow the notes + totals band — not an empty hole under items */
-      grid-template-rows: auto auto auto minmax(150px, 1fr) auto;
-      gap: 0;
+      width: 210mm;
+      min-height: 297mm;
+      padding: 18mm 18mm 16mm;
+      display: flex;
+      flex-direction: column;
     }
-
-    .mono {
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      font-variant-numeric: tabular-nums;
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
     }
-
-    .label {
-      margin: 0 0 8px;
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .logo {
+      margin: 0;
+      font-family: Syne, sans-serif;
+      font-size: 34px;
+      font-weight: 800;
+      letter-spacing: -0.06em;
+      line-height: 1;
+    }
+    .store-name {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      line-height: 1;
+    }
+    .store-address {
+      margin: 6px 0 0;
       font-size: 10px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: #9CA3AF;
+    }
+    .badge {
+      background: #000B26;
+      color: #fff;
+      border-radius: 999px;
+      padding: 8px 16px;
+      font-size: 9px;
       font-weight: 700;
       letter-spacing: 0.18em;
       text-transform: uppercase;
-      color: #888;
     }
-
-    /* —— Header —— */
-    .topbar {
+    .registry {
       display: flex;
       justify-content: space-between;
       align-items: flex-end;
-      padding-bottom: 16px;
-      border-bottom: 2.5px solid #111;
+      margin-top: 40px;
     }
-
-    .brand-kicker {
+    .label {
       margin: 0;
-      font-family: Syne, sans-serif;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.32em;
+      font-size: 9px;
+      font-weight: 500;
+      letter-spacing: 0.2em;
       text-transform: uppercase;
-      color: #777;
+      color: #9CA3AF;
     }
-
-    h1 {
-      margin: 4px 0 0;
-      font-family: Syne, sans-serif;
-      font-size: 40px;
+    .order-no {
+      margin: 8px 0 0;
+      font-size: 22px;
       font-weight: 800;
-      letter-spacing: -0.04em;
+      letter-spacing: -0.02em;
       line-height: 1;
     }
-
-    .tagline {
+    .date {
       margin: 8px 0 0;
-      color: #777;
-      font-size: 12px;
-    }
-
-    .meta-card {
-      min-width: 46%;
-      background: #f6f6f6;
-      border: 1px solid #e8e8e8;
-      padding: 14px 16px;
-    }
-
-    .meta-card .inv-no {
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 13px;
+      font-size: 16px;
       font-weight: 700;
-      margin-bottom: 8px;
+      text-align: right;
     }
-
-    .meta-grid {
-      display: grid;
-      grid-template-columns: auto 1fr;
-      gap: 4px 14px;
-      font-size: 12px;
+    .rule {
+      margin-top: 18px;
+      border-top: 1.5px solid #111;
     }
-
-    .meta-grid dt { color: #888; }
-    .meta-grid dd { margin: 0; font-weight: 600; text-align: right; }
-
-    /* —— Parties —— */
     .parties {
       display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 18px;
-      margin-top: 20px;
-      padding-bottom: 18px;
-      border-bottom: 1px solid #ddd;
+      grid-template-columns: 1fr 1fr;
+      gap: 40px;
+      margin-top: 24px;
     }
-
-    .party {
-      min-height: 110px;
+    .name {
+      margin: 8px 0 4px;
+      font-size: 16px;
+      font-weight: 700;
+      color: #111;
     }
-
-    .party address,
-    .party .body {
-      font-style: normal;
-      color: #333;
-      font-size: 12.5px;
+    .addr {
+      color: #6B7280;
+      font-size: 13px;
       line-height: 1.55;
     }
-
-    .party strong {
-      color: #111;
-      font-size: 13.5px;
-    }
-
-    .pay-method {
-      margin: 0 0 4px;
-      font-weight: 700;
-      font-size: 13.5px;
-    }
-
-    .pay-ref {
-      margin: 0;
-      font-size: 11px;
-      color: #777;
-      word-break: break-all;
-    }
-
-    /* —— Items —— */
-    .items {
-      margin-top: 18px;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .items-head {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      margin-bottom: 8px;
-    }
-
-    .items-head h2 {
-      margin: 0;
-      font-family: Syne, sans-serif;
+    .pay {
+      margin-top: 8px;
       font-size: 13px;
-      font-weight: 700;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
+      line-height: 1.7;
     }
-
-    .items-head span {
-      color: #888;
-      font-size: 11.5px;
-    }
-
+    .pay span { color: #9CA3AF; text-transform: uppercase; letter-spacing: 0.04em; }
+    .pay strong { color: #111; letter-spacing: 0.04em; }
     table {
       width: 100%;
       border-collapse: collapse;
+      margin-top: 40px;
     }
-
     thead th {
-      padding: 10px 8px;
-      background: #111;
-      color: #fff;
+      padding: 0 0 8px;
       font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 0.16em;
-      text-transform: uppercase;
-      text-align: left;
-    }
-
-    thead th.center { text-align: center; }
-    thead th.right { text-align: right; }
-
-    tbody td {
-      padding: 14px 8px;
-      border-bottom: 1px solid #e8e8e8;
-      vertical-align: top;
-      font-size: 13px;
-    }
-
-    tbody tr:nth-child(even) td {
-      background: #fafafa;
-    }
-
-    td.center { text-align: center; }
-    td.right { text-align: right; font-weight: 600; }
-
-    .item-name { font-weight: 700; color: #111; }
-    .item-sku {
-      margin-top: 3px;
-      font-size: 11px;
-      color: #888;
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    }
-
-    /* —— Bottom band —— */
-    .bottom {
-      display: grid;
-      grid-template-columns: 1.15fr 0.85fr;
-      gap: 20px;
-      align-items: stretch;
-      margin-top: 20px;
-      min-height: 0;
-    }
-
-    .notes {
-      border: 1px solid #e4e4e4;
-      background: #fafafa;
-      padding: 18px 20px;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      gap: 16px;
-      height: 100%;
-    }
-
-    .notes h3 {
-      margin: 0;
-      font-family: Syne, sans-serif;
-      font-size: 12px;
       font-weight: 700;
       letter-spacing: 0.14em;
       text-transform: uppercase;
+      text-align: left;
+      border-bottom: 1px solid #111;
     }
-
-    .notes p {
-      margin: 0;
-      color: #444;
-      font-size: 12px;
-      line-height: 1.55;
+    th.center, td.center { text-align: center; width: 72px; }
+    th.right, td.right { text-align: right; width: 140px; }
+    tbody td {
+      padding: 16px 0;
+      border-bottom: 1px solid #E5E7EB;
+      vertical-align: top;
     }
-
-    .notes ul {
-      margin: 0;
-      padding-left: 16px;
-      color: #444;
-      font-size: 12px;
+    .item-name {
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
     }
-
-    .notes li { margin-top: 4px; }
-
-    .totals {
-      border: 1px solid #111;
-      padding: 16px 18px 14px;
+    .item-meta {
+      margin-top: 4px;
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #9CA3AF;
+    }
+    .totals-wrap {
       display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      height: 100%;
+      justify-content: flex-end;
+      margin-top: 32px;
     }
-
+    .totals {
+      width: 260px;
+      background: #F3F4F6;
+      border-radius: 14px;
+      padding: 16px 20px;
+    }
     .row {
       display: flex;
       justify-content: space-between;
       gap: 16px;
-      margin-top: 7px;
-      color: #444;
-      font-size: 13px;
-      font-variant-numeric: tabular-nums;
+      margin-bottom: 10px;
+      font-size: 11px;
     }
-
-    .total {
+    .row span:first-child {
+      color: #9CA3AF;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      font-weight: 500;
+    }
+    .row span:last-child { font-weight: 700; }
+    .totals hr {
+      border: 0;
+      border-top: 1px solid #000B26;
+      margin: 8px 0 12px;
+    }
+    .settle {
       display: flex;
       justify-content: space-between;
-      align-items: center;
-      gap: 16px;
-      margin-top: 12px;
-      padding: 12px 14px;
-      background: #111;
-      color: #fff;
+      align-items: flex-end;
+      gap: 12px;
+      color: #000B26;
     }
-
-    .total span:first-child {
+    .settle span:first-child {
       font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.16em;
+      font-weight: 800;
+      letter-spacing: 0.12em;
       text-transform: uppercase;
     }
-
-    .total span:last-child {
-      font-family: Syne, sans-serif;
-      font-size: 20px;
+    .settle span:last-child {
+      font-size: 18px;
       font-weight: 800;
-      font-variant-numeric: tabular-nums;
     }
-
     footer {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 16px;
-      margin-top: 16px;
-      padding-top: 12px;
-      border-top: 1px solid #ddd;
-    }
-
-    footer .thanks {
-      margin: 0;
-      font-family: Syne, sans-serif;
-      font-size: 13px;
-      font-weight: 700;
-    }
-
-    footer .help {
-      margin: 3px 0 0;
-      font-size: 11px;
-      color: #777;
-    }
-
-    footer .mark {
-      margin: 0;
-      font-family: Syne, sans-serif;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.24em;
-      color: #bbb;
-    }
-
-    @media print {
-      .sheet {
-        height: 277mm;
-        overflow: hidden;
-      }
+      margin-top: auto;
+      padding-top: 48px;
+      text-align: center;
+      font-size: 9px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: #C4C4C4;
     }
   </style>
 </head>
 <body>
   <div class="sheet">
-    <div class="topbar">
-      <div>
-        <p class="brand-kicker">Fashion Edge</p>
-        <h1>INVOICE</h1>
-        <p class="tagline">fe.lk · Contemporary fashion</p>
+    <div class="header">
+      <div class="brand">
+        <p class="logo">FE</p>
+        <div>
+          <p class="store-name">Fashion Edge</p>
+          <p class="store-address">14A Kotugodella st, Kandy</p>
+        </div>
       </div>
-      <div class="meta-card">
-        <div class="inv-no">${escapeHtml(invoice.invoiceNumber)}</div>
-        <dl class="meta-grid">
-          <dt>Order</dt><dd>${escapeHtml(invoice.orderNumber)}</dd>
-          <dt>Issued</dt><dd>${escapeHtml(issued)}</dd>
-          <dt>Currency</dt><dd>${escapeHtml(invoice.currency)}</dd>
-          <dt>Items</dt><dd>${itemCount}</dd>
-        </dl>
+      <span class="badge">Official order manifest</span>
+    </div>
+
+    <div class="registry">
+      <div>
+        <p class="label">Invoice registry</p>
+        <p class="order-no">${escapeHtml(invoice.orderNumber)}</p>
+      </div>
+      <div>
+        <p class="label" style="text-align:right">Registry date</p>
+        <p class="date">${escapeHtml(issued)}</p>
       </div>
     </div>
+    <div class="rule"></div>
 
     <div class="parties">
-      <div class="party">
-        <p class="label">Bill to</p>
-        <address>${billTo ? addressHtml(billTo) : '—'}</address>
-      </div>
-      <div class="party">
-        <p class="label">Ship to</p>
-        <address>${shipTo ? addressHtml(shipTo) : '—'}</address>
-      </div>
-      <div class="party">
-        <p class="label">Payment</p>
-        <div class="body">
-          <p class="pay-method">${escapeHtml(formatPaymentMethod(invoice.paymentMethod))}</p>
-          <p class="pay-ref">${escapeHtml(invoice.paymentReference)}</p>
-        </div>
-      </div>
-    </div>
-
-    <div class="items">
-      <div class="items-head">
-        <h2>Order items</h2>
-        <span>${invoice.items.length} line${invoice.items.length === 1 ? '' : 's'} · ${itemCount} unit${itemCount === 1 ? '' : 's'}</span>
-      </div>
-      <table>
-        <thead>
-          <tr>
-            <th>Item</th>
-            <th class="right" style="width:120px">Unit</th>
-            <th class="center" style="width:64px">Qty</th>
-            <th class="right" style="width:130px">Amount</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${itemRows}
-        </tbody>
-      </table>
-    </div>
-
-    <div class="bottom">
-      <div class="notes">
-        <div>
-          <h3>Payment & delivery</h3>
-          <p>
-            Payment method: <strong>${escapeHtml(formatPaymentMethod(invoice.paymentMethod))}</strong>.
-            Please keep this invoice for your records and present the order number on delivery if requested.
-          </p>
-        </div>
-        <div>
-          <h3>Customer care</h3>
-          <p>
-            Fashion Edge is committed to quality and a smooth delivery experience. If anything is missing
-            or not as expected, reach out with your invoice number and we will help promptly.
-          </p>
-        </div>
-        <div>
-          <h3>Notes</h3>
-          <ul>
-            <li>Prices are shown in ${escapeHtml(invoice.currency)} and include applicable line discounts.</li>
-            <li>For returns or exchanges, contact support within the store policy window.</li>
-            <li>Quote invoice ${escapeHtml(invoice.invoiceNumber)} in all support requests.</li>
-          </ul>
-        </div>
-      </div>
-
-      <div class="totals">
-        <div>
-          <p class="label" style="margin-bottom:8px">Amount summary</p>
-          <div class="row"><span>Subtotal</span><span>${escapeHtml(formatCurrency(invoice.totals.subtotal, invoice.currency))}</span></div>
-          <div class="row"><span>Shipping</span><span>${escapeHtml(formatCurrency(invoice.totals.shipping, invoice.currency))}</span></div>
-          ${discountRow}
-          <div class="row"><span>Tax</span><span>${escapeHtml(formatCurrency(invoice.totals.tax, invoice.currency))}</span></div>
-        </div>
-        <div class="total">
-          <span>Total due</span>
-          <span>${escapeHtml(formatCurrency(invoice.totals.grandTotal, invoice.currency))}</span>
-        </div>
-      </div>
-    </div>
-
-    <footer>
       <div>
-        <p class="thanks">Thank you for shopping with Fashion Edge</p>
-        <p class="help">fe.lk · Support · Quote ${escapeHtml(invoice.invoiceNumber)}</p>
+        <p class="label">Recipient</p>
+        <div class="addr">${recipient ? addressHtml(recipient) : '—'}</div>
       </div>
-      <p class="mark">FE.LK</p>
-    </footer>
+      <div>
+        <p class="label">Payment details</p>
+        <div class="pay">
+          <div><span>Method: </span><strong>${escapeHtml(formatPaymentMethod(invoice.paymentMethod))}</strong></div>
+          <div><span>Status: </span><strong>SUCCESS</strong></div>
+        </div>
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Article description</th>
+          <th class="center">Qty</th>
+          <th class="right">Amount</th>
+        </tr>
+      </thead>
+      <tbody>${itemRows}</tbody>
+    </table>
+
+    <div class="totals-wrap">
+      <div class="totals">
+        <div class="row"><span>Subtotal</span><span>${escapeHtml(formatMoney(invoice.totals.subtotal, invoice.currency, false))}</span></div>
+        <div class="row"><span>Logistics</span><span>${escapeHtml(formatMoney(invoice.totals.shipping, invoice.currency, false))}</span></div>
+        ${discountRow}
+        <hr />
+        <div class="settle">
+          <span>Settlement</span>
+          <span>${escapeHtml(formatMoney(invoice.totals.grandTotal, invoice.currency))}</span>
+        </div>
+      </div>
+    </div>
+
+    <footer>Fashion Edge • Curated modern essentials</footer>
   </div>
   <script>
     window.addEventListener('load', function () {

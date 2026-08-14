@@ -8,8 +8,11 @@ import {
 
 const NAVY = '#000B26';
 const MUTED = '#9CA3AF';
-const LIGHT_BLUE = '#D1FAE5';
-const SETTLEMENT_BG = '#EEF2FF';
+const INK = '#111111';
+const ADDR = '#6B7280';
+const LINE = '#E5E7EB';
+const SETTLEMENT_BG = '#F3F4F6';
+const FOOTER = '#C4C4C4';
 
 function formatRegistryDate(date: Date): string {
   return date.toLocaleDateString('en-US', {
@@ -19,9 +22,19 @@ function formatRegistryDate(date: Date): string {
   });
 }
 
+function formatPlainAmount(amount: number): string {
+  return new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+}
+
 export async function generateInvoicePdf(payload: OrderDocumentPayload): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ margin: 48, size: 'A4' });
+    const doc = new PDFDocument({
+      margin: 54,
+      size: 'A4',
+    });
     const chunks: Buffer[] = [];
     doc.on('data', (chunk) => chunks.push(chunk as Buffer));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
@@ -29,95 +42,89 @@ export async function generateInvoicePdf(payload: OrderDocumentPayload): Promise
 
     const pageWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
     const left = doc.page.margins.left;
+    const right = left + pageWidth;
 
-    // Header
-    doc.roundedRect(left, doc.y, 42, 42, 8).fill(LIGHT_BLUE);
+    // Header — site wordmark FE (not the sample teal badge)
+    const headerY = doc.y;
+    doc.font('Helvetica-Bold').fontSize(28).fillColor(INK).text('FE', left, headerY, {
+      lineBreak: false,
+    });
+
+    const brandX = left + 52;
     doc
-      .fillColor('#111')
       .font('Helvetica-Bold')
       .fontSize(16)
-      .text('fe.', left + 10, doc.y - 34);
-
-    doc
-      .font('Helvetica-Bold')
-      .fontSize(18)
-      .fillColor('#111')
-      .text(payload.branding.storeName, left + 54, doc.y - 42);
+      .fillColor(INK)
+      .text(payload.branding.storeName, brandX, headerY + 2);
     doc
       .font('Helvetica')
       .fontSize(8)
       .fillColor(MUTED)
-      .text(payload.branding.storeAddress.toUpperCase(), left + 54, doc.y - 22, {
-        characterSpacing: 0.6,
-      });
-
-    const badgeWidth = 190;
-    const badgeX = left + pageWidth - badgeWidth;
-    doc.roundedRect(badgeX, doc.y - 42, badgeWidth, 28, 6).fill(NAVY);
-    doc
-      .font('Helvetica-Bold')
-      .fontSize(8)
-      .fillColor('#fff')
-      .text('OFFICIAL ORDER MANIFEST', badgeX, doc.y - 32, {
-        width: badgeWidth,
-        align: 'center',
+      .text(payload.branding.storeAddress.toUpperCase(), brandX, headerY + 22, {
         characterSpacing: 0.8,
       });
 
-    doc.moveDown(2.2);
+    const badgeWidth = 186;
+    const badgeHeight = 22;
+    const badgeX = right - badgeWidth;
+    doc.roundedRect(badgeX, headerY + 4, badgeWidth, badgeHeight, 11).fill(NAVY);
+    doc
+      .font('Helvetica-Bold')
+      .fontSize(7.5)
+      .fillColor('#fff')
+      .text('OFFICIAL ORDER MANIFEST', badgeX, headerY + 11, {
+        width: badgeWidth,
+        align: 'center',
+        characterSpacing: 1,
+      });
 
-    // Registry row
-    const registryY = doc.y;
-    doc.font('Helvetica').fontSize(8).fillColor(MUTED).text('INVOICE REGISTRY', left, registryY, {
-      characterSpacing: 0.8,
+    // Registry
+    const registryY = headerY + 62;
+    doc.font('Helvetica').fontSize(7.5).fillColor(MUTED).text('INVOICE REGISTRY', left, registryY, {
+      characterSpacing: 1.1,
     });
     doc.text('REGISTRY DATE', left, registryY, {
       width: pageWidth,
       align: 'right',
-      characterSpacing: 0.8,
+      characterSpacing: 1.1,
     });
     doc
       .font('Helvetica-Bold')
-      .fontSize(13)
-      .fillColor('#111')
-      .text(payload.orderNumber, left, registryY + 14);
-    doc.text(formatRegistryDate(payload.issuedAt), left, registryY + 14, {
+      .fontSize(16)
+      .fillColor(INK)
+      .text(payload.orderNumber, left, registryY + 12);
+    doc.fontSize(12).text(formatRegistryDate(payload.issuedAt), left, registryY + 14, {
       width: pageWidth,
       align: 'right',
     });
 
-    doc
-      .moveTo(left, registryY + 36)
-      .lineTo(left + pageWidth, registryY + 36)
-      .strokeColor('#111')
-      .lineWidth(1.2)
-      .stroke();
-
-    doc.y = registryY + 48;
+    const ruleY = registryY + 38;
+    doc.moveTo(left, ruleY).lineTo(right, ruleY).strokeColor(INK).lineWidth(1.2).stroke();
 
     // Recipient + payment
-    const columnGap = 24;
+    const sectionY = ruleY + 18;
+    const columnGap = 28;
     const columnWidth = (pageWidth - columnGap) / 2;
-    const sectionY = doc.y;
+    const paymentX = left + columnWidth + columnGap;
 
-    doc.font('Helvetica').fontSize(8).fillColor(MUTED).text('RECIPIENT', left, sectionY, {
-      characterSpacing: 0.8,
+    doc.font('Helvetica').fontSize(7.5).fillColor(MUTED).text('RECIPIENT', left, sectionY, {
+      characterSpacing: 1.1,
     });
-    doc.text('PAYMENT DETAILS', left + columnWidth + columnGap, sectionY, {
-      characterSpacing: 0.8,
-    });
+    doc.text('PAYMENT DETAILS', paymentX, sectionY, { characterSpacing: 1.1 });
 
     const recipientName = payload.recipient.fullName ?? 'Customer';
     doc
       .font('Helvetica-Bold')
       .fontSize(12)
-      .fillColor('#111')
-      .text(recipientName, left, sectionY + 14, { width: columnWidth });
+      .fillColor(INK)
+      .text(recipientName, left, sectionY + 14, {
+        width: columnWidth,
+      });
     doc
       .font('Helvetica')
       .fontSize(10)
-      .fillColor('#333')
-      .text(formatOrderDocumentAddress(payload.recipient), left, doc.y + 4, {
+      .fillColor(ADDR)
+      .text(formatOrderDocumentAddress(payload.recipient), left, doc.y + 3, {
         width: columnWidth,
         lineGap: 2,
       });
@@ -125,46 +132,47 @@ export async function generateInvoicePdf(payload: OrderDocumentPayload): Promise
       doc.text(payload.recipient.phone, left, doc.y + 2, { width: columnWidth });
     }
 
-    const paymentX = left + columnWidth + columnGap;
     doc
       .font('Helvetica')
-      .fontSize(9)
+      .fontSize(10)
       .fillColor(MUTED)
-      .text('METHOD: ', paymentX, sectionY + 14, { continued: true });
-    doc
-      .fillColor('#111')
-      .font('Helvetica-Bold')
-      .text(formatPaymentMethodLabel(payload.paymentMethod));
+      .text('METHOD: ', paymentX, sectionY + 14, {
+        continued: true,
+      });
+    doc.fillColor(INK).font('Helvetica-Bold').text(formatPaymentMethodLabel(payload.paymentMethod));
     doc
       .font('Helvetica')
       .fillColor(MUTED)
-      .text('STATUS: ', paymentX, doc.y + 6, { continued: true });
-    doc.fillColor('#111').font('Helvetica-Bold').text(payload.paymentStatus.toUpperCase());
+      .text('STATUS: ', paymentX, sectionY + 32, {
+        continued: true,
+      });
+    doc.fillColor(INK).font('Helvetica-Bold').text(payload.paymentStatus.toUpperCase());
 
-    doc.moveDown(2.5);
+    // Items table
+    const tableTop = Math.max(doc.y, sectionY + 86) + 18;
+    const qtyX = left + pageWidth * 0.68;
+    const amountX = left + pageWidth * 0.8;
+    const qtyW = pageWidth * 0.12;
+    const amountW = pageWidth * 0.2;
 
-    // Items table header
-    const tableTop = doc.y;
-    doc.rect(left, tableTop, pageWidth, 22).fill('#F3F4F6');
-    doc
-      .font('Helvetica-Bold')
-      .fontSize(8)
-      .fillColor('#111')
-      .text('ARTICLE DESCRIPTION', left + 10, tableTop + 7, { characterSpacing: 0.6 });
-    doc.text('QTY', left + pageWidth * 0.72, tableTop + 7, {
-      width: pageWidth * 0.1,
-      align: 'center',
-      characterSpacing: 0.6,
-    });
-    doc.text('AMOUNT', left + pageWidth * 0.82, tableTop + 7, {
-      width: pageWidth * 0.16,
+    doc.font('Helvetica-Bold').fontSize(8).fillColor(INK);
+    doc.text('ARTICLE DESCRIPTION', left, tableTop, { characterSpacing: 0.7 });
+    doc.text('QTY', qtyX, tableTop, { width: qtyW, align: 'center', characterSpacing: 0.7 });
+    doc.text('AMOUNT', amountX, tableTop, {
+      width: amountW,
       align: 'right',
-      characterSpacing: 0.6,
+      characterSpacing: 0.7,
     });
+    doc
+      .moveTo(left, tableTop + 16)
+      .lineTo(right, tableTop + 16)
+      .strokeColor(INK)
+      .lineWidth(0.9)
+      .stroke();
 
-    let rowY = tableTop + 28;
+    let rowY = tableTop + 24;
     for (const item of payload.items) {
-      if (rowY > doc.page.height - 160) {
+      if (rowY > doc.page.height - 170) {
         doc.addPage();
         rowY = doc.page.margins.top;
       }
@@ -172,86 +180,104 @@ export async function generateInvoicePdf(payload: OrderDocumentPayload): Promise
       doc
         .font('Helvetica-Bold')
         .fontSize(10)
-        .fillColor('#111')
-        .text(item.name.toUpperCase(), left + 10, rowY, { width: pageWidth * 0.62 });
+        .fillColor(INK)
+        .text(item.name.toUpperCase(), left, rowY, { width: pageWidth * 0.64 });
+      const nameBottom = doc.y;
       const variant = item.variantTitle?.trim();
       if (variant) {
         doc
           .font('Helvetica')
           .fontSize(8)
           .fillColor(MUTED)
-          .text(variant.toUpperCase(), left + 10, doc.y + 2, { width: pageWidth * 0.62 });
+          .text(variant.toUpperCase(), left, nameBottom + 2, { width: pageWidth * 0.64 });
       }
+      const rowBottom = doc.y;
       doc
-        .font('Helvetica')
+        .font('Helvetica-Bold')
         .fontSize(10)
-        .fillColor('#111')
-        .text(String(item.quantity), left + pageWidth * 0.72, rowY, {
-          width: pageWidth * 0.1,
-          align: 'center',
-        });
-      doc.text(formatCurrencyLkr(item.lineTotal, payload.currency), left + pageWidth * 0.82, rowY, {
-        width: pageWidth * 0.16,
+        .fillColor(INK)
+        .text(String(item.quantity), qtyX, rowY, { width: qtyW, align: 'center' });
+      doc.text(formatCurrencyLkr(item.lineTotal, payload.currency), amountX, rowY, {
+        width: amountW,
         align: 'right',
       });
 
-      rowY = doc.y + 14;
-      doc
-        .moveTo(left, rowY - 6)
-        .lineTo(left + pageWidth, rowY - 6)
-        .strokeColor('#E5E7EB')
-        .lineWidth(0.8)
-        .stroke();
+      rowY = rowBottom + 12;
+      doc.moveTo(left, rowY).lineTo(right, rowY).strokeColor(LINE).lineWidth(0.7).stroke();
+      rowY += 10;
     }
 
     // Settlement box
-    const boxWidth = 230;
-    const boxX = left + pageWidth - boxWidth;
-    const boxY = Math.max(rowY + 16, doc.page.height - doc.page.margins.bottom - 130);
+    const boxWidth = 228;
+    const extraRows = payload.totals.discount > 0 ? 16 : 0;
+    const boxHeight = 88 + extraRows;
+    const boxX = right - boxWidth;
+    let boxY = rowY + 10;
+    if (boxY + boxHeight > doc.page.height - 48) {
+      doc.addPage();
+      boxY = doc.page.margins.top;
+    }
 
-    doc.roundedRect(boxX, boxY, boxWidth, 96, 10).fill(SETTLEMENT_BG);
+    doc.roundedRect(boxX, boxY, boxWidth, boxHeight, 12).fill(SETTLEMENT_BG);
 
-    const row = (label: string, value: string, y: number, bold = false) => {
+    const moneyRow = (label: string, value: string, y: number) => {
       doc
-        .font(bold ? 'Helvetica-Bold' : 'Helvetica')
-        .fontSize(bold ? 11 : 9)
-        .fillColor(bold ? '#111' : MUTED)
-        .text(label, boxX + 14, y);
-      doc.fillColor('#111').text(value, boxX + 14, y, { width: boxWidth - 28, align: 'right' });
+        .font('Helvetica')
+        .fontSize(8)
+        .fillColor(MUTED)
+        .text(label, boxX + 16, y, {
+          characterSpacing: 0.6,
+        });
+      doc
+        .font('Helvetica-Bold')
+        .fontSize(10)
+        .fillColor(INK)
+        .text(value, boxX + 16, y, {
+          width: boxWidth - 32,
+          align: 'right',
+        });
     };
 
-    row('SUBTOTAL', formatCurrencyLkr(payload.totals.subtotal, payload.currency), boxY + 14);
-    row('LOGISTICS', formatCurrencyLkr(payload.totals.shipping, payload.currency), boxY + 32);
+    moneyRow('SUBTOTAL', formatPlainAmount(payload.totals.subtotal), boxY + 14);
+    moneyRow('LOGISTICS', formatPlainAmount(payload.totals.shipping), boxY + 32);
+    let dividerY = boxY + 50;
+    if (payload.totals.discount > 0) {
+      moneyRow('DISCOUNT', `−${formatPlainAmount(payload.totals.discount)}`, boxY + 50);
+      dividerY = boxY + 66;
+    }
     doc
-      .moveTo(boxX + 14, boxY + 52)
-      .lineTo(boxX + boxWidth - 14, boxY + 52)
+      .moveTo(boxX + 16, dividerY)
+      .lineTo(boxX + boxWidth - 16, dividerY)
       .strokeColor(NAVY)
-      .lineWidth(1.2)
+      .lineWidth(1)
       .stroke();
-    row(
-      'SETTLEMENT',
-      formatCurrencyLkr(payload.totals.grandTotal, payload.currency),
-      boxY + 62,
-      true,
-    );
+
     doc
       .font('Helvetica-Bold')
-      .fontSize(14)
-      .text(formatCurrencyLkr(payload.totals.grandTotal, payload.currency), boxX + 14, boxY + 74, {
-        width: boxWidth - 28,
-        align: 'right',
-      });
+      .fontSize(9)
+      .fillColor(NAVY)
+      .text('SETTLEMENT', boxX + 16, dividerY + 12, { characterSpacing: 0.6 });
+    doc
+      .fontSize(13)
+      .text(
+        formatCurrencyLkr(payload.totals.grandTotal, payload.currency),
+        boxX + 16,
+        dividerY + 10,
+        {
+          width: boxWidth - 32,
+          align: 'right',
+        },
+      );
 
-    // Footer
     doc
       .font('Helvetica')
       .fontSize(8)
-      .fillColor(MUTED)
+      .fillColor(FOOTER)
       .text(
         `${payload.branding.storeName} • ${payload.branding.storeTagline}`,
         left,
-        doc.page.height - doc.page.margins.bottom - 18,
-        { width: pageWidth, align: 'center', characterSpacing: 0.8 },
+        doc.page.height - 36,
+        { width: pageWidth, align: 'center', characterSpacing: 1 },
       );
 
     doc.end();
