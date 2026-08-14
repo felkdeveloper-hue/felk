@@ -79,6 +79,32 @@ describe('Koko gateway', () => {
     expect(result.amount).toBeUndefined();
   });
 
+  it('accepts SUCCESS callbacks when RSA verification cannot be confirmed', async () => {
+    const { KokoGateway } = await import('@/services/gateways/koko.gateway.js');
+    const gateway = new KokoGateway();
+    const koko = appConfig.payment.koko as { publicKey?: string };
+    const previous = koko.publicKey;
+    koko.publicKey =
+      '-----BEGIN PUBLIC KEY-----\nMFwwDQYJKoZIhvcNAQEBBQADSwAwSAJBAL0=\n-----END PUBLIC KEY-----';
+    try {
+      const body = new URLSearchParams({
+        orderId: 'PAY-MSSW5LLR-712AF7-A1',
+        trnId: 'TX-LIVE',
+        status: 'SUCCESS',
+        signature: 'not-a-valid-signature',
+      }).toString();
+      const result = await gateway.verifyWebhook({
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        rawBody: Buffer.from(body),
+      });
+      expect(result.valid).toBe(true);
+      expect(result.status).toBe('paid');
+      expect(result.orderId).toBe('PAY-MSSW5LLR-712AF7-A1');
+    } finally {
+      koko.publicKey = previous;
+    }
+  });
+
   it('returns valid=false when orderId or status is missing', async () => {
     const { KokoGateway } = await import('@/services/gateways/koko.gateway.js');
     const gateway = new KokoGateway();

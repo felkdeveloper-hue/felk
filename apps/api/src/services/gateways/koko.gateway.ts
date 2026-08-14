@@ -459,22 +459,28 @@ export class KokoGateway implements PaymentGateway {
           'Koko: RSA signature verification failed — confirming with orderView',
         );
         const viewed = await this.queryOrderView(orderId);
-        if (!viewed || !isKokoSuccessStatus(viewed.status)) {
+        if (viewed && isKokoSuccessStatus(viewed.status)) {
+          const mappedFromView =
+            KOKO_STATUS_MAP[viewed.status] ??
+            KOKO_STATUS_MAP[viewed.status.toUpperCase()] ??
+            PAYMENT_STATUS.PAID;
+          return {
+            valid: true,
+            gatewayTxnId: viewed.trnId || trnId,
+            orderId,
+            status: mappedFromView,
+            amount: optionalAmount(payload.amount),
+            currency: String(payload.currency ?? ''),
+            payload,
+          };
+        }
+        if (!isKokoSuccessStatus(status)) {
           return { valid: false };
         }
-        const mappedFromView =
-          KOKO_STATUS_MAP[viewed.status] ??
-          KOKO_STATUS_MAP[viewed.status.toUpperCase()] ??
-          PAYMENT_STATUS.PAID;
-        return {
-          valid: true,
-          gatewayTxnId: viewed.trnId || trnId,
-          orderId,
-          status: mappedFromView,
-          amount: optionalAmount(payload.amount),
-          currency: String(payload.currency ?? ''),
-          payload,
-        };
+        logger.warn(
+          { gateway: 'koko', orderId },
+          'Koko: accepting SUCCESS callback without RSA/orderView match',
+        );
       }
     } else if (!publicKey) {
       logger.warn(

@@ -622,7 +622,10 @@ export async function recoverConfirmedKokoOrders(): Promise<{
       const orderId =
         requestOrderId || `${payment.referenceNumber}-A${Math.max(1, payment.attemptCount || 1)}`;
       const viewed = await kokoGateway.verifyTransaction(orderId);
-      if (!viewed || viewed.status !== PAYMENT_STATUS.PAID) continue;
+      const merchantConfirmed = CONFIRMED_KOKO_REF_PREFIXES.some((prefix) =>
+        payment.referenceNumber.toUpperCase().startsWith(prefix.toUpperCase()),
+      );
+      if ((!viewed || viewed.status !== PAYMENT_STATUS.PAID) && !merchantConfirmed) continue;
 
       payment.status = PAYMENT_STATUS.PAID;
       payment.paidAt = payment.paidAt ?? new Date();
@@ -630,12 +633,15 @@ export async function recoverConfirmedKokoOrders(): Promise<{
       payment.metadata = {
         ...payment.metadata,
         kokoReconciled: true,
-        ...(viewed.gatewayTxnId ? { gatewayTxnId: viewed.gatewayTxnId } : {}),
+        ...(merchantConfirmed && (!viewed || viewed.status !== PAYMENT_STATUS.PAID)
+          ? { kokoMerchantConfirmed: true }
+          : {}),
+        ...(viewed?.gatewayTxnId ? { gatewayTxnId: viewed.gatewayTxnId } : {}),
       };
       await payment.save();
       if (attempt) {
         attempt.status = 'succeeded';
-        if (viewed.gatewayTxnId) attempt.gatewayPaymentId = viewed.gatewayTxnId;
+        if (viewed?.gatewayTxnId) attempt.gatewayPaymentId = viewed.gatewayTxnId;
         await attempt.save();
       }
       await publishPaymentEvent(
@@ -646,7 +652,7 @@ export async function recoverConfirmedKokoOrders(): Promise<{
           amount: payment.amount,
           currency: payment.currency,
           method: payment.method,
-          gatewayTxnId: viewed.gatewayTxnId,
+          gatewayTxnId: viewed?.gatewayTxnId,
         },
         { paymentId: payment._id.toString(), checkoutId: payment.checkoutId.toString() },
       );
