@@ -143,6 +143,19 @@ export async function handlePaymentSucceededEvent(payload: Record<string, unknow
       return;
     }
 
+    if (
+      payment.method !== PAYMENT_METHOD.COD &&
+      payment.status !== PAYMENT_STATUS.PAID &&
+      payment.status !== PAYMENT_STATUS.PARTIALLY_REFUNDED &&
+      payment.status !== PAYMENT_STATUS.REFUNDED
+    ) {
+      logger.warn(
+        { paymentId, status: payment.status, method: payment.method },
+        'Skip order create — gateway payment is not paid',
+      );
+      return;
+    }
+
     const checkout = await CheckoutSessionModel.findById(payment.checkoutId);
     if (!checkout) {
       logger.error(
@@ -433,7 +446,8 @@ export async function catchUpUnconsumedPaymentEvents(): Promise<{
     const exists = await OrderModel.exists({ paymentId });
     if (exists) continue;
     await handlePaymentSucceededEvent(event.payload as Record<string, unknown>);
-    created += 1;
+    const nowExists = await OrderModel.exists({ paymentId });
+    if (nowExists) created += 1;
   }
 
   return { scanned: events.length, created };

@@ -13,11 +13,13 @@ const ANALYTICS_SWEEP_INTERVAL_MS = 60_000;
 const RESERVATION_SWEEP_INTERVAL_MS = 60_000;
 /** Keep storefront product lists warm so Vercel SPAs do not hit a cold Mongo path. */
 const STOREFRONT_WARMUP_INTERVAL_MS = 4 * 60_000;
+const PAYMENT_ORDER_SYNC_INTERVAL_MS = 2 * 60_000;
 
 let emailSweepTimer: ReturnType<typeof setInterval> | null = null;
 let analyticsSweepTimer: ReturnType<typeof setInterval> | null = null;
 let reservationSweepTimer: ReturnType<typeof setInterval> | null = null;
 let storefrontWarmupTimer: ReturnType<typeof setInterval> | null = null;
+let paymentOrderSyncTimer: ReturnType<typeof setInterval> | null = null;
 
 async function runEmailSweep() {
   try {
@@ -99,6 +101,24 @@ async function runReservationSweep() {
   }
 }
 
+async function runPaymentOrderSync() {
+  try {
+    const { catchUpOrphanPaidGatewayPayments } =
+      await import('@/services/order-payment-consumer.service.js');
+    const { paymentService } = await import('@/services/payment.service.js');
+    const orphan = await catchUpOrphanPaidGatewayPayments();
+    const open = await paymentService.reconcileOpenGatewayPayments();
+    if (orphan.created > 0 || open.paid > 0) {
+      logger.info(
+        { orphanCreated: orphan.created, gatewayPaid: open.paid },
+        'Cron: synced paid gateway payments into admin orders',
+      );
+    }
+  } catch (err) {
+    logger.error({ err }, 'Payment-order sync error');
+  }
+}
+
 export function startCronJobs(): void {
   logger.info('Cron: starting retry sweep jobs');
 
@@ -118,11 +138,16 @@ export function startCronJobs(): void {
     void runStorefrontWarmup();
   }, STOREFRONT_WARMUP_INTERVAL_MS);
 
+  paymentOrderSyncTimer = setInterval(() => {
+    void runPaymentOrderSync();
+  }, PAYMENT_ORDER_SYNC_INTERVAL_MS);
+
   // Run once shortly after startup
   setTimeout(() => void runEmailSweep(), 5_000);
   setTimeout(() => void runAnalyticsSweep(), 5_000);
   setTimeout(() => void runReservationSweep(), 6_000);
   setTimeout(() => void runStorefrontWarmup(), 8_000);
+  setTimeout(() => void runPaymentOrderSync(), 20_000);
 }
 
 export function stopCronJobs(): void {
@@ -130,9 +155,11 @@ export function stopCronJobs(): void {
   if (analyticsSweepTimer) clearInterval(analyticsSweepTimer);
   if (reservationSweepTimer) clearInterval(reservationSweepTimer);
   if (storefrontWarmupTimer) clearInterval(storefrontWarmupTimer);
+  if (paymentOrderSyncTimer) clearInterval(paymentOrderSyncTimer);
   emailSweepTimer = null;
   analyticsSweepTimer = null;
   reservationSweepTimer = null;
   storefrontWarmupTimer = null;
+  paymentOrderSyncTimer = null;
   logger.info('Cron: retry sweep jobs stopped');
 }

@@ -519,7 +519,7 @@ export class PaymentService {
     });
     if (!payment) throw ApiError.notFound('No payment found for this checkout');
 
-    await this.reconcilePendingKokoPayment(payment);
+    await this.reconcilePendingGatewayPayment(payment);
 
     // Heal stuck checkouts where payment is already verified but the order was never created.
     await fulfillCodPaymentIfNeeded(payment);
@@ -1069,12 +1069,42 @@ export class PaymentService {
     return { ok: true, redirectUrl: successUrl };
   }
 
-  private async reconcilePendingKokoPayment(payment: PaymentDocument): Promise<PaymentDocument> {
-    if (payment.method !== PAYMENT_METHOD.KOKO) return payment;
-    if (PAYMENT_TERMINAL_SUCCESS_STATUSES.includes(payment.status as never)) return payment;
+  async reconcileOpenGatewayPayments(): Promise<{ scanned: number; paid: number }> {
+    const since = new Date(Date.now() - 12 * 60 * 60 * 1000);
+    const payments = await PaymentModel.find({
+      method: { $in: [PAYMENT_METHOD.KOKO, PAYMENT_METHOD.PAYHERE] },
+      status: { $in: [PAYMENT_STATUS.PENDING, PAYMENT_STATUS.PROCESSING] },
+      isDeleted: false,
+      createdAt: { $gte: since },
+    })
+      .sort({ createdAt: -1 })
+      .limit(20);
 
-    const gateway = getGateway(PAYMENT_METHOD.KOKO);
-    if (!gateway.verifyTransaction) return payment;
+    let paid = 0;
+    for (const payment of payments) {
+      try {
+        const before = payment.status;
+        await this.reconcilePendingGatewayPayment(payment);
+        if (before !== PAYMENT_STATUS.PAID && payment.status === PAYMENT_STATUS.PAID) paid += 1;
+      } catch (err) {
+        logger.warn(
+          { err, paymentId: payment._id.toString(), method: payment.method },
+          'Gateway reconcile skipped',
+        );
+      }
+    }
+    return { scanned: payments.length, paid };
+  }
+
+  private async reconcilePendingGatewayPayment(payment: PaymentDocument): Promise<void> {
+    if (payment.method === PAYMENT_METHOD.COD) return;
+    if (PAYMENT_TERMINAL_SUCCESS_STATUSES.includes(payment.status as never)) return;
+    if (payment.status !== PAYMENT_STATUS.PENDING && payment.status !== PAYMENT_STATUS.PROCESSING) {
+      return;
+    }
+
+    const gateway = getGateway(payment.method);
+    if (!gateway.verifyTransaction) return;
 
     const attempt = await PaymentAttemptModel.findOne({ paymentId: payment._id }).sort({
       attemptNumber: -1,
@@ -1092,19 +1122,19 @@ export class PaymentService {
       result = await gateway.verifyTransaction(orderId);
     } catch (err) {
       logger.warn(
-        { err, orderId, paymentId: payment._id.toString() },
-        'Koko orderView reconcile failed',
+        { err, orderId, paymentId: payment._id.toString(), method: payment.method },
+        'Gateway verifyTransaction failed',
       );
-      return payment;
+      return;
     }
-    if (!result || result.status !== PAYMENT_STATUS.PAID) return payment;
+    if (!result || result.status !== PAYMENT_STATUS.PAID) return;
 
     payment.status = PAYMENT_STATUS.PAID;
     payment.paidAt = payment.paidAt ?? new Date();
     payment.failureReason = null;
     payment.metadata = {
       ...payment.metadata,
-      kokoReconciled: true,
+      gatewayReconciled: true,
       ...(result.gatewayTxnId ? { gatewayTxnId: result.gatewayTxnId } : {}),
     };
     await payment.save();
@@ -1135,10 +1165,14 @@ export class PaymentService {
     });
 
     logger.info(
-      { paymentId: payment._id.toString(), orderId, gatewayTxnId: result.gatewayTxnId },
-      'Koko: payment marked paid from orderView',
+      {
+        paymentId: payment._id.toString(),
+        orderId,
+        method: payment.method,
+        gatewayTxnId: result.gatewayTxnId,
+      },
+      'Gateway payment marked paid from verifyTransaction',
     );
-    return payment;
   }
 
   private async findAttemptForGateway(gatewayKey: string, orderId: string) {
