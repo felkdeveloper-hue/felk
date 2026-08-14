@@ -27,6 +27,12 @@ export interface ShippingMethodOption {
 /** Flat shipping fee applied site-wide (LKR). */
 export const FIXED_SHIPPING_AMOUNT = 500;
 
+/** Cart / checkout preview: customers pay the flat fee; staff / admin is waived. */
+export function previewShippingAmount(actualShipping: number, isStaff: boolean) {
+  if (isStaff) return 0;
+  return actualShipping > 0 ? actualShipping : FIXED_SHIPPING_AMOUNT;
+}
+
 export const SHIPPING_METHOD_OPTIONS: ShippingMethodOption[] = [
   {
     id: 'standard',

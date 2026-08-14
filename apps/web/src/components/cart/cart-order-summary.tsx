@@ -2,6 +2,9 @@ import { formatCurrency } from '@/utils';
 import type { CartTotals, CartValidationResult } from '@/services/sdk';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
+import { previewShippingAmount } from '@/constants/checkout.constants';
+import { useAuthStore } from '@/store';
+import { isStaffUser } from '@/utils/auth-redirect';
 
 export interface CartOrderSummaryProps {
   totals: CartTotals;
@@ -10,7 +13,8 @@ export interface CartOrderSummaryProps {
 
 export function CartOrderSummary({ totals, validation }: CartOrderSummaryProps) {
   const currency = totals.currency ?? 'LKR';
-  const shipping = totals.shipping > 0 ? totals.shipping : 500;
+  const isStaff = isStaffUser(useAuthStore((state) => state.user));
+  const shipping = previewShippingAmount(totals.shipping, isStaff);
   const displayTotal = totals.shipping > 0 ? totals.total : totals.total + shipping;
 
   return (

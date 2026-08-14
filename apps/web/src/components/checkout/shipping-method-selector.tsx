@@ -5,6 +5,8 @@ import type { CheckoutSession, ShippingMethod } from '@/services/sdk';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { cn } from '@/lib/utils';
+import { useAuthStore } from '@/store';
+import { isStaffUser } from '@/utils/auth-redirect';
 
 export interface ShippingMethodSelectorProps {
   session: CheckoutSession;
@@ -32,10 +34,14 @@ function estimateForMethod(session: CheckoutSession, method: ShippingMethod) {
   return null;
 }
 
-function priceLabel(session: CheckoutSession, amount: number | undefined) {
+function priceLabel(session: CheckoutSession, amount: number | undefined, isStaff: boolean) {
   const { currency } = session;
   if (amount != null) return formatCurrency(amount, currency);
-  const fallback = session.totals.shipping > 0 ? session.totals.shipping : FIXED_SHIPPING_AMOUNT;
+  const fallback = isStaff
+    ? 0
+    : session.totals.shipping > 0
+      ? session.totals.shipping
+      : FIXED_SHIPPING_AMOUNT;
   return formatCurrency(fallback, currency);
 }
 
@@ -45,6 +51,7 @@ export function ShippingMethodSelector({
   onChange,
   disabled,
 }: ShippingMethodSelectorProps) {
+  const isStaff = isStaffUser(useAuthStore((state) => state.user));
   return (
     <fieldset className="space-y-5" disabled={disabled}>
       <legend className="sr-only">Shipping method</legend>
@@ -111,7 +118,9 @@ export function ShippingMethodSelector({
                 <span className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
                   Shipping fee
                 </span>
-                <span className="text-base font-semibold">{priceLabel(session, amount)}</span>
+                <span className="text-base font-semibold">
+                  {priceLabel(session, amount, isStaff)}
+                </span>
               </div>
             </label>
           );

@@ -10,6 +10,8 @@ import { consumePaymentFailedFlag, trackCommerceEvent } from '@/lib/analytics';
 import { formatCurrency } from '@/utils';
 import { customersApi } from '@/services/sdk';
 import { isGuestCheckoutUser } from '@/utils/auth/guest-checkout';
+import { isStaffUser } from '@/utils/auth-redirect';
+import { previewShippingAmount } from '@/constants/checkout.constants';
 import { CartItemRow } from '@/components/cart/cart-item-row';
 import { CartOrderSummary } from '@/components/cart/cart-order-summary';
 import { CartPromotionsPanel } from '@/components/cart/cart-promotions-panel';
@@ -52,6 +54,7 @@ export function CartPageContent() {
   const authUser = useAuthStore((state) => state.user);
   const isAuthed = useAuthStore((state) => Boolean(state.accessToken && state.user));
   const isGuestCheckout = isGuestCheckoutUser(authUser);
+  const isStaff = isStaffUser(authUser);
 
   const cart = cartQuery.data;
   const validation = cart?.validation;
@@ -190,7 +193,9 @@ export function CartPageContent() {
             </span>
             <span className="font-display text-foreground text-lg font-bold tabular-nums tracking-tight">
               {formatCurrency(
-                cart.totals.shipping > 0 ? cart.totals.total : cart.totals.total + 500,
+                cart.totals.shipping > 0
+                  ? cart.totals.total
+                  : cart.totals.total + previewShippingAmount(cart.totals.shipping, isStaff),
                 cart.totals.currency ?? 'LKR',
               )}
             </span>

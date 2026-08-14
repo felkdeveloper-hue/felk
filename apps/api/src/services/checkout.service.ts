@@ -26,9 +26,14 @@ import {
   SHIPPING_METHOD,
   type ShippingMethod,
 } from '@/constants/checkout.js';
+import { STAFF_ROLES } from '@/constants/auth.js';
 import { ORDER_STATUS } from '@/constants/order-status.js';
 import { UserModel } from '@/models/user.model.js';
 import type { AuthenticatedUser } from '@/types/index.js';
+
+function isStaffCheckout(roleKey?: string | null) {
+  return Boolean(roleKey && (STAFF_ROLES as readonly string[]).includes(roleKey));
+}
 
 function toPlain(doc: { toObject: () => Record<string, unknown> }) {
   return doc.toObject();
@@ -267,6 +272,10 @@ export class CheckoutService {
       state?: string;
     } | null;
 
+    const checkoutUser = session.userId
+      ? await UserModel.findById(session.userId).select('metadata roleKey').lean()
+      : null;
+
     const shippingEstimate = await calculateShipping({
       country: shippingAddress?.country,
       state: shippingAddress?.state,
@@ -274,6 +283,7 @@ export class CheckoutService {
       totalWeightGrams,
       method: session.shippingMethod as ShippingMethod,
       currency: session.currency,
+      waiveFee: isStaffCheckout(checkoutUser?.roleKey),
     });
 
     const taxEstimate = await calculateTax({
@@ -294,12 +304,7 @@ export class CheckoutService {
     // 5% first-order discount — signed-in accounts only (never guest checkout).
     const isGuestCheckout =
       Boolean((session.metadata as { isGuestCheckout?: boolean } | undefined)?.isGuestCheckout) ||
-      (session.userId
-        ? Boolean(
-            (await UserModel.findById(session.userId).select('metadata').lean())?.metadata
-              ?.checkoutGuest,
-          )
-        : true);
+      (session.userId ? Boolean(checkoutUser?.metadata?.checkoutGuest) : true);
     const hasPriorOrder = await OrderModel.exists({
       customerId: session.customerId,
       isDeleted: false,

@@ -12,6 +12,8 @@ export interface ShippingCalcInput {
   totalWeightGrams: number;
   method: ShippingMethod;
   currency: string;
+  /** Staff / admin checkouts skip the island-wide fee. */
+  waiveFee?: boolean;
 }
 
 export interface ShippingCalcResult {
@@ -55,6 +57,22 @@ export const FIXED_SHIPPING_AMOUNT = 500;
  * Shipping calculator — fixed LKR 500 for delivery; pickup remains free.
  */
 export async function calculateShipping(input: ShippingCalcInput): Promise<ShippingCalcResult> {
+  if (input.waiveFee) {
+    return {
+      status: 'calculated',
+      method:
+        input.method === SHIPPING_METHOD.EXPRESS || input.method === SHIPPING_METHOD.FREE
+          ? SHIPPING_METHOD.STANDARD
+          : input.method,
+      amount: 0,
+      currency: input.currency,
+      message: 'Admin / staff order — shipping waived',
+      carrier: 'internal',
+      estimatedDaysMin: 3,
+      estimatedDaysMax: 7,
+    };
+  }
+
   if (input.method === SHIPPING_METHOD.PICKUP) {
     return {
       status: 'calculated',
