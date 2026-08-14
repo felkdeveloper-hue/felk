@@ -24,8 +24,8 @@ export interface ShippingMethodOption {
   badge?: string;
 }
 
-/** Flat shipping fee applied site-wide (LKR). Temporarily 0 while testing. */
-export const FIXED_SHIPPING_AMOUNT = 0;
+/** Flat shipping fee applied site-wide (LKR). */
+export const FIXED_SHIPPING_AMOUNT = 500;
 
 export const SHIPPING_METHOD_OPTIONS: ShippingMethodOption[] = [
   {

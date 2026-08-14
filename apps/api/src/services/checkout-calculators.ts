@@ -48,11 +48,11 @@ export interface TaxCalcResult {
   provider: string;
 }
 
-/** Flat island-wide shipping fee (LKR). Temporarily 0 while testing. */
-export const FIXED_SHIPPING_AMOUNT = 0;
+/** Flat island-wide shipping fee (LKR). Free shipping is intentionally disabled. */
+export const FIXED_SHIPPING_AMOUNT = 500;
 
 /**
- * Shipping calculator — fixed delivery fee (currently waived); pickup remains free.
+ * Shipping calculator — fixed LKR 500 for delivery; pickup remains free.
  */
 export async function calculateShipping(input: ShippingCalcInput): Promise<ShippingCalcResult> {
   if (input.method === SHIPPING_METHOD.PICKUP) {
