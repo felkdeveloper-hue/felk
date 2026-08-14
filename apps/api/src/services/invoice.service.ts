@@ -28,6 +28,7 @@ export class InvoiceService {
       shippingAddress: order.shippingAddress,
       items: order.items.map((item) => ({
         name: item.name,
+        variantTitle: item.variantTitle,
         sku: item.sku,
         quantity: item.quantity,
         price: item.salePrice ?? item.price,

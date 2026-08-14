@@ -1,4 +1,4 @@
-import { useRef, useState, type TouchEvent } from 'react';
+import { useEffect, useRef, useState, type TouchEvent } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Image } from '@/components/media/image';
@@ -12,12 +12,32 @@ export interface ProductGalleryProps {
   className?: string;
 }
 
+const GALLERY_FRAME_RATIO = 3 / 4;
+
+function isShortProductPhoto(width: number, height: number) {
+  if (width <= 0 || height <= 0) return false;
+  return width / height > GALLERY_FRAME_RATIO * 1.08;
+}
+
 export function ProductGallery({ media, productName, badgeLabel, className }: ProductGalleryProps) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [zoomed, setZoomed] = useState(false);
   const [mobileZoom, setMobileZoom] = useState(false);
+  const [shortPhoto, setShortPhoto] = useState(false);
   const touchStartX = useRef<number | null>(null);
   const active = media[activeIndex] ?? media[0];
+
+  useEffect(() => {
+    setShortPhoto(false);
+    setZoomed(false);
+    setMobileZoom(false);
+    if (!active?.url) return;
+    const probe = new window.Image();
+    probe.onload = () => {
+      setShortPhoto(isShortProductPhoto(probe.naturalWidth, probe.naturalHeight));
+    };
+    probe.src = active.url;
+  }, [active?.url]);
 
   if (!active) {
     return <div className={cn('bg-muted aspect-[3/4] rounded-none', className)} />;
@@ -84,12 +104,18 @@ export function ProductGallery({ media, productName, badgeLabel, className }: Pr
 
         <div className="relative min-w-0 flex-1">
           <div
-            className="bg-muted border-border/80 relative overflow-hidden rounded-none border lg:cursor-zoom-in"
-            onMouseEnter={() => setZoomed(true)}
+            className={cn(
+              'border-border/80 relative overflow-hidden rounded-none border',
+              shortPhoto ? 'bg-white' : 'bg-muted lg:cursor-zoom-in',
+            )}
+            onMouseEnter={() => {
+              if (!shortPhoto) setZoomed(true);
+            }}
             onMouseLeave={() => setZoomed(false)}
             onTouchStart={onTouchStart}
             onTouchEnd={onTouchEnd}
             onClick={() => {
+              if (shortPhoto) return;
               // Tap-to-zoom on touch devices only (desktop keeps hover zoom)
               if (
                 typeof window !== 'undefined' &&
@@ -118,11 +144,17 @@ export function ProductGallery({ media, productName, badgeLabel, className }: Pr
                   src={active.url}
                   alt={active.alt ?? productName}
                   aspectRatio="3/4"
+                  objectFit={shortPhoto ? 'contain' : 'cover'}
+                  containerClassName={shortPhoto ? 'bg-white' : undefined}
                   className={cn(
                     'transition-transform duration-200 ease-out lg:duration-700',
-                    zoomed && 'lg:scale-[1.18]',
-                    mobileZoom && 'scale-[1.35]',
+                    !shortPhoto && zoomed && 'lg:scale-[1.18]',
+                    !shortPhoto && mobileZoom && 'scale-[1.35]',
                   )}
+                  onLoad={(event) => {
+                    const img = event.currentTarget;
+                    setShortPhoto(isShortProductPhoto(img.naturalWidth, img.naturalHeight));
+                  }}
                 />
               </motion.div>
             </AnimatePresence>

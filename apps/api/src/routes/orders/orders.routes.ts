@@ -210,6 +210,37 @@ ordersRouter.post(
   }),
 );
 
+ordersRouter.get(
+  '/:id/invoice/pdf',
+  authenticate,
+  authorizeAny(...invoicePerms),
+  validate({ params: S.orderIdParamsSchema }),
+  asyncHandler(async (req, res) => {
+    if (!req.user) throw ApiError.unauthorized();
+    const { buffer, fileName } = await orderService.getInvoicePdf(String(req.params.id), req.user);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    res.send(buffer);
+  }),
+);
+
+ordersRouter.get(
+  '/:id/shipping-label/pdf',
+  authenticate,
+  authorizeAny(...invoicePerms),
+  validate({ params: S.orderIdParamsSchema }),
+  asyncHandler(async (req, res) => {
+    if (!req.user) throw ApiError.unauthorized();
+    const { buffer, fileName } = await orderService.getShippingLabelPdf(
+      String(req.params.id),
+      req.user,
+    );
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    res.send(buffer);
+  }),
+);
+
 ordersRouter.post(
   '/:id/return',
   authenticate,

@@ -118,6 +118,7 @@ export interface OrderInvoice {
   shippingAddress: OrderAddressSnapshot | null;
   items: Array<{
     name: string;
+    variantTitle?: string;
     sku: string;
     quantity: number;
     price: number;

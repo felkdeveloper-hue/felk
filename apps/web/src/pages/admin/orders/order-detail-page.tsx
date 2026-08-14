@@ -1,12 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { Mail, Loader2 } from 'lucide-react';
+import { Download, Mail, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@fe-platform/ui';
 import { toast } from 'sonner';
 import { AdminErrorState, AdminPageHeader, AdminPanel, PageMotion } from '@/components/admin';
 import { InvoiceView } from '@/components/orders';
+import { Image } from '@/components/media/image';
 import { Button as UiButton } from '@/components/ui/button';
+import { env } from '@/config/env';
 import {
   Dialog,
   DialogContent,
@@ -27,6 +29,24 @@ import { formatOrderAddress, ordersApi, type AdminOrderAddress } from '@/service
 
 function readRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+}
+
+function resolveOrderItemImage(value: unknown): string | undefined {
+  if (typeof value !== 'string' || !value) return undefined;
+  if (/^https?:\/\//i.test(value)) return value;
+  if (value.startsWith('/uploads/') && env.apiOrigin) {
+    return `${env.apiOrigin.replace(/\/$/, '')}${value}`;
+  }
+  if (value.startsWith('/uploads/') && env.cdnUrl) {
+    return `${env.cdnUrl.replace(/\/$/, '')}${value}`;
+  }
+  return value;
+}
+
+function readItemImage(row: Record<string, unknown>): string | undefined {
+  const images = Array.isArray(row.images) ? row.images : [];
+  const first = images.find((image) => typeof image === 'string' && image.length > 0);
+  return resolveOrderItemImage(first);
 }
 
 function readAddress(value: unknown): AdminOrderAddress | null {
@@ -95,6 +115,8 @@ export function OrderDetailPage({ orderId }: { orderId: string }) {
   const [note, setNote] = useState('');
   const [nextStatus, setNextStatus] = useState('confirmed');
   const [invoiceOpen, setInvoiceOpen] = useState(false);
+  const [downloadingInvoice, setDownloadingInvoice] = useState(false);
+  const [downloadingLabel, setDownloadingLabel] = useState(false);
 
   const detailQuery = useQuery({
     queryKey: QUERY_KEYS.adminOrders.detail(orderId),
@@ -181,6 +203,28 @@ export function OrderDetailPage({ orderId }: { orderId: string }) {
     ? nextStatus
     : (allowedStatuses[0] ?? '');
 
+  const downloadInvoicePdf = async () => {
+    try {
+      setDownloadingInvoice(true);
+      await ordersApi.downloadInvoicePdf(orderId);
+    } catch (error) {
+      toast.error(error instanceof AppError ? error.message : 'Unable to download invoice PDF');
+    } finally {
+      setDownloadingInvoice(false);
+    }
+  };
+
+  const downloadShippingLabelPdf = async () => {
+    try {
+      setDownloadingLabel(true);
+      await ordersApi.downloadShippingLabelPdf(orderId);
+    } catch (error) {
+      toast.error(error instanceof AppError ? error.message : 'Unable to download shipping label');
+    } finally {
+      setDownloadingLabel(false);
+    }
+  };
+
   return (
     <PageMotion>
       <AdminPageHeader
@@ -240,12 +284,46 @@ export function OrderDetailPage({ orderId }: { orderId: string }) {
             <ul className="space-y-3 text-sm">
               {items.map((item, index) => {
                 const row = readRecord(item);
+                const productId = row.productId ? String(row.productId) : '';
+                const imageUrl = readItemImage(row);
                 return (
                   <li
-                    key={String(row.id ?? index)}
-                    className="flex items-start justify-between gap-4 border-b border-[var(--admin-line)] pb-3 last:border-0 last:pb-0"
+                    key={String(row.id ?? row._id ?? index)}
+                    className="flex items-start gap-3 border-b border-[var(--admin-line)] pb-3 last:border-0 last:pb-0"
                   >
-                    <div>
+                    {productId ? (
+                      <Link
+                        to={ADMIN_ROUTES.productDetail}
+                        params={{ productId }}
+                        className="bg-muted relative size-14 shrink-0 overflow-hidden ring-1 ring-[var(--admin-line)] transition-opacity hover:opacity-85"
+                        title="Open product"
+                      >
+                        {imageUrl ? (
+                          <Image
+                            src={imageUrl}
+                            alt={String(row.name ?? row.productName ?? 'Product')}
+                            className="size-full object-cover"
+                            sizes="56px"
+                          />
+                        ) : (
+                          <span className="text-muted-foreground flex size-full items-center justify-center text-[10px] font-semibold uppercase">
+                            FE
+                          </span>
+                        )}
+                      </Link>
+                    ) : (
+                      <div className="bg-muted relative size-14 shrink-0 overflow-hidden ring-1 ring-[var(--admin-line)]">
+                        {imageUrl ? (
+                          <Image
+                            src={imageUrl}
+                            alt={String(row.name ?? row.productName ?? 'Product')}
+                            className="size-full object-cover"
+                            sizes="56px"
+                          />
+                        ) : null}
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
                       <p className="font-medium text-[var(--admin-ink)]">
                         {String(row.name ?? row.productName ?? 'Item')}
                       </p>
@@ -253,7 +331,7 @@ export function OrderDetailPage({ orderId }: { orderId: string }) {
                         {String(row.variantTitle ?? '')} · SKU {String(row.sku ?? '—')}
                       </p>
                     </div>
-                    <div className="text-right">
+                    <div className="shrink-0 text-right text-sm">
                       <p>Qty {String(row.quantity ?? 1)}</p>
                       <p className="text-muted-foreground">
                         {formatCurrency(
@@ -389,6 +467,32 @@ export function OrderDetailPage({ orderId }: { orderId: string }) {
             <div className="mt-4 flex flex-wrap gap-2">
               <Button variant="outline" size="sm" onClick={() => setInvoiceOpen(true)}>
                 View invoice
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void downloadInvoicePdf()}
+                disabled={downloadingInvoice}
+              >
+                {downloadingInvoice ? (
+                  <Loader2 className="mr-2 size-4 animate-spin" aria-hidden />
+                ) : (
+                  <Download className="mr-2 size-4" aria-hidden />
+                )}
+                {downloadingInvoice ? 'Downloading…' : 'Download invoice PDF'}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void downloadShippingLabelPdf()}
+                disabled={downloadingLabel}
+              >
+                {downloadingLabel ? (
+                  <Loader2 className="mr-2 size-4 animate-spin" aria-hidden />
+                ) : (
+                  <Download className="mr-2 size-4" aria-hidden />
+                )}
+                {downloadingLabel ? 'Downloading…' : 'Shipping label PDF'}
               </Button>
               {orderPerms.update ? (
                 <Button

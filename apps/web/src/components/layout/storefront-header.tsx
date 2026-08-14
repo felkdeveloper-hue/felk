@@ -1,5 +1,4 @@
-import { useState, type FormEvent } from 'react';
-import { Link, useNavigate, useRouterState } from '@tanstack/react-router';
+import { Link, useRouterState } from '@tanstack/react-router';
 import { Heart, LogOut, Search, ShoppingBag, UserRound } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ROUTES } from '@/constants';
@@ -12,7 +11,7 @@ import { selectCartItemCount, useCartStore } from '@/store/cart-store';
 import { useUiStore } from '@/store/ui-store';
 import { getSetting } from '@/utils/cms';
 import { Button } from '@/components/ui/button';
-import { SearchBar } from '@/components/ui/search-bar';
+import { HeaderSearchField } from '@/components/search/header-search-field';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -46,7 +45,6 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
     // Auto-hide on checkout clips titles under the bar — keep it pinned there.
     hideOnScrollDown: !isCheckout,
   });
-  const navigate = useNavigate();
   const isHome = pathname === ROUTES.home;
   const transparent = isHome && !isScrolled;
   const frosted = isHome && isScrolled;
@@ -65,8 +63,6 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
   const user = useAuthStore((state) => state.user);
   const logoutMutation = useLogoutMutation();
   const { data: wishlistCount = 0 } = useWishlistItemCountQuery();
-  const [searchQuery, setSearchQuery] = useState('');
-
   const accountLabel = user?.firstName ?? user?.email?.split('@')[0] ?? 'Account';
   const iconBtn = cn(
     'size-11 shrink-0',
@@ -75,13 +71,6 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
       ? 'text-white hover:bg-white/10 hover:text-white'
       : 'text-foreground hover:bg-muted/70 hover:text-foreground',
   );
-
-  const submitSearch = (event: FormEvent) => {
-    event.preventDefault();
-    const value = searchQuery.trim();
-    const path = value ? `${ROUTES.search}?q=${encodeURIComponent(value)}` : ROUTES.search;
-    void navigate({ to: path as typeof ROUTES.search });
-  };
 
   return (
     <header
@@ -137,29 +126,10 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
         />
 
         <div className="flex min-w-0 items-center justify-end gap-0.5 sm:gap-1">
-          <form
-            role="search"
-            onSubmit={submitSearch}
+          <HeaderSearchField
+            lightChrome={lightChrome}
             className="hidden w-40 shrink-0 xl:block xl:w-48 2xl:w-56"
-          >
-            <SearchBar
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              onClear={() => setSearchQuery('')}
-              placeholder="Search products"
-              aria-label="Search products"
-              containerClassName={cn(
-                '[&_svg]:size-3.5 [&_svg]:stroke-[1.5]',
-                lightChrome ? '[&_svg]:text-white/65' : undefined,
-              )}
-              className={cn(
-                'h-9 rounded-none border-0 text-xs tracking-wide shadow-none focus-visible:shadow-[var(--shadow-focus)]',
-                lightChrome
-                  ? 'focus-visible:bg-white/12 border border-white/30 bg-white/[0.08] text-white placeholder:text-white/50 focus-visible:border-white/45'
-                  : 'bg-muted text-foreground placeholder:text-muted-foreground focus-visible:bg-card',
-              )}
-            />
-          </form>
+          />
 
           <div className="flex shrink-0 items-center gap-0.5">
             <Button

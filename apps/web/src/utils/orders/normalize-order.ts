@@ -162,6 +162,7 @@ export function normalizeInvoice(raw: unknown): OrderInvoice {
           const line = asRecord(item);
           return {
             name: String(line.name ?? ''),
+            variantTitle: typeof line.variantTitle === 'string' ? line.variantTitle : undefined,
             sku: String(line.sku ?? ''),
             quantity: Number(line.quantity ?? 1),
             price: Number(line.price ?? 0),

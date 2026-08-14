@@ -139,9 +139,11 @@ export function normalizeProduct(raw: unknown): Product {
   );
   const media = Array.isArray(record.media) ? record.media.map(normalizeProductMedia) : undefined;
   const thumbnailUrl =
-    resolveMediaUrl(record.thumbnailUrl) ??
     media?.find((item) => item.isPrimary)?.url ??
-    media?.[0]?.url;
+    media?.[0]?.url ??
+    resolveMediaUrl(record.thumbnailUrl) ??
+    media?.find((item) => item.isPrimary)?.thumbnailUrl ??
+    media?.[0]?.thumbnailUrl;
 
   const productPrice = toPositiveMoney(pricing.price, currency);
   const productSalePrice = toPositiveMoney(pricing.salePrice, currency);

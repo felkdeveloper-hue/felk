@@ -9,6 +9,10 @@ import { CustomerModel } from '@/models/customer.models.js';
 import { appConfig } from '@/config/app.config.js';
 import { customerService } from '@/services/customer.service.js';
 import { invoiceService } from '@/services/invoice.service.js';
+import {
+  renderOrderInvoicePdf,
+  renderOrderShippingLabelPdf,
+} from '@/services/order-documents/order-document.service.js';
 import { recordOrderTimeline } from '@/services/order-timeline.service.js';
 import { publishOrderEvent } from '@/services/order-event-publisher.js';
 import { writeAuditLog } from '@/services/audit.service.js';
@@ -471,6 +475,34 @@ export class OrderService {
       sent: true,
       email: customer.email,
       invoiceNumber: invoice.invoiceNumber,
+    };
+  }
+
+  async getInvoicePdf(
+    id: string,
+    user: AuthenticatedUser,
+  ): Promise<{ buffer: Buffer; fileName: string }> {
+    const order = await this.findById(id);
+    await this.assertAccess(order, user, ['orders.invoice', 'orders.view', 'orders.read']);
+    const invoice = await invoiceService.generate(order);
+    const buffer = await renderOrderInvoicePdf(order, invoice);
+    return {
+      buffer,
+      fileName: `${invoice.invoiceNumber}.pdf`,
+    };
+  }
+
+  async getShippingLabelPdf(
+    id: string,
+    user: AuthenticatedUser,
+  ): Promise<{ buffer: Buffer; fileName: string }> {
+    const order = await this.findById(id);
+    await this.assertAccess(order, user, ['orders.invoice', 'orders.view', 'orders.read']);
+    const invoice = await invoiceService.generate(order);
+    const buffer = await renderOrderShippingLabelPdf(order, invoice);
+    return {
+      buffer,
+      fileName: `${order.orderNumber}-shipping-label.pdf`,
     };
   }
 

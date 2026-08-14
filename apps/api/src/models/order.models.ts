@@ -262,6 +262,7 @@ export interface InvoiceDocument extends Document {
   shippingAddress?: Record<string, unknown> | null;
   items: Array<{
     name: string;
+    variantTitle?: string | null;
     sku: string;
     quantity: number;
     price: number;
@@ -282,6 +283,7 @@ export interface InvoiceDocument extends Document {
 const invoiceLineSchema = new Schema(
   {
     name: { type: String, required: true },
+    variantTitle: { type: String, default: null },
     sku: { type: String, required: true },
     quantity: { type: Number, required: true },
     price: { type: Number, required: true },

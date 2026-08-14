@@ -3,6 +3,8 @@ import { Link, useNavigate } from '@tanstack/react-router';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowLeft, Clock3, Search, TrendingUp, X } from 'lucide-react';
 import { ROUTES } from '@/constants';
+import { useProductSearchSuggestions } from '@/hooks/catalog/use-product-search-suggestions';
+import { SearchAutocompleteList } from '@/components/search/search-autocomplete-dropdown';
 import { useUiStore } from '@/store/ui-store';
 import { trackCommerceEvent } from '@/lib/analytics';
 import { Button } from '@/components/ui/button';
@@ -88,6 +90,8 @@ export function FloatingSearch() {
     return TRENDING.filter((t) => t.toLowerCase().includes(q)).slice(0, 5);
   }, [query]);
 
+  const { products, isLoading: productsLoading } = useProductSearchSuggestions(query, open);
+
   return (
     <AnimatePresence>
       {open ? (
@@ -144,6 +148,18 @@ export function FloatingSearch() {
           </form>
 
           <div className="flex-1 overflow-y-auto overscroll-contain px-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-5">
+            <SearchAutocompleteList
+              query={query}
+              products={products}
+              isLoading={productsLoading}
+              onSelect={(product) => {
+                setOpen(false);
+                setQuery('');
+                void navigate({ to: '/products/$slug', params: { slug: product.slug } });
+              }}
+              onViewAll={() => setOpen(false)}
+            />
+
             {suggestions.length ? (
               <section className="mb-8 space-y-2">
                 <h2 className="text-muted-foreground text-[10px] font-bold uppercase tracking-[0.2em]">

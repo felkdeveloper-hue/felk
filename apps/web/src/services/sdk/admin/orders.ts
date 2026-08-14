@@ -125,6 +125,16 @@ export const ordersApi = {
     );
   },
 
+  async downloadInvoicePdf(id: string): Promise<void> {
+    const { downloadOrderDocument } = await import('@/utils/orders/download-order-document');
+    await downloadOrderDocument(`/orders/${id}/invoice/pdf`, `invoice-${id}.pdf`);
+  },
+
+  async downloadShippingLabelPdf(id: string): Promise<void> {
+    const { downloadOrderDocument } = await import('@/utils/orders/download-order-document');
+    await downloadOrderDocument(`/orders/${id}/shipping-label/pdf`, `shipping-label-${id}.pdf`);
+  },
+
   async listReturns(id: string): Promise<unknown[]> {
     return http.get<unknown[]>(`/orders/${id}/returns`);
   },

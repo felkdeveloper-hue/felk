@@ -12,6 +12,8 @@ export interface ImageSource {
 export interface ImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {
   containerClassName?: string;
   aspectRatio?: string;
+  /** How the image fills its container — product cards use `contain` to show the full product. */
+  objectFit?: 'cover' | 'contain' | 'fill' | 'none' | 'scale-down';
   /**
    * Extra `<source>` candidates rendered inside a `<picture>` wrapper, e.g. a
    * portrait crop for mobile via `{ media: '(max-width: 767px)', srcSet: mobileSrc }`.
@@ -37,6 +39,7 @@ export const Image = React.forwardRef<HTMLImageElement, ImageProps>(
       className,
       containerClassName,
       aspectRatio,
+      objectFit = 'cover',
       sources,
       loading = 'lazy',
       decoding = 'async',
@@ -88,7 +91,12 @@ export const Image = React.forwardRef<HTMLImageElement, ImageProps>(
                 loading={loading}
                 decoding={decoding}
                 className={cn(
-                  'size-full object-cover transition-opacity duration-300',
+                  'size-full transition-opacity duration-300',
+                  objectFit === 'cover' && 'object-cover',
+                  objectFit === 'contain' && 'object-contain',
+                  objectFit === 'fill' && 'object-fill',
+                  objectFit === 'none' && 'object-none',
+                  objectFit === 'scale-down' && 'object-scale-down',
                   status === 'loaded' ? 'opacity-100' : 'opacity-0',
                   className,
                 )}

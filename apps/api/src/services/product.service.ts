@@ -459,9 +459,9 @@ export class ProductService {
       const primary = pool[0];
       const hover = pool[1];
       const primaryUrl = publicMediaUrl(
-        primary?.thumbnailUrl ?? primary?.url ?? listingVariant?.thumbnailUrl,
+        primary?.url ?? primary?.thumbnailUrl ?? listingVariant?.thumbnailUrl,
       );
-      const hoverUrl = publicMediaUrl(hover?.thumbnailUrl ?? hover?.url);
+      const hoverUrl = publicMediaUrl(hover?.url ?? hover?.thumbnailUrl);
       return {
         thumbnailUrl: primaryUrl,
         hoverImageUrl: hoverUrl && hoverUrl !== primaryUrl ? hoverUrl : undefined,

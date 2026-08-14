@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Eye, Heart, Plus, Star } from 'lucide-react';
 import type { Product } from '@/services/sdk';
 import { productsApi } from '@/services/sdk';
-import { Image } from '@/components/media/image';
+import { ProductCardImage } from '@/components/catalog/product-card-image';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -68,13 +68,16 @@ function ProductCardComponent({
         [])
       : [];
   const cardMedia = product.defaultVariantId ? listingMedia : productLevelMedia;
+  // Prefer full-resolution gallery URLs — thumbnails are ~400px and look soft on cards.
   const candidates = [
-    product.thumbnailUrl,
-    product.hoverImageUrl,
     cardMedia.find((item) => item.isPrimary)?.url,
     cardMedia[0]?.url,
     cardMedia[1]?.url,
     ...cardMedia.slice(2, 5).map((item) => item.url),
+    product.thumbnailUrl,
+    product.hoverImageUrl,
+    cardMedia.find((item) => item.isPrimary)?.thumbnailUrl,
+    cardMedia[0]?.thumbnailUrl,
   ].filter((url): url is string => Boolean(url));
 
   const [primaryBroken, setPrimaryBroken] = useState(false);
@@ -302,7 +305,7 @@ function ProductCardComponent({
       >
         <div
           className={cn(
-            'bg-muted relative overflow-hidden',
+            'relative overflow-hidden',
             isList ? 'w-28 shrink-0 sm:w-40 sm:rounded-xl lg:w-48' : 'w-full',
           )}
         >
@@ -329,39 +332,36 @@ function ProductCardComponent({
             onTouchEnd={onTouchEnd}
             onContextMenu={(e) => e.preventDefault()}
           >
-            <Image
+            <ProductCardImage
               key={primaryImage}
               src={primaryImage}
               alt={product.media?.[0]?.alt ?? product.name}
               sizes={sizes}
               loading={priority ? 'eager' : 'lazy'}
               fetchPriority={priority ? 'high' : 'auto'}
-              containerClassName={isList ? 'aspect-[3/4]' : 'aspect-[3/4]'}
-              className={cn(
-                'transition-opacity duration-200',
-                // Desktop-only hover zoom / swap
-                'lg:transition-all lg:duration-700 lg:ease-out lg:group-hover:scale-[1.06]',
-                hoverImage && hoverReady ? 'lg:group-hover:opacity-0' : undefined,
-              )}
+              className={cn(hoverImage && hoverReady ? 'lg:group-hover:opacity-0' : undefined)}
               onError={() => setPrimaryBroken(true)}
             />
             {/* Hover swap — desktop only */}
             {wantHover && hoverImage && hoverImage !== uniqueCandidates[0] ? (
-              <Image
-                src={hoverImage}
-                alt=""
-                sizes={sizes}
-                loading="lazy"
-                containerClassName={cn(
+              <div
+                className={cn(
                   'absolute inset-0 hidden transition-opacity duration-700 ease-out lg:block',
                   hoverReady
                     ? 'opacity-0 lg:group-hover:opacity-100'
                     : 'pointer-events-none opacity-0',
                 )}
-                className="transition-transform duration-700 ease-out group-hover:scale-[1.06]"
                 aria-hidden
-                onLoad={() => setHoverReady(true)}
-              />
+              >
+                <ProductCardImage
+                  src={hoverImage}
+                  alt=""
+                  sizes={sizes}
+                  loading="lazy"
+                  fillContainer
+                  onLoad={() => setHoverReady(true)}
+                />
+              </div>
             ) : null}
 
             {/* Double-tap heart burst */}
