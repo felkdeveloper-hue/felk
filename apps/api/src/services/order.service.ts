@@ -6,6 +6,7 @@ import {
   type OrderDocument,
 } from '@/models/order.models.js';
 import { CustomerModel } from '@/models/customer.models.js';
+import { PaymentModel } from '@/models/payment.models.js';
 import { appConfig } from '@/config/app.config.js';
 import { customerService } from '@/services/customer.service.js';
 import { invoiceService } from '@/services/invoice.service.js';
@@ -33,6 +34,7 @@ import {
 import { ORDER_AUDIT, ORDER_EVENT_TYPE } from '@/constants/order.js';
 import { MOVEMENT_TYPE } from '@/constants/inventory.js';
 import type { AuthenticatedUser } from '@/types/index.js';
+import { orderReceivedAt, paymentReceivedAt } from '@/utils/order-received-at.js';
 
 function toPlain(doc: { toObject: () => Record<string, unknown> }) {
   return doc.toObject();
@@ -87,13 +89,13 @@ export class OrderService {
   async getById(id: string, user: AuthenticatedUser) {
     const order = await this.findById(id);
     await this.assertAccess(order, user);
-    return this.toSummary(order);
+    return this.withReceivedAt(this.toSummary(order));
   }
 
   async getByOrderNumber(orderNumber: string, user: AuthenticatedUser) {
     const order = await this.findByOrderNumber(orderNumber);
     await this.assertAccess(order, user);
-    return this.toSummary(order);
+    return this.withReceivedAt(this.toSummary(order));
   }
 
   /** Public guest lookup — order number + email, or order number + shipping phone. */
@@ -132,6 +134,12 @@ export class OrderService {
       throw ApiError.notFound('Order not found for that order number and email/phone');
     }
 
+    const payment = await PaymentModel.findById(order.paymentId)
+      .select('paidAt createdAt gatewayPaymentId metadata referenceNumber')
+      .lean();
+    const receivedAt =
+      paymentReceivedAt(payment ?? {}) ?? orderReceivedAt(order) ?? order.createdAt;
+
     return {
       orderNumber: order.orderNumber,
       status: order.status,
@@ -146,7 +154,7 @@ export class OrderService {
         images: item.images?.slice(0, 1) ?? [],
       })),
       shippingMethod: order.shippingMethod,
-      placedAt: order.placedAt ?? order.createdAt,
+      placedAt: receivedAt,
       confirmedAt: order.confirmedAt,
       packedAt: order.packedAt,
       shippedAt: order.shippedAt,
@@ -186,14 +194,14 @@ export class OrderService {
 
     const [items, total] = await Promise.all([
       OrderModel.find(filter)
-        .sort({ createdAt: -1 })
+        .sort({ placedAt: -1, createdAt: -1 })
         .skip(getPaginationSkip(page, limit))
         .limit(limit),
       OrderModel.countDocuments(filter),
     ]);
 
     return {
-      items: items.map((o) => this.toSummary(o)),
+      items: await this.withReceivedAtMany(items.map((o) => this.toSummary(o))),
       meta: buildPaginationMeta(total, page, limit),
     };
   }
@@ -506,6 +514,42 @@ export class OrderService {
     };
   }
 
+  private async withReceivedAt<
+    T extends {
+      paymentId: string;
+      paidAt?: Date | null;
+      placedAt?: Date | null;
+      createdAt?: Date;
+      receivedAt?: Date;
+    },
+  >(summary: T): Promise<T> {
+    const [enriched] = await this.withReceivedAtMany([summary]);
+    return enriched;
+  }
+
+  private async withReceivedAtMany<
+    T extends {
+      paymentId: string;
+      paidAt?: Date | null;
+      placedAt?: Date | null;
+      createdAt?: Date;
+      receivedAt?: Date;
+    },
+  >(summaries: T[]): Promise<T[]> {
+    if (!summaries.length) return summaries;
+    const ids = [...new Set(summaries.map((row) => row.paymentId).filter(Boolean))];
+    const payments = await PaymentModel.find({ _id: { $in: ids } })
+      .select('paidAt createdAt gatewayPaymentId metadata referenceNumber')
+      .lean();
+    const byId = new Map(payments.map((payment) => [String(payment._id), payment]));
+    return summaries.map((summary) => {
+      const received =
+        paymentReceivedAt(byId.get(summary.paymentId) ?? {}) ?? orderReceivedAt(summary);
+      if (!received) return summary;
+      return { ...summary, receivedAt: received, placedAt: received, paidAt: received };
+    });
+  }
+
   toSummary(order: OrderDocument) {
     return {
       id: order._id.toString(),
@@ -543,6 +587,7 @@ export class OrderService {
       paymentReference: order.paymentReference,
       paidAt: order.paidAt,
       placedAt: order.placedAt,
+      receivedAt: orderReceivedAt(order),
       confirmedAt: order.confirmedAt,
       packedAt: order.packedAt,
       readyForShipmentAt: order.readyForShipmentAt,

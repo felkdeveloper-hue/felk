@@ -617,6 +617,11 @@ export interface RevenueDashboardData {
   week: number;
   month: number;
   year: number;
+  todayOrders?: number;
+  yesterdayOrders?: number;
+  weekOrders?: number;
+  monthOrders?: number;
+  yearOrders?: number;
   periodRevenue: number;
   aov: number;
   orderCount: number;

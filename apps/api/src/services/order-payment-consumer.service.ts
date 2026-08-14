@@ -21,6 +21,7 @@ import { PAYMENT_METHOD, PAYMENT_STATUS } from '@/constants/payment-status.js';
 import { PAYMENT_EVENT_TYPE } from '@/constants/payment.js';
 import { publishPaymentEvent } from '@/services/payment-event-publisher.js';
 import type { PaymentDocument } from '@/models/payment.models.js';
+import { paymentReceivedAt } from '@/utils/order-received-at.js';
 
 const SYSTEM_ACTOR: ActorMeta = {};
 const PAYMENT_SUCCEEDED = CONSUMED_PAYMENT_EVENT_TYPES[0];
@@ -199,6 +200,7 @@ export async function handlePaymentSucceededEvent(payload: Record<string, unknow
     }
 
     const items = await buildOrderItems(checkout);
+    const receivedAt = paymentReceivedAt(payment) ?? new Date();
 
     let order;
     try {
@@ -219,7 +221,8 @@ export async function handlePaymentSucceededEvent(payload: Record<string, unknow
         totals: checkout.totals,
         paymentMethod: payment.method,
         paymentReference: payment.referenceNumber,
-        paidAt: payment.paidAt ?? new Date(),
+        paidAt: receivedAt,
+        placedAt: receivedAt,
         reservationIds: committedReservationIds,
       });
     } catch (error) {
@@ -471,7 +474,12 @@ export async function catchUpOrphanPaidGatewayPayments(): Promise<{
 
 /** Confirmed Mintpay merchant-portal purchases that never reached our order table. */
 const CONFIRMED_MINTPAY_PURCHASE_IDS = ['2975188', '2983159'] as const;
-const CONFIRMED_MINTPAY_REF_PREFIXES = ['PAY-MS0OUJZP', 'PAY-MSOOUJZP', 'PAY-MSRU476F'] as const;
+const CONFIRMED_MINTPAY_REF_PREFIXES = [
+  'PAY-MS0OUJZP',
+  'PAY-MSOOUJZP',
+  'PAY-MSOOUIZP',
+  'PAY-MSRU476F',
+] as const;
 
 export async function recoverConfirmedMintpayOrders(): Promise<{
   scanned: number;
@@ -508,9 +516,10 @@ export async function recoverConfirmedMintpayOrders(): Promise<{
   }> = [];
 
   for (const payment of payments) {
+    const receivedAt = paymentReceivedAt(payment) ?? payment.createdAt ?? new Date();
     if (payment.status !== PAYMENT_STATUS.PAID) {
       payment.status = PAYMENT_STATUS.PAID;
-      payment.paidAt = payment.paidAt ?? new Date();
+      payment.paidAt = receivedAt;
       payment.failureReason = null;
       await payment.save();
       await publishPaymentEvent(
@@ -524,6 +533,9 @@ export async function recoverConfirmedMintpayOrders(): Promise<{
         },
         { paymentId: payment._id.toString(), checkoutId: payment.checkoutId.toString() },
       );
+    } else if (!payment.paidAt || payment.paidAt.getTime() - receivedAt.getTime() > 60_000) {
+      payment.paidAt = receivedAt;
+      await payment.save();
     }
 
     await handlePaymentSucceededEvent({
@@ -535,6 +547,14 @@ export async function recoverConfirmedMintpayOrders(): Promise<{
     });
 
     const order = await OrderModel.findOne({ paymentId: payment._id });
+    if (order) {
+      const current = order.paidAt ?? order.placedAt ?? order.createdAt;
+      if (!current || current.getTime() - receivedAt.getTime() > 60_000) {
+        order.paidAt = receivedAt;
+        order.placedAt = receivedAt;
+        await order.save();
+      }
+    }
     recovered.push({
       referenceNumber: payment.referenceNumber,
       orderNumber: order?.orderNumber ?? null,

@@ -13,6 +13,7 @@ import { ADMIN_ROUTES, QUERY_KEYS } from '@/constants';
 import { useCustomerTimeline } from '@/hooks/admin';
 import { cn, formatDate } from '@/lib/utils';
 import { usersApi, type AdminUserDetail } from '@/services/sdk/admin/users';
+import { orderReceivedAt } from '@/utils/orders';
 
 function displayName(user: AdminUserDetail) {
   const first = user.firstName?.trim();
@@ -165,11 +166,11 @@ export function UserDetailPage({ userId }: { userId: string }) {
                     },
                     {
                       id: 'placedAt',
-                      header: 'Placed',
-                      cell: (row) =>
-                        row.placedAt || row.createdAt
-                          ? formatDate(row.placedAt ?? row.createdAt!)
-                          : '—',
+                      header: 'Received',
+                      cell: (row) => {
+                        const received = orderReceivedAt(row);
+                        return received ? formatDate(received) : '—';
+                      },
                     },
                   ]}
                 />

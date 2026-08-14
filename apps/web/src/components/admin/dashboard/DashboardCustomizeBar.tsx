@@ -85,18 +85,20 @@ export function DashboardCustomizeBar({
             <DropdownMenuContent align="end" className="max-h-80 w-64 overflow-auto">
               <DropdownMenuLabel>Widget library</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              {(catalog?.widgets ?? []).map((w) => (
-                <DropdownMenuItem
-                  key={w.id}
-                  onSelect={() => onAddWidget(w)}
-                  className="flex flex-col items-start gap-0.5 py-2"
-                >
-                  <span className="font-medium">{w.name}</span>
-                  {w.description ? (
-                    <span className="text-muted-foreground text-xs">{w.description}</span>
-                  ) : null}
-                </DropdownMenuItem>
-              ))}
+              {(catalog?.widgets ?? [])
+                .filter((w) => w.id !== 'revenue')
+                .map((w) => (
+                  <DropdownMenuItem
+                    key={w.id}
+                    onSelect={() => onAddWidget(w)}
+                    className="flex flex-col items-start gap-0.5 py-2"
+                  >
+                    <span className="font-medium">{w.name}</span>
+                    {w.description ? (
+                      <span className="text-muted-foreground text-xs">{w.description}</span>
+                    ) : null}
+                  </DropdownMenuItem>
+                ))}
             </DropdownMenuContent>
           </DropdownMenu>
 

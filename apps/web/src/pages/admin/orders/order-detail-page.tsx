@@ -26,6 +26,7 @@ import { useAdminPermissions } from '@/hooks/admin';
 import { AppError } from '@/lib/errors';
 import { cn, formatCurrency, formatDate } from '@/lib/utils';
 import { formatOrderAddress, ordersApi, type AdminOrderAddress } from '@/services/sdk/admin';
+import { orderReceivedAt } from '@/utils/orders';
 
 function readRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
@@ -196,6 +197,7 @@ export function OrderDetailPage({ orderId }: { orderId: string }) {
   const billingAddress = readAddress(order.billingAddress);
   const items = Array.isArray(order.items) ? order.items : [];
   const status = String(order.status ?? 'pending');
+  const receivedAt = orderReceivedAt(order);
   const allowedStatuses = (ORDER_STATUS_TRANSITIONS[status] ?? []).filter((candidate) =>
     candidate === 'cancelled' ? orderPerms.cancel : orderPerms.update,
   );
@@ -229,7 +231,7 @@ export function OrderDetailPage({ orderId }: { orderId: string }) {
     <PageMotion>
       <AdminPageHeader
         title={`Order ${String(order.orderNumber ?? orderId)}`}
-        description={`Placed ${order.createdAt ? formatDate(String(order.createdAt)) : '—'}`}
+        description={`Received ${receivedAt ? formatDate(receivedAt) : '—'}`}
         actions={
           <Link to={ADMIN_ROUTES.orders}>
             <Button variant="outline" size="sm">
@@ -460,8 +462,8 @@ export function OrderDetailPage({ orderId }: { orderId: string }) {
                 <dd className="font-mono text-xs">{String(order.paymentReference ?? '—')}</dd>
               </div>
               <div className="flex justify-between gap-4">
-                <dt className="text-neutral-500 dark:text-neutral-400">Placed</dt>
-                <dd>{order.createdAt ? formatDate(String(order.createdAt)) : '—'}</dd>
+                <dt className="text-neutral-500 dark:text-neutral-400">Received</dt>
+                <dd>{receivedAt ? formatDate(receivedAt) : '—'}</dd>
               </div>
             </dl>
             <div className="mt-4 flex flex-wrap gap-2">

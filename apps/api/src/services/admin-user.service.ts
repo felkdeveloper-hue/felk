@@ -10,6 +10,7 @@ import {
   CustomerModel,
   OrderModel,
   PasswordResetTokenModel,
+  PaymentModel,
   RefreshTokenModel,
   UserModel,
   UserSessionModel,
@@ -26,6 +27,7 @@ import {
 } from '@/utils/password.helper.js';
 import { buildPaginationMeta, getPaginationSkip, parsePagination } from '@/utils/pagination.js';
 import { parseSort } from '@/utils/sorting.js';
+import { orderReceivedAt, paymentReceivedAt } from '@/utils/order-received-at.js';
 
 const passwordSchema = z
   .string()
@@ -328,6 +330,8 @@ export class AdminUserService {
       grandTotal: number;
       currency: string;
       itemCount: number;
+      paymentId?: string;
+      paidAt?: Date;
       placedAt?: Date;
       createdAt?: Date;
     }> = [];
@@ -383,10 +387,26 @@ export class AdminUserService {
           grandTotal: Number(totals.grandTotal ?? 0),
           currency: String(totals.currency ?? order.currency ?? 'LKR'),
           itemCount: Number(totals.totalQuantity ?? items.length),
+          paymentId: String(order.paymentId ?? ''),
+          paidAt: order.paidAt ?? undefined,
           placedAt: order.placedAt ?? undefined,
           createdAt: order.createdAt,
         };
       });
+
+      const paymentIds = [...new Set(orders.map((row) => row.paymentId).filter(Boolean))];
+      if (paymentIds.length) {
+        const payments = await PaymentModel.find({ _id: { $in: paymentIds } })
+          .select('paidAt createdAt gatewayPaymentId metadata referenceNumber')
+          .lean();
+        const byId = new Map(payments.map((payment) => [String(payment._id), payment]));
+        orders = orders.map((row) => {
+          const received = paymentReceivedAt(byId.get(row.paymentId) ?? {}) ?? orderReceivedAt(row);
+          return received
+            ? { ...row, paidAt: received, placedAt: received, createdAt: row.createdAt }
+            : row;
+        });
+      }
     }
 
     const purchasedItemCount = orders.reduce((sum, order) => sum + order.itemCount, 0);

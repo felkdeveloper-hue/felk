@@ -16,9 +16,9 @@ const widgets: WidgetDefinitionMeta[] = [
   {
     id: 'revenue',
     name: 'Revenue',
-    description: 'Period revenue, AOV, and order count',
+    description: 'Today, yesterday, week, month, and year revenue',
     category: 'revenue',
-    defaultSize: { w: 4, h: 3, minW: 3, minH: 2 },
+    defaultSize: { w: 12, h: 4, minW: 6, minH: 3 },
     permissions: ['analytics.view', 'reports.view'],
     settingsSchema: {
       period: { type: 'string', enum: ['today', '7d', '30d', '90d'] },

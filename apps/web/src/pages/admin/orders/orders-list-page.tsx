@@ -13,6 +13,7 @@ import { ADMIN_ROUTES, QUERY_KEYS } from '@/constants';
 import { useAdminPermissions } from '@/hooks/admin';
 import { cn, formatCurrency, formatDate } from '@/lib/utils';
 import { formatOrderAddress, ordersApi } from '@/services/sdk/admin';
+import { orderReceivedAt } from '@/utils/orders';
 
 function StatusBadge({ status }: { status: string }) {
   return (
@@ -109,20 +110,23 @@ export function OrdersListPage() {
           {
             id: 'order',
             header: 'Order',
-            cell: (row) => (
-              <div className="min-w-[9rem]">
-                <Link
-                  to={ADMIN_ROUTES.orderDetail}
-                  params={{ orderId: row.id }}
-                  className="font-medium hover:underline"
-                >
-                  {row.orderNumber}
-                </Link>
-                <p className="text-muted-foreground mt-0.5 text-xs">
-                  {row.createdAt ? formatDate(row.createdAt) : '—'}
-                </p>
-              </div>
-            ),
+            cell: (row) => {
+              const received = orderReceivedAt(row);
+              return (
+                <div className="min-w-[9rem]">
+                  <Link
+                    to={ADMIN_ROUTES.orderDetail}
+                    params={{ orderId: row.id }}
+                    className="font-medium hover:underline"
+                  >
+                    {row.orderNumber}
+                  </Link>
+                  <p className="text-muted-foreground mt-0.5 text-xs">
+                    Received {received ? formatDate(received) : '—'}
+                  </p>
+                </div>
+              );
+            },
           },
           {
             id: 'customer',

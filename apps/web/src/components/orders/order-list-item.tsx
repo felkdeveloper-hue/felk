@@ -4,6 +4,7 @@ import { ChevronRight } from 'lucide-react';
 import { OrderStatusBadge, PaymentStatusBadge } from '@/components/orders/order-status-badge';
 import type { Order } from '@/services/sdk';
 import { formatCurrency, formatDate } from '@/utils/format';
+import { orderReceivedAt } from '@/utils/orders';
 
 export interface OrderListItemProps {
   order: Order;
@@ -11,6 +12,7 @@ export interface OrderListItemProps {
 }
 
 export function OrderListItem({ order, index = 0 }: OrderListItemProps) {
+  const received = orderReceivedAt(order);
   const itemCount =
     order.totals.totalQuantity ?? order.items.reduce((sum, item) => sum + item.quantity, 0);
 
@@ -33,10 +35,8 @@ export function OrderListItem({ order, index = 0 }: OrderListItemProps) {
               <PaymentStatusBadge status={order.paymentStatus} />
             </div>
             <p className="text-muted-foreground mt-1 text-sm">
-              {order.placedAt || order.createdAt
-                ? formatDate(order.placedAt ?? order.createdAt!)
-                : '—'}{' '}
-              · {itemCount} {itemCount === 1 ? 'item' : 'items'}
+              {received ? formatDate(received) : '—'} · {itemCount}{' '}
+              {itemCount === 1 ? 'item' : 'items'}
             </p>
           </div>
 

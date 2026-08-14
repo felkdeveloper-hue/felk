@@ -83,30 +83,43 @@ const RevenueWidget = memo(function RevenueWidget({
   const q = useRevenueDashboard(filter);
   if (q.isLoading) return <LoadingBlock />;
   if (!q.data) return <AnalyticsEmpty message="No revenue data" />;
+  const rows = [
+    { label: 'Today', value: q.data.today, orders: q.data.todayOrders },
+    { label: 'Yesterday', value: q.data.yesterday, orders: q.data.yesterdayOrders },
+    { label: 'Week', value: q.data.week, orders: q.data.weekOrders },
+    { label: 'Month', value: q.data.month, orders: q.data.monthOrders },
+    { label: 'Year', value: q.data.year, orders: q.data.yearOrders },
+  ];
   return (
     <WidgetFrame
       title="Revenue"
       href={ADMIN_ROUTES.analyticsRevenue}
       collapsed={placement.collapsed}
     >
-      <div className="grid grid-cols-2 gap-2">
-        <div>
-          <div className="text-muted-foreground text-xs">Period</div>
-          <div className="text-lg font-semibold tabular-nums">
-            {formatCurrency(q.data.periodRevenue)}
+      <div className="flex h-full flex-col gap-2">
+        {rows.map((row) => (
+          <div
+            key={row.label}
+            className="flex items-baseline justify-between gap-3 rounded-lg bg-[var(--admin-bg)] px-3 py-2"
+          >
+            <div className="min-w-0">
+              <div className="text-muted-foreground text-[10px] font-semibold uppercase tracking-[0.14em]">
+                {row.label}
+              </div>
+              {typeof row.orders === 'number' ? (
+                <div className="text-muted-foreground mt-0.5 text-[11px]">
+                  {row.orders} {row.orders === 1 ? 'order' : 'orders'}
+                </div>
+              ) : null}
+            </div>
+            <div className="shrink-0 text-base font-semibold tabular-nums">
+              {formatCurrency(row.value)}
+            </div>
           </div>
-        </div>
-        <div>
-          <div className="text-muted-foreground text-xs">Orders</div>
-          <div className="text-lg font-semibold tabular-nums">{q.data.orderCount}</div>
-        </div>
-        <div>
-          <div className="text-muted-foreground text-xs">AOV</div>
-          <div className="text-lg font-semibold tabular-nums">{formatCurrency(q.data.aov)}</div>
-        </div>
-        <div>
-          <div className="text-muted-foreground text-xs">Today</div>
-          <div className="text-lg font-semibold tabular-nums">{formatCurrency(q.data.today)}</div>
+        ))}
+        <div className="text-muted-foreground mt-1 flex flex-wrap gap-4 text-xs">
+          <span>AOV {formatCurrency(q.data.aov)}</span>
+          <span>{q.data.orderCount} orders in selected period</span>
         </div>
       </div>
     </WidgetFrame>

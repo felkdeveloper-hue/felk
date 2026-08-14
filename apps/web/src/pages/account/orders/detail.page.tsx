@@ -29,6 +29,7 @@ import {
   useRequestReturnMutation,
 } from '@/hooks/orders';
 import { formatCurrency, formatDate } from '@/utils/format';
+import { orderReceivedAt } from '@/utils/orders';
 import { ReturnStatusBadge } from '@/components/orders/order-status-badge';
 import { useState } from 'react';
 
@@ -99,7 +100,7 @@ export function AccountOrderDetailPage() {
           <PaymentStatusBadge status={order.paymentStatus} />
         </div>
         <p className="text-muted-foreground mt-2 text-sm">
-          Placed {order.placedAt ? formatDate(order.placedAt) : '—'} ·{' '}
+          Placed {orderReceivedAt(order) ? formatDate(orderReceivedAt(order) as string) : '—'} ·{' '}
           {formatCurrency(order.totals.grandTotal, order.currency)}
         </p>
         {order.paymentMethod ? (

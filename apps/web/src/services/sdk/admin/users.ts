@@ -41,6 +41,7 @@ export interface AdminUserOrderSummary {
   currency: string;
   itemCount: number;
   placedAt?: string;
+  paidAt?: string;
   createdAt?: string;
 }
 
@@ -140,6 +141,7 @@ export const usersApi = {
             currency: String(row.currency ?? 'LKR'),
             itemCount: Number(row.itemCount ?? 0),
             placedAt: typeof row.placedAt === 'string' ? row.placedAt : undefined,
+            paidAt: typeof row.paidAt === 'string' ? row.paidAt : undefined,
             createdAt: typeof row.createdAt === 'string' ? row.createdAt : undefined,
           };
         })

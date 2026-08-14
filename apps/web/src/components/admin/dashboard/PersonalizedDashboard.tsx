@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { AdminErrorState, AdminPageHeader, PageMotion } from '@/components/admin';
 import { ChartSkeleton } from '@/components/admin/analytics';
 import { DashboardCustomizeBar } from './DashboardCustomizeBar';
+import { DashboardRevenueHero } from './DashboardRevenueHero';
 import { DashboardWidgetRenderer } from './widgets';
 import {
   useDashboardCatalogQuery,
@@ -98,9 +99,12 @@ export function PersonalizedDashboard() {
     [layoutQuery.data?.activeKey, saveMutation, theme],
   );
 
-  const visibleWidgets = useMemo(() => widgets.filter((w) => !w.hidden), [widgets]);
+  const visibleWidgets = useMemo(
+    () => widgets.filter((w) => !w.hidden && w.widgetId !== 'revenue'),
+    [widgets],
+  );
   const hiddenCount = widgets.filter((w) => w.hidden).length;
-  const layouts = useMemo(() => buildResponsiveLayouts(widgets), [widgets]);
+  const layouts = useMemo(() => buildResponsiveLayouts(visibleWidgets), [visibleWidgets]);
 
   const onLayoutChange = useCallback(
     (current: Layout[], allLayouts: Layouts) => {
@@ -224,7 +228,7 @@ export function PersonalizedDashboard() {
     <PageMotion>
       <AdminPageHeader
         title="Dashboard"
-        description="Store performance at a glance — revenue, traffic, funnel, and catalog health."
+        description="Live store performance — paid revenue, traffic, and catalog health."
         actions={
           <DashboardCustomizeBar
             customizing={customizing}
@@ -253,11 +257,7 @@ export function PersonalizedDashboard() {
         }
       />
 
-      <div className="mb-4 rounded-xl border border-teal-500/20 bg-gradient-to-r from-teal-500/10 via-blue-500/5 to-transparent px-4 py-3">
-        <p className="text-sm text-[var(--admin-ink)]">
-          Charts refresh automatically every few seconds — no need to reload the page.
-        </p>
-      </div>
+      <DashboardRevenueHero />
 
       {customizing ? (
         <div className="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-900">

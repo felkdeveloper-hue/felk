@@ -2,6 +2,7 @@ import { Types, type FilterQuery } from 'mongoose';
 import { ProductModel } from '@/models/product.models.js';
 import { UserModel } from '@/models/user.model.js';
 import type { AnalyticsFilter } from '@/schemas/analytics/index.js';
+import { orderReceivedAtExpr } from '@/utils/order-received-at.js';
 import { resolveDateRange, type DateRange } from './date-range.util.js';
 
 export type MongoMatch = Record<string, unknown>;
@@ -198,9 +199,12 @@ export async function buildOrderMatch(
   options?: { range?: DateRange; defaultStatuses?: string[] },
 ): Promise<MongoMatch> {
   const r = options?.range ?? resolveDateRange(filter);
+  const receivedAt = orderReceivedAtExpr();
   const match: MongoMatch = {
-    placedAt: { $gte: r.from, $lte: r.to },
     isDeleted: { $ne: true },
+    $expr: {
+      $and: [{ $gte: [receivedAt, r.from] }, { $lte: [receivedAt, r.to] }],
+    },
   };
 
   if (filter.orderStatus) {

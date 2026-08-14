@@ -29,6 +29,15 @@ export interface AdminOrder {
   shippingAddress?: AdminOrderAddress | null;
   billingAddress?: AdminOrderAddress | null;
   createdAt?: string;
+  placedAt?: string;
+  paidAt?: string;
+  receivedAt?: string;
+}
+
+function asIsoDate(value: unknown): string | undefined {
+  if (typeof value === 'string' && value) return value;
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString();
+  return undefined;
 }
 
 function normalizeAddress(raw: unknown): AdminOrderAddress | null {
@@ -67,7 +76,10 @@ function normalizeOrder(raw: unknown): AdminOrder {
     shippingMethod: typeof record.shippingMethod === 'string' ? record.shippingMethod : undefined,
     shippingAddress: normalizeAddress(record.shippingAddress),
     billingAddress: normalizeAddress(record.billingAddress),
-    createdAt: typeof record.createdAt === 'string' ? record.createdAt : undefined,
+    createdAt: asIsoDate(record.createdAt),
+    placedAt: asIsoDate(record.placedAt),
+    paidAt: asIsoDate(record.paidAt),
+    receivedAt: asIsoDate(record.receivedAt),
   };
 }
 
