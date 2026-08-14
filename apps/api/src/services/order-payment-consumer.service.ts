@@ -565,3 +565,111 @@ export async function recoverConfirmedMintpayOrders(): Promise<{
 
   return { scanned: payments.length, recovered };
 }
+
+/** Koko payments that succeeded on Paykoko but never created an FE order. */
+const CONFIRMED_KOKO_REF_PREFIXES = ['PAY-MSSW5LLR-712AF7'] as const;
+
+export async function recoverConfirmedKokoOrders(): Promise<{
+  scanned: number;
+  recovered: Array<{
+    referenceNumber: string;
+    orderNumber: string | null;
+    items: string[];
+    amount: number;
+  }>;
+}> {
+  const since = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+  const prefixRegex = new RegExp(`^(${CONFIRMED_KOKO_REF_PREFIXES.join('|')})`, 'i');
+  const payments = await PaymentModel.find({
+    method: PAYMENT_METHOD.KOKO,
+    isDeleted: false,
+    $or: [
+      {
+        createdAt: { $gte: since },
+        status: {
+          $in: [
+            PAYMENT_STATUS.PENDING,
+            PAYMENT_STATUS.PROCESSING,
+            PAYMENT_STATUS.FAILED,
+            PAYMENT_STATUS.PAID,
+          ],
+        },
+      },
+      { referenceNumber: prefixRegex },
+    ],
+  })
+    .sort({ createdAt: -1 })
+    .limit(50);
+
+  const { kokoGateway } = await import('@/services/gateways/koko.gateway.js');
+  const recovered: Array<{
+    referenceNumber: string;
+    orderNumber: string | null;
+    items: string[];
+    amount: number;
+  }> = [];
+
+  for (const payment of payments) {
+    const existing = await OrderModel.exists({ paymentId: payment._id });
+    if (existing && payment.status === PAYMENT_STATUS.PAID) continue;
+
+    if (payment.status !== PAYMENT_STATUS.PAID) {
+      const attempt = await PaymentAttemptModel.findOne({ paymentId: payment._id }).sort({
+        attemptNumber: -1,
+      });
+      const requestOrderId =
+        attempt?.requestPayload && typeof attempt.requestPayload.orderId === 'string'
+          ? attempt.requestPayload.orderId
+          : '';
+      const orderId =
+        requestOrderId || `${payment.referenceNumber}-A${Math.max(1, payment.attemptCount || 1)}`;
+      const viewed = await kokoGateway.verifyTransaction(orderId);
+      if (!viewed || viewed.status !== PAYMENT_STATUS.PAID) continue;
+
+      payment.status = PAYMENT_STATUS.PAID;
+      payment.paidAt = payment.paidAt ?? new Date();
+      payment.failureReason = null;
+      payment.metadata = {
+        ...payment.metadata,
+        kokoReconciled: true,
+        ...(viewed.gatewayTxnId ? { gatewayTxnId: viewed.gatewayTxnId } : {}),
+      };
+      await payment.save();
+      if (attempt) {
+        attempt.status = 'succeeded';
+        if (viewed.gatewayTxnId) attempt.gatewayPaymentId = viewed.gatewayTxnId;
+        await attempt.save();
+      }
+      await publishPaymentEvent(
+        PAYMENT_EVENT_TYPE.PAYMENT_SUCCEEDED,
+        {
+          paymentId: payment._id.toString(),
+          checkoutToken: payment.checkoutToken,
+          amount: payment.amount,
+          currency: payment.currency,
+          method: payment.method,
+          gatewayTxnId: viewed.gatewayTxnId,
+        },
+        { paymentId: payment._id.toString(), checkoutId: payment.checkoutId.toString() },
+      );
+    }
+
+    await handlePaymentSucceededEvent({
+      paymentId: payment._id.toString(),
+      checkoutToken: payment.checkoutToken,
+      amount: payment.amount,
+      currency: payment.currency,
+      method: payment.method,
+    });
+
+    const order = await OrderModel.findOne({ paymentId: payment._id });
+    recovered.push({
+      referenceNumber: payment.referenceNumber,
+      orderNumber: order?.orderNumber ?? null,
+      items: (order?.items ?? []).map((item) => `${item.name} × ${item.quantity}`),
+      amount: payment.amount,
+    });
+  }
+
+  return { scanned: payments.length, recovered };
+}

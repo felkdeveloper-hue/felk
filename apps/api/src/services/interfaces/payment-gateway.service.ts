@@ -56,5 +56,6 @@ export interface PaymentGateway {
     status: string;
     amount?: number;
     currency?: string;
+    gatewayTxnId?: string;
   } | null>;
 }

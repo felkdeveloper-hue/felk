@@ -1,4 +1,10 @@
-import { createSign, createVerify, randomBytes } from 'node:crypto';
+import {
+  createSign,
+  createVerify,
+  publicDecrypt,
+  randomBytes,
+  constants as cryptoConstants,
+} from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { appConfig } from '@/config/app.config.js';
@@ -16,6 +22,7 @@ import {
   toPublicStorefrontUrl,
 } from '@/services/gateways/gateway.utils.js';
 import { ApiError } from '@/utils/errors/api-error.js';
+import { fetchWithRetry } from '@/utils/http-retry.js';
 
 const KOKO_STATUS_MAP: Record<string, string> = {
   approved: PAYMENT_STATUS.PAID,
@@ -48,6 +55,12 @@ function kokoOrderCreateUrl(): string {
   return useLiveKoko()
     ? 'https://prodapi.paykoko.com/api/merchants/orderCreate'
     : 'https://qaapi.paykoko.com/api/merchants/orderCreate';
+}
+
+function kokoOrderViewUrl(): string {
+  return useLiveKoko()
+    ? 'https://prodapi.paykoko.com/api/merchants/orderView'
+    : 'https://qaapi.paykoko.com/api/merchants/orderView';
 }
 
 function kokoApiPublicUrl(): string {
@@ -150,6 +163,52 @@ function verifyKokoSignature(data: string, signature: string, publicKey: string)
     logger.warn({ err }, 'Koko: RSA signature verification error');
     return false;
   }
+}
+
+/** Some Koko callbacks use private-encrypt rather than SHA-256 sign. */
+function verifyKokoEncryptedPayload(data: string, signature: string, publicKey: string): boolean {
+  try {
+    const decrypted = publicDecrypt(
+      { key: publicKey, padding: cryptoConstants.RSA_PKCS1_PADDING },
+      Buffer.from(signature, 'base64'),
+    );
+    return decrypted.toString('utf8') === data;
+  } catch {
+    return false;
+  }
+}
+
+function optionalAmount(value: unknown): number | undefined {
+  if (value === undefined || value === null || value === '') return undefined;
+  const amount = Number(value);
+  return Number.isFinite(amount) ? amount : undefined;
+}
+
+function kokoCallbackField(payload: Record<string, unknown>, ...keys: string[]): string {
+  for (const key of keys) {
+    const value = payload[key];
+    if (value !== undefined && value !== null && String(value).trim()) {
+      return String(value).trim();
+    }
+  }
+  return '';
+}
+
+function isKokoSuccessStatus(status: string): boolean {
+  const mapped = KOKO_STATUS_MAP[status] ?? KOKO_STATUS_MAP[status.toUpperCase()];
+  return mapped === PAYMENT_STATUS.PAID;
+}
+
+function flattenKokoView(raw: unknown): Record<string, unknown> {
+  if (!raw || typeof raw !== 'object') return {};
+  const record = raw as Record<string, unknown>;
+  const nested =
+    record.data && typeof record.data === 'object' && !Array.isArray(record.data)
+      ? (record.data as Record<string, unknown>)
+      : record.result && typeof record.result === 'object' && !Array.isArray(record.result)
+        ? (record.result as Record<string, unknown>)
+        : record;
+  return { ...record, ...nested };
 }
 
 const KOKO_UNAVAILABLE =
@@ -269,12 +328,79 @@ export class KokoGateway implements PaymentGateway {
     };
   }
 
+  async queryOrderView(orderId: string): Promise<{
+    orderId: string;
+    trnId: string;
+    status: string;
+  } | null> {
+    if (!orderId) return null;
+    const { apiKey, merchantId } = appConfig.payment.koko;
+    const privateKey = loadPrivateKey();
+    if (!apiKey || !merchantId || !privateKey) return null;
+
+    const dataString = merchantId + PLUGIN_NAME + PLUGIN_VERSION + orderId + apiKey;
+    let signature: string;
+    try {
+      signature = buildRequestSignature(dataString, privateKey);
+    } catch (err) {
+      logger.warn(
+        { gateway: 'koko', err: err instanceof Error ? err.message : 'sign_failed' },
+        'Koko: orderView signing failed',
+      );
+      return null;
+    }
+
+    const body = new URLSearchParams({
+      _mId: merchantId,
+      api_key: apiKey,
+      _orderId: orderId,
+      _pluginName: PLUGIN_NAME,
+      _pluginVersion: PLUGIN_VERSION,
+      signature,
+    });
+
+    try {
+      const { data } = await fetchWithRetry<unknown>(kokoOrderViewUrl(), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body.toString(),
+      });
+      const payload = typeof data === 'string' ? parseWebhookPayload(data) : flattenKokoView(data);
+      const viewedOrderId = kokoCallbackField(payload, 'orderId', '_orderId');
+      const trnId = kokoCallbackField(payload, 'trnId', 'trn_id', 'transactionId');
+      const status = kokoCallbackField(payload, 'status', 'paymentStatus');
+      if (!status) {
+        logger.warn({ gateway: 'koko', orderId }, 'Koko: orderView returned no status');
+        return null;
+      }
+      return { orderId: viewedOrderId || orderId, trnId, status };
+    } catch (err) {
+      logger.warn(
+        { gateway: 'koko', orderId, err: err instanceof Error ? err.message : 'orderView_failed' },
+        'Koko: orderView request failed',
+      );
+      return null;
+    }
+  }
+
+  async verifyTransaction(orderId: string) {
+    const viewed = await this.queryOrderView(orderId);
+    if (!viewed) return null;
+    const mappedStatus =
+      KOKO_STATUS_MAP[viewed.status] ?? KOKO_STATUS_MAP[viewed.status.toUpperCase()];
+    if (!mappedStatus) return null;
+    return {
+      status: mappedStatus,
+      gatewayTxnId: viewed.trnId || undefined,
+    };
+  }
+
   async verifyWebhook(input: WebhookVerificationInput) {
     const payload = parseWebhookPayload(input.rawBody);
-    const orderId = String(payload.orderId ?? '');
-    const trnId = String(payload.trnId ?? '');
-    const status = String(payload.status ?? '');
-    const signature = String(payload.signature ?? '');
+    const orderId = kokoCallbackField(payload, 'orderId', '_orderId');
+    const trnId = kokoCallbackField(payload, 'trnId', 'trn_id', 'transactionId');
+    const status = kokoCallbackField(payload, 'status', 'paymentStatus');
+    const signature = kokoCallbackField(payload, 'signature');
 
     if (!orderId || !status) {
       logger.warn({ gateway: 'koko' }, 'Koko: webhook missing orderId or status');
@@ -284,10 +410,31 @@ export class KokoGateway implements PaymentGateway {
     const publicKey = loadPublicKey();
     if (publicKey && signature) {
       const dataToVerify = orderId + trnId + status;
-      const isValid = verifyKokoSignature(dataToVerify, signature, publicKey);
+      const isValid =
+        verifyKokoSignature(dataToVerify, signature, publicKey) ||
+        verifyKokoEncryptedPayload(dataToVerify, signature, publicKey);
       if (!isValid) {
-        logger.warn({ gateway: 'koko', orderId }, 'Koko: RSA signature verification failed');
-        return { valid: false };
+        logger.warn(
+          { gateway: 'koko', orderId },
+          'Koko: RSA signature verification failed — confirming with orderView',
+        );
+        const viewed = await this.queryOrderView(orderId);
+        if (!viewed || !isKokoSuccessStatus(viewed.status)) {
+          return { valid: false };
+        }
+        const mappedFromView =
+          KOKO_STATUS_MAP[viewed.status] ??
+          KOKO_STATUS_MAP[viewed.status.toUpperCase()] ??
+          PAYMENT_STATUS.PAID;
+        return {
+          valid: true,
+          gatewayTxnId: viewed.trnId || trnId,
+          orderId,
+          status: mappedFromView,
+          amount: optionalAmount(payload.amount),
+          currency: String(payload.currency ?? ''),
+          payload,
+        };
       }
     } else if (!publicKey) {
       logger.warn(
@@ -296,7 +443,8 @@ export class KokoGateway implements PaymentGateway {
       );
     }
 
-    const mappedStatus = KOKO_STATUS_MAP[status] ?? PAYMENT_STATUS.FAILED;
+    const mappedStatus =
+      KOKO_STATUS_MAP[status] ?? KOKO_STATUS_MAP[status.toUpperCase()] ?? PAYMENT_STATUS.FAILED;
 
     logger.info(
       { gateway: 'koko', orderId, trnId, status, mappedStatus },
@@ -308,7 +456,7 @@ export class KokoGateway implements PaymentGateway {
       gatewayTxnId: trnId,
       orderId,
       status: mappedStatus,
-      amount: Number(payload.amount ?? 0),
+      amount: optionalAmount(payload.amount),
       currency: String(payload.currency ?? ''),
       payload,
     };

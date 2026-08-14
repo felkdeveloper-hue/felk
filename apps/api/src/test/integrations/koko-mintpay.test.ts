@@ -76,6 +76,7 @@ describe('Koko gateway', () => {
     expect(result.valid).toBe(true);
     expect(result.status).toBe('paid');
     expect(result.gatewayTxnId).toBe('TX1');
+    expect(result.amount).toBeUndefined();
   });
 
   it('returns valid=false when orderId or status is missing', async () => {

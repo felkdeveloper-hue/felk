@@ -9,6 +9,7 @@ import {
   catchUpOrphanCodPayments,
   catchUpOrphanPaidGatewayPayments,
   recoverConfirmedMintpayOrders,
+  recoverConfirmedKokoOrders,
 } from '@/services/order-payment-consumer.service.js';
 import { startCronJobs } from '@/cron/index.js';
 import { resetEmailTransporter, verifyEmailTransporter } from '@/services/email/transporter.js';
@@ -118,6 +119,28 @@ async function bootstrap(): Promise<void> {
       })
       .catch((error) => {
         logger.error({ err: error }, 'Mintpay confirmed-order recovery failed');
+      });
+    recoverConfirmedKokoOrders()
+      .then(({ scanned, recovered }) => {
+        const created = recovered.filter((row) => row.orderNumber);
+        if (created.length > 0) {
+          logger.info(
+            {
+              scanned,
+              created: created.length,
+              orders: created.map((row) => ({
+                referenceNumber: row.referenceNumber,
+                orderNumber: row.orderNumber,
+                itemCount: row.items.length,
+                amount: row.amount,
+              })),
+            },
+            'Koko recovery: created missing orders from confirmed Paykoko payments',
+          );
+        }
+      })
+      .catch((error) => {
+        logger.error({ err: error }, 'Koko confirmed-order recovery failed');
       });
   } catch (error) {
     logger.warn({ err: error }, 'MongoDB unavailable — starting in degraded mode');

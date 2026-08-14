@@ -82,4 +82,5 @@ export {
   catchUpUnconsumedPaymentEvents,
   catchUpOrphanPaidGatewayPayments,
   recoverConfirmedMintpayOrders,
+  recoverConfirmedKokoOrders,
 } from '@/services/order-payment-consumer.service.js';
