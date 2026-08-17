@@ -581,7 +581,12 @@ export async function recoverConfirmedMintpayOrders(): Promise<{
 }
 
 /** Koko payments that succeeded on Paykoko but never created an FE order. */
-const CONFIRMED_KOKO_REF_PREFIXES = ['PAY-MSSW5LLR-712AF7', 'PAY-MSSW5LLR'] as const;
+const CONFIRMED_KOKO_REF_PREFIXES = [
+  'PAY-MSSW5LLR-712AF7',
+  'PAY-MSSW5LLR',
+  'PAY-MSUVBPDN-C0493D',
+  'PAY-MSUVBPDN',
+] as const;
 
 export async function recoverConfirmedKokoOrders(): Promise<{
   scanned: number;

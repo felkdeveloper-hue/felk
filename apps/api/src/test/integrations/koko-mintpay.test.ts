@@ -169,6 +169,9 @@ describe('Koko gateway', () => {
       expect(result.redirectForm?.action).toContain('paykoko.com');
       expect(String(result.redirectForm?.fields.signature ?? '')).toMatch(/^[A-Za-z0-9+/=]+$/);
       expect(result.redirectForm?.fields._pluginName).toBe('customapi');
+      expect(String(result.redirectForm?.fields._returnUrl ?? '')).toContain(
+        '/payments/webhooks/koko/return',
+      );
     } finally {
       Object.assign(koko, previous);
     }

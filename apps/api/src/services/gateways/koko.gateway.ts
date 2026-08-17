@@ -269,13 +269,14 @@ export class KokoGateway implements PaymentGateway {
         ? input.metadata.description
         : `Order ${input.orderId}`;
     const reference = `${merchantId.slice(0, 8)}${randomBytes(3).toString('hex')}-${input.orderId}`;
-    const returnUrl = toPublicStorefrontUrl(input.returnUrl);
     const cancelUrl = toPublicStorefrontUrl(input.cancelUrl);
     const apiPublicUrl = kokoApiPublicUrl();
     const apiPrefix = process.env.API_PREFIX ?? '/api/v1';
     const responseUrl = String(
       input.metadata?.responseUrl ?? `${apiPublicUrl}${apiPrefix}/payments/webhooks/koko`,
     );
+    // Browser comes back here (like Mintpay). Server IPN still uses _responseUrl.
+    const returnUrl = `${apiPublicUrl}${apiPrefix}/payments/webhooks/koko/return`;
 
     // Signing order must match Paykoko / official WooCommerce plugin exactly.
     const dataString =

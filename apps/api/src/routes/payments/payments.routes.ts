@@ -95,6 +95,24 @@ paymentsRouter.get(
     return webhookHandler('koko')(req, res, next);
   }),
 );
+
+function kokoReturnParams(req: {
+  query?: Record<string, unknown>;
+  body?: unknown;
+}): Record<string, unknown> {
+  const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
+  return { ...(req.query ?? {}), ...(body as Record<string, unknown>) };
+}
+
+const kokoReturnHandler = asyncHandler(async (req, res) => {
+  const result = await paymentService.handleKokoBrowserReturn(
+    kokoReturnParams(req as { query?: Record<string, unknown>; body?: unknown }),
+  );
+  res.redirect(302, result.redirectUrl);
+});
+
+paymentsRouter.get('/webhooks/koko/return', kokoReturnHandler);
+paymentsRouter.post('/webhooks/koko/return', kokoReturnHandler);
 paymentsRouter.post('/webhooks/cod', webhookHandler('cod'));
 
 function mintpayQueryValue(value: unknown): string {

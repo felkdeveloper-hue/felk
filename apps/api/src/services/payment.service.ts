@@ -1069,6 +1069,123 @@ export class PaymentService {
     return { ok: true, redirectUrl: successUrl };
   }
 
+  /**
+   * Koko redirects the shopper to _returnUrl with orderId/trnId/status.
+   * Confirm payment here so admin orders are created even if the server IPN never arrives.
+   */
+  async handleKokoBrowserReturn(
+    query: Record<string, unknown>,
+  ): Promise<{ ok: boolean; redirectUrl: string }> {
+    const orderId = String(query.orderId ?? query._orderId ?? '').trim();
+    const status = String(query.status ?? query.paymentStatus ?? '').trim();
+    const trnId = String(query.trnId ?? query.trn_id ?? query.transactionId ?? '').trim();
+    const fallbackSuccess = toPublicStorefrontUrl(
+      `${appConfig.email?.shopUrl ?? 'https://fe.lk'}/checkout/success`,
+    );
+    const fallbackCancel = toPublicStorefrontUrl(
+      `${appConfig.email?.shopUrl ?? 'https://fe.lk'}/checkout/cancel`,
+    );
+
+    const attempt = orderId ? await this.findAttemptForGateway(PAYMENT_METHOD.KOKO, orderId) : null;
+    const payment = attempt
+      ? await PaymentModel.findOne({ _id: attempt.paymentId, isDeleted: false })
+      : null;
+    const successUrl = toPublicStorefrontUrl(payment?.returnUrl || fallbackSuccess);
+    const cancelUrl = toPublicStorefrontUrl(payment?.cancelUrl || fallbackCancel);
+
+    if (!orderId || !status) {
+      logger.warn({ gateway: 'koko', orderId }, 'Koko return missing orderId or status');
+      return { ok: false, redirectUrl: cancelUrl };
+    }
+
+    if (!attempt || !payment) {
+      logger.warn({ gateway: 'koko', orderId }, 'Koko return: unknown order');
+      return { ok: false, redirectUrl: cancelUrl };
+    }
+
+    const mapped =
+      status.toUpperCase() === 'SUCCESS' ||
+      status.toUpperCase() === 'APPROVED' ||
+      status.toLowerCase() === 'completed'
+        ? PAYMENT_STATUS.PAID
+        : status.toUpperCase() === 'CANCELED' || status.toUpperCase() === 'CANCELLED'
+          ? PAYMENT_STATUS.CANCELLED
+          : PAYMENT_STATUS.FAILED;
+
+    if (mapped !== PAYMENT_STATUS.PAID) {
+      if (!PAYMENT_TERMINAL_SUCCESS_STATUSES.includes(payment.status as never)) {
+        payment.status = mapped;
+        payment.failedAt = new Date();
+        payment.failureReason = `Gateway reported status: ${status}`;
+        await payment.save();
+        attempt.status = PAYMENT_ATTEMPT_STATUS.FAILED;
+        await attempt.save();
+      }
+      return { ok: false, redirectUrl: cancelUrl };
+    }
+
+    if (payment.status !== PAYMENT_STATUS.PAID) {
+      payment.status = PAYMENT_STATUS.PAID;
+      payment.paidAt = payment.paidAt ?? new Date();
+      payment.failureReason = null;
+      payment.metadata = {
+        ...payment.metadata,
+        ...(trnId ? { gatewayTxnId: trnId } : {}),
+        kokoReturnOrderId: orderId,
+      };
+      await payment.save();
+      attempt.status = PAYMENT_ATTEMPT_STATUS.SUCCEEDED;
+      if (trnId) attempt.gatewayPaymentId = trnId;
+      await attempt.save();
+
+      await writeAuditLog({
+        action: PAYMENT_AUDIT.PAYMENT_COMPLETED,
+        resourceType: 'payments',
+        resourceId: payment._id.toString(),
+        after: toPlain(payment),
+      });
+      await publishPaymentEvent(
+        PAYMENT_EVENT_TYPE.PAYMENT_SUCCEEDED,
+        {
+          paymentId: payment._id.toString(),
+          checkoutToken: payment.checkoutToken,
+          amount: payment.amount,
+          currency: payment.currency,
+          gatewayTxnId: trnId || orderId,
+        },
+        { paymentId: payment._id.toString(), checkoutId: payment.checkoutId.toString() },
+      );
+      await handlePaymentSucceededEvent({
+        paymentId: payment._id.toString(),
+        checkoutToken: payment.checkoutToken,
+        amount: payment.amount,
+        currency: payment.currency,
+        method: payment.method,
+      });
+    } else {
+      await handlePaymentSucceededEvent({
+        paymentId: payment._id.toString(),
+        checkoutToken: payment.checkoutToken,
+        amount: payment.amount,
+        currency: payment.currency,
+        method: payment.method,
+      });
+    }
+
+    await writePaymentLog({
+      paymentId: payment._id.toString(),
+      action: 'webhook.processed',
+      message: 'Koko browser return verified — payment paid, order created',
+      metadata: { orderId, trnId, status },
+    });
+
+    const withToken = new URL(successUrl);
+    if (payment.checkoutToken && !withToken.searchParams.get('checkoutToken')) {
+      withToken.searchParams.set('checkoutToken', payment.checkoutToken);
+    }
+    return { ok: true, redirectUrl: withToken.toString() };
+  }
+
   async reconcileOpenGatewayPayments(): Promise<{ scanned: number; paid: number }> {
     const since = new Date(Date.now() - 12 * 60 * 60 * 1000);
     const payments = await PaymentModel.find({
