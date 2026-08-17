@@ -1,5 +1,4 @@
-import { useEffect } from 'react';
-import { Outlet, useLocation, useRouterState } from '@tanstack/react-router';
+import { Outlet, useRouterState } from '@tanstack/react-router';
 import { CheckoutStepIndicator } from '@/components/checkout/checkout-step-indicator';
 import { PaymentRedirectOverlay } from '@/components/checkout/payment-redirect-overlay';
 import { ForceLightTheme } from '@/components/common/force-light-theme';
@@ -8,7 +7,6 @@ import { FloatingSearch } from '@/components/layout/floating-search';
 import { CHECKOUT_STEPS, type CheckoutStepId } from '@/constants/checkout.constants';
 import { ROUTES } from '@/constants';
 import { useCheckoutStore } from '@/store';
-import { trackingApi } from '@/services/sdk/tracking';
 
 function resolveStepId(pathname: string): CheckoutStepId | null {
   if (pathname === ROUTES.checkout || pathname === `${ROUTES.checkout}/`) return 'information';
@@ -21,32 +19,10 @@ function resolveStepId(pathname: string): CheckoutStepId | null {
 
 export function CheckoutLayout() {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
-  const location = useLocation();
   const stepId = resolveStepId(pathname);
   const isRedirecting = useCheckoutStore((state) => state.isRedirectingToGateway);
   const isTerminal =
     pathname.startsWith(ROUTES.checkoutSuccess) || pathname.startsWith(ROUTES.checkoutCancel);
-
-  useEffect(() => {
-    const send = () => {
-      void trackingApi.pageView(window.location.href);
-    };
-    const idle = (
-      window as Window & {
-        requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
-        cancelIdleCallback?: (id: number) => void;
-      }
-    ).requestIdleCallback;
-
-    if (typeof idle === 'function') {
-      const id = idle(send, { timeout: 3000 });
-      return () =>
-        (window as Window & { cancelIdleCallback?: (id: number) => void }).cancelIdleCallback?.(id);
-    }
-
-    const timer = globalThis.setTimeout(send, 800);
-    return () => globalThis.clearTimeout(timer);
-  }, [location.pathname]);
 
   return (
     <div className="bg-background flex min-h-screen flex-col">

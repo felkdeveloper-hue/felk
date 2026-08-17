@@ -1,5 +1,5 @@
 import { http } from '@/lib/http-client';
-import { metaPixelTrack } from '@/lib/analytics/meta-pixel';
+import { getMetaTestEventCode, metaPixelTrack } from '@/lib/analytics/meta-pixel';
 
 export interface MetaContentItem {
   id: string;
@@ -30,7 +30,19 @@ export interface TrackEventPayload {
     fbc?: string | null;
     ttclid?: string | null;
   };
+  /** Skip Conversions API (Pixel only). Used for PageView. */
+  browserOnly?: boolean;
 }
+
+const CAPI_EVENTS = new Set([
+  'ViewContent',
+  'AddToCart',
+  'InitiateCheckout',
+  'AddPaymentInfo',
+  'Purchase',
+]);
+
+const sentPurchaseEventIds = new Set<string>();
 
 function generateEventId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -112,12 +124,16 @@ export const trackingApi = {
 
     void metaPixelTrack(payload.eventName, payload.customData, eventId);
 
+    const sendToCapi = !payload.browserOnly && CAPI_EVENTS.has(payload.eventName);
+    if (!sendToCapi) return;
+
     try {
       await http.post('/tracking/event', {
         ...payload,
         eventId,
         url,
         userData,
+        testEventCode: getMetaTestEventCode(),
       });
     } catch {
       // Tracking failures must never surface to the user
@@ -125,7 +141,7 @@ export const trackingApi = {
   },
 
   pageView(url?: string) {
-    return trackingApi.track({ eventName: 'PageView', url });
+    return trackingApi.track({ eventName: 'PageView', url, browserOnly: true });
   },
 
   viewContent(contentId: string, contentName?: string, currency = 'LKR', value?: number) {
@@ -204,21 +220,32 @@ export const trackingApi = {
     options?: { browserOnly?: boolean },
   ) {
     const eventId = purchaseEventId(orderNumber);
+    if (sentPurchaseEventIds.has(eventId)) return Promise.resolve();
+    sentPurchaseEventIds.add(eventId);
+
+    try {
+      if (
+        typeof sessionStorage !== 'undefined' &&
+        sessionStorage.getItem(`meta_purchase_${eventId}`)
+      ) {
+        return Promise.resolve();
+      }
+      sessionStorage.setItem(`meta_purchase_${eventId}`, '1');
+    } catch {
+      /* private mode */
+    }
+
     const customData = {
       ...buildProductCustomData(data),
       order_id: orderNumber,
     };
-
-    if (options?.browserOnly) {
-      void metaPixelTrack('Purchase', customData, eventId);
-      return Promise.resolve();
-    }
 
     return trackingApi.track({
       eventName: 'Purchase',
       eventId,
       customData,
       userData,
+      browserOnly: options?.browserOnly,
       tiktokProperties: {
         currency: data.currency,
         value: data.value,

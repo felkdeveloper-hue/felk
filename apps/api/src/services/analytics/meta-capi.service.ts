@@ -84,6 +84,7 @@ export interface MetaEventInput {
   eventSourceUrl?: string;
   userData?: MetaUserData;
   customData?: MetaCustomData;
+  testEventCode?: string;
 }
 
 function normalizeCustomData(raw?: MetaCustomData): Record<string, unknown> | undefined {
@@ -172,7 +173,7 @@ export class MetaCapiService {
       ],
     };
 
-    const testEventCode = appConfig.analytics.meta.testEventCode;
+    const testEventCode = input.testEventCode ?? appConfig.analytics.meta.testEventCode;
     if (testEventCode) {
       payload.test_event_code = testEventCode;
     }

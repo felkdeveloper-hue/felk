@@ -60,6 +60,7 @@ export interface TrackEventInput {
   tiktokProperties?: TikTokProperties;
   /** Shared dedup ID; generated if not provided. */
   eventId?: string;
+  testEventCode?: string;
 }
 
 export class AnalyticsService {
@@ -79,6 +80,7 @@ export class AnalyticsService {
         eventSourceUrl: input.url,
         userData: metaUserData,
         customData: input.customData,
+        testEventCode: input.testEventCode,
       }),
       tikTokEventsService.sendEvent({
         eventName: input.eventName,

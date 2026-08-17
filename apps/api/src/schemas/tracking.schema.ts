@@ -23,6 +23,10 @@ export const trackEventBodySchema = z.object({
   userData: userDataSchema.optional().nullable(),
   customData: customDataSchema,
   tiktokProperties: customDataSchema,
+  testEventCode: z
+    .string()
+    .regex(/^TEST\d{3,12}$/i)
+    .optional(),
 });
 
 export type TrackEventBody = z.infer<typeof trackEventBodySchema>;

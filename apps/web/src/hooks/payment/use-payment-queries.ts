@@ -9,11 +9,8 @@ import {
   type PaymentCreatePayload,
   type PaymentMethod,
   type PaymentRetryPayload,
-  type PaymentStatus,
 } from '@/services/sdk';
 import { useCheckoutStore } from '@/store/checkout-store';
-
-const TERMINAL_STATUSES: PaymentStatus[] = ['paid', 'failed', 'cancelled', 'expired', 'refunded'];
 
 export function usePaymentStatusQuery(checkoutToken?: string | null, options?: { poll?: boolean }) {
   return useQuery({
@@ -24,10 +21,11 @@ export function usePaymentStatusQuery(checkoutToken?: string | null, options?: {
       if (!options?.poll) return false;
       const data = query.state.data;
       if (!data) return 2000;
-      // COD is confirmed once an order exists (fulfilled at placement or on status probe).
-      if (data.method === 'cod') return data.orderNumber ? false : 2000;
-      if (TERMINAL_STATUSES.includes(data.status)) return false;
-      if (data.status === 'paid' || data.status === 'authorized') return false;
+      if (query.state.dataUpdateCount > 45) return false;
+      if (data.orderNumber) return false;
+      if (data.status === 'failed' || data.status === 'cancelled' || data.status === 'expired') {
+        return false;
+      }
       return 2000;
     },
   });

@@ -1,4 +1,4 @@
-/** Meta (Facebook) browser Pixel — loads fbevents.js and wraps `fbq`. */
+/** Meta (Facebook) browser Pixel — official fbevents.js wrapper. */
 
 declare global {
   interface Window {
@@ -9,10 +9,12 @@ declare global {
 
 type FbqFunction = {
   (command: 'init', pixelId: string): void;
+  (command: 'set', key: 'autoConfig', value: boolean, pixelId: string): void;
   (
-    command: 'track',
-    eventName: string,
-    params?: Record<string, unknown>,
+    command: 'track' | 'trackSingle',
+    eventNameOrPixelId: string,
+    eventNameOrParams?: string | Record<string, unknown>,
+    paramsOrOptions?: Record<string, unknown> | { eventID?: string },
     options?: { eventID?: string },
   ): void;
   callMethod?: (...args: unknown[]) => void;
@@ -22,18 +24,21 @@ type FbqFunction = {
   push?: FbqFunction;
 };
 
-const PIXEL_ID = import.meta.env.VITE_META_PIXEL_ID ?? '1485989443213075';
+export const META_PIXEL_ID = import.meta.env.VITE_META_PIXEL_ID ?? '1485989443213075';
 
-let initPromise: Promise<void> | null = null;
+const TEST_CODE_STORAGE_KEY = 'meta_test_event_code';
+const TEST_CODE_PATTERN = /^TEST\d{3,12}$/i;
+
+let scriptPromise: Promise<void> | null = null;
+let pixelInitialized = false;
 
 function loadScript(): Promise<void> {
   if (typeof window === 'undefined') return Promise.resolve();
-  if (window.fbq?.loaded) return Promise.resolve();
-  if (initPromise) return initPromise;
+  if (scriptPromise) return scriptPromise;
 
-  initPromise = new Promise((resolve) => {
+  scriptPromise = new Promise((resolve) => {
     const existing = document.querySelector('script[data-meta-pixel="true"]');
-    if (existing) {
+    if (existing && window.fbq) {
       resolve();
       return;
     }
@@ -61,17 +66,50 @@ function loadScript(): Promise<void> {
     document.head.appendChild(script);
   });
 
-  return initPromise;
+  return scriptPromise;
 }
 
 export function isMetaPixelConfigured(): boolean {
-  return Boolean(PIXEL_ID);
+  return Boolean(META_PIXEL_ID);
+}
+
+/** Persist the Test Events code from the current URL so CAPI matches Events Manager. */
+export function captureMetaTestEventCode(): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const fromUrl = params.get('test_event_code') ?? params.get('meta_test_code');
+    if (fromUrl && TEST_CODE_PATTERN.test(fromUrl)) {
+      const normalized = fromUrl.toUpperCase();
+      sessionStorage.setItem(TEST_CODE_STORAGE_KEY, normalized);
+      return normalized;
+    }
+    const stored = sessionStorage.getItem(TEST_CODE_STORAGE_KEY);
+    return stored && TEST_CODE_PATTERN.test(stored) ? stored.toUpperCase() : null;
+  } catch {
+    return null;
+  }
+}
+
+export function getMetaTestEventCode(): string | null {
+  if (typeof window === 'undefined') return null;
+  const fromEnv = import.meta.env.VITE_META_TEST_EVENT_CODE;
+  if (typeof fromEnv === 'string' && TEST_CODE_PATTERN.test(fromEnv)) {
+    return fromEnv.toUpperCase();
+  }
+  return captureMetaTestEventCode();
 }
 
 export async function initMetaPixel(): Promise<void> {
-  if (!PIXEL_ID || typeof window === 'undefined') return;
+  if (!META_PIXEL_ID || typeof window === 'undefined') return;
+  captureMetaTestEventCode();
   await loadScript();
-  window.fbq?.('init', PIXEL_ID);
+  if (pixelInitialized || !window.fbq) return;
+
+  // Meta docs: disable automatic button/microdata events BEFORE init.
+  window.fbq('set', 'autoConfig', false, META_PIXEL_ID);
+  window.fbq('init', META_PIXEL_ID);
+  pixelInitialized = true;
 }
 
 export async function metaPixelTrack(
@@ -79,13 +117,14 @@ export async function metaPixelTrack(
   params?: Record<string, unknown>,
   eventId?: string,
 ): Promise<void> {
-  if (!PIXEL_ID || typeof window === 'undefined') return;
+  if (!META_PIXEL_ID || typeof window === 'undefined') return;
   await initMetaPixel();
   if (!window.fbq) return;
 
+  const data = params ?? {};
   if (eventId) {
-    window.fbq('track', eventName, params ?? {}, { eventID: eventId });
+    window.fbq('trackSingle', META_PIXEL_ID, eventName, data, { eventID: eventId });
   } else {
-    window.fbq('track', eventName, params ?? {});
+    window.fbq('trackSingle', META_PIXEL_ID, eventName, data);
   }
 }

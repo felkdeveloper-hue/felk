@@ -47,6 +47,38 @@ export function CheckoutSuccessPage() {
     (statusQuery.isError || (statusQuery.isSuccess && isCod && !orderNumber));
 
   useEffect(() => {
+    const tracking = statusQuery.data?.purchaseTracking;
+    const purchaseOrderNumber = tracking?.orderNumber ?? orderNumber;
+    if (!purchaseOrderNumber || !statusQuery.data) return;
+
+    const authUser = useAuthStore.getState().user;
+    const userEmail = authUser?.email ?? null;
+    const userPhone = typeof authUser?.phone === 'string' ? authUser.phone : null;
+    const payload = tracking
+      ? {
+          contentIds: tracking.contentIds,
+          contents: tracking.contents,
+          contentType: 'product' as const,
+          numItems: tracking.numItems,
+          currency: tracking.currency,
+          value: tracking.value,
+        }
+      : {
+          contentIds: [] as string[],
+          contents: [] as Array<{ id: string; quantity: number; item_price: number }>,
+          contentType: 'product' as const,
+          numItems: 1,
+          currency: statusQuery.data.currency ?? 'LKR',
+          value: statusQuery.data.amount ?? 0,
+        };
+
+    void trackingApi.purchase(purchaseOrderNumber, payload, {
+      email: userEmail,
+      phone: userPhone,
+    });
+  }, [orderNumber, statusQuery.data]);
+
+  useEffect(() => {
     if (!isConfirmed || !checkoutToken) return;
 
     clearCheckoutPlacedFlag(checkoutToken);
@@ -55,53 +87,6 @@ export function CheckoutSuccessPage() {
       orderNumber: orderNumber ?? null,
       method,
     });
-
-    const tracking = statusQuery.data?.purchaseTracking;
-    const purchaseOrderNumber = tracking?.orderNumber ?? orderNumber;
-    if (purchaseOrderNumber && statusQuery.data) {
-      const dedupeKey = `meta_purchase_${tracking?.eventId ?? `purchase-${purchaseOrderNumber}`}`;
-      if (!sessionStorage.getItem(dedupeKey)) {
-        sessionStorage.setItem(dedupeKey, '1');
-        const authUser = useAuthStore.getState().user;
-        const userEmail = authUser?.email ?? null;
-        const userPhone = typeof authUser?.phone === 'string' ? authUser.phone : null;
-        if (tracking) {
-          void trackingApi.purchase(
-            tracking.orderNumber,
-            {
-              contentIds: tracking.contentIds,
-              contents: tracking.contents,
-              contentType: 'product',
-              numItems: tracking.numItems,
-              currency: tracking.currency,
-              value: tracking.value,
-            },
-            {
-              email: userEmail,
-              phone: userPhone,
-            },
-            { browserOnly: true },
-          );
-        } else {
-          void trackingApi.purchase(
-            purchaseOrderNumber,
-            {
-              contentIds: [],
-              contents: [],
-              contentType: 'product',
-              numItems: 1,
-              currency: statusQuery.data.currency ?? 'LKR',
-              value: statusQuery.data.amount ?? 0,
-            },
-            {
-              email: userEmail,
-              phone: userPhone,
-            },
-            { browserOnly: true },
-          );
-        }
-      }
-    }
 
     void (async () => {
       try {
@@ -114,15 +99,7 @@ export function CheckoutSuccessPage() {
       void queryClient.invalidateQueries({ queryKey: ['cart'] });
       void queryClient.invalidateQueries({ queryKey: ['orders'] });
     })();
-  }, [
-    isConfirmed,
-    checkoutToken,
-    resetCheckoutUi,
-    queryClient,
-    orderNumber,
-    method,
-    statusQuery.data?.purchaseTracking,
-  ]);
+  }, [isConfirmed, checkoutToken, resetCheckoutUi, queryClient, orderNumber, method]);
 
   return (
     <>

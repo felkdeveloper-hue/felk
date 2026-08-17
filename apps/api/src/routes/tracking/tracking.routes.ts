@@ -30,7 +30,7 @@ trackingRouter.post(
   trackingRateLimit,
   validate({ body: trackEventBodySchema }),
   asyncHandler(async (req, res) => {
-    const { eventName, url, eventId, userData, customData, tiktokProperties } =
+    const { eventName, url, eventId, userData, customData, tiktokProperties, testEventCode } =
       req.body as ReturnType<typeof trackEventBodySchema.parse>;
 
     const enrichedUserData = userData
@@ -50,6 +50,11 @@ trackingRouter.post(
       userAgent: enrichedUserData.userAgent,
     });
 
+    if (eventName === 'PageView') {
+      ApiResponse.success(res, { accepted: true }, 'Event accepted');
+      return;
+    }
+
     // Fire-and-forget — response is immediate, send doesn't block the client
     void analyticsService
       .track({
@@ -59,6 +64,7 @@ trackingRouter.post(
         userData: enrichedUserData,
         customData: customData as Record<string, unknown> | undefined,
         tiktokProperties: tiktokProperties as Record<string, unknown> | undefined,
+        testEventCode: testEventCode?.toUpperCase(),
       })
       .catch(() => {
         /* errors already logged inside each service */

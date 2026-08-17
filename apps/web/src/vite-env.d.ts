@@ -11,6 +11,8 @@ interface ImportMetaEnv {
   readonly VITE_POSTHOG_HOST?: string;
   /** Meta Pixel ID for browser-side fbq tracking. */
   readonly VITE_META_PIXEL_ID?: string;
+  /** Optional Meta Test Events code (TEST12345). Prefer ?test_event_code= on the shop URL. */
+  readonly VITE_META_TEST_EVENT_CODE?: string;
 }
 
 interface ImportMeta {
