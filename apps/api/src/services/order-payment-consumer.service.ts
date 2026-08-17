@@ -22,6 +22,7 @@ import { PAYMENT_EVENT_TYPE } from '@/constants/payment.js';
 import { publishPaymentEvent } from '@/services/payment-event-publisher.js';
 import type { PaymentDocument } from '@/models/payment.models.js';
 import { paymentReceivedAt } from '@/utils/order-received-at.js';
+import { KOKO_RECOVER_LOOKBACK_MS, kokoStuckPaymentIsDue } from '@/utils/koko-auto-recover.js';
 import {
   ensureMetaPurchaseTracked,
   trackMetaPurchaseForOrder,
@@ -604,12 +605,16 @@ export async function recoverConfirmedMintpayOrders(): Promise<{
   return { scanned: payments.length, recovered };
 }
 
-/** Koko payments that succeeded on Paykoko but never created an FE order. */
-const CONFIRMED_KOKO_REF_PREFIXES = [
-  'PAY-MSSW5LLR-712AF7',
-  'PAY-MSSW5LLR',
-  'PAY-MSUVBPDN-C0493D',
-  'PAY-MSUVBPDN',
+/**
+ * Automatic Koko → admin order catch-up.
+ * Koko orderView often returns `order.notExists` even for paid merchant orders, so we cannot
+ * wait for a merchant ID allowlist. After webhook/return have had time to land, any still-open
+ * Koko payment without an FE order is treated as captured and the admin order is created.
+ */
+const KOKO_STUCK_STATUSES = [
+  PAYMENT_STATUS.PENDING,
+  PAYMENT_STATUS.PROCESSING,
+  PAYMENT_STATUS.EXPIRED,
 ] as const;
 
 export async function recoverConfirmedKokoOrders(): Promise<{
@@ -622,8 +627,7 @@ export async function recoverConfirmedKokoOrders(): Promise<{
   }>;
   scannedReferences: string[];
 }> {
-  const since = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
-  const prefixRegex = new RegExp(`(${CONFIRMED_KOKO_REF_PREFIXES.join('|')})`, 'i');
+  const since = new Date(Date.now() - KOKO_RECOVER_LOOKBACK_MS);
   const recentAttempts = await PaymentAttemptModel.find({
     gateway: PAYMENT_METHOD.KOKO,
     createdAt: { $gte: since },
@@ -633,14 +637,16 @@ export async function recoverConfirmedKokoOrders(): Promise<{
   const payments = await PaymentModel.find({
     method: PAYMENT_METHOD.KOKO,
     isDeleted: false,
+    status: {
+      $nin: [PAYMENT_STATUS.FAILED, PAYMENT_STATUS.CANCELLED],
+    },
     $or: [
       { createdAt: { $gte: since } },
       { _id: { $in: recentAttempts.map((row) => row.paymentId) } },
-      { referenceNumber: prefixRegex },
     ],
   })
     .sort({ createdAt: -1 })
-    .limit(100);
+    .limit(200);
 
   const { kokoGateway } = await import('@/services/gateways/koko.gateway.js');
   const recovered: Array<{
@@ -652,9 +658,21 @@ export async function recoverConfirmedKokoOrders(): Promise<{
 
   for (const payment of payments) {
     const existing = await OrderModel.exists({ paymentId: payment._id });
-    if (existing && payment.status === PAYMENT_STATUS.PAID) continue;
+    if (existing) continue;
+
+    const checkoutAlreadyOrdered = await OrderModel.exists({ checkoutId: payment.checkoutId });
+    if (checkoutAlreadyOrdered) continue;
 
     if (payment.status !== PAYMENT_STATUS.PAID) {
+      const newerRetry = await PaymentModel.exists({
+        checkoutId: payment.checkoutId,
+        isDeleted: false,
+        _id: { $ne: payment._id },
+        createdAt: { $gt: payment.createdAt },
+        status: { $nin: [PAYMENT_STATUS.FAILED, PAYMENT_STATUS.CANCELLED] },
+      });
+      if (newerRetry) continue;
+
       const attempt = await PaymentAttemptModel.findOne({ paymentId: payment._id }).sort({
         attemptNumber: -1,
       });
@@ -665,10 +683,15 @@ export async function recoverConfirmedKokoOrders(): Promise<{
       const orderId =
         requestOrderId || `${payment.referenceNumber}-A${Math.max(1, payment.attemptCount || 1)}`;
       const viewed = await kokoGateway.verifyTransaction(orderId);
-      const merchantConfirmed = CONFIRMED_KOKO_REF_PREFIXES.some((prefix) =>
-        payment.referenceNumber.toUpperCase().startsWith(prefix.toUpperCase()),
-      );
-      if ((!viewed || viewed.status !== PAYMENT_STATUS.PAID) && !merchantConfirmed) continue;
+      const viewedPaid = viewed?.status === PAYMENT_STATUS.PAID;
+      const viewedRejected =
+        viewed?.status === PAYMENT_STATUS.FAILED || viewed?.status === PAYMENT_STATUS.CANCELLED;
+      const stuckDue =
+        (KOKO_STUCK_STATUSES as readonly string[]).includes(payment.status) &&
+        kokoStuckPaymentIsDue(payment.createdAt ?? new Date());
+
+      if (viewedRejected) continue;
+      if (!viewedPaid && !stuckDue) continue;
 
       payment.status = PAYMENT_STATUS.PAID;
       payment.paidAt = payment.paidAt ?? new Date();
@@ -676,9 +699,7 @@ export async function recoverConfirmedKokoOrders(): Promise<{
       payment.metadata = {
         ...payment.metadata,
         kokoReconciled: true,
-        ...(merchantConfirmed && (!viewed || viewed.status !== PAYMENT_STATUS.PAID)
-          ? { kokoMerchantConfirmed: true }
-          : {}),
+        ...(viewedPaid ? {} : { kokoAutoRecovered: true }),
         ...(viewed?.gatewayTxnId ? { gatewayTxnId: viewed.gatewayTxnId } : {}),
       };
       await payment.save();
@@ -687,6 +708,14 @@ export async function recoverConfirmedKokoOrders(): Promise<{
         if (viewed?.gatewayTxnId) attempt.gatewayPaymentId = viewed.gatewayTxnId;
         await attempt.save();
       }
+      logger.info(
+        {
+          referenceNumber: payment.referenceNumber,
+          viewedPaid,
+          autoRecovered: !viewedPaid,
+        },
+        'Koko recovery: marking payment paid so admin order can be created',
+      );
       await publishPaymentEvent(
         PAYMENT_EVENT_TYPE.PAYMENT_SUCCEEDED,
         {
@@ -710,10 +739,11 @@ export async function recoverConfirmedKokoOrders(): Promise<{
     });
 
     const order = await OrderModel.findOne({ paymentId: payment._id });
+    if (!order) continue;
     recovered.push({
       referenceNumber: payment.referenceNumber,
-      orderNumber: order?.orderNumber ?? null,
-      items: (order?.items ?? []).map((item) => `${item.name} × ${item.quantity}`),
+      orderNumber: order.orderNumber ?? null,
+      items: (order.items ?? []).map((item) => `${item.name} × ${item.quantity}`),
       amount: payment.amount,
     });
   }

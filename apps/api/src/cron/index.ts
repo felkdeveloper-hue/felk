@@ -103,14 +103,24 @@ async function runReservationSweep() {
 
 async function runPaymentOrderSync() {
   try {
-    const { catchUpOrphanPaidGatewayPayments } =
+    const { catchUpOrphanPaidGatewayPayments, recoverConfirmedKokoOrders } =
       await import('@/services/order-payment-consumer.service.js');
     const { paymentService } = await import('@/services/payment.service.js');
-    const orphan = await catchUpOrphanPaidGatewayPayments();
     const open = await paymentService.reconcileOpenGatewayPayments();
-    if (orphan.created > 0 || open.paid > 0) {
+    const koko = await recoverConfirmedKokoOrders();
+    const orphan = await catchUpOrphanPaidGatewayPayments();
+    if (orphan.created > 0 || open.paid > 0 || koko.recovered.length > 0) {
       logger.info(
-        { orphanCreated: orphan.created, gatewayPaid: open.paid },
+        {
+          orphanCreated: orphan.created,
+          gatewayPaid: open.paid,
+          kokoRecovered: koko.recovered.length,
+          kokoOrders: koko.recovered.map((row) => ({
+            referenceNumber: row.referenceNumber,
+            orderNumber: row.orderNumber,
+            amount: row.amount,
+          })),
+        },
         'Cron: synced paid gateway payments into admin orders',
       );
     }

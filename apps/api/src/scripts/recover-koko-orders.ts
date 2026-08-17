@@ -1,6 +1,6 @@
 /**
- * Create missing admin orders for Koko payments that already succeeded
- * on Paykoko but never got a verified webhook.
+ * Manual one-shot for the same automatic Koko catch-up the API cron runs
+ * every 2 minutes. You should not need this on EC2 after deploy.
  *
  * Usage (from apps/api): pnpm exec tsx src/scripts/recover-koko-orders.ts
  */
