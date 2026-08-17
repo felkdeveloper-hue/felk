@@ -201,15 +201,23 @@ export const trackingApi = {
     orderNumber: string,
     data: MetaProductPayload,
     userData?: TrackEventPayload['userData'],
+    options?: { browserOnly?: boolean },
   ) {
     const eventId = purchaseEventId(orderNumber);
+    const customData = {
+      ...buildProductCustomData(data),
+      order_id: orderNumber,
+    };
+
+    if (options?.browserOnly) {
+      void metaPixelTrack('Purchase', customData, eventId);
+      return Promise.resolve();
+    }
+
     return trackingApi.track({
       eventName: 'Purchase',
       eventId,
-      customData: {
-        ...buildProductCustomData(data),
-        order_id: orderNumber,
-      },
+      customData,
       userData,
       tiktokProperties: {
         currency: data.currency,

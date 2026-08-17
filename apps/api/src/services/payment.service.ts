@@ -45,6 +45,7 @@ import {
   buildMetaContentsFromLines,
   purchaseEventId,
 } from '@/services/analytics/meta-tracking.helpers.js';
+import { ensureMetaPurchaseTracked } from '@/services/analytics/purchase-tracking.service.js';
 import { emailQueueService } from '@/services/email-queue.service.js';
 import { paymentSuccessfulEmail, paymentFailedEmail } from '@/emails/index.js';
 import {
@@ -532,6 +533,10 @@ export class PaymentService {
     }
 
     const order = await OrderModel.findOne({ paymentId: payment._id });
+
+    if (order) {
+      void ensureMetaPurchaseTracked(payment._id.toString());
+    }
 
     const purchaseTracking =
       order &&

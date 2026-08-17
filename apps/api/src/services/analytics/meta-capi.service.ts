@@ -81,6 +81,15 @@ function normalizeCustomData(raw?: MetaCustomData): Record<string, unknown> | un
   };
 }
 
+function isDuplicateKeyError(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error as { code: number }).code === 11000
+  );
+}
+
 function buildUserData(ud: MetaUserData) {
   return {
     ...(ud.email && { em: hashPii(ud.email) }),
@@ -137,13 +146,35 @@ export class MetaCapiService {
       payload.test_event_code = testEventCode;
     }
 
-    const logDoc = await AnalyticsEventLogModel.create({
-      provider: 'meta',
-      eventName: input.eventName,
-      eventId,
-      status: 'pending',
-      payload,
-    });
+    let logDoc;
+    try {
+      logDoc = await AnalyticsEventLogModel.create({
+        provider: 'meta',
+        eventName: input.eventName,
+        eventId,
+        status: 'pending',
+        payload,
+      });
+    } catch (err) {
+      if (!isDuplicateKeyError(err)) throw err;
+
+      const existing = await AnalyticsEventLogModel.findOne({
+        provider: 'meta',
+        eventId,
+      });
+      if (existing?.status === 'sent') {
+        logger.debug(
+          { event: input.eventName, eventId },
+          'Meta CAPI: duplicate event_id already sent — skipping',
+        );
+        return;
+      }
+      if (!existing) throw err;
+      logDoc = existing;
+      logDoc.eventName = input.eventName;
+      logDoc.payload = payload;
+      logDoc.status = 'pending';
+    }
 
     try {
       const url = `${this.endpoint()}?access_token=${appConfig.analytics.meta.token}`;

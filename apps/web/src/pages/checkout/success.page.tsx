@@ -80,6 +80,7 @@ export function CheckoutSuccessPage() {
               email: userEmail,
               phone: userPhone,
             },
+            { browserOnly: true },
           );
         } else {
           void trackingApi.purchase(
@@ -96,6 +97,7 @@ export function CheckoutSuccessPage() {
               email: userEmail,
               phone: userPhone,
             },
+            { browserOnly: true },
           );
         }
       }

@@ -329,7 +329,7 @@ export async function handlePaymentSucceededEvent(payload: Record<string, unknow
       { orderId: order._id.toString(), paymentId: payment._id.toString() },
     );
 
-    void trackMetaPurchaseForOrder(payment, order, checkout);
+    await trackMetaPurchaseForOrder(payment, order, checkout);
 
     logger.info({ orderId: order._id.toString(), orderNumber: order.orderNumber }, 'Order created');
   } catch (error) {
