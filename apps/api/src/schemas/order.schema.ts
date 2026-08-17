@@ -50,3 +50,22 @@ export const orderReturnRequestSchema = z.object({
   description: z.string().trim().max(2000).optional(),
   images: z.array(z.string().trim().min(1)).max(10).optional(),
 });
+
+export const fedShipmentCreateSchema = z
+  .object({
+    mode: z.enum(['new', 'existing']).default('new'),
+    waybillId: z.string().trim().max(32).optional(),
+    parcelWeightKg: z.coerce.number().positive().max(500).optional(),
+    parcelDescription: z.string().trim().max(200).optional(),
+    amount: z.coerce.number().min(0).optional(),
+    exchange: z.boolean().optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.mode === 'existing' && !data.waybillId?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'waybillId is required when mode is existing',
+        path: ['waybillId'],
+      });
+    }
+  });

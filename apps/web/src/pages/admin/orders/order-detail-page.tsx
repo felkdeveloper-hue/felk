@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { Download, Mail, Loader2 } from 'lucide-react';
+import { Download, Mail, Loader2, Truck } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@fe-platform/ui';
 import { toast } from 'sonner';
@@ -118,6 +118,8 @@ export function OrderDetailPage({ orderId }: { orderId: string }) {
   const [invoiceOpen, setInvoiceOpen] = useState(false);
   const [downloadingInvoice, setDownloadingInvoice] = useState(false);
   const [downloadingLabel, setDownloadingLabel] = useState(false);
+  const [existingWaybillId, setExistingWaybillId] = useState('');
+  const [useExistingWaybill, setUseExistingWaybill] = useState(false);
 
   const detailQuery = useQuery({
     queryKey: QUERY_KEYS.adminOrders.detail(orderId),
@@ -177,6 +179,22 @@ export function OrderDetailPage({ orderId }: { orderId: string }) {
     },
   });
 
+  const fedShipmentMutation = useMutation({
+    mutationFn: () =>
+      ordersApi.createFedShipment(orderId, {
+        mode: useExistingWaybill ? 'existing' : 'new',
+        waybillId: useExistingWaybill ? existingWaybillId.trim() : undefined,
+      }),
+    onSuccess: () => {
+      toast.success('FED waybill created. Tracking will update when FED sends status callbacks.');
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminOrders.detail(orderId) });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminOrders.timeline(orderId) });
+    },
+    onError: (error) => {
+      toast.error(error instanceof AppError ? error.message : 'Unable to create FED waybill');
+    },
+  });
+
   if (detailQuery.isLoading) {
     return (
       <PageMotion>
@@ -204,6 +222,13 @@ export function OrderDetailPage({ orderId }: { orderId: string }) {
   const selectedStatus = allowedStatuses.includes(nextStatus)
     ? nextStatus
     : (allowedStatuses[0] ?? '');
+  const shipment = readRecord(order.shipment ?? readRecord(order.metadata).shipment);
+  const tracking = readRecord(order.tracking ?? readRecord(order.metadata).tracking);
+  const waybillNo = String(shipment.waybillNo ?? tracking.trackingNumber ?? '');
+  const fedStatus = String(shipment.fedStatus ?? tracking.lastCourierStatus ?? '');
+  const fedStatusUpdatedAt = String(
+    shipment.fedStatusUpdatedAt ?? tracking.lastCourierUpdateAt ?? '',
+  );
   const source = readRecord(order.source);
   const sourceLabel = String(source.label ?? 'Unknown');
   const sourceMeta = [source.channel, source.detail].filter(Boolean).join(' · ');
@@ -477,7 +502,9 @@ export function OrderDetailPage({ orderId }: { orderId: string }) {
               </div>
               <div className="flex justify-between gap-4">
                 <dt className="text-neutral-500 dark:text-neutral-400">Received</dt>
-                <dd>{receivedAt ? formatDate(receivedAt) : '—'}</dd>
+                <dd>
+                  {receivedAt ? formatDate(receivedAt) : '—'}
+                </dd>
               </div>
             </dl>
             <div className="mt-4 flex flex-wrap gap-2">
@@ -521,6 +548,84 @@ export function OrderDetailPage({ orderId }: { orderId: string }) {
                 </Button>
               ) : null}
             </div>
+          </AdminPanel>
+
+          <AdminPanel title="FED Courier">
+            {waybillNo ? (
+              <dl className="space-y-2 text-sm">
+                <div className="flex justify-between gap-4">
+                  <dt className="text-neutral-500 dark:text-neutral-400">Waybill</dt>
+                  <dd className="font-mono text-xs">{waybillNo}</dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-neutral-500 dark:text-neutral-400">Courier status</dt>
+                  <dd className="text-right capitalize">{fedStatus || 'Awaiting update'}</dd>
+                </div>
+                {fedStatusUpdatedAt ? (
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-neutral-500 dark:text-neutral-400">Last update</dt>
+                    <dd className="text-right">{formatDate(fedStatusUpdatedAt)}</dd>
+                  </div>
+                ) : null}
+                <div className="pt-2">
+                  <a
+                    href="https://www.fdedomestic.com/client/all_parcel.php"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-sm text-blue-600 hover:underline dark:text-blue-400"
+                  >
+                    Open in FED portal
+                  </a>
+                </div>
+              </dl>
+            ) : orderPerms.update ? (
+              <div className="space-y-3">
+                <p className="text-sm text-neutral-500 dark:text-neutral-400">
+                  Create a FED waybill for this FE order. The FE order number is sent to FED as the
+                  reference so only your website orders are linked.
+                </p>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={useExistingWaybill}
+                    onChange={(event) => setUseExistingWaybill(event.target.checked)}
+                  />
+                  Use an existing CRE/CCP waybill number
+                </label>
+                {useExistingWaybill ? (
+                  <input
+                    value={existingWaybillId}
+                    onChange={(event) => setExistingWaybillId(event.target.value)}
+                    placeholder="Enter existing waybill ID"
+                    className="w-full rounded-lg border border-[var(--admin-line)] bg-[var(--admin-panel)] px-3 py-2 text-sm"
+                  />
+                ) : null}
+                <Button
+                  size="sm"
+                  onClick={() => fedShipmentMutation.mutate()}
+                  disabled={
+                    fedShipmentMutation.isPending ||
+                    (useExistingWaybill && !existingWaybillId.trim())
+                  }
+                >
+                  {fedShipmentMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 size-4 animate-spin" aria-hidden />
+                      Creating…
+                    </>
+                  ) : (
+                    <>
+                      <Truck className="mr-2 size-4" aria-hidden />
+                      Create FED waybill
+                    </>
+                  )}
+                </Button>
+              </div>
+            ) : (
+              <p className="text-sm text-neutral-500 dark:text-neutral-400">
+                No FED waybill has been created for this order yet.
+              </p>
+            )}
           </AdminPanel>
 
           {orderPerms.update || orderPerms.cancel ? (

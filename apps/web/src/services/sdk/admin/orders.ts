@@ -173,4 +173,18 @@ export const ordersApi = {
   async addNote(id: string, note: string): Promise<unknown> {
     return http.post<unknown>(`/orders/${id}/note`, { note });
   },
+
+  async createFedShipment(
+    id: string,
+    payload?: {
+      mode?: 'new' | 'existing';
+      waybillId?: string;
+      parcelWeightKg?: number;
+      parcelDescription?: string;
+      amount?: number;
+      exchange?: boolean;
+    },
+  ): Promise<unknown> {
+    return http.post<unknown>(`/orders/${id}/fed-shipment`, payload ?? { mode: 'new' });
+  },
 };

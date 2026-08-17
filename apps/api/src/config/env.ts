@@ -124,6 +124,14 @@ const envSchema = z
 
     FROM_NAME: z.string().optional(),
     SHOP_URL: z.string().url().optional(),
+
+    /** Fardar Express Domestic (FED) courier integration */
+    FED_ENABLED: z
+      .enum(['true', 'false'])
+      .default('false')
+      .transform((v) => v === 'true'),
+    FED_CLIENT_ID: z.string().optional(),
+    FED_API_KEY: z.string().optional(),
   })
   .superRefine((data, ctx) => {
     const strictProduction =

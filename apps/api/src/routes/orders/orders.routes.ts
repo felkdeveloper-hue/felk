@@ -10,6 +10,7 @@ import { ApiError } from '@/utils/errors/api-error.js';
 import * as S from '@/schemas/order.schema.js';
 import type { OrderStatus } from '@/constants/order-status.js';
 import { emitBusinessEvent } from '@/services/platform-analytics/index.js';
+import { orderShipmentService } from '@/services/order-shipment.service.js';
 
 const P = PERMISSIONS;
 
@@ -265,5 +266,29 @@ ordersRouter.get(
   validate({ params: S.orderIdParamsSchema }),
   asyncHandler(async (req, res) => {
     ApiResponse.success(res, await returnService.listForOrder(String(req.params.id)));
+  }),
+);
+
+ordersRouter.post(
+  '/:id/fed-shipment',
+  authenticate,
+  authorizeAny(...updatePerms),
+  validate({ params: S.orderIdParamsSchema, body: S.fedShipmentCreateSchema }),
+  asyncHandler(async (req, res) => {
+    if (!req.user) throw ApiError.unauthorized();
+    const order = await orderShipmentService.createFedShipment(
+      String(req.params.id),
+      req.body as {
+        mode?: 'new' | 'existing';
+        waybillId?: string;
+        parcelWeightKg?: number;
+        parcelDescription?: string;
+        amount?: number;
+        exchange?: boolean;
+      },
+      req.user,
+      actorFromRequest(req),
+    );
+    ApiResponse.success(res, order, 'FED waybill created');
   }),
 );

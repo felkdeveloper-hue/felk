@@ -283,7 +283,7 @@ async function testPayHere(token: string, variantId: string, addressId: string) 
   summary.pass =
     payRes.ok &&
     action.includes('payhere.lk') &&
-    (Boolean(summary.redirectFormAction)
+    (summary.redirectFormAction
       ? summary.redirectFormFields.includes('hash') &&
         summary.redirectFormFields.includes('merchant_id') &&
         summary.redirectFormFields.includes('notify_url')
