@@ -7,6 +7,34 @@ import { AnalyticsEventLogModel } from '@/models/analytics.model.js';
 
 const GRAPH_API_VERSION = 'v19.0';
 
+interface MetaCapiResponse {
+  events_received?: number;
+  messages?: Array<{ message?: string; error?: { message?: string; type?: string } }>;
+  fbtrace_id?: string;
+}
+
+function parseMetaCapiResponse(data: unknown): MetaCapiResponse {
+  if (!data || typeof data !== 'object') return {};
+  return data as MetaCapiResponse;
+}
+
+function assertMetaAccepted(data: unknown, eventName: string): MetaCapiResponse {
+  const response = parseMetaCapiResponse(data);
+  const received = response.events_received ?? 0;
+  const messages = response.messages ?? [];
+
+  if (received < 1 || messages.length > 0) {
+    const detail =
+      messages
+        .map((m) => m.message ?? m.error?.message)
+        .filter(Boolean)
+        .join('; ') || `events_received=${received}`;
+    throw new Error(`Meta rejected ${eventName}: ${detail}`);
+  }
+
+  return response;
+}
+
 export interface MetaUserData {
   email?: string | null;
   phone?: string | null;
@@ -116,10 +144,10 @@ export class MetaCapiService {
     return `https://graph.facebook.com/${GRAPH_API_VERSION}/${pixelId}/events`;
   }
 
-  async sendEvent(input: MetaEventInput): Promise<void> {
+  async sendEvent(input: MetaEventInput): Promise<MetaCapiResponse> {
     if (!this.configured) {
       logger.debug({ event: input.eventName }, 'Meta CAPI: not configured, skipping');
-      return;
+      return {};
     }
 
     const eventId = input.eventId ?? randomUUID();
@@ -167,7 +195,7 @@ export class MetaCapiService {
           { event: input.eventName, eventId },
           'Meta CAPI: duplicate event_id already sent — skipping',
         );
-        return;
+        return parseMetaCapiResponse(existing.payload);
       }
       if (!existing) throw err;
       logDoc = existing;
@@ -178,17 +206,25 @@ export class MetaCapiService {
 
     try {
       const url = `${this.endpoint()}?access_token=${appConfig.analytics.meta.token}`;
-      await fetchWithRetry(url, {
+      const { data } = await fetchWithRetry<MetaCapiResponse>(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
 
+      const metaResponse = assertMetaAccepted(data, input.eventName);
+
       logDoc.status = 'sent';
       logDoc.sentAt = new Date();
+      logDoc.payload = { ...payload, metaResponse };
       await logDoc.save();
 
-      logger.info({ event: input.eventName, eventId }, 'Meta CAPI: event sent');
+      logger.info(
+        { event: input.eventName, eventId, fbtrace_id: metaResponse.fbtrace_id },
+        'Meta CAPI: event sent',
+      );
+
+      return metaResponse;
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
       logDoc.status = 'retrying';
@@ -200,6 +236,7 @@ export class MetaCapiService {
         { event: input.eventName, eventId, err: errMsg },
         'Meta CAPI: event queued for retry',
       );
+      throw err instanceof Error ? err : new Error(errMsg);
     }
   }
 
@@ -208,12 +245,23 @@ export class MetaCapiService {
     if (doc.provider !== 'meta') return;
     if (!this.configured) throw new Error('Meta CAPI not configured');
 
+    const payload = doc.payload as Record<string, unknown>;
+    const eventName =
+      Array.isArray(payload.data) &&
+      payload.data[0] &&
+      typeof payload.data[0] === 'object' &&
+      'event_name' in payload.data[0]
+        ? String((payload.data[0] as { event_name: string }).event_name)
+        : 'event';
+
     const url = `${this.endpoint()}?access_token=${appConfig.analytics.meta.token}`;
-    await fetchWithRetry(url, {
+    const { data } = await fetchWithRetry<MetaCapiResponse>(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(doc.payload),
+      body: JSON.stringify(payload),
     });
+
+    assertMetaAccepted(data, eventName);
   }
 
   // ---- Convenience event methods ----
