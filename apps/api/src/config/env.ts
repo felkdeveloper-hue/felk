@@ -118,6 +118,8 @@ const envSchema = z
 
     META_CAPI_TOKEN: z.string().optional(),
     META_PIXEL_ID: z.string().optional(),
+    /** Meta Events Manager Test Events code — appended to CAPI payloads while testing. */
+    META_TEST_EVENT_CODE: z.string().optional(),
 
     TIKTOK_PIXEL_ID: z.string().optional(),
     TIKTOK_ACCESS_TOKEN: z.string().optional(),

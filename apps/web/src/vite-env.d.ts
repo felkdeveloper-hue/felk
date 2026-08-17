@@ -9,6 +9,8 @@ interface ImportMetaEnv {
   readonly VITE_POSTHOG_KEY?: string;
   /** Optional — PostHog host, defaults to https://app.posthog.com */
   readonly VITE_POSTHOG_HOST?: string;
+  /** Meta Pixel ID for browser-side fbq tracking. */
+  readonly VITE_META_PIXEL_ID?: string;
 }
 
 interface ImportMeta {

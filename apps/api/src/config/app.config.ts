@@ -129,6 +129,7 @@ export const appConfig = {
     meta: {
       token: env.META_CAPI_TOKEN,
       pixelId: env.META_PIXEL_ID,
+      testEventCode: env.META_TEST_EVENT_CODE,
       configured: Boolean(env.META_CAPI_TOKEN && env.META_PIXEL_ID),
     },
     tiktok: {

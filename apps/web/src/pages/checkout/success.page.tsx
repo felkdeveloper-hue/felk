@@ -13,6 +13,8 @@ import { cartApi } from '@/services/sdk';
 import { useCartStore, useCheckoutStore } from '@/store';
 import { clearCheckoutPlacedFlag, readCheckoutPlacedFlag } from '@/utils/checkout-placed-flag';
 import { trackCommerceEvent } from '@/lib/analytics';
+import { trackingApi } from '@/services/sdk/tracking';
+import { useAuthStore } from '@/store/auth-store';
 
 export function CheckoutSuccessPage() {
   const search = useSearch({ strict: false }) as { checkoutToken?: string };
@@ -54,6 +56,51 @@ export function CheckoutSuccessPage() {
       method,
     });
 
+    const tracking = statusQuery.data?.purchaseTracking;
+    const purchaseOrderNumber = tracking?.orderNumber ?? orderNumber;
+    if (purchaseOrderNumber && statusQuery.data) {
+      const dedupeKey = `meta_purchase_${tracking?.eventId ?? `purchase-${purchaseOrderNumber}`}`;
+      if (!sessionStorage.getItem(dedupeKey)) {
+        sessionStorage.setItem(dedupeKey, '1');
+        const authUser = useAuthStore.getState().user;
+        const userEmail = authUser?.email ?? null;
+        const userPhone = typeof authUser?.phone === 'string' ? authUser.phone : null;
+        if (tracking) {
+          void trackingApi.purchase(
+            tracking.orderNumber,
+            {
+              contentIds: tracking.contentIds,
+              contents: tracking.contents,
+              contentType: 'product',
+              numItems: tracking.numItems,
+              currency: tracking.currency,
+              value: tracking.value,
+            },
+            {
+              email: userEmail,
+              phone: userPhone,
+            },
+          );
+        } else {
+          void trackingApi.purchase(
+            purchaseOrderNumber,
+            {
+              contentIds: [],
+              contents: [],
+              contentType: 'product',
+              numItems: 1,
+              currency: statusQuery.data.currency ?? 'LKR',
+              value: statusQuery.data.amount ?? 0,
+            },
+            {
+              email: userEmail,
+              phone: userPhone,
+            },
+          );
+        }
+      }
+    }
+
     void (async () => {
       try {
         const cart = await cartApi.clear();
@@ -65,7 +112,15 @@ export function CheckoutSuccessPage() {
       void queryClient.invalidateQueries({ queryKey: ['cart'] });
       void queryClient.invalidateQueries({ queryKey: ['orders'] });
     })();
-  }, [isConfirmed, checkoutToken, resetCheckoutUi, queryClient, orderNumber, method]);
+  }, [
+    isConfirmed,
+    checkoutToken,
+    resetCheckoutUi,
+    queryClient,
+    orderNumber,
+    method,
+    statusQuery.data?.purchaseTracking,
+  ]);
 
   return (
     <>

@@ -21,15 +21,28 @@ export interface MetaUserData {
   externalId?: string | null;
 }
 
+export interface MetaContentItem {
+  id: string;
+  quantity: number;
+  item_price: number;
+}
+
 export interface MetaCustomData {
   currency?: string;
   value?: number;
+  content_ids?: string[];
   contentIds?: string[];
+  content_type?: string;
   contentType?: string;
+  contents?: MetaContentItem[];
+  content_name?: string;
   contentName?: string;
   contentCategory?: string;
+  num_items?: number;
   numItems?: number;
+  search_string?: string;
   searchString?: string;
+  order_id?: string;
   orderId?: string;
   [key: string]: unknown;
 }
@@ -40,6 +53,32 @@ export interface MetaEventInput {
   eventSourceUrl?: string;
   userData?: MetaUserData;
   customData?: MetaCustomData;
+}
+
+function normalizeCustomData(raw?: MetaCustomData): Record<string, unknown> | undefined {
+  if (!raw) return undefined;
+
+  const contentIds = raw.content_ids ?? raw.contentIds;
+  const contents = raw.contents;
+  const numItems = raw.num_items ?? raw.numItems;
+  const contentType = raw.content_type ?? raw.contentType ?? (contentIds ? 'product' : undefined);
+
+  return {
+    ...(raw.currency && { currency: raw.currency }),
+    ...(raw.value !== undefined && { value: raw.value }),
+    ...(contentIds && { content_ids: contentIds }),
+    ...(contentType && { content_type: contentType }),
+    ...(contents && { contents }),
+    ...(numItems !== undefined && { num_items: numItems }),
+    ...((raw.content_name ?? raw.contentName) && {
+      content_name: raw.content_name ?? raw.contentName,
+    }),
+    ...((raw.search_string ?? raw.searchString) && {
+      search_string: raw.search_string ?? raw.searchString,
+    }),
+    ...((raw.order_id ?? raw.orderId) && { order_id: raw.order_id ?? raw.orderId }),
+    ...(raw.contentCategory && { content_category: raw.contentCategory }),
+  };
 }
 
 function buildUserData(ud: MetaUserData) {
@@ -77,7 +116,9 @@ export class MetaCapiService {
     const eventId = input.eventId ?? randomUUID();
     const eventTime = Math.floor(Date.now() / 1000);
 
-    const payload = {
+    const customData = normalizeCustomData(input.customData);
+
+    const payload: Record<string, unknown> = {
       data: [
         {
           event_name: input.eventName,
@@ -86,10 +127,15 @@ export class MetaCapiService {
           ...(input.eventSourceUrl && { event_source_url: input.eventSourceUrl }),
           action_source: 'website',
           ...(input.userData && { user_data: buildUserData(input.userData) }),
-          ...(input.customData && { custom_data: input.customData }),
+          ...(customData && Object.keys(customData).length > 0 && { custom_data: customData }),
         },
       ],
     };
+
+    const testEventCode = appConfig.analytics.meta.testEventCode;
+    if (testEventCode) {
+      payload.test_event_code = testEventCode;
+    }
 
     const logDoc = await AnalyticsEventLogModel.create({
       provider: 'meta',
@@ -224,19 +270,24 @@ export class MetaCapiService {
 
   trackInitiateCheckout(data: {
     contentIds?: string[];
+    contents?: MetaContentItem[];
     numItems?: number;
     currency: string;
     value: number;
     userData?: MetaUserData;
     eventId?: string;
+    eventSourceUrl?: string;
   }) {
     return this.sendEvent({
       eventName: 'InitiateCheckout',
+      eventSourceUrl: data.eventSourceUrl,
       userData: data.userData,
       eventId: data.eventId,
       customData: {
         ...(data.contentIds && { content_ids: data.contentIds }),
-        ...(data.numItems && { num_items: data.numItems }),
+        ...(data.contents && { contents: data.contents }),
+        content_type: 'product',
+        ...(data.numItems !== undefined && { num_items: data.numItems }),
         currency: data.currency,
         value: data.value,
       },
@@ -262,19 +313,24 @@ export class MetaCapiService {
     currency: string;
     value: number;
     contentIds?: string[];
+    contents?: MetaContentItem[];
     numItems?: number;
     userData?: MetaUserData;
     eventId?: string;
+    eventSourceUrl?: string;
   }) {
     return this.sendEvent({
       eventName: 'Purchase',
+      eventSourceUrl: data.eventSourceUrl,
       userData: data.userData,
       eventId: data.eventId,
       customData: {
         order_id: data.orderId,
         currency: data.currency,
         value: data.value,
+        content_type: 'product',
         ...(data.contentIds && { content_ids: data.contentIds }),
+        ...(data.contents && { contents: data.contents }),
         ...(data.numItems !== undefined && { num_items: data.numItems }),
       },
     });

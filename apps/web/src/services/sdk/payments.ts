@@ -60,6 +60,16 @@ export interface PaymentRecord {
   updatedAt?: string;
 }
 
+export interface PurchaseTrackingPayload {
+  eventId: string;
+  orderNumber: string;
+  value: number;
+  currency: string;
+  contentIds: string[];
+  contents: Array<{ id: string; quantity: number; item_price: number }>;
+  numItems: number;
+}
+
 export interface PaymentStatusResult {
   checkoutToken: string;
   status: PaymentStatus;
@@ -68,6 +78,7 @@ export interface PaymentStatusResult {
   currency: string;
   orderId?: string | null;
   orderNumber?: string | null;
+  purchaseTracking?: PurchaseTrackingPayload | null;
   redirectUrl?: string | null;
   updatedAt?: string;
 }
@@ -120,6 +131,36 @@ function normalizePayment(raw: unknown): PaymentRecord {
   };
 }
 
+function normalizePurchaseTracking(raw: unknown): PurchaseTrackingPayload | null | undefined {
+  if (raw === null) return null;
+  if (!raw || typeof raw !== 'object') return undefined;
+  const record = raw as Record<string, unknown>;
+  if (typeof record.orderNumber !== 'string') return undefined;
+  const contentsRaw = record.contents;
+  const contents: PurchaseTrackingPayload['contents'] = [];
+  if (Array.isArray(contentsRaw)) {
+    for (const item of contentsRaw) {
+      if (!item || typeof item !== 'object') continue;
+      const row = item as Record<string, unknown>;
+      if (typeof row.id !== 'string') continue;
+      contents.push({
+        id: row.id,
+        quantity: Number(row.quantity ?? 1),
+        item_price: Number(row.item_price ?? 0),
+      });
+    }
+  }
+  return {
+    eventId: String(record.eventId ?? `purchase-${record.orderNumber}`),
+    orderNumber: record.orderNumber,
+    value: Number(record.value ?? 0),
+    currency: String(record.currency ?? 'LKR'),
+    contentIds: Array.isArray(record.contentIds) ? record.contentIds.map((id) => String(id)) : [],
+    contents,
+    numItems: Number(record.numItems ?? 0),
+  };
+}
+
 function normalizePaymentStatus(raw: unknown): PaymentStatusResult {
   const record = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
   return {
@@ -140,6 +181,7 @@ function normalizePaymentStatus(raw: unknown): PaymentStatusResult {
         : record.orderNumber === null
           ? null
           : undefined,
+    purchaseTracking: normalizePurchaseTracking(record.purchaseTracking),
     redirectUrl:
       typeof record.redirectUrl === 'string'
         ? record.redirectUrl

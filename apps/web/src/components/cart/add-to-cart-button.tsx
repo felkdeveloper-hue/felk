@@ -106,6 +106,17 @@ export function AddToCartButton({
         },
       },
       {
+        onSuccess: () => {
+          setJustAdded(true);
+          setCartAnnouncement(`${product.name} added to cart`);
+          toast.success(`${product.name} added to bag`);
+          void trackingApi.addToCart(resolvedVariantId, product.name, 'LKR', unitPrice, quantity);
+          trackCommerceEvent(
+            'add_to_cart',
+            productMetaFrom(product, { variantId: resolvedVariantId, quantity }),
+          );
+          onAdded?.();
+        },
         onError: (error) => {
           setJustAdded(false);
           const message = AppError.isAppError(error) ? error.message : 'Unable to add item to cart';
@@ -114,16 +125,6 @@ export function AddToCartButton({
         },
       },
     );
-
-    setJustAdded(true);
-    setCartAnnouncement(`${product.name} added to cart`);
-    toast.success(`${product.name} added to bag`);
-    void trackingApi.addToCart(resolvedVariantId, product.name, 'LKR', unitPrice);
-    trackCommerceEvent(
-      'add_to_cart',
-      productMetaFrom(product, { variantId: resolvedVariantId, quantity }),
-    );
-    onAdded?.();
   };
 
   return (

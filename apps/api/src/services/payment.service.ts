@@ -41,6 +41,10 @@ import {
 } from '@/services/gateways/gateway.utils.js';
 import type { AuthenticatedUser } from '@/types/index.js';
 import { analyticsService } from '@/services/analytics/analytics.service.js';
+import {
+  buildMetaContentsFromLines,
+  purchaseEventId,
+} from '@/services/analytics/meta-tracking.helpers.js';
 import { emailQueueService } from '@/services/email-queue.service.js';
 import { paymentSuccessfulEmail, paymentFailedEmail } from '@/emails/index.js';
 import {
@@ -434,14 +438,8 @@ export class PaymentService {
         });
       }
 
-      // Track InitiateCheckout + AddPaymentInfo (fire-and-forget)
-      void analyticsService
-        .trackInitiateCheckout({
-          currency: payment.currency,
-          value: payment.amount,
-        })
-        .catch(() => {});
-
+      // Track AddPaymentInfo when the customer reaches payment (fire-and-forget).
+      // InitiateCheckout is sent when checkout starts (storefront), not here.
       void analyticsService
         .trackAddPaymentInfo({
           currency: payment.currency,
@@ -535,6 +533,32 @@ export class PaymentService {
 
     const order = await OrderModel.findOne({ paymentId: payment._id });
 
+    const purchaseTracking =
+      order &&
+      (payment.status === PAYMENT_STATUS.PAID ||
+        payment.status === PAYMENT_STATUS.AUTHORIZED ||
+        payment.method === PAYMENT_METHOD.COD)
+        ? (() => {
+            const { contentIds, contents, numItems } = buildMetaContentsFromLines(
+              order.items.map((item) => ({
+                variantId: item.variantId,
+                quantity: item.quantity,
+                salePrice: item.salePrice,
+                unitPrice: item.salePrice ?? item.price,
+              })),
+            );
+            return {
+              eventId: purchaseEventId(order.orderNumber),
+              orderNumber: order.orderNumber,
+              value: payment.amount,
+              currency: payment.currency,
+              contentIds,
+              contents,
+              numItems,
+            };
+          })()
+        : null;
+
     return {
       checkoutToken: payment.checkoutToken,
       status: payment.status,
@@ -543,6 +567,7 @@ export class PaymentService {
       currency: payment.currency,
       orderId: order?._id.toString() ?? null,
       orderNumber: order?.orderNumber ?? null,
+      purchaseTracking,
       redirectUrl:
         NON_TERMINAL_STATUSES.includes(payment.status as never) && payment.expiresAt > new Date()
           ? payment.redirectUrl
@@ -848,15 +873,6 @@ export class PaymentService {
           /* non-blocking */
         }
       })();
-
-      // Track Purchase (fire-and-forget)
-      void analyticsService
-        .trackPurchase({
-          orderId: payment.referenceNumber,
-          currency: payment.currency,
-          value: payment.amount,
-        })
-        .catch(() => {});
     } else if (newStatus === PAYMENT_STATUS.AUTHORIZED) {
       await publishPaymentEvent(
         PAYMENT_EVENT_TYPE.PAYMENT_AUTHORIZED,

@@ -1,4 +1,21 @@
 import { http } from '@/lib/http-client';
+import { metaPixelTrack } from '@/lib/analytics/meta-pixel';
+
+export interface MetaContentItem {
+  id: string;
+  quantity: number;
+  item_price: number;
+}
+
+export interface MetaProductPayload {
+  contentIds: string[];
+  contents: MetaContentItem[];
+  contentType?: 'product';
+  numItems: number;
+  currency: string;
+  value: number;
+  contentName?: string;
+}
 
 export interface TrackEventPayload {
   eventName: string;
@@ -8,10 +25,26 @@ export interface TrackEventPayload {
   tiktokProperties?: Record<string, unknown>;
   userData?: {
     email?: string | null;
+    phone?: string | null;
     fbp?: string | null;
     fbc?: string | null;
     ttclid?: string | null;
   };
+}
+
+function generateEventId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `evt_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+}
+
+export function purchaseEventId(orderNumber: string): string {
+  return `purchase-${orderNumber}`;
+}
+
+export function checkoutEventId(checkoutToken: string): string {
+  return `checkout-${checkoutToken}`;
 }
 
 function getFbp(): string | null {
@@ -36,18 +69,55 @@ function getTtclid(): string | null {
   }
 }
 
+function buildProductCustomData(data: MetaProductPayload): Record<string, unknown> {
+  return {
+    content_ids: data.contentIds,
+    contents: data.contents,
+    content_type: data.contentType ?? 'product',
+    num_items: data.numItems,
+    currency: data.currency,
+    value: data.value,
+    ...(data.contentName ? { content_name: data.contentName } : {}),
+  };
+}
+
+function singleItemPayload(
+  contentId: string,
+  currency: string,
+  value: number,
+  quantity = 1,
+  contentName?: string,
+): MetaProductPayload {
+  return {
+    contentIds: [contentId],
+    contents: [{ id: contentId, quantity, item_price: value }],
+    contentType: 'product',
+    numItems: quantity,
+    currency,
+    value: value * quantity,
+    contentName,
+  };
+}
+
 export const trackingApi = {
   async track(payload: TrackEventPayload): Promise<void> {
+    const eventId = payload.eventId ?? generateEventId();
+    const url = payload.url ?? (typeof window !== 'undefined' ? window.location.href : undefined);
+    const userData = {
+      ...(payload.userData ?? {}),
+      fbp: payload.userData?.fbp ?? getFbp(),
+      fbc: payload.userData?.fbc ?? getFbc(),
+      ttclid: payload.userData?.ttclid ?? getTtclid(),
+    };
+
+    void metaPixelTrack(payload.eventName, payload.customData, eventId);
+
     try {
       await http.post('/tracking/event', {
         ...payload,
-        url: payload.url ?? (typeof window !== 'undefined' ? window.location.href : undefined),
-        userData: {
-          ...(payload.userData ?? {}),
-          fbp: payload.userData?.fbp ?? getFbp(),
-          fbc: payload.userData?.fbc ?? getFbc(),
-          ttclid: payload.userData?.ttclid ?? getTtclid(),
-        },
+        eventId,
+        url,
+        userData,
       });
     } catch {
       // Tracking failures must never surface to the user
@@ -58,11 +128,13 @@ export const trackingApi = {
     return trackingApi.track({ eventName: 'PageView', url });
   },
 
-  viewContent(contentId: string, contentName?: string, currency?: string, value?: number) {
+  viewContent(contentId: string, contentName?: string, currency = 'LKR', value?: number) {
+    const price = value ?? 0;
+    const data = singleItemPayload(contentId, currency, price, 1, contentName);
     return trackingApi.track({
       eventName: 'ViewContent',
-      customData: { content_ids: [contentId], content_name: contentName, currency, value },
-      tiktokProperties: { contentId, contentName, currency, value },
+      customData: buildProductCustomData(data),
+      tiktokProperties: { contentId, contentName, currency, value: price },
     });
   },
 
@@ -75,26 +147,118 @@ export const trackingApi = {
   },
 
   addToWishlist(contentId: string, contentName?: string, currency?: string, value?: number) {
+    const cur = currency ?? 'LKR';
+    const price = value ?? 0;
+    const data = singleItemPayload(contentId, cur, price, 1, contentName);
     return trackingApi.track({
       eventName: 'AddToWishlist',
-      customData: { content_ids: [contentId], content_name: contentName, currency, value },
-      tiktokProperties: { contentId, contentName, currency, value },
+      customData: buildProductCustomData(data),
+      tiktokProperties: { contentId, contentName, currency: cur, value: price },
     });
   },
 
-  addToCart(contentId: string, contentName: string, currency: string, value: number) {
+  addToCart(
+    contentId: string,
+    contentName: string,
+    currency: string,
+    unitPrice: number,
+    quantity = 1,
+  ) {
+    const data = singleItemPayload(contentId, currency, unitPrice, quantity, contentName);
     return trackingApi.track({
       eventName: 'AddToCart',
-      customData: { content_ids: [contentId], content_name: contentName, currency, value },
-      tiktokProperties: { contentId, contentName, currency, value },
+      customData: buildProductCustomData(data),
+      tiktokProperties: {
+        contentId,
+        contentName,
+        currency,
+        value: data.value,
+        numItems: quantity,
+      },
     });
   },
 
-  initiateCheckout(currency: string, value: number, numItems?: number) {
+  initiateCheckout(
+    data: MetaProductPayload,
+    eventId?: string,
+    userData?: TrackEventPayload['userData'],
+  ) {
     return trackingApi.track({
       eventName: 'InitiateCheckout',
-      customData: { currency, value, num_items: numItems },
-      tiktokProperties: { currency, value, numItems },
+      eventId: eventId ?? generateEventId(),
+      customData: buildProductCustomData(data),
+      userData,
+      tiktokProperties: {
+        currency: data.currency,
+        value: data.value,
+        numItems: data.numItems,
+        contentId: data.contentIds[0],
+      },
+    });
+  },
+
+  purchase(
+    orderNumber: string,
+    data: MetaProductPayload,
+    userData?: TrackEventPayload['userData'],
+  ) {
+    const eventId = purchaseEventId(orderNumber);
+    return trackingApi.track({
+      eventName: 'Purchase',
+      eventId,
+      customData: {
+        ...buildProductCustomData(data),
+        order_id: orderNumber,
+      },
+      userData,
+      tiktokProperties: {
+        currency: data.currency,
+        value: data.value,
+        numItems: data.numItems,
+        contentId: data.contentIds[0],
+        orderId: orderNumber,
+      },
     });
   },
 };
+
+/** Build Meta product payload from checkout/cart line items. */
+export function buildMetaProductFromLines(
+  lines: Array<{
+    variantId: string;
+    quantity: number;
+    unitPrice?: number;
+    salePrice?: number;
+    lineSubtotal?: number;
+  }>,
+  currency: string,
+  grandTotal?: number,
+): MetaProductPayload {
+  const contents = lines.map((line) => {
+    const itemPrice =
+      typeof line.salePrice === 'number' && line.salePrice > 0
+        ? line.salePrice
+        : typeof line.unitPrice === 'number'
+          ? line.unitPrice
+          : line.lineSubtotal && line.quantity > 0
+            ? Number((line.lineSubtotal / line.quantity).toFixed(2))
+            : 0;
+    return {
+      id: line.variantId,
+      quantity: line.quantity,
+      item_price: itemPrice,
+    };
+  });
+  const numItems = lines.reduce((sum, line) => sum + line.quantity, 0);
+  const value =
+    grandTotal ?? contents.reduce((sum, item) => sum + item.item_price * item.quantity, 0);
+
+  return {
+    contentIds: lines.map((line) => line.variantId),
+    contents,
+    contentType: 'product',
+    numItems,
+    currency,
+    value,
+  };
+}

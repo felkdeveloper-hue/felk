@@ -19,7 +19,7 @@ const customDataSchema = z.record(z.unknown()).optional();
 export const trackEventBodySchema = z.object({
   eventName: z.string().min(1).max(100),
   url: z.string().url().optional(),
-  eventId: z.string().uuid().optional(),
+  eventId: z.string().min(1).max(200).optional(),
   userData: userDataSchema.optional().nullable(),
   customData: customDataSchema,
   tiktokProperties: customDataSchema,

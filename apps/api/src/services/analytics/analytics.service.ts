@@ -174,11 +174,13 @@ export class AnalyticsService {
 
   async trackInitiateCheckout(data: {
     contentIds?: string[];
+    contents?: Array<{ id: string; quantity: number; item_price: number }>;
     numItems?: number;
     currency: string;
     value: number;
     userData?: TrackingUserData | null;
     eventId?: string;
+    eventSourceUrl?: string;
   }) {
     const eventId = data.eventId ?? randomUUID();
     await Promise.allSettled([
@@ -217,9 +219,11 @@ export class AnalyticsService {
     currency: string;
     value: number;
     contentIds?: string[];
+    contents?: Array<{ id: string; quantity: number; item_price: number }>;
     numItems?: number;
     userData?: TrackingUserData | null;
     eventId?: string;
+    eventSourceUrl?: string;
   }) {
     const eventId = data.eventId ?? randomUUID();
     await Promise.allSettled([

@@ -79,7 +79,9 @@ function sampleImageEdgeColor(image: HTMLImageElement): string | null {
     let r = 0;
     let g = 0;
     let b = 0;
-    for (const [x, y] of points) {
+    for (const point of points) {
+      const x = point[0] ?? 0;
+      const y = point[1] ?? 0;
       const i = (y * sample + x) * 4;
       r += data[i] ?? 255;
       g += data[i + 1] ?? 255;

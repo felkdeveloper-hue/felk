@@ -27,6 +27,7 @@ import {
 } from '@/hooks/checkout';
 import { useAuthStore, useCartStore, useCheckoutStore } from '@/store';
 import { trackCommerceEvent } from '@/lib/analytics';
+import { buildMetaProductFromLines, checkoutEventId, trackingApi } from '@/services/sdk/tracking';
 import { isGuestCheckoutUser } from '@/utils/auth/guest-checkout';
 import { AppError } from '@/lib/errors';
 import { QUERY_KEYS } from '@/constants';
@@ -136,7 +137,7 @@ export function CheckoutInformationPage() {
         quantity: item.quantity,
       }));
     try {
-      await startCheckout.mutateAsync({
+      const session = await startCheckout.mutateAsync({
         shippingAddressId: defaultShipping?.id,
         autoReserve: false,
         ...(buyNowItems?.length
@@ -146,6 +147,28 @@ export function CheckoutInformationPage() {
             : {}),
       });
       trackCommerceEvent('checkout_started');
+
+      const dedupeKey = `meta_initiate_checkout_${session.checkoutToken}`;
+      if (!sessionStorage.getItem(dedupeKey) && session.lines.length > 0) {
+        sessionStorage.setItem(dedupeKey, '1');
+        const metaPayload = buildMetaProductFromLines(
+          session.lines.map((line) => ({
+            variantId: line.variantId,
+            quantity: line.quantity,
+            unitPrice: line.unitPrice,
+            salePrice: line.salePrice,
+            lineSubtotal: line.lineSubtotal,
+          })),
+          session.currency ?? 'LKR',
+          session.totals?.grandTotal,
+        );
+        const shippingPhone = session.shippingAddress?.phone;
+        void trackingApi.initiateCheckout(
+          metaPayload,
+          checkoutEventId(session.checkoutToken),
+          shippingPhone ? { phone: shippingPhone } : undefined,
+        );
+      }
     } catch (error) {
       // Stock / cart validation failures belong on the bag, not the checkout form.
       if (

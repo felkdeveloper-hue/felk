@@ -38,6 +38,7 @@ import {
 import { resolveProductGalleryMedia } from '@/utils/catalog/resolve-gallery-media';
 import type { ProductVariant } from '@/services/sdk';
 import { productMetaFrom, trackCommerceEvent } from '@/lib/analytics';
+import { trackingApi } from '@/services/sdk/tracking';
 
 function resolveBadgeLabel(product: {
   isFeatured?: boolean;
@@ -138,6 +139,34 @@ export function ProductDetailPage() {
     trackCommerceEvent('product_viewed', productMetaFrom(product));
     trackCommerceEvent('product_detail_opened', productMetaFrom(product));
   }, [product?.id]);
+
+  const selectedVariantForTracking = useMemo(
+    () =>
+      product?.variants?.find((v: ProductVariant) => v.id === selectedVariantId) ??
+      product?.variants?.[0],
+    [product?.variants, selectedVariantId],
+  );
+
+  useEffect(() => {
+    if (!product?.id || !selectedVariantForTracking?.id) return;
+    const price =
+      selectedVariantForTracking.salePrice?.amount ??
+      selectedVariantForTracking.price?.amount ??
+      product.salePrice?.amount ??
+      product.price?.amount ??
+      (typeof product.price === 'number' ? product.price : 0);
+    const currency =
+      selectedVariantForTracking.price?.currency ??
+      product.salePrice?.currency ??
+      product.price?.currency ??
+      'LKR';
+    void trackingApi.viewContent(
+      selectedVariantForTracking.id,
+      product.name,
+      currency,
+      typeof price === 'number' ? price : 0,
+    );
+  }, [product?.id, product?.name, selectedVariantForTracking?.id]);
 
   useEffect(() => {
     if (!product?.variants?.length) return;

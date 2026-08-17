@@ -22,6 +22,7 @@ import { PAYMENT_EVENT_TYPE } from '@/constants/payment.js';
 import { publishPaymentEvent } from '@/services/payment-event-publisher.js';
 import type { PaymentDocument } from '@/models/payment.models.js';
 import { paymentReceivedAt } from '@/utils/order-received-at.js';
+import { trackMetaPurchaseForOrder } from '@/services/analytics/purchase-tracking.service.js';
 
 const SYSTEM_ACTOR: ActorMeta = {};
 const PAYMENT_SUCCEEDED = CONSUMED_PAYMENT_EVENT_TYPES[0];
@@ -327,6 +328,8 @@ export async function handlePaymentSucceededEvent(payload: Record<string, unknow
       },
       { orderId: order._id.toString(), paymentId: payment._id.toString() },
     );
+
+    void trackMetaPurchaseForOrder(payment, order, checkout);
 
     logger.info({ orderId: order._id.toString(), orderNumber: order.orderNumber }, 'Order created');
   } catch (error) {

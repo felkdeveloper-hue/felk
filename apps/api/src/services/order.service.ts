@@ -220,6 +220,55 @@ export class OrderService {
     };
   }
 
+  /**
+   * Advance order status from courier webhooks (system actor).
+   * Walks the fulfillment pipeline so jumps like confirmed → ready_for_shipment work.
+   */
+  async syncStatusFromCourier(
+    orderId: string,
+    targetStatus: OrderStatus,
+    note?: string,
+  ): Promise<void> {
+    const pipeline: OrderStatus[] = [
+      ORDER_STATUS.PENDING,
+      ORDER_STATUS.CONFIRMED,
+      ORDER_STATUS.PACKED,
+      ORDER_STATUS.READY_FOR_SHIPMENT,
+      ORDER_STATUS.SHIPPED,
+      ORDER_STATUS.DELIVERED,
+    ];
+
+    const targetIdx = pipeline.indexOf(targetStatus);
+    if (targetIdx === -1) return;
+
+    const systemActor: ActorMeta = {};
+
+    for (;;) {
+      const order = await this.findById(orderId);
+      if (order.status === targetStatus) return;
+
+      const currentIdx = pipeline.indexOf(order.status as OrderStatus);
+      if (currentIdx === -1 || currentIdx >= targetIdx) return;
+
+      const nextStatus = pipeline[currentIdx + 1];
+      if (!nextStatus) return;
+
+      const allowed = ORDER_STATUS_TRANSITIONS[order.status as OrderStatus] ?? [];
+      if (!allowed.includes(nextStatus)) return;
+
+      try {
+        await this.transitionTo(
+          order,
+          nextStatus,
+          nextStatus === targetStatus ? note : undefined,
+          systemActor,
+        );
+      } catch {
+        return;
+      }
+    }
+  }
+
   async updateStatus(
     id: string,
     payload: { status: OrderStatus; note?: string; updateMessage?: string },

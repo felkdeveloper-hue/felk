@@ -5,6 +5,7 @@ import { ErrorBoundary } from './error-boundary';
 import { QueryProvider } from './query-provider';
 import { ThemeProvider } from './theme-provider';
 import { ToastProvider } from './toast-provider';
+import { MetaPixelProvider } from '@/components/analytics/MetaPixelProvider';
 
 interface AppProvidersProps {
   children: ReactNode;
@@ -23,7 +24,9 @@ export function AppProviders({ children }: AppProvidersProps) {
         <ThemeProvider>
           <QueryProvider>
             <ToastProvider>
-              <AuthProvider>{children}</AuthProvider>
+              <MetaPixelProvider>
+                <AuthProvider>{children}</AuthProvider>
+              </MetaPixelProvider>
             </ToastProvider>
           </QueryProvider>
         </ThemeProvider>
