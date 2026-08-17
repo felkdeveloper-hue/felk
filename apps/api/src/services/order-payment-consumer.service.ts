@@ -22,7 +22,10 @@ import { PAYMENT_EVENT_TYPE } from '@/constants/payment.js';
 import { publishPaymentEvent } from '@/services/payment-event-publisher.js';
 import type { PaymentDocument } from '@/models/payment.models.js';
 import { paymentReceivedAt } from '@/utils/order-received-at.js';
-import { trackMetaPurchaseForOrder } from '@/services/analytics/purchase-tracking.service.js';
+import {
+  ensureMetaPurchaseTracked,
+  trackMetaPurchaseForOrder,
+} from '@/services/analytics/purchase-tracking.service.js';
 
 const SYSTEM_ACTOR: ActorMeta = {};
 const PAYMENT_SUCCEEDED = CONSUMED_PAYMENT_EVENT_TYPES[0];
@@ -135,6 +138,7 @@ export async function handlePaymentSucceededEvent(payload: Record<string, unknow
     const alreadyExists = await OrderModel.exists({ paymentId });
     if (alreadyExists) {
       logger.info({ paymentId }, 'Order already exists for this payment — skipping (idempotent)');
+      await ensureMetaPurchaseTracked(paymentId);
       return;
     }
 
@@ -329,7 +333,14 @@ export async function handlePaymentSucceededEvent(payload: Record<string, unknow
       { orderId: order._id.toString(), paymentId: payment._id.toString() },
     );
 
-    await trackMetaPurchaseForOrder(payment, order, checkout);
+    try {
+      await trackMetaPurchaseForOrder(payment, order, checkout);
+    } catch (error) {
+      logger.warn(
+        { err: error, orderNumber: order.orderNumber, paymentId },
+        'Meta Purchase after order create failed — order is still valid',
+      );
+    }
 
     logger.info({ orderId: order._id.toString(), orderNumber: order.orderNumber }, 'Order created');
   } catch (error) {
@@ -346,7 +357,10 @@ export async function fulfillCodPaymentIfNeeded(payment: PaymentDocument): Promi
 
   const paymentId = payment._id.toString();
   const alreadyExists = await OrderModel.exists({ paymentId });
-  if (alreadyExists) return;
+  if (alreadyExists) {
+    await ensureMetaPurchaseTracked(paymentId);
+    return;
+  }
 
   const succeededPayload = {
     paymentId,
@@ -447,7 +461,14 @@ export async function catchUpUnconsumedPaymentEvents(): Promise<{
     const paymentId = event.payload?.paymentId as string | undefined;
     if (!paymentId) continue;
     const exists = await OrderModel.exists({ paymentId });
-    if (exists) continue;
+    if (exists) {
+      const existingOrder = await OrderModel.findOne({ paymentId }).select('createdAt').lean();
+      const createdAt = existingOrder?.createdAt ? new Date(existingOrder.createdAt).getTime() : 0;
+      if (createdAt && Date.now() - createdAt < 6 * 60 * 60 * 1000) {
+        await ensureMetaPurchaseTracked(paymentId);
+      }
+      continue;
+    }
     await handlePaymentSucceededEvent(event.payload as Record<string, unknown>);
     const nowExists = await OrderModel.exists({ paymentId });
     if (nowExists) created += 1;

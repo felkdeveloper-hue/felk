@@ -11,6 +11,7 @@ interface MetaCapiResponse {
   events_received?: number;
   messages?: Array<{ message?: string; error?: { message?: string; type?: string } }>;
   fbtrace_id?: string;
+  error?: { message?: string; type?: string; code?: number };
 }
 
 function parseMetaCapiResponse(data: unknown): MetaCapiResponse {
@@ -20,12 +21,14 @@ function parseMetaCapiResponse(data: unknown): MetaCapiResponse {
 
 function assertMetaAccepted(data: unknown, eventName: string): MetaCapiResponse {
   const response = parseMetaCapiResponse(data);
-  const received = response.events_received ?? 0;
-  const messages = response.messages ?? [];
+  if (response.error?.message) {
+    throw new Error(`Meta rejected ${eventName}: ${response.error.message}`);
+  }
 
-  if (received < 1 || messages.length > 0) {
+  const received = response.events_received ?? 0;
+  if (received < 1) {
     const detail =
-      messages
+      (response.messages ?? [])
         .map((m) => m.message ?? m.error?.message)
         .filter(Boolean)
         .join('; ') || `events_received=${received}`;
@@ -216,7 +219,8 @@ export class MetaCapiService {
 
       logDoc.status = 'sent';
       logDoc.sentAt = new Date();
-      logDoc.payload = { ...payload, metaResponse };
+      logDoc.payload = payload;
+      logDoc.lastError = null;
       await logDoc.save();
 
       logger.info(
@@ -245,20 +249,21 @@ export class MetaCapiService {
     if (doc.provider !== 'meta') return;
     if (!this.configured) throw new Error('Meta CAPI not configured');
 
-    const payload = doc.payload as Record<string, unknown>;
+    const raw = (doc.payload ?? {}) as Record<string, unknown>;
+    const { metaResponse: _ignored, ...requestPayload } = raw;
     const eventName =
-      Array.isArray(payload.data) &&
-      payload.data[0] &&
-      typeof payload.data[0] === 'object' &&
-      'event_name' in payload.data[0]
-        ? String((payload.data[0] as { event_name: string }).event_name)
+      Array.isArray(requestPayload.data) &&
+      requestPayload.data[0] &&
+      typeof requestPayload.data[0] === 'object' &&
+      'event_name' in requestPayload.data[0]
+        ? String((requestPayload.data[0] as { event_name: string }).event_name)
         : 'event';
 
     const url = `${this.endpoint()}?access_token=${appConfig.analytics.meta.token}`;
     const { data } = await fetchWithRetry<MetaCapiResponse>(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(requestPayload),
     });
 
     assertMetaAccepted(data, eventName);

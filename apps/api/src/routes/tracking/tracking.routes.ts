@@ -5,6 +5,7 @@ import { validate } from '@/middlewares/validate.middleware.js';
 import { trackEventBodySchema } from '@/schemas/tracking.schema.js';
 import { analyticsService } from '@/services/analytics/analytics.service.js';
 import {
+  captureMetaClickContext,
   getMetaPurchaseStatus,
   replayLatestMetaPurchase,
   replayMetaPurchaseForOrderNumber,
@@ -39,6 +40,15 @@ trackingRouter.post(
           userAgent: req.headers['user-agent'] ?? null,
         }
       : { ipAddress: req.ip, userAgent: req.headers['user-agent'] ?? null };
+
+    void captureMetaClickContext({
+      eventId,
+      url,
+      fbp: userData?.fbp ?? null,
+      fbc: userData?.fbc ?? null,
+      ipAddress: enrichedUserData.ipAddress,
+      userAgent: enrichedUserData.userAgent,
+    });
 
     // Fire-and-forget — response is immediate, send doesn't block the client
     void analyticsService
@@ -132,9 +142,7 @@ trackingRouter.post(
   trackingRateLimit,
   asyncHandler(async (req, res) => {
     if (!appConfig.analytics.meta.testEventCode) {
-      throw ApiError.forbidden(
-        'Test Purchase is only available while META_TEST_EVENT_CODE is set',
-      );
+      throw ApiError.forbidden('Test Purchase is only available while META_TEST_EVENT_CODE is set');
     }
 
     const value =

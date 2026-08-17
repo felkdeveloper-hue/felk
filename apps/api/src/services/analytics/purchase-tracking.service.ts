@@ -37,29 +37,99 @@ async function clearPurchaseLog(eventId: string): Promise<void> {
 }
 
 async function purchaseAlreadyAccepted(eventId: string): Promise<boolean> {
-  const existing = await AnalyticsEventLogModel.findOne({
-    provider: 'meta',
-    eventId,
-    eventName: 'Purchase',
-    status: 'sent',
-  });
-  if (!existing) return false;
+  return Boolean(
+    await AnalyticsEventLogModel.exists({
+      provider: 'meta',
+      eventId,
+      eventName: 'Purchase',
+      status: 'sent',
+    }),
+  );
+}
 
-  const payload = existing.payload as { metaResponse?: { events_received?: number } } | undefined;
-  const received = payload?.metaResponse?.events_received;
-  if (received !== undefined && received < 1) {
-    await clearPurchaseLog(eventId);
-    return false;
+type MetaClickContext = {
+  fbp?: string;
+  fbc?: string;
+  ipAddress?: string;
+  userAgent?: string;
+};
+
+function readMetaClick(
+  checkout?: Pick<CheckoutSessionDocument, 'metadata'> | null,
+): MetaClickContext {
+  const raw = checkout?.metadata?.metaClick;
+  if (!raw || typeof raw !== 'object') return {};
+  const click = raw as Record<string, unknown>;
+  return {
+    ...(typeof click.fbp === 'string' && click.fbp ? { fbp: click.fbp } : {}),
+    ...(typeof click.fbc === 'string' && click.fbc ? { fbc: click.fbc } : {}),
+    ...(typeof click.ipAddress === 'string' && click.ipAddress
+      ? { ipAddress: click.ipAddress }
+      : {}),
+    ...(typeof click.userAgent === 'string' && click.userAgent
+      ? { userAgent: click.userAgent }
+      : {}),
+  };
+}
+
+function extractCheckoutToken(eventId?: string, url?: string): string | null {
+  if (eventId?.startsWith('checkout-')) {
+    const token = eventId.slice('checkout-'.length).trim();
+    return token || null;
   }
+  if (!url) return null;
+  try {
+    return new URL(url).searchParams.get('checkoutToken');
+  } catch {
+    return null;
+  }
+}
 
-  return true;
+/** Persist browser click IDs from checkout so server Purchase can match ads. */
+export async function captureMetaClickContext(input: {
+  eventId?: string;
+  url?: string;
+  fbp?: string | null;
+  fbc?: string | null;
+  ipAddress?: string | null;
+  userAgent?: string | null;
+}): Promise<void> {
+  const token = extractCheckoutToken(input.eventId, input.url);
+  if (!token) return;
+  if (!input.fbp && !input.fbc && !input.ipAddress && !input.userAgent) return;
+
+  try {
+    const session = await CheckoutSessionModel.findOne({ checkoutToken: token })
+      .select('metadata')
+      .lean();
+    if (!session) return;
+
+    const existing = readMetaClick(session);
+    await CheckoutSessionModel.updateOne(
+      { checkoutToken: token },
+      {
+        $set: {
+          'metadata.metaClick': {
+            ...existing,
+            ...(input.fbp ? { fbp: input.fbp } : {}),
+            ...(input.fbc ? { fbc: input.fbc } : {}),
+            ...(input.ipAddress ? { ipAddress: input.ipAddress } : {}),
+            ...(input.userAgent ? { userAgent: input.userAgent } : {}),
+            updatedAt: new Date().toISOString(),
+          },
+        },
+      },
+    );
+  } catch (error) {
+    logger.debug({ err: error }, 'Meta click context capture skipped');
+  }
 }
 
 /** Send Meta Purchase after an order is successfully created. Returns true when Meta accepted the event. */
 export async function trackMetaPurchaseForOrder(
   payment: PaymentDocument,
   order: Pick<OrderDocument, 'orderNumber' | 'items'>,
-  checkout?: Pick<CheckoutSessionDocument, 'shippingAddress'> | null,
+  checkout?: Pick<CheckoutSessionDocument, 'shippingAddress' | 'metadata'> | null,
 ): Promise<boolean> {
   const eventId = purchaseEventId(order.orderNumber);
 
@@ -79,6 +149,7 @@ export async function trackMetaPurchaseForOrder(
       })),
     );
     const shipping = (checkout?.shippingAddress ?? {}) as Record<string, unknown>;
+    const click = readMetaClick(checkout);
     const eventSourceUrl = `${appConfig.email.shopUrl.replace(/\/$/, '')}/checkout/success?checkoutToken=${encodeURIComponent(payment.checkoutToken)}`;
 
     const metaResponse = await metaCapiService.trackPurchase({
@@ -90,22 +161,24 @@ export async function trackMetaPurchaseForOrder(
       numItems,
       eventId,
       eventSourceUrl,
-      userData: customer
-        ? {
-            email: (customer as { email?: string }).email ?? null,
-            phone:
-              (customer as { phone?: string | null }).phone ??
-              (typeof shipping.phone === 'string' ? shipping.phone : null),
-            firstName: (customer as { firstName?: string | null }).firstName ?? null,
-            lastName: (customer as { lastName?: string | null }).lastName ?? null,
-            city: typeof shipping.city === 'string' ? shipping.city : null,
-            country:
-              typeof shipping.country === 'string'
-                ? shipping.country
-                : ((customer as { country?: string | null }).country ?? null),
-            externalId: payment.customerId.toString(),
-          }
-        : undefined,
+      userData: {
+        email: (customer as { email?: string } | null)?.email ?? null,
+        phone:
+          (customer as { phone?: string | null } | null)?.phone ??
+          (typeof shipping.phone === 'string' ? shipping.phone : null),
+        firstName: (customer as { firstName?: string | null } | null)?.firstName ?? null,
+        lastName: (customer as { lastName?: string | null } | null)?.lastName ?? null,
+        city: typeof shipping.city === 'string' ? shipping.city : null,
+        country:
+          typeof shipping.country === 'string'
+            ? shipping.country
+            : ((customer as { country?: string | null } | null)?.country ?? null),
+        externalId: payment.customerId.toString(),
+        fbp: click.fbp ?? null,
+        fbc: click.fbc ?? null,
+        ipAddress: click.ipAddress ?? null,
+        userAgent: click.userAgent ?? null,
+      },
     });
 
     logger.info(
@@ -124,10 +197,10 @@ export async function trackMetaPurchaseForOrder(
 
 /** Idempotent Purchase tracking — safe to call from status polls and webhooks. */
 export async function ensureMetaPurchaseTracked(paymentId: string): Promise<boolean> {
-  const order = await OrderModel.findOne({ paymentId, isDeleted: false });
+  const order = await OrderModel.findOne({ paymentId, isDeleted: { $ne: true } });
   if (!order) return false;
 
-  const payment = await PaymentModel.findOne({ _id: paymentId, isDeleted: false });
+  const payment = await PaymentModel.findOne({ _id: paymentId, isDeleted: { $ne: true } });
   if (!payment) return false;
 
   const checkout = await CheckoutSessionModel.findById(order.checkoutId).lean();
