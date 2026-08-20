@@ -179,10 +179,17 @@ async function stampUserVisitMeta(user: UserDocument, meta: AuthRequestMeta): Pr
   try {
     const geo =
       meta.countryCode && meta.countryCode !== 'XX'
-        ? { country: meta.countryCode, countryCode: meta.countryCode }
+        ? {
+            country: meta.countryCode,
+            countryCode: meta.countryCode,
+            region: null as string | null,
+          }
         : await resolveGeoFromIp(meta.ip);
-    const country = geo?.country ?? geo?.countryCode ?? null;
-    if (country) user.lastLoginCountry = country;
+    const location = [geo?.region, geo?.country ?? geo?.countryCode]
+      .map((p) => (typeof p === 'string' ? p.trim() : ''))
+      .filter(Boolean)
+      .join(', ');
+    if (location) user.lastLoginCountry = location;
   } catch {
     /* geo is best-effort */
   }

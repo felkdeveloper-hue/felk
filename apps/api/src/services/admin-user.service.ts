@@ -20,7 +20,10 @@ import { paginationQuerySchema, objectIdSchema } from '@/schemas/common.schema.j
 import { findRoleByKey } from '@/services/rbac.service.js';
 import { writeAuditLog } from '@/services/audit.service.js';
 import { VisitorModel } from '@/models/analytics/index.js';
-import { formatAttribution } from '@/services/platform-analytics/source-attribution.util.js';
+import {
+  formatAttribution,
+  hasAttributionSignal,
+} from '@/services/platform-analytics/source-attribution.util.js';
 import { ApiError } from '@/utils/errors/api-error.js';
 import {
   assertPasswordStrength,
@@ -135,6 +138,7 @@ function mapUserRow(
     lastLoginAt?: Date | null;
     lastLoginCountry?: string | null;
     lastLoginDevice?: string | null;
+    metadata?: Record<string, unknown> | null;
     sourceLabel?: string | null;
     sourceChannel?: string | null;
     sourceDetail?: string | null;
@@ -196,7 +200,12 @@ async function revokeUserSessions(userId: Types.ObjectId) {
 function visitExtras(
   visitor:
     | {
-        geo?: { city?: string | null; country?: string | null; countryCode?: string | null } | null;
+        geo?: {
+          city?: string | null;
+          region?: string | null;
+          country?: string | null;
+          countryCode?: string | null;
+        } | null;
         device?: { type?: string | null } | null;
         trafficSource?: string | null;
         referrer?: string | null;
@@ -213,8 +222,13 @@ function visitExtras(
       }
     | null
     | undefined,
+  acquisition?: {
+    sourceLabel?: string | null;
+    sourceChannel?: string | null;
+    sourceDetail?: string | null;
+  } | null,
 ) {
-  if (!visitor) {
+  if (!visitor && !acquisition?.sourceLabel) {
     return {
       sourceLabel: null as string | null,
       sourceChannel: null as string | null,
@@ -224,38 +238,64 @@ function visitExtras(
     };
   }
 
-  const attribution = formatAttribution({
-    trafficSource: visitor.trafficSource || 'direct',
-    referrer: visitor.referrer,
-    utmSource: visitor.utmSource,
-    utmMedium: visitor.utmMedium,
-    utmCampaign: visitor.utmCampaign,
-    utmContent: visitor.utmContent,
-    fbclid: visitor.fbclid,
-    gclid: visitor.gclid,
-    ttclid: visitor.ttclid,
-    msclkid: visitor.msclkid,
-    igshid: visitor.igshid,
-    inAppSource: visitor.inAppSource,
-  });
+  const attribution = visitor
+    ? formatAttribution({
+        trafficSource: visitor.trafficSource || 'direct',
+        referrer: visitor.referrer,
+        utmSource: visitor.utmSource,
+        utmMedium: visitor.utmMedium,
+        utmCampaign: visitor.utmCampaign,
+        utmContent: visitor.utmContent,
+        fbclid: visitor.fbclid,
+        gclid: visitor.gclid,
+        ttclid: visitor.ttclid,
+        msclkid: visitor.msclkid,
+        igshid: visitor.igshid,
+        inAppSource: visitor.inAppSource,
+      })
+    : null;
+
+  const visitorHasSignal = visitor
+    ? hasAttributionSignal({
+        referrer: visitor.referrer,
+        utmSource: visitor.utmSource,
+        utmMedium: visitor.utmMedium,
+        utmCampaign: visitor.utmCampaign,
+        utmContent: visitor.utmContent,
+        fbclid: visitor.fbclid,
+        gclid: visitor.gclid,
+        ttclid: visitor.ttclid,
+        msclkid: visitor.msclkid,
+        igshid: visitor.igshid,
+        inAppSource: visitor.inAppSource,
+      })
+    : false;
 
   const device =
-    visitor.device?.type === 'mobile'
+    visitor?.device?.type === 'mobile'
       ? 'Phone'
-      : visitor.device?.type === 'tablet'
+      : visitor?.device?.type === 'tablet'
         ? 'Tablet'
-        : visitor.device?.type === 'desktop'
+        : visitor?.device?.type === 'desktop'
           ? 'Desktop'
           : null;
 
-  const countryParts = [visitor.geo?.city, visitor.geo?.country ?? visitor.geo?.countryCode].filter(
-    (part) => Boolean(part && String(part).trim()),
-  );
+  const countryParts = [
+    visitor?.geo?.city,
+    visitor?.geo?.region,
+    visitor?.geo?.country ?? visitor?.geo?.countryCode,
+  ].filter((part) => Boolean(part && String(part).trim()));
 
   return {
-    sourceLabel: attribution.label,
-    sourceChannel: attribution.channel,
-    sourceDetail: attribution.detail ?? null,
+    sourceLabel: visitorHasSignal
+      ? (attribution?.label ?? null)
+      : (acquisition?.sourceLabel ?? attribution?.label ?? null),
+    sourceChannel: visitorHasSignal
+      ? (attribution?.channel ?? null)
+      : (acquisition?.sourceChannel ?? attribution?.channel ?? null),
+    sourceDetail: visitorHasSignal
+      ? (attribution?.detail ?? null)
+      : (acquisition?.sourceDetail ?? attribution?.detail ?? null),
     lastLoginCountry: countryParts.join(', ') || null,
     lastLoginDevice: device,
   };
@@ -386,12 +426,24 @@ export class AdminUserService {
       const customerId = customerByUserId.get(String(user._id));
       const customerIdStr = customerId ? String(customerId) : undefined;
       const visit = visitorByUser.get(String(user._id));
+      const acquisition =
+        user.metadata &&
+        typeof user.metadata === 'object' &&
+        'acquisition' in user.metadata &&
+        user.metadata.acquisition &&
+        typeof user.metadata.acquisition === 'object'
+          ? (user.metadata.acquisition as {
+              sourceLabel?: string | null;
+              sourceChannel?: string | null;
+              sourceDetail?: string | null;
+            })
+          : null;
 
       return mapUserRow(user, {
         customerId: customerIdStr,
         cartItemCount: customerIdStr ? (cartCountByCustomer.get(customerIdStr) ?? 0) : 0,
         purchasedItemCount: customerIdStr ? (purchaseCountByCustomer.get(customerIdStr) ?? 0) : 0,
-        ...visitExtras(visit),
+        ...visitExtras(visit, acquisition),
       });
     });
 
@@ -517,13 +569,25 @@ export class AdminUserService {
     }
 
     const purchasedItemCount = orders.reduce((sum, order) => sum + order.itemCount, 0);
+    const acquisition =
+      user.metadata &&
+      typeof user.metadata === 'object' &&
+      'acquisition' in user.metadata &&
+      user.metadata.acquisition &&
+      typeof user.metadata.acquisition === 'object'
+        ? (user.metadata.acquisition as {
+            sourceLabel?: string | null;
+            sourceChannel?: string | null;
+            sourceDetail?: string | null;
+          })
+        : null;
 
     return {
       ...mapUserRow(user, {
         customerId: customerIdStr,
         cartItemCount: cartItems.reduce((sum, item) => sum + item.quantity, 0),
         purchasedItemCount,
-        ...visitExtras(visitor),
+        ...visitExtras(visitor, acquisition),
       }),
       cartItems,
       orders,

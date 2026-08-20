@@ -159,7 +159,23 @@ export const authApi = {
   },
 
   /** One-click guest — no email/OTP; only address is needed next. */
-  async checkoutContinueAsGuest(payload?: { guestCartToken?: string }): Promise<AuthSession> {
+  async checkoutContinueAsGuest(payload?: {
+    guestCartToken?: string;
+    visitorId?: string;
+    utmSource?: string | null;
+    utmMedium?: string | null;
+    utmCampaign?: string | null;
+    utmTerm?: string | null;
+    utmContent?: string | null;
+    referrer?: string | null;
+    fbclid?: string | null;
+    gclid?: string | null;
+    ttclid?: string | null;
+    msclkid?: string | null;
+    igshid?: string | null;
+    inAppSource?: string | null;
+    landingPath?: string | null;
+  }): Promise<AuthSession> {
     const raw = await http.post<unknown>('/auth/checkout/continue-as-guest', payload ?? {}, {
       skipAuthRefresh: true,
       timeout: 20_000,

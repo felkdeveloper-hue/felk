@@ -20,6 +20,7 @@ import { useCreateAddressMutation } from '@/hooks/account';
 import { cartApi } from '@/services/sdk/cart';
 import { QUERY_KEYS } from '@/constants/query-keys';
 import { AppError } from '@/lib/errors';
+import { getAttributionPayloadForAuth } from '@/lib/analytics/auth-attribution';
 
 type Step = 'email' | 'password' | 'otp' | 'create_password' | 'address';
 
@@ -107,10 +108,10 @@ export function CheckoutGuestAuthDialog({ open, onAuthenticated }: CheckoutGuest
     setGuestPending(true);
     try {
       const guestCartToken = useCartStore.getState().guestCartToken ?? undefined;
-      // Keep local bag + guest token — merge runs after modal closes (beginCheckout).
-      const session = await authApi.checkoutContinueAsGuest(
-        guestCartToken ? { guestCartToken } : undefined,
-      );
+      const session = await authApi.checkoutContinueAsGuest({
+        ...(guestCartToken ? { guestCartToken } : {}),
+        ...getAttributionPayloadForAuth(),
+      });
       setSession(session);
       queryClient.setQueryData(QUERY_KEYS.customers.addresses(), []);
       onAuthenticated();

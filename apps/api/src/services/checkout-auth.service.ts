@@ -283,7 +283,23 @@ export const checkoutAuthService = {
    * Optimized for <1s: no argon2, cached role, session before cart merge.
    */
   async continueAsGuest(
-    input: { guestCartToken?: string },
+    input: {
+      guestCartToken?: string;
+      visitorId?: string;
+      utmSource?: string | null;
+      utmMedium?: string | null;
+      utmCampaign?: string | null;
+      utmTerm?: string | null;
+      utmContent?: string | null;
+      referrer?: string | null;
+      fbclid?: string | null;
+      gclid?: string | null;
+      ttclid?: string | null;
+      msclkid?: string | null;
+      igshid?: string | null;
+      inAppSource?: string | null;
+      landingPath?: string | null;
+    },
     meta: AuthRequestMeta,
   ): Promise<AuthTokensResult & { rememberMe: boolean; message: string }> {
     const role = await getCustomerRole();
@@ -350,6 +366,34 @@ export const checkoutAuthService = {
       actorUserId: user._id.toString(),
       metadata: { source: 'checkout_continue_as_guest', ip: meta.ip },
     });
+
+    try {
+      const { linkVisitorToUser } =
+        await import('@/services/platform-analytics/link-visitor.service.js');
+      await linkVisitorToUser({
+        userId: user._id.toString(),
+        ip: meta.ip,
+        userAgent: meta.userAgent,
+        attribution: {
+          visitorId: input.visitorId,
+          utmSource: input.utmSource,
+          utmMedium: input.utmMedium,
+          utmCampaign: input.utmCampaign,
+          utmTerm: input.utmTerm,
+          utmContent: input.utmContent,
+          referrer: input.referrer,
+          fbclid: input.fbclid,
+          gclid: input.gclid,
+          ttclid: input.ttclid,
+          msclkid: input.msclkid,
+          igshid: input.igshid,
+          inAppSource: input.inAppSource,
+          landingPath: input.landingPath,
+        },
+      });
+    } catch (err) {
+      logger.warn({ err, email }, 'Guest visitor attribution link failed');
+    }
 
     return {
       ...tokens,

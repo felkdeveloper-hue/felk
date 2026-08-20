@@ -423,7 +423,7 @@ export function UsersListPage() {
           },
           {
             id: 'country',
-            header: 'Country',
+            header: 'Location',
             cell: (row) => row.lastLoginCountry || '—',
           },
           {
