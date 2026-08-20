@@ -1,4 +1,5 @@
 export * from './applied-filter-chips';
+export * from './bnpl-installment-hint';
 export * from './catalog-category-hero';
 export * from './back-to-top';
 export * from './catalog-filter-sidebar';

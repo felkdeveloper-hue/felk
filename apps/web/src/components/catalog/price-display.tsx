@@ -1,6 +1,7 @@
 import { formatCurrency } from '@/utils';
 import type { ProductMoney } from '@/services/sdk';
 import { cn } from '@/lib/utils';
+import { BnplInstallmentHint } from './bnpl-installment-hint';
 
 export interface PriceDisplayProps {
   price?: ProductMoney;
@@ -11,6 +12,8 @@ export interface PriceDisplayProps {
   size?: 'sm' | 'md';
   /** Premium PDP layout: struck original, red sale, SAVE badge. */
   premium?: boolean;
+  /** Show Mintpay / KOKO installment lines under the price. Default true. */
+  showInstallments?: boolean;
 }
 
 function resolveDiscountPercent(
@@ -35,6 +38,7 @@ export function PriceDisplay({
   className,
   size = 'sm',
   premium = false,
+  showInstallments = true,
 }: PriceDisplayProps) {
   const liveSale = salePrice && salePrice.amount > 0 ? salePrice : undefined;
   const display = liveSale ?? price;
@@ -44,29 +48,39 @@ export function PriceDisplay({
 
   const offPercent = resolveDiscountPercent(display, original, discountPercent);
   const onSale = Boolean(original && original.amount > display.amount);
+  const installmentBlock = showInstallments ? (
+    <BnplInstallmentHint
+      amount={display.amount}
+      currency={display.currency}
+      size={size === 'md' || premium ? 'md' : 'sm'}
+    />
+  ) : null;
 
   if (premium) {
     return (
-      <div className={cn('flex flex-wrap items-center gap-2.5', className)}>
-        {onSale ? (
-          <span className="text-muted-foreground text-sm line-through sm:text-base">
-            {formatCurrency(original!.amount, original!.currency)}
+      <div className="space-y-1">
+        <div className={cn('flex flex-wrap items-center gap-2.5', className)}>
+          {onSale ? (
+            <span className="text-muted-foreground text-sm line-through sm:text-base">
+              {formatCurrency(original!.amount, original!.currency)}
+            </span>
+          ) : null}
+          <span
+            className={cn(
+              'font-bold tracking-tight',
+              onSale ? 'text-accent' : 'text-foreground',
+              size === 'md' ? 'text-2xl' : 'text-lg',
+            )}
+          >
+            {formatCurrency(display.amount, display.currency)}
           </span>
-        ) : null}
-        <span
-          className={cn(
-            'font-bold tracking-tight',
-            onSale ? 'text-accent' : 'text-foreground',
-            size === 'md' ? 'text-2xl' : 'text-lg',
-          )}
-        >
-          {formatCurrency(display.amount, display.currency)}
-        </span>
-        {offPercent && offPercent > 0 ? (
-          <span className="bg-accent text-accent-foreground rounded-none px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider">
-            Save {Math.round(offPercent)}%
-          </span>
-        ) : null}
+          {offPercent && offPercent > 0 ? (
+            <span className="bg-accent text-accent-foreground rounded-none px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider">
+              Save {Math.round(offPercent)}%
+            </span>
+          ) : null}
+        </div>
+        {installmentBlock}
       </div>
     );
   }
@@ -74,23 +88,26 @@ export function PriceDisplay({
   const priceSize = size === 'md' ? 'text-base sm:text-lg' : 'text-[15px] sm:text-sm';
 
   return (
-    <div className={cn('flex flex-wrap items-baseline gap-x-2 gap-y-0.5', className)}>
-      {/* Original price (struck through) always first */}
-      {onSale ? (
-        <span className={cn('text-muted-foreground line-through', priceSize)}>
-          {formatCurrency(original!.amount, original!.currency)}
+    <div className="space-y-0.5">
+      <div className={cn('flex flex-wrap items-baseline gap-x-2 gap-y-0.5', className)}>
+        {/* Original price (struck through) always first */}
+        {onSale ? (
+          <span className={cn('text-muted-foreground line-through', priceSize)}>
+            {formatCurrency(original!.amount, original!.currency)}
+          </span>
+        ) : null}
+        {/* Current / sale price — red when on sale */}
+        <span
+          className={cn(
+            'font-semibold tracking-tight',
+            onSale ? 'text-red-600 dark:text-red-500' : 'text-foreground',
+            priceSize,
+          )}
+        >
+          {formatCurrency(display.amount, display.currency)}
         </span>
-      ) : null}
-      {/* Current / sale price — red when on sale */}
-      <span
-        className={cn(
-          'font-semibold tracking-tight',
-          onSale ? 'text-red-600 dark:text-red-500' : 'text-foreground',
-          priceSize,
-        )}
-      >
-        {formatCurrency(display.amount, display.currency)}
-      </span>
+      </div>
+      {installmentBlock}
     </div>
   );
 }
