@@ -18,6 +18,9 @@ export interface AdminUserRow {
   lastLoginAt?: string | null;
   lastLoginCountry?: string | null;
   lastLoginDevice?: string | null;
+  sourceLabel?: string | null;
+  sourceChannel?: string | null;
+  sourceDetail?: string | null;
   createdAt?: string;
 }
 
@@ -80,6 +83,9 @@ function normalizeUser(raw: unknown): AdminUserRow {
     lastLoginAt: typeof record.lastLoginAt === 'string' ? record.lastLoginAt : null,
     lastLoginCountry: typeof record.lastLoginCountry === 'string' ? record.lastLoginCountry : null,
     lastLoginDevice: typeof record.lastLoginDevice === 'string' ? record.lastLoginDevice : null,
+    sourceLabel: typeof record.sourceLabel === 'string' ? record.sourceLabel : null,
+    sourceChannel: typeof record.sourceChannel === 'string' ? record.sourceChannel : null,
+    sourceDetail: typeof record.sourceDetail === 'string' ? record.sourceDetail : null,
     createdAt: typeof record.createdAt === 'string' ? record.createdAt : undefined,
   };
 }

@@ -23,6 +23,13 @@ type AttributionFields = {
   utmSource?: string | null;
   utmMedium?: string | null;
   utmCampaign?: string | null;
+  utmContent?: string | null;
+  fbclid?: string | null;
+  gclid?: string | null;
+  ttclid?: string | null;
+  msclkid?: string | null;
+  igshid?: string | null;
+  inAppSource?: string | null;
 };
 
 function sourceFrom(fields: AttributionFields): OrderSource {
@@ -32,6 +39,13 @@ function sourceFrom(fields: AttributionFields): OrderSource {
     utmSource: fields.utmSource,
     utmMedium: fields.utmMedium,
     utmCampaign: fields.utmCampaign,
+    utmContent: fields.utmContent,
+    fbclid: fields.fbclid,
+    gclid: fields.gclid,
+    ttclid: fields.ttclid,
+    msclkid: fields.msclkid,
+    igshid: fields.igshid,
+    inAppSource: fields.inAppSource,
   });
 }
 
@@ -96,7 +110,9 @@ export async function resolveOrderSources(
   const userObjectIds = userIds.map((id) => new Types.ObjectId(id));
   const visitors = await VisitorModel.find({ userId: { $in: userObjectIds } })
     .sort({ lastSeenAt: -1 })
-    .select('userId trafficSource referrer utmSource utmMedium utmCampaign')
+    .select(
+      'userId trafficSource referrer utmSource utmMedium utmCampaign utmContent fbclid gclid ttclid msclkid igshid inAppSource',
+    )
     .lean();
 
   const visitorByUser = new Map<string, (typeof visitors)[number]>();
@@ -154,7 +170,9 @@ export async function resolveOrderSources(
 
   const sessionVisitors = visitorIds.size
     ? await VisitorModel.find({ visitorId: { $in: [...visitorIds] } })
-        .select('visitorId trafficSource referrer utmSource utmMedium utmCampaign')
+        .select(
+          'visitorId trafficSource referrer utmSource utmMedium utmCampaign utmContent fbclid gclid ttclid msclkid igshid inAppSource',
+        )
         .lean()
     : [];
   const visitorByVisitorId = new Map(
@@ -177,6 +195,13 @@ export async function resolveOrderSources(
         utmSource: sessionVisitor?.utmSource,
         utmMedium: sessionVisitor?.utmMedium,
         utmCampaign: sessionVisitor?.utmCampaign,
+        utmContent: sessionVisitor?.utmContent,
+        fbclid: sessionVisitor?.fbclid,
+        gclid: sessionVisitor?.gclid,
+        ttclid: sessionVisitor?.ttclid,
+        msclkid: sessionVisitor?.msclkid,
+        igshid: sessionVisitor?.igshid,
+        inAppSource: sessionVisitor?.inAppSource,
       }),
     );
   }

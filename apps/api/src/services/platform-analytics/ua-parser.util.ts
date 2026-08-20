@@ -28,6 +28,17 @@ function detectDeviceType(ua: string): DeviceData['type'] {
 
 function detectBrowser(ua: string): { browser: string | null; browserVersion: string | null } {
   const browsers: Array<{ name: string; pattern: RegExp; versionPattern: RegExp }> = [
+    { name: 'Instagram', pattern: /Instagram/i, versionPattern: /Instagram\s([^\s;]+)/i },
+    {
+      name: 'Facebook',
+      pattern: /FBAN|FBAV|FB_IAB|FB4A|FBIOS/i,
+      versionPattern: /FBAV\/([^\s;]+)/i,
+    },
+    {
+      name: 'TikTok',
+      pattern: /TikTok|BytedanceWebview|musical_ly/i,
+      versionPattern: /TikTok[^\d]*([\d.]+)/i,
+    },
     { name: 'Edge', pattern: /Edg\//i, versionPattern: /Edg\/([^\s;]+)/i },
     {
       name: 'Chrome',

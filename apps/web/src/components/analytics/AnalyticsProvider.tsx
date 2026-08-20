@@ -13,10 +13,12 @@ import {
   posthogReset,
   posthogPageView,
 } from '@/lib/analytics';
+import { captureAttribution } from '@/lib/analytics/attribution';
+import { CookieConsentBanner } from '@/components/analytics/CookieConsentBanner';
 
 /**
  * Mount once inside storefront layouts (not admin).
- * Handles: route tracking, PostHog init, user identification, flush lifecycle.
+ * First-party source/geo tracking starts immediately — ads are not lost if the banner is ignored.
  */
 export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -25,31 +27,30 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
   const initialized = useRef(false);
 
   useEffect(() => {
-    if (initialized.current) return;
-    initialized.current = true;
-
-    void initPostHog();
-    setup();
-    startFlushInterval();
+    captureAttribution();
+    if (!initialized.current) {
+      initialized.current = true;
+      void initPostHog();
+      setup();
+      startFlushInterval();
+    }
 
     return () => {
+      initialized.current = false;
       teardown();
       stopFlushInterval();
       void flush();
     };
   }, []);
 
-  // Route change tracking
   useEffect(() => {
     const path = location.pathname;
     trackRouteChange(path);
     posthogPageView(path);
-    // Flush quickly so Live + page views update without waiting for the interval
     const t = window.setTimeout(() => void flush(), 300);
     return () => window.clearTimeout(t);
   }, [location.pathname]);
 
-  // User identity sync
   useEffect(() => {
     const uid = user?.id ?? null;
     if (uid === prevUserId.current) return;
@@ -66,5 +67,10 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user]);
 
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      <CookieConsentBanner />
+    </>
+  );
 }

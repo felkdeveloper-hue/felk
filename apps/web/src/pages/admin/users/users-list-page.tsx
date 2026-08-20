@@ -33,6 +33,30 @@ const actionBtn = 'admin-btn';
 const actionSecondary = 'admin-btn-secondary';
 const actionDanger = 'admin-btn-danger';
 
+function passwordIssues(password: string): string[] {
+  const issues: string[] = [];
+  if (password.length < 8) issues.push('at least 8 characters');
+  if (!/[a-z]/.test(password)) issues.push('a lowercase letter');
+  if (!/[A-Z]/.test(password)) issues.push('an uppercase letter');
+  if (!/\d/.test(password)) issues.push('a number');
+  if (!/[^A-Za-z0-9]/.test(password)) issues.push('a special character');
+  return issues;
+}
+
+function errorMessage(error: unknown, fallback: string): string {
+  if (!AppError.isAppError(error)) return fallback;
+  const details = error.details;
+  if (Array.isArray(details)) {
+    const messages = details
+      .map((item) =>
+        item && typeof item === 'object' && 'message' in item ? String(item.message) : null,
+      )
+      .filter((item): item is string => Boolean(item));
+    if (messages.length) return messages.join('. ');
+  }
+  return error.message || fallback;
+}
+
 const ROLE_OPTIONS = ADMIN_ROLE_OPTIONS.map(({ label, value }) => ({ label, value }));
 
 const STATUS_OPTIONS = [
@@ -127,7 +151,7 @@ export function UsersListPage() {
       invalidateUsers();
     },
     onError: (error) => {
-      toast.error(AppError.isAppError(error) ? error.message : 'Unable to update password');
+      toast.error(errorMessage(error, 'Unable to update password'));
     },
   });
 
@@ -210,8 +234,9 @@ export function UsersListPage() {
 
   const submitPassword = () => {
     if (!passwordTarget) return;
-    if (newPassword.length < 8) {
-      toast.error('Password must be at least 8 characters');
+    const issues = passwordIssues(newPassword);
+    if (issues.length) {
+      toast.error(`Password must include ${issues.join(', ')}. Try Rohit@123`);
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -383,6 +408,18 @@ export function UsersListPage() {
             id: 'bought',
             header: 'Items bought',
             cell: (row) => row.purchasedItemCount,
+          },
+          {
+            id: 'source',
+            header: 'Source',
+            cell: (row) => (
+              <div className="max-w-[12rem]">
+                <p className="text-sm font-medium">{row.sourceLabel || '—'}</p>
+                {row.sourceChannel ? (
+                  <p className="text-muted-foreground text-[11px]">{row.sourceChannel}</p>
+                ) : null}
+              </div>
+            ),
           },
           {
             id: 'country',

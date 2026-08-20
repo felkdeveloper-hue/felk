@@ -13,6 +13,10 @@ export async function getTrafficSources(filter: AnalyticsFilter) {
       utmMedium: string;
       utmCampaign: string;
       referrer: string;
+      inAppSource: string;
+      hasFbclid: boolean;
+      hasGclid: boolean;
+      hasTtclid: boolean;
     };
     count: number;
   }>([
@@ -25,6 +29,10 @@ export async function getTrafficSources(filter: AnalyticsFilter) {
           utmMedium: { $ifNull: ['$utmMedium', ''] },
           utmCampaign: { $ifNull: ['$utmCampaign', ''] },
           referrer: { $ifNull: ['$referrer', ''] },
+          inAppSource: { $ifNull: ['$inAppSource', ''] },
+          hasFbclid: { $gt: [{ $strLenCP: { $ifNull: ['$fbclid', ''] } }, 0] },
+          hasGclid: { $gt: [{ $strLenCP: { $ifNull: ['$gclid', ''] } }, 0] },
+          hasTtclid: { $gt: [{ $strLenCP: { $ifNull: ['$ttclid', ''] } }, 0] },
         },
         count: { $sum: 1 },
       },
@@ -44,6 +52,10 @@ export async function getTrafficSources(filter: AnalyticsFilter) {
       utmMedium: row._id.utmMedium || null,
       utmCampaign: row._id.utmCampaign || null,
       referrer: row._id.referrer || null,
+      inAppSource: row._id.inAppSource || null,
+      fbclid: row._id.hasFbclid ? '1' : null,
+      gclid: row._id.hasGclid ? '1' : null,
+      ttclid: row._id.hasTtclid ? '1' : null,
     });
     const existing = merged.get(attribution.label);
     if (existing) {

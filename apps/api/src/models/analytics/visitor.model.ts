@@ -30,6 +30,13 @@ export interface VisitorDocument extends Document {
   utmCampaign?: string | null;
   utmTerm?: string | null;
   utmContent?: string | null;
+  fbclid?: string | null;
+  gclid?: string | null;
+  ttclid?: string | null;
+  msclkid?: string | null;
+  igshid?: string | null;
+  inAppSource?: string | null;
+  landingPath?: string | null;
   trafficSource: string;
   firstSeenAt: Date;
   lastSeenAt: Date;
@@ -77,6 +84,13 @@ const visitorSchema = new Schema<VisitorDocument>(
     utmCampaign: { type: String, default: null },
     utmTerm: { type: String, default: null },
     utmContent: { type: String, default: null },
+    fbclid: { type: String, default: null },
+    gclid: { type: String, default: null },
+    ttclid: { type: String, default: null },
+    msclkid: { type: String, default: null },
+    igshid: { type: String, default: null },
+    inAppSource: { type: String, default: null },
+    landingPath: { type: String, default: null },
     trafficSource: { type: String, default: 'direct', index: true },
     firstSeenAt: { type: Date, required: true, index: true },
     lastSeenAt: { type: Date, required: true, index: true },

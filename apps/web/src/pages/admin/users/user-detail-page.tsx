@@ -90,8 +90,12 @@ export function UserDetailPage({ userId }: { userId: string }) {
               <Row label="Role" value={user.roleKey.replaceAll('_', ' ')} />
               <Row label="Status" value={user.status.replaceAll('_', ' ')} />
               <Row label="Joined" value={user.createdAt ? formatDate(user.createdAt) : '—'} />
-              <Row label="Last login country" value={user.lastLoginCountry || '—'} />
-              <Row label="Last login device" value={user.lastLoginDevice || '—'} />
+              <Row label="Source" value={user.sourceLabel || '—'} />
+              {user.sourceChannel ? (
+                <Row label="Source channel" value={user.sourceChannel} />
+              ) : null}
+              <Row label="Country" value={user.lastLoginCountry || '—'} />
+              <Row label="Device" value={user.lastLoginDevice || '—'} />
             </dl>
           </AdminPanel>
 

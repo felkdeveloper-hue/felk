@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import {
   authService,
+  authMetaFromRequest,
   clearAuthCookies,
   setAuthCookies,
   type AuthRequestMeta,
@@ -16,18 +17,7 @@ import { HTTP_STATUS } from '@/constants/http.js';
 import { emitBusinessEvent } from '@/services/platform-analytics/index.js';
 
 function meta(req: Request): AuthRequestMeta {
-  const countryCode =
-    req.get('cf-ipcountry') ||
-    req.get('x-vercel-ip-country') ||
-    req.get('cloudfront-viewer-country') ||
-    req.get('x-country-code') ||
-    undefined;
-  return {
-    ip: req.ip,
-    userAgent: req.get('user-agent') || undefined,
-    requestId: req.requestId,
-    countryCode: countryCode || undefined,
-  };
+  return authMetaFromRequest(req);
 }
 
 export const authController = {

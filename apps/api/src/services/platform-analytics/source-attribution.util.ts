@@ -64,7 +64,6 @@ function canonicalSourceLabel(value: string | null | undefined): string | null {
 
 const AD_PLATFORMS: Array<{ pattern: RegExp; label: string }> = [
   { pattern: /google|adwords|gads/i, label: 'Google Ads' },
-  { pattern: /facebook|instagram|meta/i, label: 'Meta Ads' },
   { pattern: /tiktok/i, label: 'TikTok Ads' },
   { pattern: /bing|microsoft/i, label: 'Microsoft Ads' },
 ];
@@ -81,6 +80,8 @@ const IGNORED_REFERRER_HOSTS = [
   /webxpay\.com/i,
   /genie\.lk/i,
   /fe\.lk$/i,
+  /vercel\.com/i,
+  /vercel\.app/i,
 ];
 
 function normalizeHost(referrer: string | null | undefined): string | null {
@@ -113,8 +114,98 @@ function matchList(value: string, list: Array<{ pattern: RegExp; label: string }
 
 function isPaidMedium(medium: string | null | undefined): boolean {
   if (!medium) return false;
-  const m = medium.toLowerCase();
-  return m === 'cpc' || m === 'ppc' || m === 'paid' || m === 'paid_social' || m === 'display';
+  const m = medium.toLowerCase().replace(/-/g, '_');
+  return (
+    m === 'cpc' ||
+    m === 'ppc' ||
+    m === 'paid' ||
+    m === 'paid_social' ||
+    m === 'paidsocial' ||
+    m === 'display' ||
+    m === 'cpm'
+  );
+}
+
+export type AttributionSignals = {
+  referrer?: string | null;
+  utmSource?: string | null;
+  utmMedium?: string | null;
+  utmCampaign?: string | null;
+  utmContent?: string | null;
+  fbclid?: string | null;
+  gclid?: string | null;
+  ttclid?: string | null;
+  msclkid?: string | null;
+  igshid?: string | null;
+  inAppSource?: string | null;
+};
+
+function hasClickId(opts: AttributionSignals): boolean {
+  return Boolean(opts.fbclid || opts.gclid || opts.ttclid || opts.msclkid);
+}
+
+export function hasAttributionSignal(opts: AttributionSignals): boolean {
+  const referrer = opts.referrer?.trim() || null;
+  const meaningfulReferrer = Boolean(referrer) && !isIgnoredReferrer(referrer);
+  return Boolean(
+    opts.utmSource?.trim() ||
+    opts.utmMedium?.trim() ||
+    opts.utmCampaign?.trim() ||
+    hasClickId(opts) ||
+    opts.igshid?.trim() ||
+    meaningfulReferrer,
+  );
+}
+
+function looksLikeInstagram(value?: string | null): boolean {
+  const v = (value ?? '').toLowerCase();
+  return /instagram|\binsta\b|(?:^|[^a-z0-9])ig(?:[^a-z0-9]|$)/i.test(v);
+}
+
+function isInstagramSignal(opts: AttributionSignals): boolean {
+  if ((opts.inAppSource ?? '').toLowerCase() === 'instagram') return true;
+  if (opts.igshid?.trim()) return true;
+  const source = (opts.utmSource ?? '').trim();
+  if (canonicalSourceLabel(source) === 'Instagram') return true;
+  if (
+    looksLikeInstagram(opts.utmCampaign) ||
+    looksLikeInstagram(opts.utmContent) ||
+    looksLikeInstagram(opts.utmMedium)
+  ) {
+    return true;
+  }
+  const host = acquisitionHost(opts.referrer);
+  return Boolean(host && /instagram\.com/i.test(host));
+}
+
+function isFacebookSignal(opts: AttributionSignals): boolean {
+  if (isInstagramSignal(opts)) return false;
+  if ((opts.inAppSource ?? '').toLowerCase() === 'facebook') return true;
+  const source = (opts.utmSource ?? '').trim();
+  if (canonicalSourceLabel(source) === 'Facebook') return true;
+  if (opts.fbclid?.trim()) return true;
+  const host = acquisitionHost(opts.referrer);
+  return Boolean(host && /facebook\.com|fb\.com|fb\.me/i.test(host));
+}
+
+/** Instagram / Facebook / TikTok in-app browsers — used when ads only send fbclid. */
+export function detectInAppSource(ua?: string | null): string | null {
+  if (!ua) return null;
+  if (/Instagram/i.test(ua)) return 'instagram';
+  if (/FBAN|FBAV|FB_IAB|FB4A|FBIOS/i.test(ua)) return 'facebook';
+  if (/TikTok|BytedanceWebview|musical_ly/i.test(ua)) return 'tiktok';
+  return null;
+}
+
+function isOrganicSocialTagged(opts: AttributionSignals): boolean {
+  const medium = (opts.utmMedium ?? '').trim().toLowerCase();
+  const content = (opts.utmContent ?? '').trim().toLowerCase();
+  return (
+    medium === 'social' ||
+    medium === 'organic' ||
+    medium === 'bio' ||
+    /link[_-]?in[_-]?bio/.test(content)
+  );
 }
 
 function titleCase(value: string): string {
@@ -127,20 +218,24 @@ function titleCase(value: string): string {
 }
 
 /**
- * Classify traffic source from referrer + UTM params.
+ * Classify traffic source from referrer, UTM params, and ad click IDs.
  */
-export function classifyTrafficSource(opts: {
-  referrer?: string | null;
-  utmSource?: string | null;
-  utmMedium?: string | null;
-}): string {
+export function classifyTrafficSource(opts: AttributionSignals): string {
   const { referrer, utmSource, utmMedium } = opts;
 
-  if (isPaidMedium(utmMedium)) return 'paid_search';
+  if (opts.gclid || opts.msclkid) return 'paid_search';
+
+  if (isPaidMedium(utmMedium)) {
+    if (isInstagramSignal(opts) || isFacebookSignal(opts) || opts.ttclid) return 'paid_social';
+    return 'paid_search';
+  }
+
   if (utmMedium?.toLowerCase() === 'email') return 'email';
-  if (utmMedium?.toLowerCase() === 'social') return 'social';
+  if (isOrganicSocialTagged(opts)) return 'social';
   if (utmMedium?.toLowerCase() === 'affiliate') return 'referral';
   if (utmMedium?.toLowerCase() === 'display') return 'display';
+
+  if (opts.fbclid || opts.ttclid) return 'paid_social';
 
   const refHost = acquisitionHost(referrer);
   if (refHost) {
@@ -163,16 +258,31 @@ export function classifyTrafficSource(opts: {
       canonical === 'LinkedIn' ||
       canonical === 'Pinterest'
     ) {
-      return isPaidMedium(utmMedium) ? 'paid_search' : 'social';
+      return isPaidMedium(utmMedium) ? 'paid_social' : 'social';
     }
     if (/google|bing|yahoo|duckduckgo/.test(s)) return 'organic_search';
-    if (/facebook|instagram|twitter|linkedin|tiktok|pinterest|youtube|meta/.test(s)) {
-      return isPaidMedium(utmMedium) ? 'paid_search' : 'social';
-    }
     if (s === 'email') return 'email';
   }
 
   return 'direct';
+}
+
+/** Keep the first non-direct source; Direct never overwrites ads/social. */
+export function pickFirstTouchAttribution<T extends AttributionSignals>(
+  existing: T | null | undefined,
+  incoming: T,
+): T {
+  const incomingHasSignal = hasAttributionSignal(incoming);
+  const incomingSource = classifyTrafficSource(incoming);
+  const existingSource = existing ? classifyTrafficSource(existing) : 'direct';
+  const existingIsDirect =
+    !existing || existingSource === 'direct' || !hasAttributionSignal(existing);
+
+  if (!incomingHasSignal || incomingSource === 'direct') {
+    return (existing ?? incoming) as T;
+  }
+  if (existingIsDirect) return incoming;
+  return existing as T;
 }
 
 /** Build a professional label for admin tables. */
@@ -182,20 +292,51 @@ export function formatAttribution(opts: {
   utmSource?: string | null;
   utmMedium?: string | null;
   utmCampaign?: string | null;
+  utmContent?: string | null;
+  fbclid?: string | null;
+  gclid?: string | null;
+  ttclid?: string | null;
+  msclkid?: string | null;
+  igshid?: string | null;
+  inAppSource?: string | null;
 }): AttributionDisplay {
   const { trafficSource, referrer, utmSource, utmMedium, utmCampaign } = opts;
   const refHost = acquisitionHost(referrer);
   const utmSourceNorm = utmSource?.trim() ?? '';
   const utmMediumNorm = utmMedium?.trim() ?? '';
   const campaign = utmCampaign?.trim() || null;
+  const content = opts.utmContent?.trim() || null;
   const canonicalUtm = canonicalSourceLabel(utmSourceNorm);
+  const organicSocial = isOrganicSocialTagged(opts);
+  const paid =
+    !organicSocial &&
+    (isPaidMedium(utmMediumNorm) ||
+      trafficSource === 'paid_search' ||
+      trafficSource === 'paid_social' ||
+      trafficSource === 'display' ||
+      Boolean(opts.fbclid || opts.gclid || opts.ttclid || opts.msclkid));
 
-  // Paid ads (UTM takes priority)
-  if (
-    isPaidMedium(utmMediumNorm) ||
-    trafficSource === 'paid_search' ||
-    trafficSource === 'display'
-  ) {
+  if (paid) {
+    if (isInstagramSignal(opts)) {
+      return {
+        label: 'Instagram Ads',
+        channel: 'Paid social',
+        detail: campaign ?? content ?? 'Instagram',
+      };
+    }
+    if (isFacebookSignal(opts) || opts.fbclid) {
+      return {
+        label: 'Facebook Ads',
+        channel: 'Paid social',
+        detail: campaign ?? content ?? 'Facebook',
+      };
+    }
+    if (opts.ttclid || canonicalUtm === 'TikTok') {
+      return { label: 'TikTok Ads', channel: 'Paid social', detail: campaign };
+    }
+    if (opts.gclid || canonicalUtm === 'Google') {
+      return { label: 'Google Ads', channel: 'Paid search', detail: campaign };
+    }
     const adLabel =
       matchList(`${utmSourceNorm} ${utmMediumNorm}`, AD_PLATFORMS) ??
       canonicalUtm ??

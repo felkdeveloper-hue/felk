@@ -59,6 +59,13 @@ export async function getVisitors(filter: AnalyticsFilter) {
       utmSource: row.utmSource,
       utmMedium: row.utmMedium,
       utmCampaign: row.utmCampaign,
+      utmContent: row.utmContent,
+      fbclid: row.fbclid,
+      gclid: row.gclid,
+      ttclid: row.ttclid,
+      msclkid: row.msclkid,
+      igshid: row.igshid,
+      inAppSource: row.inAppSource,
     });
 
     return {

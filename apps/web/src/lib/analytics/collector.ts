@@ -1,4 +1,5 @@
-import { getPersistedUtm } from './utm';
+import { captureAttribution } from './attribution';
+import { useAuthStore } from '@/store/auth-store';
 
 const ENDPOINT = `${import.meta.env.VITE_API_URL ?? '/api/v1'}/analytics/collect`;
 const FLUSH_INTERVAL_MS = 5_000;
@@ -41,6 +42,13 @@ interface VisitorPayload {
   utmCampaign?: string | null;
   utmTerm?: string | null;
   utmContent?: string | null;
+  fbclid?: string | null;
+  gclid?: string | null;
+  ttclid?: string | null;
+  msclkid?: string | null;
+  igshid?: string | null;
+  inAppSource?: string | null;
+  landingPath?: string | null;
 }
 
 export interface SessionPayload {
@@ -83,20 +91,19 @@ function getDeviceType(): 'desktop' | 'mobile' | 'tablet' | 'unknown' {
   return 'unknown';
 }
 
-function getUtmParam(key: string): string | null {
-  try {
-    return new URLSearchParams(window.location.search).get(key);
-  } catch {
-    return null;
-  }
-}
-
 async function send(payload: CollectPayload): Promise<void> {
   const body = JSON.stringify(payload);
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  try {
+    const token = useAuthStore.getState().accessToken;
+    if (token) headers.Authorization = `Bearer ${token}`;
+  } catch {
+    /* store not ready */
+  }
   try {
     await fetch(ENDPOINT, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body,
       keepalive: true,
       credentials: 'include',
@@ -105,7 +112,7 @@ async function send(payload: CollectPayload): Promise<void> {
   } catch {
     /* fall through to beacon */
   }
-  if (navigator.sendBeacon) {
+  if (navigator.sendBeacon && !headers.Authorization) {
     const blob = new Blob([body], { type: 'application/json' });
     navigator.sendBeacon(ENDPOINT, blob);
   }
@@ -180,7 +187,7 @@ export function stopFlushInterval(): void {
 }
 
 export function buildVisitorPayload(visitorId: string): VisitorPayload {
-  const utm = getPersistedUtm();
+  const attr = captureAttribution();
   return {
     visitorId,
     device: {
@@ -188,11 +195,24 @@ export function buildVisitorPayload(visitorId: string): VisitorPayload {
       screenResolution: typeof screen !== 'undefined' ? `${screen.width}x${screen.height}` : null,
       language: navigator.language ?? null,
     },
-    referrer: document.referrer || null,
-    utmSource: utm?.utmSource ?? getUtmParam('utm_source'),
-    utmMedium: utm?.utmMedium ?? getUtmParam('utm_medium'),
-    utmCampaign: utm?.utmCampaign ?? getUtmParam('utm_campaign'),
-    utmTerm: utm?.utmTerm ?? getUtmParam('utm_term'),
-    utmContent: utm?.utmContent ?? getUtmParam('utm_content'),
+    geo: {
+      timezone:
+        typeof Intl !== 'undefined'
+          ? (Intl.DateTimeFormat().resolvedOptions().timeZone ?? null)
+          : null,
+    },
+    referrer: attr.referrer ?? null,
+    utmSource: attr.utmSource ?? null,
+    utmMedium: attr.utmMedium ?? null,
+    utmCampaign: attr.utmCampaign ?? null,
+    utmTerm: attr.utmTerm ?? null,
+    utmContent: attr.utmContent ?? null,
+    fbclid: attr.fbclid ?? null,
+    gclid: attr.gclid ?? null,
+    ttclid: attr.ttclid ?? null,
+    msclkid: attr.msclkid ?? null,
+    igshid: attr.igshid ?? null,
+    inAppSource: attr.inAppSource ?? null,
+    landingPath: attr.landingPath ?? window.location.pathname,
   };
 }

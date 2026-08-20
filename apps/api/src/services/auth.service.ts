@@ -1,4 +1,4 @@
-import type { CookieOptions, Response } from 'express';
+import type { CookieOptions, Request, Response } from 'express';
 import { randomUUID } from 'node:crypto';
 import { appConfig } from '@/config/app.config.js';
 import { logger } from '@/config/logger.js';
@@ -47,7 +47,7 @@ import {
   wasPasswordUsedRecently,
 } from '@/utils/password.helper.js';
 import { hashToken } from '@/utils/token.helper.js';
-import { resolveCountryFromIp } from '@/services/platform-analytics/geoip.util.js';
+import { resolveGeoFromIp, getClientIp } from '@/services/platform-analytics/geoip.util.js';
 import { parseUserAgent } from '@/services/platform-analytics/ua-parser.util.js';
 
 export interface AuthRequestMeta {
@@ -56,6 +56,21 @@ export interface AuthRequestMeta {
   requestId?: string;
   /** ISO country code from CDN/proxy headers when available. */
   countryCode?: string;
+}
+
+export function authMetaFromRequest(req: Request): AuthRequestMeta {
+  const countryCode =
+    req.get('cf-ipcountry') ||
+    req.get('x-vercel-ip-country') ||
+    req.get('cloudfront-viewer-country') ||
+    req.get('x-country-code') ||
+    undefined;
+  return {
+    ip: getClientIp(req) ?? req.ip,
+    userAgent: req.get('user-agent') || undefined,
+    requestId: req.requestId,
+    countryCode: countryCode && countryCode !== 'XX' ? countryCode : undefined,
+  };
 }
 
 function loginDeviceLabel(userAgent?: string): string {
@@ -156,11 +171,30 @@ function assertPortalAccess(roleKey: RoleKey, portal: AuthPortal): void {
   // decides where to redirect based on the returned role.
 }
 
+async function stampUserVisitMeta(user: UserDocument, meta: AuthRequestMeta): Promise<void> {
+  user.lastLoginAt = new Date();
+  if (meta.ip) user.lastLoginIp = meta.ip;
+  const device = loginDeviceLabel(meta.userAgent);
+  if (device) user.lastLoginDevice = device;
+  try {
+    const geo =
+      meta.countryCode && meta.countryCode !== 'XX'
+        ? { country: meta.countryCode, countryCode: meta.countryCode }
+        : await resolveGeoFromIp(meta.ip);
+    const country = geo?.country ?? geo?.countryCode ?? null;
+    if (country) user.lastLoginCountry = country;
+  } catch {
+    /* geo is best-effort */
+  }
+  await user.save();
+}
+
 async function createSessionAndTokens(
   user: UserDocument,
   meta: AuthRequestMeta,
   rememberMe: boolean,
 ): Promise<AuthTokensResult> {
+  await stampUserVisitMeta(user, meta);
   const familyId = randomUUID();
   const refreshTtl = getRefreshTokenTtlMs(rememberMe);
   const expiresAt = new Date(Date.now() + refreshTtl);
@@ -478,14 +512,6 @@ export const authService = {
     if (user.status === USER_STATUS.LOCKED || user.status === USER_STATUS.PENDING_VERIFICATION) {
       user.status = USER_STATUS.ACTIVE;
     }
-    user.lastLoginAt = new Date();
-    user.lastLoginIp = meta.ip ?? null;
-    user.lastLoginDevice = loginDeviceLabel(meta.userAgent);
-    const geo =
-      meta.countryCode && meta.countryCode !== 'XX'
-        ? { country: meta.countryCode, countryCode: meta.countryCode }
-        : await resolveCountryFromIp(meta.ip);
-    user.lastLoginCountry = geo?.country ?? geo?.countryCode ?? null;
     await user.save();
 
     const tokens = await createSessionAndTokens(user, meta, rememberMe);

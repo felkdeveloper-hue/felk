@@ -19,6 +19,8 @@ import {
 import { paginationQuerySchema, objectIdSchema } from '@/schemas/common.schema.js';
 import { findRoleByKey } from '@/services/rbac.service.js';
 import { writeAuditLog } from '@/services/audit.service.js';
+import { VisitorModel } from '@/models/analytics/index.js';
+import { formatAttribution } from '@/services/platform-analytics/source-attribution.util.js';
 import { ApiError } from '@/utils/errors/api-error.js';
 import {
   assertPasswordStrength,
@@ -133,6 +135,9 @@ function mapUserRow(
     lastLoginAt?: Date | null;
     lastLoginCountry?: string | null;
     lastLoginDevice?: string | null;
+    sourceLabel?: string | null;
+    sourceChannel?: string | null;
+    sourceDetail?: string | null;
     createdAt: Date;
     updatedAt: Date;
   },
@@ -140,6 +145,11 @@ function mapUserRow(
     customerId?: string;
     cartItemCount: number;
     purchasedItemCount: number;
+    sourceLabel?: string | null;
+    sourceChannel?: string | null;
+    sourceDetail?: string | null;
+    lastLoginCountry?: string | null;
+    lastLoginDevice?: string | null;
   },
 ) {
   const hasPassword = Boolean(user.passwordHash);
@@ -162,8 +172,11 @@ function mapUserRow(
     cartItemCount: extras.cartItemCount,
     purchasedItemCount: extras.purchasedItemCount,
     lastLoginAt: user.lastLoginAt ?? null,
-    lastLoginCountry: user.lastLoginCountry ?? null,
-    lastLoginDevice: user.lastLoginDevice ?? null,
+    lastLoginCountry: extras.lastLoginCountry || user.lastLoginCountry || null,
+    lastLoginDevice: extras.lastLoginDevice || user.lastLoginDevice || null,
+    sourceLabel: extras.sourceLabel ?? null,
+    sourceChannel: extras.sourceChannel ?? null,
+    sourceDetail: extras.sourceDetail ?? null,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   };
@@ -178,6 +191,74 @@ async function revokeUserSessions(userId: Types.ObjectId) {
     { userId, revokedAt: null },
     { $set: { revokedAt: new Date() } },
   );
+}
+
+function visitExtras(
+  visitor:
+    | {
+        geo?: { city?: string | null; country?: string | null; countryCode?: string | null } | null;
+        device?: { type?: string | null } | null;
+        trafficSource?: string | null;
+        referrer?: string | null;
+        utmSource?: string | null;
+        utmMedium?: string | null;
+        utmCampaign?: string | null;
+        utmContent?: string | null;
+        fbclid?: string | null;
+        gclid?: string | null;
+        ttclid?: string | null;
+        msclkid?: string | null;
+        igshid?: string | null;
+        inAppSource?: string | null;
+      }
+    | null
+    | undefined,
+) {
+  if (!visitor) {
+    return {
+      sourceLabel: null as string | null,
+      sourceChannel: null as string | null,
+      sourceDetail: null as string | null,
+      lastLoginCountry: null as string | null,
+      lastLoginDevice: null as string | null,
+    };
+  }
+
+  const attribution = formatAttribution({
+    trafficSource: visitor.trafficSource || 'direct',
+    referrer: visitor.referrer,
+    utmSource: visitor.utmSource,
+    utmMedium: visitor.utmMedium,
+    utmCampaign: visitor.utmCampaign,
+    utmContent: visitor.utmContent,
+    fbclid: visitor.fbclid,
+    gclid: visitor.gclid,
+    ttclid: visitor.ttclid,
+    msclkid: visitor.msclkid,
+    igshid: visitor.igshid,
+    inAppSource: visitor.inAppSource,
+  });
+
+  const device =
+    visitor.device?.type === 'mobile'
+      ? 'Phone'
+      : visitor.device?.type === 'tablet'
+        ? 'Tablet'
+        : visitor.device?.type === 'desktop'
+          ? 'Desktop'
+          : null;
+
+  const countryParts = [visitor.geo?.city, visitor.geo?.country ?? visitor.geo?.countryCode].filter(
+    (part) => Boolean(part && String(part).trim()),
+  );
+
+  return {
+    sourceLabel: attribution.label,
+    sourceChannel: attribution.channel,
+    sourceDetail: attribution.detail ?? null,
+    lastLoginCountry: countryParts.join(', ') || null,
+    lastLoginDevice: device,
+  };
 }
 
 export class AdminUserService {
@@ -286,14 +367,31 @@ export class AdminUserService {
       }
     }
 
+    const visitors = userIds.length
+      ? await VisitorModel.find({ userId: { $in: userIds } })
+          .sort({ lastSeenAt: -1 })
+          .select(
+            'userId geo device trafficSource referrer utmSource utmMedium utmCampaign utmContent fbclid gclid ttclid msclkid igshid inAppSource',
+          )
+          .lean()
+      : [];
+    const visitorByUser = new Map<string, (typeof visitors)[number]>();
+    for (const visitor of visitors) {
+      if (!visitor.userId) continue;
+      const id = String(visitor.userId);
+      if (!visitorByUser.has(id)) visitorByUser.set(id, visitor);
+    }
+
     const data = users.map((user) => {
       const customerId = customerByUserId.get(String(user._id));
       const customerIdStr = customerId ? String(customerId) : undefined;
+      const visit = visitorByUser.get(String(user._id));
 
       return mapUserRow(user, {
         customerId: customerIdStr,
         cartItemCount: customerIdStr ? (cartCountByCustomer.get(customerIdStr) ?? 0) : 0,
         purchasedItemCount: customerIdStr ? (purchaseCountByCustomer.get(customerIdStr) ?? 0) : 0,
+        ...visitExtras(visit),
       });
     });
 
@@ -308,7 +406,15 @@ export class AdminUserService {
       throw ApiError.notFound('User not found', 'USER_NOT_FOUND');
     }
 
-    const customer = await CustomerModel.findOne({ userId: user._id, isDeleted: false }).lean();
+    const [customer, visitor] = await Promise.all([
+      CustomerModel.findOne({ userId: user._id, isDeleted: false }).lean(),
+      VisitorModel.findOne({ userId: user._id })
+        .sort({ lastSeenAt: -1 })
+        .select(
+          'geo device trafficSource referrer utmSource utmMedium utmCampaign utmContent fbclid gclid ttclid msclkid igshid inAppSource',
+        )
+        .lean(),
+    ]);
     const customerIdStr = customer ? String(customer._id) : undefined;
 
     let cartItems: Array<{
@@ -417,6 +523,7 @@ export class AdminUserService {
         customerId: customerIdStr,
         cartItemCount: cartItems.reduce((sum, item) => sum + item.quantity, 0),
         purchasedItemCount,
+        ...visitExtras(visitor),
       }),
       cartItems,
       orders,

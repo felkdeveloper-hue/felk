@@ -28,6 +28,13 @@ const visitorPayloadSchema = z.object({
   utmCampaign: z.string().max(200).optional().nullable(),
   utmTerm: z.string().max(200).optional().nullable(),
   utmContent: z.string().max(200).optional().nullable(),
+  fbclid: z.string().max(500).optional().nullable(),
+  gclid: z.string().max(500).optional().nullable(),
+  ttclid: z.string().max(500).optional().nullable(),
+  msclkid: z.string().max(500).optional().nullable(),
+  igshid: z.string().max(500).optional().nullable(),
+  inAppSource: z.string().max(50).optional().nullable(),
+  landingPath: z.string().max(2000).optional().nullable(),
 });
 
 const sessionPayloadSchema = z.object({

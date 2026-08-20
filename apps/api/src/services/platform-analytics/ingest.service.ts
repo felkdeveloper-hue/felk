@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import type { Request } from 'express';
 import type { Types } from 'mongoose';
 import { VisitorModel, SessionModel, PageViewModel, EventModel } from '@/models/analytics/index.js';
+import { UserModel } from '@/models/user.model.js';
 import type {
   CollectBody,
   VisitorPayload,
@@ -9,21 +10,14 @@ import type {
   PageViewPayload,
   EventPayload,
 } from '@/schemas/analytics/index.js';
-import { resolveGeo, anonymizeIp, resolveGeoFromIp } from './geoip.util.js';
+import { resolveGeo, anonymizeIp, resolveGeoFromIp, getClientIp } from './geoip.util.js';
 import { parseUserAgent } from './ua-parser.util.js';
-import { classifyTrafficSource, isIgnoredReferrer } from './source-attribution.util.js';
+import {
+  classifyTrafficSource,
+  detectInAppSource,
+  pickFirstTouchAttribution,
+} from './source-attribution.util.js';
 import type { GeoData } from '@/models/analytics/index.js';
-
-function hasAttributionSignal(payload: VisitorPayload): boolean {
-  const referrer = payload.referrer?.trim() || null;
-  const meaningfulReferrer = Boolean(referrer) && !isIgnoredReferrer(referrer);
-  return Boolean(
-    payload.utmSource?.trim() ||
-    payload.utmMedium?.trim() ||
-    payload.utmCampaign?.trim() ||
-    meaningfulReferrer,
-  );
-}
 
 function mergeGeo(existing: GeoData | null | undefined, incoming: GeoData): GeoData {
   const prev = existing ?? {};
@@ -40,6 +34,18 @@ function geoIsEmpty(geo: GeoData): boolean {
   return !geo.country && !geo.countryCode && !geo.city && !geo.region;
 }
 
+function hintGeoFromClient(payload: VisitorPayload): GeoData | null {
+  const timezone = payload.geo?.timezone ?? null;
+  if (timezone === 'Asia/Colombo') {
+    return { country: 'Sri Lanka', countryCode: 'LK', region: null, city: null, timezone };
+  }
+  const language = payload.device?.language ?? '';
+  if (/-(LK)\b/i.test(language)) {
+    return { country: 'Sri Lanka', countryCode: 'LK', region: null, city: null, timezone };
+  }
+  return null;
+}
+
 function hashIp(ip: string | undefined): string {
   return createHash('sha256').update(anonymizeIp(ip)).digest('hex').slice(0, 32);
 }
@@ -50,19 +56,57 @@ async function upsertVisitor(
   userId: Types.ObjectId | undefined,
 ): Promise<void> {
   const ua = req.headers['user-agent'];
-  const ip = req.ip;
+  const ip = getClientIp(req);
   const parsedDevice = parseUserAgent(ua);
   let geo = payload.geo ?? resolveGeo(req);
   if (geoIsEmpty(geo)) {
     const fromIp = await resolveGeoFromIp(ip);
     if (fromIp) geo = mergeGeo(geo, fromIp);
   }
+  if (geoIsEmpty(geo)) {
+    const hinted = hintGeoFromClient(payload);
+    if (hinted) geo = mergeGeo(geo, hinted);
+  }
 
-  const trafficSource = classifyTrafficSource({
-    referrer: payload.referrer,
-    utmSource: payload.utmSource,
-    utmMedium: payload.utmMedium,
-  });
+  const incomingSignals = {
+    referrer: payload.referrer ?? null,
+    utmSource: payload.utmSource ?? null,
+    utmMedium: payload.utmMedium ?? null,
+    utmCampaign: payload.utmCampaign ?? null,
+    utmContent: payload.utmContent ?? null,
+    fbclid: payload.fbclid ?? null,
+    gclid: payload.gclid ?? null,
+    ttclid: payload.ttclid ?? null,
+    msclkid: payload.msclkid ?? null,
+    igshid: payload.igshid ?? null,
+    inAppSource: payload.inAppSource ?? detectInAppSource(typeof ua === 'string' ? ua : null),
+  };
+
+  const existing = await VisitorModel.findOne({ visitorId: payload.visitorId })
+    .select(
+      'geo referrer utmSource utmMedium utmCampaign utmTerm utmContent trafficSource fbclid gclid ttclid msclkid igshid inAppSource landingPath',
+    )
+    .lean();
+
+  const kept = pickFirstTouchAttribution(
+    existing
+      ? {
+          referrer: existing.referrer,
+          utmSource: existing.utmSource,
+          utmMedium: existing.utmMedium,
+          utmCampaign: existing.utmCampaign,
+          utmContent: existing.utmContent,
+          fbclid: existing.fbclid,
+          gclid: existing.gclid,
+          ttclid: existing.ttclid,
+          msclkid: existing.msclkid,
+          igshid: existing.igshid,
+          inAppSource: existing.inAppSource,
+        }
+      : null,
+    incomingSignals,
+  );
+  const trafficSource = classifyTrafficSource(kept);
   const device = {
     ...parsedDevice,
     screenResolution: payload.device?.screenResolution ?? null,
@@ -70,21 +114,23 @@ async function upsertVisitor(
     type: payload.device?.type ?? parsedDevice.type,
   };
 
-  const attributionUpdate = hasAttributionSignal(payload)
-    ? {
-        referrer: payload.referrer ?? null,
-        utmSource: payload.utmSource ?? null,
-        utmMedium: payload.utmMedium ?? null,
-        utmCampaign: payload.utmCampaign ?? null,
-        utmTerm: payload.utmTerm ?? null,
-        utmContent: payload.utmContent ?? null,
-        trafficSource,
-      }
-    : {};
+  const firstTouchFields = {
+    referrer: kept.referrer ?? null,
+    utmSource: kept.utmSource ?? null,
+    utmMedium: kept.utmMedium ?? null,
+    utmCampaign: kept.utmCampaign ?? null,
+    utmTerm: existing?.utmTerm ?? payload.utmTerm ?? null,
+    utmContent: existing?.utmContent ?? kept.utmContent ?? payload.utmContent ?? null,
+    fbclid: kept.fbclid ?? null,
+    gclid: kept.gclid ?? null,
+    ttclid: kept.ttclid ?? null,
+    msclkid: kept.msclkid ?? null,
+    igshid: kept.igshid ?? existing?.igshid ?? null,
+    inAppSource: existing?.inAppSource ?? kept.inAppSource ?? null,
+    landingPath: existing?.landingPath ?? payload.landingPath ?? null,
+    trafficSource,
+  };
 
-  const existing = await VisitorModel.findOne({ visitorId: payload.visitorId })
-    .select('geo')
-    .lean();
   const mergedGeo = mergeGeo(existing?.geo as GeoData | undefined, geo);
 
   await VisitorModel.findOneAndUpdate(
@@ -95,19 +141,13 @@ async function upsertVisitor(
         ipHash: hashIp(ip),
         firstSeenAt: new Date(),
         isReturning: false,
-        referrer: payload.referrer ?? null,
-        utmSource: payload.utmSource ?? null,
-        utmMedium: payload.utmMedium ?? null,
-        utmCampaign: payload.utmCampaign ?? null,
-        utmTerm: payload.utmTerm ?? null,
-        utmContent: payload.utmContent ?? null,
-        trafficSource,
+        ...firstTouchFields,
       },
       $set: {
         geo: mergedGeo,
         device,
         lastSeenAt: new Date(),
-        ...attributionUpdate,
+        ...firstTouchFields,
         ...(userId ? { userId } : {}),
       },
       $inc: { totalVisits: 1 },
@@ -120,6 +160,24 @@ async function upsertVisitor(
     { visitorId: payload.visitorId, totalVisits: { $gt: 1 } },
     { $set: { isReturning: true } },
   );
+
+  if (userId) {
+    const country = mergedGeo.country ?? mergedGeo.countryCode ?? null;
+    const deviceLabel =
+      parsedDevice.type === 'mobile'
+        ? 'Phone'
+        : parsedDevice.type === 'tablet'
+          ? 'Tablet'
+          : parsedDevice.type === 'desktop'
+            ? 'Desktop'
+            : null;
+    const patch: Record<string, string> = {};
+    if (country) patch.lastLoginCountry = country;
+    if (deviceLabel) patch.lastLoginDevice = deviceLabel;
+    if (Object.keys(patch).length) {
+      await UserModel.updateOne({ _id: userId }, { $set: patch });
+    }
+  }
 }
 
 async function upsertSession(
@@ -129,7 +187,11 @@ async function upsertSession(
 ): Promise<void> {
   const ua = req.headers['user-agent'];
   const parsedDevice = parseUserAgent(ua);
-  const geo = resolveGeo(req);
+  let geo = resolveGeo(req);
+  if (geoIsEmpty(geo)) {
+    const fromIp = await resolveGeoFromIp(getClientIp(req));
+    if (fromIp) geo = mergeGeo(geo, fromIp);
+  }
   const visitorDoc = await VisitorModel.findOne({ visitorId: payload.visitorId })
     .select('trafficSource')
     .lean();
@@ -190,8 +252,15 @@ async function upsertSession(
 async function insertPageViews(
   views: PageViewPayload[],
   userId: Types.ObjectId | undefined,
+  req: Request,
 ): Promise<void> {
   if (!views.length) return;
+
+  let geo = resolveGeo(req);
+  if (geoIsEmpty(geo)) {
+    const fromIp = await resolveGeoFromIp(getClientIp(req));
+    if (fromIp) geo = mergeGeo(geo, fromIp);
+  }
 
   const docs = views.map((v) => ({
     sessionId: v.sessionId,
@@ -206,7 +275,7 @@ async function insertPageViews(
     isEntry: v.isEntry ?? false,
     isExit: v.isExit ?? false,
     deviceType: 'unknown',
-    country: null,
+    country: geo.countryCode ?? geo.country ?? null,
   }));
 
   await PageViewModel.insertMany(docs, { ordered: false });
@@ -301,7 +370,7 @@ export async function processCollect(body: CollectBody, req: Request): Promise<v
   }
 
   if (body.pageViews?.length) {
-    ops.push(insertPageViews(body.pageViews, userId));
+    ops.push(insertPageViews(body.pageViews, userId, req));
   }
 
   if (body.events?.length) {
