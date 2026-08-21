@@ -88,20 +88,38 @@ async function upsertVisitor(
     )
     .lean();
 
+  const ipKey = hashIp(ip);
+  // Same public IP, new browser/cookie — keep the first social/ads source (90 days).
+  let priorByIp: typeof existing = null;
+  if (!existing) {
+    const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+    priorByIp = await VisitorModel.findOne({
+      ipHash: ipKey,
+      firstSeenAt: { $gte: ninetyDaysAgo },
+      visitorId: { $ne: payload.visitorId },
+    })
+      .sort({ firstSeenAt: 1 })
+      .select(
+        'referrer utmSource utmMedium utmCampaign utmTerm utmContent trafficSource fbclid gclid ttclid msclkid igshid inAppSource landingPath',
+      )
+      .lean();
+  }
+
+  const seed = existing ?? priorByIp;
   const kept = pickFirstTouchAttribution(
-    existing
+    seed
       ? {
-          referrer: existing.referrer,
-          utmSource: existing.utmSource,
-          utmMedium: existing.utmMedium,
-          utmCampaign: existing.utmCampaign,
-          utmContent: existing.utmContent,
-          fbclid: existing.fbclid,
-          gclid: existing.gclid,
-          ttclid: existing.ttclid,
-          msclkid: existing.msclkid,
-          igshid: existing.igshid,
-          inAppSource: existing.inAppSource,
+          referrer: seed.referrer,
+          utmSource: seed.utmSource,
+          utmMedium: seed.utmMedium,
+          utmCampaign: seed.utmCampaign,
+          utmContent: seed.utmContent,
+          fbclid: seed.fbclid,
+          gclid: seed.gclid,
+          ttclid: seed.ttclid,
+          msclkid: seed.msclkid,
+          igshid: seed.igshid,
+          inAppSource: seed.inAppSource,
         }
       : null,
     incomingSignals,
@@ -138,15 +156,16 @@ async function upsertVisitor(
     {
       $setOnInsert: {
         visitorId: payload.visitorId,
-        ipHash: hashIp(ip),
+        ipHash: ipKey,
         firstSeenAt: new Date(),
-        isReturning: false,
+        isReturning: Boolean(priorByIp),
         ...firstTouchFields,
       },
       $set: {
         geo: mergedGeo,
         device,
         lastSeenAt: new Date(),
+        ipHash: ipKey,
         ...firstTouchFields,
         ...(userId ? { userId } : {}),
       },

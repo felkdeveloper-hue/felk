@@ -14,11 +14,10 @@ import {
   posthogPageView,
 } from '@/lib/analytics';
 import { captureAttribution } from '@/lib/analytics/attribution';
-import { CookieConsentBanner } from '@/components/analytics/CookieConsentBanner';
 
 /**
  * Mount once inside storefront layouts (not admin).
- * First-party source/geo tracking starts immediately — ads are not lost if the banner is ignored.
+ * Tracks landings silently — no consent UI.
  */
 export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -47,7 +46,8 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
     const path = location.pathname;
     trackRouteChange(path);
     posthogPageView(path);
-    const t = window.setTimeout(() => void flush(), 300);
+    // Flush right away so Sources counts the landing, not only guest checkout later.
+    const t = window.setTimeout(() => void flush(), 50);
     return () => window.clearTimeout(t);
   }, [location.pathname]);
 
@@ -62,15 +62,11 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
         name: `${user?.firstName ?? ''} ${user?.lastName ?? ''}`.trim(),
         role: user?.roleKey,
       });
+      void flush();
     } else {
       posthogReset();
     }
   }, [user]);
 
-  return (
-    <>
-      {children}
-      <CookieConsentBanner />
-    </>
-  );
+  return <>{children}</>;
 }

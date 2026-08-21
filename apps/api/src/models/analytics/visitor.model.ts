@@ -102,6 +102,8 @@ const visitorSchema = new Schema<VisitorDocument>(
 );
 
 visitorSchema.index({ lastSeenAt: -1 });
+visitorSchema.index({ firstSeenAt: -1 });
+visitorSchema.index({ ipHash: 1, firstSeenAt: -1 });
 visitorSchema.index({ 'geo.country': 1, lastSeenAt: -1 });
 visitorSchema.index({ 'device.type': 1 });
 visitorSchema.index({ 'device.browser': 1 });

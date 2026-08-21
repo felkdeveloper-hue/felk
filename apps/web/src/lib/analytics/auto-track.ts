@@ -15,6 +15,7 @@ import {
   setPendingVisitor,
   setPendingSession,
   buildVisitorPayload,
+  flush,
 } from './collector';
 import { captureAttribution } from './attribution';
 
@@ -245,10 +246,12 @@ export function setup() {
     pushSessionSnapshot(false);
   }, 15_000);
 
-  // First heartbeat right away so Active Now isn't empty for ~30s after landing.
+  // First heartbeat + visitor payload right away so Sources counts landings.
   const { sessionId } = getOrCreateSession();
   const visitorId = getVisitorId();
+  setPendingVisitor(buildVisitorPayload(visitorId));
   sendHeartbeat(sessionId, visitorId, window.location.pathname);
+  void flush();
 }
 
 export function teardown() {
