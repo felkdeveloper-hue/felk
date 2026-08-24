@@ -196,6 +196,59 @@ async function stampUserVisitMeta(user: UserDocument, meta: AuthRequestMeta): Pr
   await user.save();
 }
 
+type AttributionBody = {
+  visitorId?: string | null;
+  utmSource?: string | null;
+  utmMedium?: string | null;
+  utmCampaign?: string | null;
+  utmTerm?: string | null;
+  utmContent?: string | null;
+  referrer?: string | null;
+  fbclid?: string | null;
+  gclid?: string | null;
+  ttclid?: string | null;
+  msclkid?: string | null;
+  igshid?: string | null;
+  inAppSource?: string | null;
+  landingPath?: string | null;
+};
+
+async function linkAuthAttribution(
+  userId: string,
+  meta: AuthRequestMeta,
+  body?: AttributionBody | null,
+): Promise<void> {
+  try {
+    const { linkVisitorToUser } =
+      await import('@/services/platform-analytics/link-visitor.service.js');
+    await linkVisitorToUser({
+      userId,
+      ip: meta.ip,
+      userAgent: meta.userAgent,
+      attribution: body
+        ? {
+            visitorId: body.visitorId,
+            utmSource: body.utmSource,
+            utmMedium: body.utmMedium,
+            utmCampaign: body.utmCampaign,
+            utmTerm: body.utmTerm,
+            utmContent: body.utmContent,
+            referrer: body.referrer,
+            fbclid: body.fbclid,
+            gclid: body.gclid,
+            ttclid: body.ttclid,
+            msclkid: body.msclkid,
+            igshid: body.igshid,
+            inAppSource: body.inAppSource,
+            landingPath: body.landingPath,
+          }
+        : { visitorId: null },
+    });
+  } catch {
+    /* attribution must never block auth */
+  }
+}
+
 async function createSessionAndTokens(
   user: UserDocument,
   meta: AuthRequestMeta,
@@ -296,6 +349,20 @@ export const authService = {
       firstName: string;
       lastName: string;
       phone?: string;
+      visitorId?: string | null;
+      utmSource?: string | null;
+      utmMedium?: string | null;
+      utmCampaign?: string | null;
+      utmTerm?: string | null;
+      utmContent?: string | null;
+      referrer?: string | null;
+      fbclid?: string | null;
+      gclid?: string | null;
+      ttclid?: string | null;
+      msclkid?: string | null;
+      igshid?: string | null;
+      inAppSource?: string | null;
+      landingPath?: string | null;
     },
     meta: AuthRequestMeta,
   ) {
@@ -424,6 +491,8 @@ export const authService = {
       ip: meta.ip,
     });
 
+    await linkAuthAttribution(user._id.toString(), meta, input);
+
     return attachDevVerificationCode(
       {
         user: sanitizeUser(user),
@@ -442,6 +511,20 @@ export const authService = {
       password: string;
       rememberMe?: boolean;
       portal?: AuthPortal;
+      visitorId?: string | null;
+      utmSource?: string | null;
+      utmMedium?: string | null;
+      utmCampaign?: string | null;
+      utmTerm?: string | null;
+      utmContent?: string | null;
+      referrer?: string | null;
+      fbclid?: string | null;
+      gclid?: string | null;
+      ttclid?: string | null;
+      msclkid?: string | null;
+      igshid?: string | null;
+      inAppSource?: string | null;
+      landingPath?: string | null;
     },
     meta: AuthRequestMeta,
   ): Promise<AuthTokensResult & { rememberMe: boolean }> {
@@ -522,6 +605,8 @@ export const authService = {
     await user.save();
 
     const tokens = await createSessionAndTokens(user, meta, rememberMe);
+
+    await linkAuthAttribution(user._id.toString(), meta, input);
 
     await writeAuditLog({
       action: AUDIT_ACTIONS.USER_LOGIN,
@@ -909,9 +994,15 @@ export const authService = {
     return { message: 'Password changed successfully' };
   },
 
-  async verifyEmail(emailRaw: string, code: string, meta: AuthRequestMeta) {
+  async verifyEmail(
+    emailRaw: string,
+    code: string,
+    meta: AuthRequestMeta,
+    attribution?: AttributionBody | null,
+  ) {
     const { otpService } = await import('@/services/otp.service.js');
     const result = await otpService.verifyOtp(emailRaw, code, meta);
+    await linkAuthAttribution(result.user.id, meta, attribution);
     return {
       message: result.message,
       user: result.user,

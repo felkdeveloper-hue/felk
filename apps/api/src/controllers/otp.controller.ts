@@ -19,7 +19,7 @@ export const otpController = {
   }),
 
   verifyOtp: asyncHandler(async (req, res) => {
-    const result = await otpService.verifyOtp(req.body.email, req.body.otp, meta(req));
+    const result = await otpService.verifyOtp(req.body.email, req.body.otp, meta(req), req.body);
     setAuthCookies(res, {
       accessToken: result.accessToken,
       refreshToken: result.refreshToken,

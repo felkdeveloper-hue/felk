@@ -93,6 +93,22 @@ export const otpService = {
     emailRaw: string,
     otp: string,
     meta: AuthRequestMeta,
+    attribution?: {
+      visitorId?: string | null;
+      utmSource?: string | null;
+      utmMedium?: string | null;
+      utmCampaign?: string | null;
+      utmTerm?: string | null;
+      utmContent?: string | null;
+      referrer?: string | null;
+      fbclid?: string | null;
+      gclid?: string | null;
+      ttclid?: string | null;
+      msclkid?: string | null;
+      igshid?: string | null;
+      inAppSource?: string | null;
+      landingPath?: string | null;
+    } | null,
   ): Promise<AuthTokensResult & { message: string; rememberMe: boolean }> {
     const email = normalizeEmail(emailRaw);
     const invalidCodeError = () =>
@@ -149,6 +165,19 @@ export const otpService = {
 
     const { authService } = await import('@/services/auth.service.js');
     const tokens = await authService.issueAuthSession(user._id.toString(), meta, false);
+
+    try {
+      const { linkVisitorToUser } =
+        await import('@/services/platform-analytics/link-visitor.service.js');
+      await linkVisitorToUser({
+        userId: user._id.toString(),
+        ip: meta.ip,
+        userAgent: meta.userAgent,
+        attribution: attribution ?? { visitorId: null },
+      });
+    } catch {
+      /* attribution must never block verification */
+    }
 
     void emailService
       .sendWelcomeEmail({ email: user.email, firstName: user.firstName })

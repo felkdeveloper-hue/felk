@@ -1,4 +1,5 @@
 import { http } from '@/lib/http-client';
+import { getAttributionPayloadForAuth } from '@/lib/analytics/auth-attribution';
 import { normalizeAuthSession, normalizeAuthUser } from '@/utils/auth';
 import type {
   AuthSession,
@@ -20,7 +21,7 @@ export const authApi = {
       user: unknown;
       message: string;
       devVerificationCode?: string;
-    }>('/auth/register', payload);
+    }>('/auth/register', { ...payload, ...getAttributionPayloadForAuth() });
     return {
       user: normalizeAuthUser(raw.user),
       message: raw.message,
@@ -29,7 +30,10 @@ export const authApi = {
   },
 
   async login(payload: LoginPayload): Promise<AuthSession> {
-    const raw = await http.post<unknown>('/auth/login', payload);
+    const raw = await http.post<unknown>('/auth/login', {
+      ...payload,
+      ...getAttributionPayloadForAuth(),
+    });
     return normalizeAuthSession(raw);
   },
 
@@ -59,7 +63,13 @@ export const authApi = {
   },
 
   verifyEmail(email: string, code: string): Promise<AuthSession> {
-    return http.post<unknown>('/auth/verify-otp', { email, otp: code }).then(normalizeAuthSession);
+    return http
+      .post<unknown>('/auth/verify-otp', {
+        email,
+        otp: code,
+        ...getAttributionPayloadForAuth(),
+      })
+      .then(normalizeAuthSession);
   },
 
   resendVerification(email: string): Promise<MessageResult> {
@@ -71,7 +81,13 @@ export const authApi = {
   },
 
   verifyOtp(email: string, otp: string): Promise<AuthSession> {
-    return http.post<unknown>('/auth/verify-otp', { email, otp }).then(normalizeAuthSession);
+    return http
+      .post<unknown>('/auth/verify-otp', {
+        email,
+        otp,
+        ...getAttributionPayloadForAuth(),
+      })
+      .then(normalizeAuthSession);
   },
 
   resendOtp(email: string): Promise<MessageResult> {

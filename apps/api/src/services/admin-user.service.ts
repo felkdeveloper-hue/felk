@@ -1,4 +1,5 @@
 import { type Types } from 'mongoose';
+import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { AUDIT_ACTIONS, AUTH_LIMITS, USER_STATUS, type UserStatus } from '@/constants/auth.js';
 import { CART_STATUS, CART_ITEM_LOCATION } from '@/constants/cart.js';
@@ -24,6 +25,7 @@ import {
   formatAttribution,
   hasAttributionSignal,
 } from '@/services/platform-analytics/source-attribution.util.js';
+import { anonymizeIp } from '@/services/platform-analytics/geoip.util.js';
 import { ApiError } from '@/utils/errors/api-error.js';
 import {
   assertPasswordStrength,
@@ -33,6 +35,11 @@ import {
 import { buildPaginationMeta, getPaginationSkip, parsePagination } from '@/utils/pagination.js';
 import { parseSort } from '@/utils/sorting.js';
 import { orderReceivedAt, paymentReceivedAt } from '@/utils/order-received-at.js';
+
+function hashIp(ip: string | undefined | null): string | null {
+  if (!ip) return null;
+  return createHash('sha256').update(anonymizeIp(ip)).digest('hex').slice(0, 32);
+}
 
 const passwordSchema = z
   .string()
@@ -422,6 +429,59 @@ export class AdminUserService {
       if (!visitorByUser.has(id)) visitorByUser.set(id, visitor);
     }
 
+    // Recover source for registered users who never got visitorId linked (login
+    // stamped geo/device but not acquisition). Match their lastLoginIp to a
+    // visitor that already has a non-direct first-touch source.
+    const ipHashesNeeded: string[] = [];
+    const userIdByIpHash = new Map<string, string[]>();
+    for (const user of users) {
+      const id = String(user._id);
+      if (visitorByUser.has(id)) continue;
+      const acq =
+        user.metadata &&
+        typeof user.metadata === 'object' &&
+        'acquisition' in user.metadata &&
+        user.metadata.acquisition &&
+        typeof user.metadata.acquisition === 'object'
+          ? (user.metadata.acquisition as { sourceLabel?: string | null })
+          : null;
+      if (acq?.sourceLabel) continue;
+      const ipHash = hashIp((user as { lastLoginIp?: string | null }).lastLoginIp);
+      if (!ipHash) continue;
+      ipHashesNeeded.push(ipHash);
+      const list = userIdByIpHash.get(ipHash) ?? [];
+      list.push(id);
+      userIdByIpHash.set(ipHash, list);
+    }
+
+    if (ipHashesNeeded.length) {
+      const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+      const byIp = await VisitorModel.find({
+        ipHash: { $in: [...new Set(ipHashesNeeded)] },
+        firstSeenAt: { $gte: ninetyDaysAgo },
+        trafficSource: { $exists: true, $nin: ['direct', null, ''] },
+      })
+        .sort({ firstSeenAt: 1 })
+        .select(
+          'ipHash geo device trafficSource referrer utmSource utmMedium utmCampaign utmContent fbclid gclid ttclid msclkid igshid inAppSource',
+        )
+        .lean();
+
+      const visitorByIpHash = new Map<string, (typeof byIp)[number]>();
+      for (const visitor of byIp) {
+        const key = visitor.ipHash as string;
+        if (!visitorByIpHash.has(key)) visitorByIpHash.set(key, visitor);
+      }
+
+      for (const [ipHash, ids] of userIdByIpHash) {
+        const visit = visitorByIpHash.get(ipHash);
+        if (!visit) continue;
+        for (const id of ids) {
+          if (!visitorByUser.has(id)) visitorByUser.set(id, visit);
+        }
+      }
+    }
+
     const data = users.map((user) => {
       const customerId = customerByUserId.get(String(user._id));
       const customerIdStr = customerId ? String(customerId) : undefined;
@@ -458,7 +518,7 @@ export class AdminUserService {
       throw ApiError.notFound('User not found', 'USER_NOT_FOUND');
     }
 
-    const [customer, visitor] = await Promise.all([
+    const [customer, visitorDirect] = await Promise.all([
       CustomerModel.findOne({ userId: user._id, isDeleted: false }).lean(),
       VisitorModel.findOne({ userId: user._id })
         .sort({ lastSeenAt: -1 })
@@ -467,6 +527,32 @@ export class AdminUserService {
         )
         .lean(),
     ]);
+
+    let visitor = visitorDirect;
+    const acquisitionEarly =
+      user.metadata &&
+      typeof user.metadata === 'object' &&
+      'acquisition' in user.metadata &&
+      user.metadata.acquisition &&
+      typeof user.metadata.acquisition === 'object'
+        ? (user.metadata.acquisition as { sourceLabel?: string | null })
+        : null;
+    if (!visitor && !acquisitionEarly?.sourceLabel) {
+      const ipHash = hashIp(user.lastLoginIp);
+      if (ipHash) {
+        const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+        visitor = await VisitorModel.findOne({
+          ipHash,
+          firstSeenAt: { $gte: ninetyDaysAgo },
+          trafficSource: { $exists: true, $nin: ['direct', null, ''] },
+        })
+          .sort({ firstSeenAt: 1 })
+          .select(
+            'geo device trafficSource referrer utmSource utmMedium utmCampaign utmContent fbclid gclid ttclid msclkid igshid inAppSource',
+          )
+          .lean();
+      }
+    }
     const customerIdStr = customer ? String(customer._id) : undefined;
 
     let cartItems: Array<{

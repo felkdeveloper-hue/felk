@@ -61,6 +61,8 @@ export async function linkVisitorToUser(opts: {
   };
 
   let existingSignals: AttributionSignals | null = null;
+  let resolvedVisitorId = visitorId;
+
   if (visitorId) {
     const existing = await VisitorModel.findOne({ visitorId })
       .select(
@@ -84,6 +86,52 @@ export async function linkVisitorToUser(opts: {
     }
   }
 
+  // Cookie cleared / different browser — recover first-touch from same IP (90 days).
+  if (!existingSignals && ip) {
+    const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+    const priorByIp = await VisitorModel.findOne({
+      ipHash: hashIp(ip),
+      firstSeenAt: { $gte: ninetyDaysAgo },
+      trafficSource: { $exists: true, $nin: ['direct', null, ''] },
+    })
+      .sort({ firstSeenAt: 1 })
+      .select(
+        'visitorId referrer utmSource utmMedium utmCampaign utmContent fbclid gclid ttclid msclkid igshid inAppSource',
+      )
+      .lean();
+    if (priorByIp) {
+      if (!resolvedVisitorId) resolvedVisitorId = priorByIp.visitorId;
+      existingSignals = {
+        referrer: priorByIp.referrer,
+        utmSource: priorByIp.utmSource,
+        utmMedium: priorByIp.utmMedium,
+        utmCampaign: priorByIp.utmCampaign,
+        utmContent: priorByIp.utmContent,
+        fbclid: priorByIp.fbclid,
+        gclid: priorByIp.gclid,
+        ttclid: priorByIp.ttclid,
+        msclkid: priorByIp.msclkid,
+        igshid: priorByIp.igshid,
+        inAppSource: priorByIp.inAppSource,
+      };
+    }
+  }
+
+  // Keep existing user acquisition if it already has a non-direct source.
+  const existingUser = await UserModel.findById(userId).select('metadata').lean();
+  const priorAcq = (existingUser?.metadata as Record<string, unknown> | undefined)?.acquisition as
+    | {
+        sourceLabel?: string | null;
+        sourceChannel?: string | null;
+        sourceDetail?: string | null;
+        trafficSource?: string | null;
+      }
+    | undefined;
+  const priorIsNonDirect =
+    Boolean(priorAcq?.sourceLabel) &&
+    priorAcq?.sourceLabel !== 'Direct' &&
+    priorAcq?.sourceLabel !== 'Unknown';
+
   const kept = pickFirstTouchAttribution(existingSignals, incoming);
   const trafficSource = classifyTrafficSource(kept);
   const attribution = formatAttribution({ trafficSource, ...kept });
@@ -99,12 +147,12 @@ export async function linkVisitorToUser(opts: {
           ? 'Desktop'
           : null;
 
-  if (visitorId) {
+  if (resolvedVisitorId) {
     await VisitorModel.findOneAndUpdate(
-      { visitorId },
+      { visitorId: resolvedVisitorId },
       {
         $setOnInsert: {
-          visitorId,
+          visitorId: resolvedVisitorId,
           ipHash: hashIp(ip),
           firstSeenAt: new Date(),
           isReturning: false,
@@ -152,8 +200,9 @@ export async function linkVisitorToUser(opts: {
     );
   }
 
-  const patch: Record<string, unknown> = {
-    'metadata.acquisition': {
+  const patch: Record<string, unknown> = {};
+  if (!priorIsNonDirect) {
+    patch['metadata.acquisition'] = {
       sourceLabel: attribution.label,
       sourceChannel: attribution.channel,
       sourceDetail: attribution.detail ?? null,
@@ -162,12 +211,14 @@ export async function linkVisitorToUser(opts: {
       utmMedium: kept.utmMedium ?? null,
       utmCampaign: kept.utmCampaign ?? null,
       fbclid: kept.fbclid ?? null,
-      visitorId: visitorId ?? null,
+      visitorId: resolvedVisitorId ?? null,
       capturedAt: new Date().toISOString(),
-    },
-  };
+    };
+  }
   if (location) patch.lastLoginCountry = location;
   if (deviceLabel) patch.lastLoginDevice = deviceLabel;
 
-  await UserModel.updateOne({ _id: userId }, { $set: patch });
+  if (Object.keys(patch).length) {
+    await UserModel.updateOne({ _id: userId }, { $set: patch });
+  }
 }
