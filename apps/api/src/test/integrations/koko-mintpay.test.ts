@@ -138,6 +138,27 @@ describe('Koko gateway', () => {
     expect(kokoReturnHmacMatches('PAY-OTHER-A1', sig)).toBe(false);
   });
 
+  it('accepts SUCCESS on HMAC-bound IPN when Koko sends a transaction id', async () => {
+    const { KokoGateway, kokoReturnHmac } = await import('@/services/gateways/koko.gateway.js');
+    const gateway = new KokoGateway();
+    const orderId = 'PAY-BOUND-A1';
+    const body = new URLSearchParams({
+      orderId,
+      trnId: '00011048995',
+      status: 'SUCCESS',
+    }).toString();
+
+    const result = await gateway.verifyWebhook({
+      headers: {},
+      rawBody: Buffer.from(body),
+      callbackHmac: kokoReturnHmac(orderId),
+    });
+
+    expect(result.valid).toBe(true);
+    expect(result.status).toBe('paid');
+    expect(result.gatewayTxnId).toBe('00011048995');
+  });
+
   it('never puts PEM material in customer-facing errors', async () => {
     const { KokoGateway } = await import('@/services/gateways/koko.gateway.js');
     const gateway = new KokoGateway();
@@ -194,6 +215,9 @@ describe('Koko gateway', () => {
       expect(result.redirectForm?.fields._pluginName).toBe('customapi');
       expect(String(result.redirectForm?.fields._returnUrl ?? '')).toMatch(
         /\/payments\/webhooks\/koko\/return\/[a-f0-9]{64}$/,
+      );
+      expect(String(result.redirectForm?.fields._responseUrl ?? '')).toMatch(
+        /\/payments\/webhooks\/koko\/ipn\/[a-f0-9]{64}$/,
       );
     } finally {
       Object.assign(koko, previous);

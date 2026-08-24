@@ -18,8 +18,10 @@ import type {
   WebhookVerificationInput,
 } from '@/services/interfaces/payment-gateway.service.js';
 import {
+  getHeader,
   normalizeMintpayTelephone,
   parseWebhookPayload,
+  rawBodyToString,
   toPublicStorefrontUrl,
 } from '@/services/gateways/gateway.utils.js';
 import { ApiError } from '@/utils/errors/api-error.js';
@@ -256,6 +258,40 @@ function flattenKokoView(raw: unknown): Record<string, unknown> {
 const KOKO_UNAVAILABLE =
   'Koko payment is temporarily unavailable. Please choose PayHere or Mintpay.';
 
+function kokoCallbackHmacOk(orderId: string, provided?: string): boolean {
+  return Boolean(provided && kokoReturnHmacMatches(orderId, provided));
+}
+
+function kokoBodyHmacOk(rawBody: Buffer | string, signature: string): boolean {
+  const secret = appConfig.payment.koko.secretKey;
+  if (!secret || secret === 'dev-koko-secret-key' || !signature) return false;
+  const body = rawBodyToString(rawBody);
+  return (
+    safeCompare(hmacSha256Hex(secret, body), signature) ||
+    safeCompare(hmacSha256Hex(secret, body).toUpperCase(), signature.toUpperCase())
+  );
+}
+
+function kokoRsaMatches(
+  orderId: string,
+  trnId: string,
+  status: string,
+  signature: string,
+  publicKey: string,
+): boolean {
+  const candidates = [
+    orderId + trnId + status,
+    orderId + status + trnId,
+    orderId + trnId,
+    orderId + status,
+  ];
+  return candidates.some(
+    (data) =>
+      verifyKokoSignature(data, signature, publicKey) ||
+      verifyKokoEncryptedPayload(data, signature, publicKey),
+  );
+}
+
 export class KokoGateway implements PaymentGateway {
   readonly name = PAYMENT_METHOD.KOKO;
 
@@ -293,7 +329,8 @@ export class KokoGateway implements PaymentGateway {
     const apiPublicUrl = kokoApiPublicUrl();
     const apiPrefix = process.env.API_PREFIX ?? '/api/v1';
     const responseUrl = String(
-      input.metadata?.responseUrl ?? `${apiPublicUrl}${apiPrefix}/payments/webhooks/koko`,
+      input.metadata?.responseUrl ??
+        `${apiPublicUrl}${apiPrefix}/payments/webhooks/koko/ipn/${kokoReturnHmac(input.orderId)}`,
     );
     // HMAC is in the path so Koko can append ?orderId=&status= without stripping it.
     const returnUrl = `${apiPublicUrl}${apiPrefix}/payments/webhooks/koko/return/${kokoReturnHmac(input.orderId)}`;
@@ -402,6 +439,7 @@ export class KokoGateway implements PaymentGateway {
       _orderId: orderId,
       _pluginName: PLUGIN_NAME,
       _pluginVersion: pluginVersion,
+      dataString,
       signature,
     });
 
@@ -461,7 +499,10 @@ export class KokoGateway implements PaymentGateway {
     const orderId = kokoCallbackField(payload, 'orderId', '_orderId');
     const trnId = kokoCallbackField(payload, 'trnId', 'trn_id', 'transactionId');
     const status = kokoCallbackField(payload, 'status', 'paymentStatus');
-    const signature = kokoCallbackField(payload, 'signature');
+    const signature =
+      kokoCallbackField(payload, 'signature') ||
+      getHeader(input.headers, 'x-koko-signature') ||
+      getHeader(input.headers, 'x-koko-hmac');
 
     if (!orderId || !status) {
       logger.warn({ gateway: 'koko' }, 'Koko: webhook missing orderId or status');
@@ -471,15 +512,23 @@ export class KokoGateway implements PaymentGateway {
     const mappedStatus =
       KOKO_STATUS_MAP[status] ?? KOKO_STATUS_MAP[status.toUpperCase()] ?? PAYMENT_STATUS.FAILED;
     const publicKey = loadPublicKey();
-    let rsaOk = false;
-    if (publicKey && signature) {
-      const dataToVerify = orderId + trnId + status;
-      rsaOk =
-        verifyKokoSignature(dataToVerify, signature, publicKey) ||
-        verifyKokoEncryptedPayload(dataToVerify, signature, publicKey);
-    }
+    const rsaOk = Boolean(
+      publicKey && signature && kokoRsaMatches(orderId, trnId, status, signature, publicKey),
+    );
+    const bodyHmacOk = Boolean(signature && kokoBodyHmacOk(input.rawBody, signature));
+    const fieldHmacOk = Boolean(
+      signature &&
+      appConfig.payment.koko.secretKey &&
+      appConfig.payment.koko.secretKey !== 'dev-koko-secret-key' &&
+      safeCompare(
+        hmacSha256Hex(appConfig.payment.koko.secretKey, orderId + trnId + status),
+        signature,
+      ),
+    );
+    const pathHmacOk = kokoCallbackHmacOk(orderId, input.callbackHmac);
+    const cryptoOk = rsaOk || bodyHmacOk || fieldHmacOk;
 
-    if (!rsaOk) {
+    if (!cryptoOk) {
       const viewed = await this.queryOrderView(orderId);
       if (viewed) {
         const mappedFromView =
@@ -488,7 +537,7 @@ export class KokoGateway implements PaymentGateway {
           PAYMENT_STATUS.FAILED;
         logger.warn(
           { gateway: 'koko', orderId, mappedFromView },
-          'Koko: RSA missing/invalid — using orderView status',
+          'Koko: crypto missing/invalid — using orderView status',
         );
         return {
           valid: true,
@@ -501,9 +550,26 @@ export class KokoGateway implements PaymentGateway {
         };
       }
 
-      if (isKokoSuccessStatus(status) || mappedStatus === PAYMENT_STATUS.PAID) {
-        logger.warn(
+      const isSuccess = isKokoSuccessStatus(status) || mappedStatus === PAYMENT_STATUS.PAID;
+      if (isSuccess && pathHmacOk && trnId.length >= 6) {
+        logger.info(
           { gateway: 'koko', orderId },
+          'Koko: accepting SUCCESS on HMAC-bound IPN with transaction id',
+        );
+        return {
+          valid: true,
+          gatewayTxnId: trnId,
+          orderId,
+          status: PAYMENT_STATUS.PAID,
+          amount: optionalAmount(payload.amount),
+          currency: String(payload.currency ?? ''),
+          payload,
+        };
+      }
+
+      if (isSuccess) {
+        logger.warn(
+          { gateway: 'koko', orderId, pathHmacOk, hasTrnId: Boolean(trnId) },
           'Koko: rejecting unsigned SUCCESS — would create an unpaid admin order',
         );
         return { valid: false };
@@ -511,12 +577,12 @@ export class KokoGateway implements PaymentGateway {
 
       logger.info(
         { gateway: 'koko', orderId, mappedStatus },
-        'Koko: recording failed/cancelled callback without RSA',
+        'Koko: recording failed/cancelled callback without crypto',
       );
     }
 
     logger.info(
-      { gateway: 'koko', orderId, trnId, status, mappedStatus, rsaOk },
+      { gateway: 'koko', orderId, trnId, status, mappedStatus, rsaOk, pathHmacOk },
       'Koko: webhook processed',
     );
 

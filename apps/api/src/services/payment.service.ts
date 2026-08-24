@@ -657,6 +657,7 @@ export class PaymentService {
       rawBody?: Buffer;
       body: unknown;
       ip?: string;
+      callbackHmac?: string;
     },
   ): Promise<{ ok: boolean; reason?: string; status?: string; duplicate?: boolean }> {
     const startedAt = Date.now();
@@ -706,7 +707,11 @@ export class PaymentService {
       metadata: { gateway: gatewayKey, eventId },
     });
 
-    const verification = await gateway.verifyWebhook({ headers: req.headers, rawBody });
+    const verification = await gateway.verifyWebhook({
+      headers: req.headers,
+      rawBody,
+      callbackHmac: req.callbackHmac,
+    });
     webhook.verified = Boolean(verification.valid);
 
     if (!verification.valid) {
@@ -1151,7 +1156,8 @@ export class PaymentService {
     }
     const viewed = await kokoGateway.verifyTransaction(orderId);
     const viewedPaid = viewed?.status === PAYMENT_STATUS.PAID;
-    const captureEvidence = refererOk || viewedPaid || rsaOk;
+    const returnHmacOk = Boolean(providedSig && kokoReturnHmacMatches(orderId, providedSig));
+    const captureEvidence = refererOk || viewedPaid || rsaOk || (returnHmacOk && trnId.length >= 6);
 
     const mapped =
       status.toUpperCase() === 'SUCCESS' ||

@@ -34,6 +34,7 @@ function webhookHandler(gateway: string) {
       rawBody: req.rawBody,
       body: req.body,
       ip: req.ip,
+      callbackHmac: String((req.params as { feSig?: string }).feSig ?? ''),
     });
 
     if (!result.ok && result.reason === 'invalid_signature') {
@@ -82,6 +83,19 @@ function webhookHandler(gateway: string) {
 }
 
 paymentsRouter.post('/webhooks/payhere', webhookHandler('payhere'));
+paymentsRouter.post('/webhooks/koko/ipn/:feSig', webhookHandler('koko'));
+paymentsRouter.get(
+  '/webhooks/koko/ipn/:feSig',
+  asyncHandler(async (req, res, next) => {
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries((req.query ?? {}) as Record<string, unknown>)) {
+      if (value == null) continue;
+      params.set(key, Array.isArray(value) ? String(value[0]) : String(value));
+    }
+    req.rawBody = Buffer.from(params.toString());
+    return webhookHandler('koko')(req, res, next);
+  }),
+);
 paymentsRouter.post('/webhooks/koko', webhookHandler('koko'));
 paymentsRouter.get(
   '/webhooks/koko',

@@ -33,6 +33,8 @@ export interface PaymentSessionResult {
 export interface WebhookVerificationInput {
   headers: Record<string, string | string[] | undefined>;
   rawBody: Buffer | string;
+  /** Server-issued HMAC from the Koko IPN path — not a client header. */
+  callbackHmac?: string;
 }
 
 export interface PaymentGateway {
