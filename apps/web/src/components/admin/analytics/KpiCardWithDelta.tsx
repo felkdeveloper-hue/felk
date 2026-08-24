@@ -34,7 +34,7 @@ export function KpiCardWithDelta({ title, metric, format, hint, onDrill, classNa
         {title}
       </p>
       <p className="mt-1 text-xl font-semibold tabular-nums sm:mt-1.5 sm:text-2xl">{display}</p>
-      {hint && <p className="text-muted-foreground mt-0.5 hidden text-xs sm:block">{hint}</p>}
+      {hint && <p className="text-muted-foreground mt-0.5 text-[10px] sm:text-xs">{hint}</p>}
       <div className="mt-1.5 flex flex-wrap items-center gap-1 sm:mt-2">
         {isNeutral ? (
           <Minus className="text-muted-foreground h-3.5 w-3.5" />

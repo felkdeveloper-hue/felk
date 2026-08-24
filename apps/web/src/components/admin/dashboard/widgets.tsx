@@ -32,6 +32,7 @@ import { AnalyticsEmpty, KpiCardWithDelta, formatDuration } from '@/components/a
 import { AdminStatCard } from '@/components/admin';
 import { formatCurrency } from '@/lib/utils';
 import type { AnalyticsFilter, DashboardWidgetPlacement } from '@/services/sdk/admin';
+import { formatAnalyticsPeriodLabel, withPeriodHint } from '@/lib/analytics-period-label';
 import { ADMIN_CHART_COLORS, adminChartColor } from '@/lib/admin-chart-colors';
 
 const COLORS = ADMIN_CHART_COLORS;
@@ -42,17 +43,7 @@ function periodFilter(settings?: DashboardWidgetPlacement['settings']): Analytic
 }
 
 function periodLabel(period: string | undefined): string {
-  const map: Record<string, string> = {
-    today: 'Today',
-    yesterday: 'Yesterday',
-    '7d': 'Last 7 days',
-    '14d': 'Last 14 days',
-    '30d': 'Last 30 days',
-    '90d': 'Last 90 days',
-    '180d': 'Last 180 days',
-    '1y': 'Last 12 months',
-  };
-  return map[period ?? '7d'] ?? 'Last 7 days';
+  return formatAnalyticsPeriodLabel({ period: (period as AnalyticsFilter['period']) || '7d' });
 }
 
 function WidgetFrame({
@@ -145,11 +136,17 @@ const VisitorsWidget = memo(function VisitorsWidget({
 }: {
   placement: DashboardWidgetPlacement;
 }) {
+  const period = (placement.settings?.period as string) || '7d';
   const q = useAnalyticsOverview(periodFilter(placement.settings));
   if (q.isLoading) return <LoadingBlock />;
   if (!q.data) return <AnalyticsEmpty />;
+  const label = q.data.periodLabel || periodLabel(period);
   return (
-    <KpiCardWithDelta title="Visitors" metric={q.data.totalVisitors} hint="Unique visitor IDs" />
+    <KpiCardWithDelta
+      title="Visitors"
+      metric={q.data.totalVisitors}
+      hint={withPeriodHint('Unique IPs', label)}
+    />
   );
 });
 
@@ -158,9 +155,11 @@ const SessionsWidget = memo(function SessionsWidget({
 }: {
   placement: DashboardWidgetPlacement;
 }) {
+  const period = (placement.settings?.period as string) || '7d';
   const q = useAnalyticsOverview(periodFilter(placement.settings));
   if (q.isLoading) return <LoadingBlock />;
   if (!q.data) return <AnalyticsEmpty />;
+  const label = q.data.periodLabel || periodLabel(period);
   return (
     <WidgetFrame
       title="Sessions"
@@ -171,7 +170,7 @@ const SessionsWidget = memo(function SessionsWidget({
         {formatDuration(q.data.avgSessionDurationMs.value)}
       </div>
       <div className="text-muted-foreground text-xs">
-        avg duration · {q.data.sessionsToday} sessions today
+        avg duration · {label} · {q.data.sessionsToday} sessions today
       </div>
     </WidgetFrame>
   );
@@ -408,8 +407,7 @@ const TrafficWidget = memo(function TrafficWidget({
               </p>
               <p className="mt-0.5 text-lg font-semibold leading-tight">{top.label}</p>
               <p className="text-muted-foreground text-xs">
-                {top.pct}% of {totalVisits.toLocaleString()} visitor
-                {totalVisits !== 1 ? 's' : ''}
+                {top.pct}% of {totalVisits.toLocaleString()} visit{totalVisits !== 1 ? 's' : ''}
                 {top.channel ? ` · ${top.channel}` : ''}
               </p>
             </div>

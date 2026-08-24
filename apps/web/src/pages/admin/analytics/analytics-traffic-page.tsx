@@ -23,6 +23,7 @@ import {
 } from '@/components/admin/analytics';
 import { useTrafficSources, useAnalyticsFilters, useAnalyticsDrillDown } from '@/hooks/admin';
 import { ADMIN_CHART_COLORS, adminChartColor } from '@/lib/admin-chart-colors';
+import { formatAnalyticsPeriodLabel } from '@/lib/analytics-period-label';
 
 const COLORS = ADMIN_CHART_COLORS;
 
@@ -31,12 +32,13 @@ export function AnalyticsTrafficPage() {
   const { drill, breadcrumbs, trail } = useAnalyticsDrillDown(filter);
   const query = useTrafficSources(filter);
   const sources = query.data ?? [];
+  const periodLabel = formatAnalyticsPeriodLabel(filter);
 
   return (
     <PageMotion>
       <AdminPageHeader
         title="Traffic Sources"
-        description="Where visitors come from in the selected period (accounts and guests). Ads/social/search count unique browsers; Direct counts unique IPs."
+        description={`Where visitors come from · ${periodLabel}. Ads/social/search count unique browsers; Direct counts unique IPs.`}
         actions={
           <AnalyticsExportButton
             reportType="traffic"

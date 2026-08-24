@@ -10,6 +10,7 @@ import { ADMIN_ROUTES } from '@/constants';
 import type { VisitorRow } from '@/services/sdk/admin';
 import type { DataTableColumn } from '@/components/admin';
 import { formatDate } from '@/lib/utils';
+import { formatAnalyticsPeriodLabel } from '@/lib/analytics-period-label';
 
 function formatLocation(row: VisitorRow): string {
   const parts = [row.geo.city, row.geo.region, row.geo.country ?? row.geo.countryCode].filter(
@@ -106,12 +107,13 @@ export function AnalyticsVisitorsPage() {
     defaults: { period: '7d', page: 1 },
   });
   const query = useAnalyticsVisitors(filter);
+  const periodLabel = formatAnalyticsPeriodLabel(filter);
 
   return (
     <PageMotion>
       <AdminPageHeader
         title="Visitors"
-        description="Unique visitors by IP for the selected period. Same IP counts once per day; over 7D/30D each IP counts once."
+        description={`Unique visitors by IP · ${periodLabel}. Same IP once per day; over multi-day ranges each IP counts once.`}
         actions={<AnalyticsExportButton reportType="visitors" filter={filter} allowPageScope />}
       />
 

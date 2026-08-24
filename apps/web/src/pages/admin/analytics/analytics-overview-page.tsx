@@ -12,18 +12,20 @@ import {
 import { useAnalyticsOverview } from '@/hooks/admin';
 import type { AnalyticsFilter } from '@/services/sdk/admin';
 import { ADMIN_ROUTES } from '@/constants';
+import { formatAnalyticsPeriodLabel, withPeriodHint } from '@/lib/analytics-period-label';
 
 export function AnalyticsOverviewPage() {
   const [filter, setFilter] = useState<AnalyticsFilter>({ period: '7d' });
   const overview = useAnalyticsOverview(filter);
 
   const data = overview.data;
+  const periodLabel = data?.periodLabel || formatAnalyticsPeriodLabel(filter);
 
   return (
     <PageMotion>
       <AdminPageHeader
         title="Analytics"
-        description="Visitor behavior, sessions, and business metrics."
+        description={`Visitor behavior, sessions, and business metrics · showing ${periodLabel}.`}
         actions={<AnalyticsExportButton reportType="overview" filter={filter} />}
       />
 
@@ -49,15 +51,23 @@ export function AnalyticsOverviewPage() {
             <KpiCardWithDelta
               title="Total Visitors"
               metric={data.totalVisitors}
-              hint="Unique visitor IDs"
+              hint={withPeriodHint('Unique IPs', periodLabel)}
             />
             <KpiCardWithDelta
               title="Logged-in Users"
               metric={data.loggedInUsers}
-              hint="Authenticated sessions"
+              hint={withPeriodHint('Visitors linked to an account', periodLabel)}
             />
-            <KpiCardWithDelta title="Returning Visitors" metric={data.returningVisitors} />
-            <KpiCardWithDelta title="Total Page Views" metric={data.totalPageViews} />
+            <KpiCardWithDelta
+              title="Returning Visitors"
+              metric={data.returningVisitors}
+              hint={withPeriodHint('Unique IPs marked returning', periodLabel)}
+            />
+            <KpiCardWithDelta
+              title="Total Page Views"
+              metric={data.totalPageViews}
+              hint={withPeriodHint('All page views', periodLabel)}
+            />
           </div>
 
           <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -65,16 +75,19 @@ export function AnalyticsOverviewPage() {
               title="Avg Session Duration"
               metric={data.avgSessionDurationMs}
               format={formatDuration}
+              hint={withPeriodHint('Average session length', periodLabel)}
             />
             <KpiCardWithDelta
               title="Bounce Rate"
               metric={data.bounceRate}
               format={(v) => `${v}%`}
+              hint={withPeriodHint('Single-page sessions', periodLabel)}
             />
             <KpiCardWithDelta
               title="Avg Pages / Session"
               metric={data.avgPagesPerSession}
               format={(v) => v.toFixed(1)}
+              hint={withPeriodHint('Pages per session', periodLabel)}
             />
           </div>
 
@@ -84,6 +97,9 @@ export function AnalyticsOverviewPage() {
               <div>
                 <p className="text-muted-foreground text-xs">New users today</p>
                 <p className="text-lg font-semibold">{data.newUsersToday}</p>
+                <p className="text-muted-foreground text-[10px]">
+                  Accounts created today (LK time)
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-4 rounded-xl border border-[var(--admin-line)] bg-gradient-to-br from-blue-500/10 to-[var(--admin-panel)] p-4">
@@ -91,6 +107,9 @@ export function AnalyticsOverviewPage() {
               <div>
                 <p className="text-muted-foreground text-xs">Sessions today</p>
                 <p className="text-lg font-semibold">{data.sessionsToday}</p>
+                <p className="text-muted-foreground text-[10px]">
+                  Sessions started today (LK time)
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-4 rounded-xl border border-[var(--admin-line)] bg-gradient-to-br from-amber-500/10 to-[var(--admin-panel)] p-4">
@@ -98,6 +117,7 @@ export function AnalyticsOverviewPage() {
               <div>
                 <p className="text-muted-foreground text-xs">Unique visitors</p>
                 <p className="text-lg font-semibold">{data.uniqueVisitors.value}</p>
+                <p className="text-muted-foreground text-[10px]">Unique IPs · {periodLabel}</p>
               </div>
             </div>
           </div>

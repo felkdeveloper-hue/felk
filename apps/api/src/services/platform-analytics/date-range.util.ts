@@ -90,3 +90,36 @@ export function getPctChange(current: number, previous: number): number {
   if (previous === 0) return current > 0 ? 100 : 0;
   return Math.round(((current - previous) / previous) * 100 * 10) / 10;
 }
+
+/** Human label for filter period (admin UI hints). */
+export function formatPeriodLabel(filter: Pick<AnalyticsFilter, 'period' | 'from' | 'to'>): string {
+  switch (filter.period) {
+    case 'today':
+      return 'Today';
+    case 'yesterday':
+      return 'Yesterday';
+    case '7d':
+      return 'Last 7 days';
+    case '30d':
+      return 'Last 30 days';
+    case '90d':
+      return 'Last 90 days';
+    case 'custom':
+      if (filter.from && filter.to) {
+        const from = new Date(filter.from).toLocaleDateString('en-GB', {
+          timeZone: ANALYTICS_TIMEZONE,
+          day: 'numeric',
+          month: 'short',
+        });
+        const to = new Date(filter.to).toLocaleDateString('en-GB', {
+          timeZone: ANALYTICS_TIMEZONE,
+          day: 'numeric',
+          month: 'short',
+        });
+        return `${from} – ${to}`;
+      }
+      return 'Custom range';
+    default:
+      return 'Last 7 days';
+  }
+}

@@ -53,6 +53,8 @@ export interface KpiMetric {
 
 export interface OverviewData {
   period: { from: string; to: string };
+  /** e.g. "Last 7 days" — matches the selected filter */
+  periodLabel?: string;
   totalVisitors: KpiMetric;
   uniqueVisitors: KpiMetric;
   loggedInUsers: KpiMetric;
