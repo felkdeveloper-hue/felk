@@ -1,12 +1,11 @@
 import { Types } from 'mongoose';
-import { VisitorModel, SessionModel } from '@/models/analytics/index.js';
 import { CustomerModel } from '@/models/customer.models.js';
-import { UserModel } from '@/models/user.model.js';
 import type { OrderDocument } from '@/models/order.models.js';
 import {
-  formatAttribution,
-  type AttributionDisplay,
-} from '@/services/platform-analytics/source-attribution.util.js';
+  resolveUserAttributions,
+  type ResolvedUserAttribution,
+} from '@/services/platform-analytics/resolve-user-attribution.service.js';
+import type { AttributionDisplay } from '@/services/platform-analytics/source-attribution.util.js';
 
 export type OrderSource = AttributionDisplay;
 
@@ -18,57 +17,23 @@ export const UNKNOWN_ORDER_SOURCE: OrderSource = {
 
 const UNKNOWN = UNKNOWN_ORDER_SOURCE;
 
-type AttributionFields = {
-  trafficSource?: string | null;
-  referrer?: string | null;
-  utmSource?: string | null;
-  utmMedium?: string | null;
-  utmCampaign?: string | null;
-  utmContent?: string | null;
-  fbclid?: string | null;
-  gclid?: string | null;
-  ttclid?: string | null;
-  msclkid?: string | null;
-  igshid?: string | null;
-  inAppSource?: string | null;
-};
-
-function sourceFrom(fields: AttributionFields): OrderSource {
-  return formatAttribution({
-    trafficSource: fields.trafficSource || 'direct',
-    referrer: fields.referrer,
-    utmSource: fields.utmSource,
-    utmMedium: fields.utmMedium,
-    utmCampaign: fields.utmCampaign,
-    utmContent: fields.utmContent,
-    fbclid: fields.fbclid,
-    gclid: fields.gclid,
-    ttclid: fields.ttclid,
-    msclkid: fields.msclkid,
-    igshid: fields.igshid,
-    inAppSource: fields.inAppSource,
-  });
-}
-
 export async function resolveOrderSource(order: OrderDocument): Promise<OrderSource> {
   const sources = await resolveOrderSources([order]);
   return sources.get(String(order._id)) ?? UNKNOWN;
 }
 
-/** Batch lookup for order lists — avoids N+1 visitor/session queries. */
+/** Batch lookup for order lists — same attribution rules as Users admin. */
 export async function resolveOrderSources(
   orders: OrderDocument[],
 ): Promise<Map<string, OrderSource>> {
   const result = new Map<string, OrderSource>();
   if (!orders.length) return result;
 
-  const orderById = new Map<string, OrderDocument>();
   const orderIdsByUser = new Map<string, string[]>();
   const missingCustomerIds: string[] = [];
 
   for (const order of orders) {
     const orderId = String(order._id);
-    orderById.set(orderId, order);
     if (order.userId) {
       const userId = String(order.userId);
       const ids = orderIdsByUser.get(userId) ?? [];
@@ -108,165 +73,16 @@ export async function resolveOrderSources(
   const userIds = [...orderIdsByUser.keys()].filter((id) => Types.ObjectId.isValid(id));
   if (!userIds.length) return result;
 
-  const userObjectIds = userIds.map((id) => new Types.ObjectId(id));
-  const visitors = await VisitorModel.find({ userId: { $in: userObjectIds } })
-    .sort({ lastSeenAt: -1 })
-    .select(
-      'userId trafficSource referrer utmSource utmMedium utmCampaign utmContent fbclid gclid ttclid msclkid igshid inAppSource',
-    )
-    .lean();
+  const attributions = await resolveUserAttributions(userIds, {
+    persistMissingAcquisition: true,
+  });
 
-  const visitorByUser = new Map<string, (typeof visitors)[number]>();
-  for (const visitor of visitors) {
-    if (!visitor.userId) continue;
-    const userId = String(visitor.userId);
-    if (!visitorByUser.has(userId)) visitorByUser.set(userId, visitor);
-  }
-
-  const unresolvedUserIds: string[] = [];
   for (const userId of userIds) {
-    const visitor = visitorByUser.get(userId);
-    const orderIds = orderIdsByUser.get(userId) ?? [];
-    if (visitor) {
-      const source = sourceFrom(visitor);
-      for (const orderId of orderIds) result.set(orderId, source);
-    } else {
-      unresolvedUserIds.push(userId);
-    }
-  }
-
-  if (!unresolvedUserIds.length) return result;
-
-  const sessions = await SessionModel.find({
-    userId: { $in: unresolvedUserIds.map((id) => new Types.ObjectId(id)) },
-  })
-    .sort({ startedAt: -1 })
-    .select('userId startedAt trafficSource visitorId')
-    .lean();
-
-  const sessionsByUser = new Map<string, typeof sessions>();
-  for (const session of sessions) {
-    if (!session.userId) continue;
-    const userId = String(session.userId);
-    const list = sessionsByUser.get(userId) ?? [];
-    list.push(session);
-    sessionsByUser.set(userId, list);
-  }
-
-  const visitorIds = new Set<string>();
-  const sessionByOrder = new Map<string, (typeof sessions)[number] | null>();
-  for (const userId of unresolvedUserIds) {
-    const userSessions = sessionsByUser.get(userId) ?? [];
+    const resolved: ResolvedUserAttribution | undefined = attributions.get(userId);
+    const source = resolved?.display ?? UNKNOWN;
     for (const orderId of orderIdsByUser.get(userId) ?? []) {
-      const order = orderById.get(orderId);
-      const placedAt = order?.placedAt ?? order?.createdAt ?? new Date();
-      const session =
-        userSessions.find((item) => item.startedAt && item.startedAt <= placedAt) ??
-        userSessions[0] ??
-        null;
-      sessionByOrder.set(orderId, session);
-      if (session?.visitorId) visitorIds.add(session.visitorId);
+      result.set(orderId, source.label === 'Unknown' || !source.label ? UNKNOWN : source);
     }
-  }
-
-  const sessionVisitors = visitorIds.size
-    ? await VisitorModel.find({ visitorId: { $in: [...visitorIds] } })
-        .select(
-          'visitorId trafficSource referrer utmSource utmMedium utmCampaign utmContent fbclid gclid ttclid msclkid igshid inAppSource',
-        )
-        .lean()
-    : [];
-  const visitorByVisitorId = new Map(
-    sessionVisitors.map((visitor) => [visitor.visitorId, visitor] as const),
-  );
-
-  const stillUnresolved: string[] = [];
-  for (const [orderId, session] of sessionByOrder) {
-    if (!session) {
-      stillUnresolved.push(orderId);
-      continue;
-    }
-    const sessionVisitor = session.visitorId
-      ? (visitorByVisitorId.get(session.visitorId) ?? null)
-      : null;
-    result.set(
-      orderId,
-      sourceFrom({
-        trafficSource: sessionVisitor?.trafficSource || session.trafficSource || 'direct',
-        referrer: sessionVisitor?.referrer,
-        utmSource: sessionVisitor?.utmSource,
-        utmMedium: sessionVisitor?.utmMedium,
-        utmCampaign: sessionVisitor?.utmCampaign,
-        utmContent: sessionVisitor?.utmContent,
-        fbclid: sessionVisitor?.fbclid,
-        gclid: sessionVisitor?.gclid,
-        ttclid: sessionVisitor?.ttclid,
-        msclkid: sessionVisitor?.msclkid,
-        igshid: sessionVisitor?.igshid,
-        inAppSource: sessionVisitor?.inAppSource,
-      }),
-    );
-  }
-
-  // Final fallback: check user metadata.acquisition saved when user was linked to a visitor.
-  const allUnresolved = [
-    ...stillUnresolved.map((orderId) => {
-      const order = orderById.get(orderId);
-      return order?.userId ? String(order.userId) : null;
-    }),
-    ...unresolvedUserIds,
-  ].filter((id): id is string => Boolean(id) && Types.ObjectId.isValid(id as string));
-
-  const uniqueUnresolved = [...new Set(allUnresolved)];
-  if (uniqueUnresolved.length) {
-    const usersWithAcq = await UserModel.find({
-      _id: { $in: uniqueUnresolved.map((id) => new Types.ObjectId(id)) },
-    })
-      .select('metadata')
-      .lean();
-
-    for (const user of usersWithAcq) {
-      const acq = (user.metadata as Record<string, unknown> | undefined)?.acquisition as
-        | {
-            sourceLabel?: string | null;
-            sourceChannel?: string | null;
-            sourceDetail?: string | null;
-            trafficSource?: string | null;
-            utmSource?: string | null;
-            utmMedium?: string | null;
-            utmCampaign?: string | null;
-            fbclid?: string | null;
-          }
-        | undefined;
-      if (!acq) continue;
-
-      const source: OrderSource = acq.sourceLabel
-        ? {
-            label: acq.sourceLabel,
-            channel: acq.sourceChannel ?? '',
-            detail: acq.sourceDetail ?? undefined,
-          }
-        : sourceFrom({
-            trafficSource: acq.trafficSource ?? 'direct',
-            utmSource: acq.utmSource,
-            utmMedium: acq.utmMedium,
-            utmCampaign: acq.utmCampaign,
-            fbclid: acq.fbclid,
-          });
-
-      const userId = String(user._id);
-      for (const orderId of orderIdsByUser.get(userId) ?? []) {
-        if (!result.has(orderId)) result.set(orderId, source);
-      }
-      for (const orderId of stillUnresolved) {
-        if (!result.has(orderId)) result.set(orderId, source);
-      }
-    }
-  }
-
-  // Mark anything still unresolved as UNKNOWN.
-  for (const orderId of stillUnresolved) {
-    if (!result.has(orderId)) result.set(orderId, UNKNOWN);
   }
 
   return result;

@@ -396,8 +396,15 @@ export function formatAttribution(opts: {
     }
   }
   if (trafficSource === 'organic_search') {
-    const label = canonicalUtm ?? (utmSourceNorm ? titleCase(utmSourceNorm) : 'Organic search');
-    return { label, channel: 'Organic search', detail: campaign || utmMediumNorm || null };
+    const label =
+      (refHost ? matchList(refHost, SEARCH_ENGINES) : null) ??
+      canonicalUtm ??
+      (utmSourceNorm ? titleCase(utmSourceNorm) : 'Google Search');
+    return {
+      label,
+      channel: 'Organic search',
+      detail: campaign || utmMediumNorm || refHost || null,
+    };
   }
 
   // Shared / referral link

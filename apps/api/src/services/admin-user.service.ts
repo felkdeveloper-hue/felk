@@ -1,5 +1,4 @@
 import { type Types } from 'mongoose';
-import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { AUDIT_ACTIONS, AUTH_LIMITS, USER_STATUS, type UserStatus } from '@/constants/auth.js';
 import { CART_STATUS, CART_ITEM_LOCATION } from '@/constants/cart.js';
@@ -20,12 +19,7 @@ import {
 import { paginationQuerySchema, objectIdSchema } from '@/schemas/common.schema.js';
 import { findRoleByKey } from '@/services/rbac.service.js';
 import { writeAuditLog } from '@/services/audit.service.js';
-import { VisitorModel } from '@/models/analytics/index.js';
-import {
-  formatAttribution,
-  hasAttributionSignal,
-} from '@/services/platform-analytics/source-attribution.util.js';
-import { anonymizeIp } from '@/services/platform-analytics/geoip.util.js';
+import { resolveUserAttributions } from '@/services/platform-analytics/resolve-user-attribution.service.js';
 import { ApiError } from '@/utils/errors/api-error.js';
 import {
   assertPasswordStrength,
@@ -35,11 +29,6 @@ import {
 import { buildPaginationMeta, getPaginationSkip, parsePagination } from '@/utils/pagination.js';
 import { parseSort } from '@/utils/sorting.js';
 import { orderReceivedAt, paymentReceivedAt } from '@/utils/order-received-at.js';
-
-function hashIp(ip: string | undefined | null): string | null {
-  if (!ip) return null;
-  return createHash('sha256').update(anonymizeIp(ip)).digest('hex').slice(0, 32);
-}
 
 const passwordSchema = z
   .string()
@@ -204,108 +193,25 @@ async function revokeUserSessions(userId: Types.ObjectId) {
   );
 }
 
-function visitExtras(
-  visitor:
-    | {
-        geo?: {
-          city?: string | null;
-          region?: string | null;
-          country?: string | null;
-          countryCode?: string | null;
-        } | null;
-        device?: { type?: string | null } | null;
-        trafficSource?: string | null;
-        referrer?: string | null;
-        utmSource?: string | null;
-        utmMedium?: string | null;
-        utmCampaign?: string | null;
-        utmContent?: string | null;
-        fbclid?: string | null;
-        gclid?: string | null;
-        ttclid?: string | null;
-        msclkid?: string | null;
-        igshid?: string | null;
-        inAppSource?: string | null;
-      }
-    | null
-    | undefined,
-  acquisition?: {
-    sourceLabel?: string | null;
-    sourceChannel?: string | null;
-    sourceDetail?: string | null;
+function deviceLabelFromType(type?: string | null): string | null {
+  if (type === 'mobile') return 'Phone';
+  if (type === 'tablet') return 'Tablet';
+  if (type === 'desktop') return 'Desktop';
+  return null;
+}
+
+function countryFromGeo(
+  geo?: {
+    city?: string | null;
+    region?: string | null;
+    country?: string | null;
+    countryCode?: string | null;
   } | null,
-) {
-  if (!visitor && !acquisition?.sourceLabel) {
-    return {
-      sourceLabel: null as string | null,
-      sourceChannel: null as string | null,
-      sourceDetail: null as string | null,
-      lastLoginCountry: null as string | null,
-      lastLoginDevice: null as string | null,
-    };
-  }
-
-  const attribution = visitor
-    ? formatAttribution({
-        trafficSource: visitor.trafficSource || 'direct',
-        referrer: visitor.referrer,
-        utmSource: visitor.utmSource,
-        utmMedium: visitor.utmMedium,
-        utmCampaign: visitor.utmCampaign,
-        utmContent: visitor.utmContent,
-        fbclid: visitor.fbclid,
-        gclid: visitor.gclid,
-        ttclid: visitor.ttclid,
-        msclkid: visitor.msclkid,
-        igshid: visitor.igshid,
-        inAppSource: visitor.inAppSource,
-      })
-    : null;
-
-  const visitorHasSignal = visitor
-    ? hasAttributionSignal({
-        referrer: visitor.referrer,
-        utmSource: visitor.utmSource,
-        utmMedium: visitor.utmMedium,
-        utmCampaign: visitor.utmCampaign,
-        utmContent: visitor.utmContent,
-        fbclid: visitor.fbclid,
-        gclid: visitor.gclid,
-        ttclid: visitor.ttclid,
-        msclkid: visitor.msclkid,
-        igshid: visitor.igshid,
-        inAppSource: visitor.inAppSource,
-      })
-    : false;
-
-  const device =
-    visitor?.device?.type === 'mobile'
-      ? 'Phone'
-      : visitor?.device?.type === 'tablet'
-        ? 'Tablet'
-        : visitor?.device?.type === 'desktop'
-          ? 'Desktop'
-          : null;
-
-  const countryParts = [
-    visitor?.geo?.city,
-    visitor?.geo?.region,
-    visitor?.geo?.country ?? visitor?.geo?.countryCode,
-  ].filter((part) => Boolean(part && String(part).trim()));
-
-  return {
-    sourceLabel: visitorHasSignal
-      ? (attribution?.label ?? null)
-      : (acquisition?.sourceLabel ?? attribution?.label ?? null),
-    sourceChannel: visitorHasSignal
-      ? (attribution?.channel ?? null)
-      : (acquisition?.sourceChannel ?? attribution?.channel ?? null),
-    sourceDetail: visitorHasSignal
-      ? (attribution?.detail ?? null)
-      : (acquisition?.sourceDetail ?? attribution?.detail ?? null),
-    lastLoginCountry: countryParts.join(', ') || null,
-    lastLoginDevice: device,
-  };
+): string | null {
+  const parts = [geo?.city, geo?.region, geo?.country ?? geo?.countryCode].filter((part) =>
+    Boolean(part && String(part).trim()),
+  );
+  return parts.length ? parts.join(', ') : null;
 }
 
 export class AdminUserService {
@@ -414,96 +320,28 @@ export class AdminUserService {
       }
     }
 
-    const visitors = userIds.length
-      ? await VisitorModel.find({ userId: { $in: userIds } })
-          .sort({ lastSeenAt: -1 })
-          .select(
-            'userId geo device trafficSource referrer utmSource utmMedium utmCampaign utmContent fbclid gclid ttclid msclkid igshid inAppSource',
-          )
-          .lean()
-      : [];
-    const visitorByUser = new Map<string, (typeof visitors)[number]>();
-    for (const visitor of visitors) {
-      if (!visitor.userId) continue;
-      const id = String(visitor.userId);
-      if (!visitorByUser.has(id)) visitorByUser.set(id, visitor);
-    }
-
-    // Recover source for registered users who never got visitorId linked (login
-    // stamped geo/device but not acquisition). Match their lastLoginIp to a
-    // visitor that already has a non-direct first-touch source.
-    const ipHashesNeeded: string[] = [];
-    const userIdByIpHash = new Map<string, string[]>();
-    for (const user of users) {
-      const id = String(user._id);
-      if (visitorByUser.has(id)) continue;
-      const acq =
-        user.metadata &&
-        typeof user.metadata === 'object' &&
-        'acquisition' in user.metadata &&
-        user.metadata.acquisition &&
-        typeof user.metadata.acquisition === 'object'
-          ? (user.metadata.acquisition as { sourceLabel?: string | null })
-          : null;
-      if (acq?.sourceLabel) continue;
-      const ipHash = hashIp((user as { lastLoginIp?: string | null }).lastLoginIp);
-      if (!ipHash) continue;
-      ipHashesNeeded.push(ipHash);
-      const list = userIdByIpHash.get(ipHash) ?? [];
-      list.push(id);
-      userIdByIpHash.set(ipHash, list);
-    }
-
-    if (ipHashesNeeded.length) {
-      const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
-      const byIp = await VisitorModel.find({
-        ipHash: { $in: [...new Set(ipHashesNeeded)] },
-        firstSeenAt: { $gte: ninetyDaysAgo },
-        trafficSource: { $exists: true, $nin: ['direct', null, ''] },
-      })
-        .sort({ firstSeenAt: 1 })
-        .select(
-          'ipHash geo device trafficSource referrer utmSource utmMedium utmCampaign utmContent fbclid gclid ttclid msclkid igshid inAppSource',
+    const attributions = userIds.length
+      ? await resolveUserAttributions(
+          userIds.map((id) => String(id)),
+          { persistMissingAcquisition: true },
         )
-        .lean();
-
-      const visitorByIpHash = new Map<string, (typeof byIp)[number]>();
-      for (const visitor of byIp) {
-        const key = visitor.ipHash as string;
-        if (!visitorByIpHash.has(key)) visitorByIpHash.set(key, visitor);
-      }
-
-      for (const [ipHash, ids] of userIdByIpHash) {
-        const visit = visitorByIpHash.get(ipHash);
-        if (!visit) continue;
-        for (const id of ids) {
-          if (!visitorByUser.has(id)) visitorByUser.set(id, visit);
-        }
-      }
-    }
+      : new Map();
 
     const data = users.map((user) => {
       const customerId = customerByUserId.get(String(user._id));
       const customerIdStr = customerId ? String(customerId) : undefined;
-      const visit = visitorByUser.get(String(user._id));
-      const acquisition =
-        user.metadata &&
-        typeof user.metadata === 'object' &&
-        'acquisition' in user.metadata &&
-        user.metadata.acquisition &&
-        typeof user.metadata.acquisition === 'object'
-          ? (user.metadata.acquisition as {
-              sourceLabel?: string | null;
-              sourceChannel?: string | null;
-              sourceDetail?: string | null;
-            })
-          : null;
+      const resolved = attributions.get(String(user._id));
+      const display = resolved?.display;
 
       return mapUserRow(user, {
         customerId: customerIdStr,
         cartItemCount: customerIdStr ? (cartCountByCustomer.get(customerIdStr) ?? 0) : 0,
         purchasedItemCount: customerIdStr ? (purchaseCountByCustomer.get(customerIdStr) ?? 0) : 0,
-        ...visitExtras(visit, acquisition),
+        sourceLabel: display?.label && display.label !== 'Unknown' ? display.label : null,
+        sourceChannel: display?.channel || null,
+        sourceDetail: display?.detail || null,
+        lastLoginCountry: countryFromGeo(resolved?.geo) || null,
+        lastLoginDevice: deviceLabelFromType(resolved?.deviceType),
       });
     });
 
@@ -518,41 +356,12 @@ export class AdminUserService {
       throw ApiError.notFound('User not found', 'USER_NOT_FOUND');
     }
 
-    const [customer, visitorDirect] = await Promise.all([
+    const [customer, attributions] = await Promise.all([
       CustomerModel.findOne({ userId: user._id, isDeleted: false }).lean(),
-      VisitorModel.findOne({ userId: user._id })
-        .sort({ lastSeenAt: -1 })
-        .select(
-          'geo device trafficSource referrer utmSource utmMedium utmCampaign utmContent fbclid gclid ttclid msclkid igshid inAppSource',
-        )
-        .lean(),
+      resolveUserAttributions([String(user._id)], { persistMissingAcquisition: true }),
     ]);
-
-    let visitor = visitorDirect;
-    const acquisitionEarly =
-      user.metadata &&
-      typeof user.metadata === 'object' &&
-      'acquisition' in user.metadata &&
-      user.metadata.acquisition &&
-      typeof user.metadata.acquisition === 'object'
-        ? (user.metadata.acquisition as { sourceLabel?: string | null })
-        : null;
-    if (!visitor && !acquisitionEarly?.sourceLabel) {
-      const ipHash = hashIp(user.lastLoginIp);
-      if (ipHash) {
-        const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
-        visitor = await VisitorModel.findOne({
-          ipHash,
-          firstSeenAt: { $gte: ninetyDaysAgo },
-          trafficSource: { $exists: true, $nin: ['direct', null, ''] },
-        })
-          .sort({ firstSeenAt: 1 })
-          .select(
-            'geo device trafficSource referrer utmSource utmMedium utmCampaign utmContent fbclid gclid ttclid msclkid igshid inAppSource',
-          )
-          .lean();
-      }
-    }
+    const resolved = attributions.get(String(user._id));
+    const display = resolved?.display;
     const customerIdStr = customer ? String(customer._id) : undefined;
 
     let cartItems: Array<{
@@ -655,25 +464,17 @@ export class AdminUserService {
     }
 
     const purchasedItemCount = orders.reduce((sum, order) => sum + order.itemCount, 0);
-    const acquisition =
-      user.metadata &&
-      typeof user.metadata === 'object' &&
-      'acquisition' in user.metadata &&
-      user.metadata.acquisition &&
-      typeof user.metadata.acquisition === 'object'
-        ? (user.metadata.acquisition as {
-            sourceLabel?: string | null;
-            sourceChannel?: string | null;
-            sourceDetail?: string | null;
-          })
-        : null;
 
     return {
       ...mapUserRow(user, {
         customerId: customerIdStr,
         cartItemCount: cartItems.reduce((sum, item) => sum + item.quantity, 0),
         purchasedItemCount,
-        ...visitExtras(visitor, acquisition),
+        sourceLabel: display?.label && display.label !== 'Unknown' ? display.label : null,
+        sourceChannel: display?.channel || null,
+        sourceDetail: display?.detail || null,
+        lastLoginCountry: countryFromGeo(resolved?.geo) || null,
+        lastLoginDevice: deviceLabelFromType(resolved?.deviceType),
       }),
       cartItems,
       orders,
