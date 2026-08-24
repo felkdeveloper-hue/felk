@@ -175,8 +175,25 @@ const orderSchema = new Schema<OrderDocument>(
   { timestamps: true, collection: 'orders' },
 );
 
-// One order per payment — the idempotency guard for PaymentSucceeded consumption.
-orderSchema.index({ paymentId: 1 }, { unique: true });
+// One live order per payment and per checkout. Cancelled rows are excluded so a
+// voided unpaid order cannot block a later captured payment on the same ids.
+orderSchema.index({ paymentId: 1 });
+orderSchema.index(
+  { paymentId: 1 },
+  {
+    unique: true,
+    name: 'paymentId_live_unique',
+    partialFilterExpression: { isDeleted: false, status: { $ne: 'cancelled' } },
+  },
+);
+orderSchema.index(
+  { checkoutId: 1 },
+  {
+    unique: true,
+    name: 'checkoutId_live_unique',
+    partialFilterExpression: { isDeleted: false, status: { $ne: 'cancelled' } },
+  },
+);
 orderSchema.index({ customerId: 1, createdAt: -1 });
 orderSchema.index({ status: 1, createdAt: -1 });
 

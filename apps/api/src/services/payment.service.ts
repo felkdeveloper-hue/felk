@@ -1102,20 +1102,25 @@ export class PaymentService {
 
   /**
    * Koko redirects the shopper to _returnUrl with orderId/trnId/status.
-   * Confirm payment here so admin orders are created even if the server IPN never arrives.
+   * Capture is accepted only with our HMAC plus Koko evidence (referer, RSA, or orderView).
    */
   async handleKokoBrowserReturn(
     query: Record<string, unknown>,
+    meta: { feSig?: string; referer?: string } = {},
   ): Promise<{ ok: boolean; redirectUrl: string }> {
     const orderId = String(query.orderId ?? query._orderId ?? '').trim();
     const status = String(query.status ?? query.paymentStatus ?? '').trim();
     const trnId = String(query.trnId ?? query.trn_id ?? query.transactionId ?? '').trim();
+    const signature = String(query.signature ?? '').trim();
     const fallbackSuccess = toPublicStorefrontUrl(
       `${appConfig.email?.shopUrl ?? 'https://fe.lk'}/checkout/success`,
     );
     const fallbackCancel = toPublicStorefrontUrl(
       `${appConfig.email?.shopUrl ?? 'https://fe.lk'}/checkout/cancel`,
     );
+
+    const { kokoGateway, kokoReturnHmacMatches, isKokoHostedReferer } =
+      await import('@/services/gateways/koko.gateway.js');
 
     const attempt = orderId ? await this.findAttemptForGateway(PAYMENT_METHOD.KOKO, orderId) : null;
     const payment = attempt
@@ -1133,6 +1138,20 @@ export class PaymentService {
       logger.warn({ gateway: 'koko', orderId }, 'Koko return: unknown order');
       return { ok: false, redirectUrl: cancelUrl };
     }
+
+    const providedSig = String(meta.feSig ?? '').trim();
+    const refererOk = isKokoHostedReferer(String(meta.referer ?? ''));
+    let rsaOk = false;
+    if (signature) {
+      const viewedAsWebhook = await kokoGateway.verifyWebhook({
+        headers: {},
+        rawBody: new URLSearchParams({ orderId, trnId, status, signature }).toString(),
+      });
+      rsaOk = Boolean(viewedAsWebhook.valid && viewedAsWebhook.status === PAYMENT_STATUS.PAID);
+    }
+    const viewed = await kokoGateway.verifyTransaction(orderId);
+    const viewedPaid = viewed?.status === PAYMENT_STATUS.PAID;
+    const captureEvidence = refererOk || viewedPaid || rsaOk;
 
     const mapped =
       status.toUpperCase() === 'SUCCESS' ||
@@ -1161,6 +1180,30 @@ export class PaymentService {
         }
       }
       return { ok: false, redirectUrl: cancelUrl };
+    }
+
+    if (providedSig && !kokoReturnHmacMatches(orderId, providedSig)) {
+      logger.warn({ gateway: 'koko', orderId }, 'Koko return HMAC mismatch');
+      return { ok: false, redirectUrl: cancelUrl };
+    }
+
+    if (providedSig && !kokoReturnHmacMatches(orderId, providedSig)) {
+      logger.warn({ gateway: 'koko', orderId }, 'Koko return HMAC mismatch');
+      return { ok: false, redirectUrl: cancelUrl };
+    }
+
+    if (!captureEvidence) {
+      logger.warn(
+        {
+          gateway: 'koko',
+          orderId,
+          refererOk,
+          viewedPaid,
+          rsaOk,
+        },
+        'Koko return SUCCESS ignored — missing Koko capture evidence',
+      );
+      return { ok: false, redirectUrl: successUrl };
     }
 
     if (payment.status !== PAYMENT_STATUS.PAID) {

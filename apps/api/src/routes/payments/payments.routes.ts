@@ -107,10 +107,16 @@ function kokoReturnParams(req: {
 const kokoReturnHandler = asyncHandler(async (req, res) => {
   const result = await paymentService.handleKokoBrowserReturn(
     kokoReturnParams(req as { query?: Record<string, unknown>; body?: unknown }),
+    {
+      feSig: String((req.params as { feSig?: string }).feSig ?? ''),
+      referer: String(req.get('referer') ?? req.get('referrer') ?? ''),
+    },
   );
   res.redirect(302, result.redirectUrl);
 });
 
+paymentsRouter.get('/webhooks/koko/return/:feSig', kokoReturnHandler);
+paymentsRouter.post('/webhooks/koko/return/:feSig', kokoReturnHandler);
 paymentsRouter.get('/webhooks/koko/return', kokoReturnHandler);
 paymentsRouter.post('/webhooks/koko/return', kokoReturnHandler);
 paymentsRouter.post('/webhooks/cod', webhookHandler('cod'));

@@ -22,6 +22,7 @@ import { PAYMENT_EVENT_TYPE } from '@/constants/payment.js';
 import { publishPaymentEvent } from '@/services/payment-event-publisher.js';
 import type { PaymentDocument } from '@/models/payment.models.js';
 import { paymentReceivedAt } from '@/utils/order-received-at.js';
+import { liveOrderExistsForCheckout, liveOrderExistsForPayment } from '@/utils/live-order.js';
 import {
   KOKO_RECOVER_LOOKBACK_MS,
   kokoReferenceIsConfirmedCapture,
@@ -140,7 +141,7 @@ export async function handlePaymentSucceededEvent(payload: Record<string, unknow
   }
 
   try {
-    const alreadyExists = await OrderModel.exists({ paymentId });
+    const alreadyExists = await liveOrderExistsForPayment(paymentId);
     if (alreadyExists) {
       logger.info({ paymentId }, 'Order already exists for this payment — skipping (idempotent)');
       await ensureMetaPurchaseTracked(paymentId);
@@ -150,6 +151,14 @@ export async function handlePaymentSucceededEvent(payload: Record<string, unknow
     const payment = await PaymentModel.findById(paymentId);
     if (!payment) {
       logger.error({ paymentId }, 'Payment not found — cannot create order');
+      return;
+    }
+
+    if (await liveOrderExistsForCheckout(payment.checkoutId)) {
+      logger.info(
+        { paymentId, checkoutId: payment.checkoutId.toString() },
+        'Live order already exists for this checkout — skipping duplicate',
+      );
       return;
     }
 
@@ -361,7 +370,7 @@ export async function fulfillCodPaymentIfNeeded(payment: PaymentDocument): Promi
   if (payment.method !== PAYMENT_METHOD.COD) return;
 
   const paymentId = payment._id.toString();
-  const alreadyExists = await OrderModel.exists({ paymentId });
+  const alreadyExists = await liveOrderExistsForPayment(paymentId);
   if (alreadyExists) {
     await ensureMetaPurchaseTracked(paymentId);
     return;
@@ -502,11 +511,9 @@ export async function catchUpOrphanPaidGatewayPayments(): Promise<{
     if (payment.metadata?.kokoAutoRecovered || payment.metadata?.kokoAutoRecoveryReversed) {
       continue;
     }
-    const exists = await OrderModel.exists({
-      paymentId: payment._id,
-      status: { $ne: ORDER_STATUS.CANCELLED },
-    });
+    const exists = await liveOrderExistsForPayment(payment._id);
     if (exists) continue;
+    if (await liveOrderExistsForCheckout(payment.checkoutId)) continue;
     await handlePaymentSucceededEvent({
       paymentId: payment._id.toString(),
       checkoutToken: payment.checkoutToken,
@@ -514,7 +521,7 @@ export async function catchUpOrphanPaidGatewayPayments(): Promise<{
       currency: payment.currency,
       method: payment.method,
     });
-    const nowExists = await OrderModel.exists({ paymentId: payment._id });
+    const nowExists = await liveOrderExistsForPayment(payment._id);
     if (nowExists) created += 1;
   }
 
@@ -565,6 +572,8 @@ export async function recoverConfirmedMintpayOrders(): Promise<{
   }> = [];
 
   for (const payment of payments) {
+    if (await liveOrderExistsForPayment(payment._id)) continue;
+    if (await liveOrderExistsForCheckout(payment.checkoutId)) continue;
     const receivedAt = paymentReceivedAt(payment) ?? payment.createdAt ?? new Date();
     if (payment.status !== PAYMENT_STATUS.PAID) {
       payment.status = PAYMENT_STATUS.PAID;
@@ -660,17 +669,8 @@ export async function recoverConfirmedKokoOrders(): Promise<{
   }> = [];
 
   for (const payment of payments) {
-    const existing = await OrderModel.exists({
-      paymentId: payment._id,
-      status: { $ne: ORDER_STATUS.CANCELLED },
-    });
-    if (existing) continue;
-
-    const checkoutAlreadyOrdered = await OrderModel.exists({
-      checkoutId: payment.checkoutId,
-      status: { $ne: ORDER_STATUS.CANCELLED },
-    });
-    if (checkoutAlreadyOrdered) continue;
+    if (await liveOrderExistsForPayment(payment._id)) continue;
+    if (await liveOrderExistsForCheckout(payment.checkoutId)) continue;
 
     if (payment.status !== PAYMENT_STATUS.PAID) {
       const attempt = await PaymentAttemptModel.findOne({ paymentId: payment._id }).sort({

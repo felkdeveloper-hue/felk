@@ -8,6 +8,7 @@ vi.mock('@/config/app.config', () => ({
     app: { version: '0.1.0' },
     cors: { origins: ['http://localhost:5173'] },
     server: { apiPrefix: '/api/v1' },
+    cookie: { secret: 'test-cookie-secret' },
     payment: {
       payhere: { merchantId: 'pm', merchantSecret: 'ps', mode: 'sandbox' },
       koko: {
@@ -59,7 +60,7 @@ describe('Koko gateway', () => {
     ).rejects.toMatchObject({ code: 'KOKO_NOT_CONFIGURED' });
   });
 
-  it('accepts Paykoko form callback when public key is not configured', async () => {
+  it('rejects unsigned SUCCESS so a forged callback cannot create an unpaid admin order', async () => {
     const { KokoGateway } = await import('@/services/gateways/koko.gateway.js');
     const gateway = new KokoGateway();
     const body = new URLSearchParams({
@@ -73,13 +74,10 @@ describe('Koko gateway', () => {
       rawBody: Buffer.from(body),
     });
 
-    expect(result.valid).toBe(true);
-    expect(result.status).toBe('paid');
-    expect(result.gatewayTxnId).toBe('TX1');
-    expect(result.amount).toBeUndefined();
+    expect(result.valid).toBe(false);
   });
 
-  it('accepts SUCCESS callbacks when RSA verification cannot be confirmed', async () => {
+  it('rejects SUCCESS when RSA verification cannot be confirmed', async () => {
     const { KokoGateway } = await import('@/services/gateways/koko.gateway.js');
     const gateway = new KokoGateway();
     const koko = appConfig.payment.koko as { publicKey?: string };
@@ -97,9 +95,7 @@ describe('Koko gateway', () => {
         headers: { 'content-type': 'application/x-www-form-urlencoded' },
         rawBody: Buffer.from(body),
       });
-      expect(result.valid).toBe(true);
-      expect(result.status).toBe('paid');
-      expect(result.orderId).toBe('PAY-MSSW5LLR-712AF7-A1');
+      expect(result.valid).toBe(false);
     } finally {
       koko.publicKey = previous;
     }
@@ -132,6 +128,14 @@ describe('Koko gateway', () => {
       rawBody: Buffer.from('status=SUCCESS'),
     });
     expect(result.valid).toBe(false);
+  });
+
+  it('HMAC for Koko return URLs is order-specific', async () => {
+    const { kokoReturnHmac, kokoReturnHmacMatches } =
+      await import('@/services/gateways/koko.gateway.js');
+    const sig = kokoReturnHmac('PAY-TEST-A1');
+    expect(kokoReturnHmacMatches('PAY-TEST-A1', sig)).toBe(true);
+    expect(kokoReturnHmacMatches('PAY-OTHER-A1', sig)).toBe(false);
   });
 
   it('never puts PEM material in customer-facing errors', async () => {
@@ -188,8 +192,8 @@ describe('Koko gateway', () => {
       expect(result.redirectForm?.action).toContain('paykoko.com');
       expect(String(result.redirectForm?.fields.signature ?? '')).toMatch(/^[A-Za-z0-9+/=]+$/);
       expect(result.redirectForm?.fields._pluginName).toBe('customapi');
-      expect(String(result.redirectForm?.fields._returnUrl ?? '')).toContain(
-        '/payments/webhooks/koko/return',
+      expect(String(result.redirectForm?.fields._returnUrl ?? '')).toMatch(
+        /\/payments\/webhooks\/koko\/return\/[a-f0-9]{64}$/,
       );
     } finally {
       Object.assign(koko, previous);

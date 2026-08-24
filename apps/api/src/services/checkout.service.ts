@@ -17,6 +17,7 @@ import {
 import { writeAuditLog } from '@/services/audit.service.js';
 import type { ActorMeta } from '@/services/cms-crud.service.js';
 import { ApiError } from '@/utils/errors/api-error.js';
+import { liveOrderExistsForCheckout } from '@/utils/live-order.js';
 import {
   CHECKOUT_AUDIT,
   CHECKOUT_RESERVATION_TTL_MINUTES,
@@ -384,7 +385,7 @@ export class CheckoutService {
 
     if (existing) {
       // Reject duplicate unless expired, or already fulfilled into an order.
-      const alreadyOrdered = await OrderModel.exists({ checkoutId: existing._id });
+      const alreadyOrdered = await liveOrderExistsForCheckout(existing._id);
       if (alreadyOrdered) {
         existing.status = CHECKOUT_STATUS.COMPLETED;
         existing.reservationExpiresAt = null;
@@ -564,7 +565,7 @@ export class CheckoutService {
       session.shippingAddress &&
       session.lines?.length
     ) {
-      const alreadyOrdered = await OrderModel.exists({ checkoutId: session._id });
+      const alreadyOrdered = await liveOrderExistsForCheckout(session._id);
       if (!alreadyOrdered) {
         session.status = CHECKOUT_STATUS.READY;
         session.reservationExpiresAt = null;

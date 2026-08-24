@@ -10,6 +10,7 @@ import { resolve } from 'node:path';
 import { appConfig } from '@/config/app.config.js';
 import { logger } from '@/config/logger.js';
 import { PAYMENT_METHOD, PAYMENT_STATUS } from '@/constants/payment-status.js';
+import { hmacSha256Hex, safeCompare } from '@/utils/crypto.helper.js';
 import type {
   CreatePaymentSessionInput,
   PaymentGateway,
@@ -42,6 +43,25 @@ const KOKO_STATUS_MAP: Record<string, string> = {
 const PLUGIN_NAME = appConfig.payment.koko.pluginName || 'customapi';
 const PLUGIN_VERSION = appConfig.payment.koko.pluginVersion || '1';
 const ORDER_VIEW_PLUGIN_VERSIONS = [...new Set([PLUGIN_VERSION, '1', '1.0.1'])];
+
+export function kokoReturnHmac(orderId: string): string {
+  return hmacSha256Hex(`${appConfig.cookie.secret}:koko-return`, orderId);
+}
+
+export function kokoReturnHmacMatches(orderId: string, provided: string): boolean {
+  if (!orderId || !provided) return false;
+  return safeCompare(kokoReturnHmac(orderId), provided);
+}
+
+export function isKokoHostedReferer(referer: string): boolean {
+  if (!referer.trim()) return false;
+  try {
+    const host = new URL(referer).hostname.toLowerCase();
+    return host === 'paykoko.com' || host.endsWith('.paykoko.com');
+  } catch {
+    return /(?:^|[/.])paykoko\.com(?:[:/]|$)/i.test(referer);
+  }
+}
 
 const PEM_BEGIN = /-----BEGIN [A-Z0-9 ]+-----/;
 const PEM_PRIVATE = /-----BEGIN (?:RSA )?PRIVATE KEY-----/;
@@ -195,6 +215,11 @@ function kokoCallbackField(payload: Record<string, unknown>, ...keys: string[]):
   return '';
 }
 
+function isKokoSuccessStatus(status: string): boolean {
+  const mapped = KOKO_STATUS_MAP[status] ?? KOKO_STATUS_MAP[status.toUpperCase()];
+  return mapped === PAYMENT_STATUS.PAID;
+}
+
 function kokoOrderIdCandidates(orderId: string, referenceNumber?: string): string[] {
   const ids = new Set<string>();
   const add = (value?: string) => {
@@ -270,8 +295,8 @@ export class KokoGateway implements PaymentGateway {
     const responseUrl = String(
       input.metadata?.responseUrl ?? `${apiPublicUrl}${apiPrefix}/payments/webhooks/koko`,
     );
-    // Browser comes back here (like Mintpay). Server IPN still uses _responseUrl.
-    const returnUrl = `${apiPublicUrl}${apiPrefix}/payments/webhooks/koko/return`;
+    // HMAC is in the path so Koko can append ?orderId=&status= without stripping it.
+    const returnUrl = `${apiPublicUrl}${apiPrefix}/payments/webhooks/koko/return/${kokoReturnHmac(input.orderId)}`;
 
     // Signing order must match Paykoko / official WooCommerce plugin exactly.
     const dataString =
@@ -443,50 +468,55 @@ export class KokoGateway implements PaymentGateway {
       return { valid: false };
     }
 
+    const mappedStatus =
+      KOKO_STATUS_MAP[status] ?? KOKO_STATUS_MAP[status.toUpperCase()] ?? PAYMENT_STATUS.FAILED;
     const publicKey = loadPublicKey();
+    let rsaOk = false;
     if (publicKey && signature) {
       const dataToVerify = orderId + trnId + status;
-      const isValid =
+      rsaOk =
         verifyKokoSignature(dataToVerify, signature, publicKey) ||
         verifyKokoEncryptedPayload(dataToVerify, signature, publicKey);
-      if (!isValid) {
+    }
+
+    if (!rsaOk) {
+      const viewed = await this.queryOrderView(orderId);
+      if (viewed) {
+        const mappedFromView =
+          KOKO_STATUS_MAP[viewed.status] ??
+          KOKO_STATUS_MAP[viewed.status.toUpperCase()] ??
+          PAYMENT_STATUS.FAILED;
+        logger.warn(
+          { gateway: 'koko', orderId, mappedFromView },
+          'Koko: RSA missing/invalid — using orderView status',
+        );
+        return {
+          valid: true,
+          gatewayTxnId: viewed.trnId || trnId,
+          orderId,
+          status: mappedFromView,
+          amount: optionalAmount(payload.amount),
+          currency: String(payload.currency ?? ''),
+          payload,
+        };
+      }
+
+      if (isKokoSuccessStatus(status) || mappedStatus === PAYMENT_STATUS.PAID) {
         logger.warn(
           { gateway: 'koko', orderId },
-          'Koko: RSA signature verification failed — confirming with orderView',
+          'Koko: rejecting unsigned SUCCESS — would create an unpaid admin order',
         );
-        const viewed = await this.queryOrderView(orderId);
-        if (viewed) {
-          const mappedFromView =
-            KOKO_STATUS_MAP[viewed.status] ??
-            KOKO_STATUS_MAP[viewed.status.toUpperCase()] ??
-            PAYMENT_STATUS.FAILED;
-          return {
-            valid: true,
-            gatewayTxnId: viewed.trnId || trnId,
-            orderId,
-            status: mappedFromView,
-            amount: optionalAmount(payload.amount),
-            currency: String(payload.currency ?? ''),
-            payload,
-          };
-        }
-        logger.warn(
-          { gateway: 'koko', orderId, status },
-          'Koko: accepting callback status without RSA/orderView match',
-        );
+        return { valid: false };
       }
-    } else if (!publicKey) {
-      logger.warn(
-        { gateway: 'koko' },
-        'Koko: no public key configured (KOKO_PUBLIC_KEY), skipping signature verification',
+
+      logger.info(
+        { gateway: 'koko', orderId, mappedStatus },
+        'Koko: recording failed/cancelled callback without RSA',
       );
     }
 
-    const mappedStatus =
-      KOKO_STATUS_MAP[status] ?? KOKO_STATUS_MAP[status.toUpperCase()] ?? PAYMENT_STATUS.FAILED;
-
     logger.info(
-      { gateway: 'koko', orderId, trnId, status, mappedStatus },
+      { gateway: 'koko', orderId, trnId, status, mappedStatus, rsaOk },
       'Koko: webhook processed',
     );
 
