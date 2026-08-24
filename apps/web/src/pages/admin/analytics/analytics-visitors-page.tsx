@@ -111,7 +111,7 @@ export function AnalyticsVisitorsPage() {
     <PageMotion>
       <AdminPageHeader
         title="Visitors"
-        description="Track where visitors come from, who they are when logged in, and what device they use."
+        description="Unique visitors by IP for the selected period. Same IP counts once per day; over 7D/30D each IP counts once."
         actions={<AnalyticsExportButton reportType="visitors" filter={filter} allowPageScope />}
       />
 

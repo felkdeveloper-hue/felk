@@ -5,55 +5,74 @@ export interface DateRange {
   to: Date;
 }
 
+/** Business timezone for fe.lk analytics day boundaries. */
+export const ANALYTICS_TIMEZONE = 'Asia/Colombo';
+const COLOMBO_OFFSET = '+05:30';
+
+/** Calendar YYYY-MM-DD in the analytics timezone. */
+function calendarDateInTz(date: Date, timeZone = ANALYTICS_TIMEZONE): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date);
+}
+
+/** Midnight (start of calendar day) in Asia/Colombo, as a UTC Date. */
+function startOfZonedDay(ymd: string): Date {
+  return new Date(`${ymd}T00:00:00${COLOMBO_OFFSET}`);
+}
+
+function addCalendarDays(ymd: string, days: number): string {
+  const base = startOfZonedDay(ymd);
+  const shifted = new Date(base.getTime() + days * 24 * 60 * 60 * 1000);
+  return calendarDateInTz(shifted);
+}
+
 export function resolveDateRange(
   filter: Pick<AnalyticsFilter, 'period' | 'from' | 'to'>,
 ): DateRange {
   const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const todayYmd = calendarDateInTz(now);
 
   switch (filter.period) {
     case 'today':
-      return { from: today, to: now };
+      return { from: startOfZonedDay(todayYmd), to: now };
 
     case 'yesterday': {
-      const yStart = new Date(today);
-      yStart.setDate(yStart.getDate() - 1);
-      const yEnd = new Date(today);
-      yEnd.setMilliseconds(-1);
+      const yYmd = addCalendarDays(todayYmd, -1);
+      const yStart = startOfZonedDay(yYmd);
+      const yEnd = new Date(startOfZonedDay(todayYmd).getTime() - 1);
       return { from: yStart, to: yEnd };
     }
 
     case '7d': {
-      const start = new Date(today);
-      start.setDate(start.getDate() - 6);
-      return { from: start, to: now };
+      const startYmd = addCalendarDays(todayYmd, -6);
+      return { from: startOfZonedDay(startYmd), to: now };
     }
 
     case '30d': {
-      const start = new Date(today);
-      start.setDate(start.getDate() - 29);
-      return { from: start, to: now };
+      const startYmd = addCalendarDays(todayYmd, -29);
+      return { from: startOfZonedDay(startYmd), to: now };
     }
 
     case '90d': {
-      const start = new Date(today);
-      start.setDate(start.getDate() - 89);
-      return { from: start, to: now };
+      const startYmd = addCalendarDays(todayYmd, -89);
+      return { from: startOfZonedDay(startYmd), to: now };
     }
 
     case 'custom': {
       if (filter.from && filter.to) {
         return { from: new Date(filter.from), to: new Date(filter.to) };
       }
-      const start7 = new Date(today);
-      start7.setDate(start7.getDate() - 6);
-      return { from: start7, to: now };
+      const startYmd = addCalendarDays(todayYmd, -6);
+      return { from: startOfZonedDay(startYmd), to: now };
     }
 
     default: {
-      const start = new Date(today);
-      start.setDate(start.getDate() - 6);
-      return { from: start, to: now };
+      const startYmd = addCalendarDays(todayYmd, -6);
+      return { from: startOfZonedDay(startYmd), to: now };
     }
   }
 }
