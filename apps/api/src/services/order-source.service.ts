@@ -1,6 +1,7 @@
 import { Types } from 'mongoose';
 import { VisitorModel, SessionModel } from '@/models/analytics/index.js';
 import { CustomerModel } from '@/models/customer.models.js';
+import { UserModel } from '@/models/user.model.js';
 import type { OrderDocument } from '@/models/order.models.js';
 import {
   formatAttribution,
@@ -179,9 +180,10 @@ export async function resolveOrderSources(
     sessionVisitors.map((visitor) => [visitor.visitorId, visitor] as const),
   );
 
+  const stillUnresolved: string[] = [];
   for (const [orderId, session] of sessionByOrder) {
     if (!session) {
-      result.set(orderId, UNKNOWN);
+      stillUnresolved.push(orderId);
       continue;
     }
     const sessionVisitor = session.visitorId
@@ -204,6 +206,67 @@ export async function resolveOrderSources(
         inAppSource: sessionVisitor?.inAppSource,
       }),
     );
+  }
+
+  // Final fallback: check user metadata.acquisition saved when user was linked to a visitor.
+  const allUnresolved = [
+    ...stillUnresolved.map((orderId) => {
+      const order = orderById.get(orderId);
+      return order?.userId ? String(order.userId) : null;
+    }),
+    ...unresolvedUserIds,
+  ].filter((id): id is string => Boolean(id) && Types.ObjectId.isValid(id as string));
+
+  const uniqueUnresolved = [...new Set(allUnresolved)];
+  if (uniqueUnresolved.length) {
+    const usersWithAcq = await UserModel.find({
+      _id: { $in: uniqueUnresolved.map((id) => new Types.ObjectId(id)) },
+    })
+      .select('metadata')
+      .lean();
+
+    for (const user of usersWithAcq) {
+      const acq = (user.metadata as Record<string, unknown> | undefined)?.acquisition as
+        | {
+            sourceLabel?: string | null;
+            sourceChannel?: string | null;
+            sourceDetail?: string | null;
+            trafficSource?: string | null;
+            utmSource?: string | null;
+            utmMedium?: string | null;
+            utmCampaign?: string | null;
+            fbclid?: string | null;
+          }
+        | undefined;
+      if (!acq) continue;
+
+      const source: OrderSource = acq.sourceLabel
+        ? {
+            label: acq.sourceLabel,
+            channel: acq.sourceChannel ?? '',
+            detail: acq.sourceDetail ?? undefined,
+          }
+        : sourceFrom({
+            trafficSource: acq.trafficSource ?? 'direct',
+            utmSource: acq.utmSource,
+            utmMedium: acq.utmMedium,
+            utmCampaign: acq.utmCampaign,
+            fbclid: acq.fbclid,
+          });
+
+      const userId = String(user._id);
+      for (const orderId of orderIdsByUser.get(userId) ?? []) {
+        if (!result.has(orderId)) result.set(orderId, source);
+      }
+      for (const orderId of stillUnresolved) {
+        if (!result.has(orderId)) result.set(orderId, source);
+      }
+    }
+  }
+
+  // Mark anything still unresolved as UNKNOWN.
+  for (const orderId of stillUnresolved) {
+    if (!result.has(orderId)) result.set(orderId, UNKNOWN);
   }
 
   return result;

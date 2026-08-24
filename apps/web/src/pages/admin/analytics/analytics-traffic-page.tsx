@@ -10,6 +10,7 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
+  LabelList,
 } from 'recharts';
 import { AdminErrorState, AdminPageHeader, PageMotion } from '@/components/admin';
 import {
@@ -35,7 +36,7 @@ export function AnalyticsTrafficPage() {
     <PageMotion>
       <AdminPageHeader
         title="Traffic Sources"
-        description="Where your visitors come from."
+        description="Where your visitors come from. Ads &amp; social count every device visit; Direct counts unique IPs."
         actions={
           <AnalyticsExportButton
             reportType="traffic"
@@ -57,7 +58,7 @@ export function AnalyticsTrafficPage() {
       ) : (
         <div className="mt-4 space-y-5">
           <div className="grid gap-5 lg:grid-cols-2">
-            <AnalyticsChartCard title="Traffic distribution" description="Click a source">
+            <AnalyticsChartCard title="Traffic distribution" description="Click a source to filter">
               <ResponsiveContainer width="100%" height={280}>
                 <PieChart style={{ cursor: 'pointer' }}>
                   <Pie
@@ -65,8 +66,8 @@ export function AnalyticsTrafficPage() {
                     dataKey="count"
                     nameKey="label"
                     cx="50%"
-                    cy="50%"
-                    outerRadius={100}
+                    cy="45%"
+                    outerRadius={90}
                     label={false}
                     labelLine={false}
                     onClick={(_, index) => {
@@ -89,34 +90,64 @@ export function AnalyticsTrafficPage() {
                       border: '1px solid var(--border)',
                       background: 'var(--card)',
                     }}
-                    formatter={(v: unknown) => [(v as number).toLocaleString(), 'Visitors']}
+                    formatter={(
+                      v: unknown,
+                      _name: unknown,
+                      props: { payload?: { label?: string; pct?: number } },
+                    ) => [
+                      `${(v as number).toLocaleString()} visits (${props.payload?.pct ?? 0}%)`,
+                      props.payload?.label ?? 'Source',
+                    ]}
+                  />
+                  <Legend
+                    layout="horizontal"
+                    verticalAlign="bottom"
+                    iconType="circle"
+                    iconSize={8}
+                    formatter={(value: string) =>
+                      value.length > 18 ? `${value.slice(0, 17)}…` : value
+                    }
+                    wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
                   />
                 </PieChart>
               </ResponsiveContainer>
             </AnalyticsChartCard>
 
-            <AnalyticsChartCard title="Visitors by source">
+            <AnalyticsChartCard title="Visits by source">
               <ResponsiveContainer width="100%" height={280}>
-                <BarChart data={sources} layout="vertical">
+                <BarChart data={sources} layout="vertical" margin={{ right: 48 }}>
                   <CartesianGrid
                     strokeDasharray="3 3"
                     horizontal={false}
                     className="stroke-border"
                   />
-                  <XAxis type="number" className="text-xs" />
-                  <YAxis dataKey="label" type="category" width={100} className="text-xs" />
+                  <XAxis type="number" tick={{ fontSize: 11 }} />
+                  <YAxis dataKey="label" type="category" width={110} tick={{ fontSize: 11 }} />
                   <Tooltip
                     contentStyle={{
                       fontSize: 12,
                       border: '1px solid var(--border)',
                       background: 'var(--card)',
                     }}
-                    formatter={(v: unknown) => [(v as number).toLocaleString(), 'Visitors']}
+                    formatter={(
+                      v: unknown,
+                      _name: unknown,
+                      props: { payload?: { label?: string; pct?: number } },
+                    ) => [
+                      `${(v as number).toLocaleString()} (${props.payload?.pct ?? 0}%)`,
+                      props.payload?.label ?? 'Visits',
+                    ]}
                   />
                   <Bar dataKey="count" radius={[0, 4, 4, 0]}>
                     {sources.map((_, i) => (
                       <Cell key={i} fill={adminChartColor(i)} />
                     ))}
+                    <LabelList
+                      dataKey="count"
+                      position="right"
+                      style={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
+                      formatter={(v: unknown) => (v as number).toLocaleString()}
+                    />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
@@ -135,7 +166,7 @@ export function AnalyticsTrafficPage() {
                     Source
                   </th>
                   <th className="text-muted-foreground px-4 py-2.5 text-right text-xs font-medium">
-                    Visitors
+                    Visits
                   </th>
                   <th className="text-muted-foreground px-4 py-2.5 text-right text-xs font-medium">
                     Share

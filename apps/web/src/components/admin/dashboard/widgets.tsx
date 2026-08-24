@@ -41,6 +41,20 @@ function periodFilter(settings?: DashboardWidgetPlacement['settings']): Analytic
   return { period };
 }
 
+function periodLabel(period: string | undefined): string {
+  const map: Record<string, string> = {
+    today: 'Today',
+    yesterday: 'Yesterday',
+    '7d': 'Last 7 days',
+    '14d': 'Last 14 days',
+    '30d': 'Last 30 days',
+    '90d': 'Last 90 days',
+    '180d': 'Last 180 days',
+    '1y': 'Last 12 months',
+  };
+  return map[period ?? '7d'] ?? 'Last 7 days';
+}
+
 function WidgetFrame({
   title,
   href,
@@ -371,10 +385,12 @@ const TrafficWidget = memo(function TrafficWidget({
 }: {
   placement: DashboardWidgetPlacement;
 }) {
+  const period = (placement.settings?.period as string) || '7d';
   const q = useTrafficSources(periodFilter(placement.settings));
   if (q.isLoading) return <LoadingBlock />;
   const rows = (q.data ?? []).slice(0, 8);
   const top = rows[0];
+  const totalVisits = rows.reduce((s, r) => s + r.count, 0);
   return (
     <WidgetFrame
       title="Sources"
@@ -388,11 +404,11 @@ const TrafficWidget = memo(function TrafficWidget({
           {top ? (
             <div>
               <p className="text-muted-foreground text-[10px] font-semibold uppercase tracking-[0.16em]">
-                Top source
+                Top source · {periodLabel(period)}
               </p>
               <p className="mt-0.5 text-lg font-semibold leading-tight">{top.label}</p>
               <p className="text-muted-foreground text-xs">
-                {top.pct}% of visitors
+                {top.pct}% of {totalVisits.toLocaleString()} visit{totalVisits !== 1 ? 's' : ''}
                 {top.channel ? ` · ${top.channel}` : ''}
               </p>
             </div>
@@ -401,9 +417,15 @@ const TrafficWidget = memo(function TrafficWidget({
             {rows.map((row, index) => (
               <li key={`${row.label}-${index}`}>
                 <div className="mb-1 flex items-center justify-between gap-2 text-sm">
-                  <span className="truncate font-medium">{row.label}</span>
+                  <span className="flex items-center gap-1.5 truncate font-medium">
+                    <span
+                      className="inline-block h-2 w-2 shrink-0 rounded-full"
+                      style={{ backgroundColor: adminChartColor(index) }}
+                    />
+                    {row.label}
+                  </span>
                   <span className="text-muted-foreground shrink-0 tabular-nums">
-                    {row.count} · {row.pct}%
+                    {row.count.toLocaleString()} · {row.pct}%
                   </span>
                 </div>
                 <div className="bg-muted h-1.5 overflow-hidden rounded-full">

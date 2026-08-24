@@ -4,8 +4,11 @@ import { buildVisitorMatch, resolveDateRange, type MongoMatch } from './analytic
 import { formatAttribution } from './source-attribution.util.js';
 
 /**
- * Unique visitors by first-touch source for the selected period.
- * Counts landings (not only guests/customers). One IP = one count.
+ * Traffic source counts for the selected period.
+ * Direct: deduplicates by IP (same person = 1).
+ * Ads / Social / Search: counts per browser (visitorId) so that the same
+ * person on multiple devices, or returning from a different ad click, counts
+ * separately — giving a better picture of which channels drive traffic.
  */
 export async function getTrafficSources(filter: AnalyticsFilter) {
   const range = resolveDateRange(filter);
@@ -64,15 +67,27 @@ export async function getTrafficSources(filter: AnalyticsFilter) {
         uniqueKeys: {
           $addToSet: {
             $cond: [
+              // Non-direct sources: count per browser (visitorId) so every
+              // device/click from an ad or social link is counted individually.
               {
-                $and: [
-                  { $ne: ['$ipHash', null] },
-                  { $ne: ['$ipHash', ''] },
-                  { $ne: ['$ipHash', 'unknown'] },
+                $ne: [{ $ifNull: ['$trafficSource', 'direct'] }, 'direct'],
+              },
+              { $concat: ['v:', '$visitorId'] },
+              // Direct: deduplicate by IP so the same person opening multiple
+              // tabs or returning later only counts once.
+              {
+                $cond: [
+                  {
+                    $and: [
+                      { $ne: ['$ipHash', null] },
+                      { $ne: ['$ipHash', ''] },
+                      { $ne: ['$ipHash', 'unknown'] },
+                    ],
+                  },
+                  { $concat: ['ip:', '$ipHash'] },
+                  { $concat: ['v:', '$visitorId'] },
                 ],
               },
-              { $concat: ['ip:', '$ipHash'] },
-              { $concat: ['v:', '$visitorId'] },
             ],
           },
         },
@@ -110,30 +125,8 @@ export async function getTrafficSources(filter: AnalyticsFilter) {
     }
   }
 
-  // One IP should not inflate both Direct and Instagram — non-direct wins.
-  const ipOwner = new Map<string, string>();
-  const ordered = [...merged.values()].sort((a, b) => {
-    const aDirect = a.label === 'Direct' ? 1 : 0;
-    const bDirect = b.label === 'Direct' ? 1 : 0;
-    return aDirect - bDirect;
-  });
-  for (const row of ordered) {
-    for (const key of [...row.keys]) {
-      if (!key.startsWith('ip:')) continue;
-      const owner = ipOwner.get(key);
-      if (!owner) {
-        ipOwner.set(key, row.label);
-        continue;
-      }
-      if (owner !== row.label && row.label === 'Direct') {
-        row.keys.delete(key);
-      } else if (owner === 'Direct' && row.label !== 'Direct') {
-        merged.get('Direct')?.keys.delete(key);
-        ipOwner.set(key, row.label);
-      }
-    }
-  }
-
+  // No cross-source IP conflict resolution needed: non-direct sources use
+  // v: keys (visitorId) and direct uses ip: keys, so they never collide.
   const ranked = [...merged.values()]
     .map((row) => ({
       source: row.source,

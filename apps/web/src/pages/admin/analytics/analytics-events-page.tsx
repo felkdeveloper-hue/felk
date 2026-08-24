@@ -140,10 +140,10 @@ export function AnalyticsEventsPage() {
               {!breakdown.data?.length ? (
                 <AnalyticsEmpty />
               ) : (
-                <ResponsiveContainer width="100%" height={220}>
+                <ResponsiveContainer width="100%" height={260}>
                   <BarChart
                     data={breakdown.data}
-                    margin={{ left: 0 }}
+                    margin={{ left: 0, bottom: 60 }}
                     style={{ cursor: 'pointer' }}
                     onClick={(state) => {
                       const payload = (
@@ -158,14 +158,23 @@ export function AnalyticsEventsPage() {
                     }}
                   >
                     <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                    <XAxis dataKey="name" className="text-xs" tick={{ fontSize: 11 }} />
-                    <YAxis className="text-xs" />
+                    <XAxis
+                      dataKey="name"
+                      tick={{ fontSize: 11, angle: -40, textAnchor: 'end', dy: 4 }}
+                      interval={0}
+                    />
+                    <YAxis className="text-xs" tick={{ fontSize: 11 }} width={45} />
                     <Tooltip
                       contentStyle={{
                         fontSize: 12,
                         border: '1px solid var(--border)',
                         background: 'var(--card)',
                       }}
+                      formatter={(
+                        v: unknown,
+                        _name: unknown,
+                        props: { payload?: { name?: string } },
+                      ) => [(v as number).toLocaleString(), props.payload?.name ?? 'count']}
                     />
                     <Bar dataKey="count" fill={adminChartColor(0)} radius={[4, 4, 0, 0]} />
                   </BarChart>
