@@ -408,8 +408,8 @@ const TrafficWidget = memo(function TrafficWidget({
               </p>
               <p className="mt-0.5 text-lg font-semibold leading-tight">{top.label}</p>
               <p className="text-muted-foreground text-xs">
-                {top.pct}% of {totalVisits.toLocaleString()} visit
-                {totalVisits !== 1 ? 's' : ''} in this period
+                {top.pct}% of {totalVisits.toLocaleString()} visitor
+                {totalVisits !== 1 ? 's' : ''}
                 {top.channel ? ` · ${top.channel}` : ''}
               </p>
             </div>

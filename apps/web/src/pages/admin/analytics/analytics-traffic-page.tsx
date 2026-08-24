@@ -36,7 +36,7 @@ export function AnalyticsTrafficPage() {
     <PageMotion>
       <AdminPageHeader
         title="Traffic Sources"
-        description="Visits in the selected period by first-touch source. Ads, social, and search count each session; Direct counts unique IPs."
+        description="Where visitors come from in the selected period (accounts and guests). Ads/social/search count unique browsers; Direct counts unique IPs."
         actions={
           <AnalyticsExportButton
             reportType="traffic"
