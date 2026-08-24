@@ -195,11 +195,6 @@ function kokoCallbackField(payload: Record<string, unknown>, ...keys: string[]):
   return '';
 }
 
-function isKokoSuccessStatus(status: string): boolean {
-  const mapped = KOKO_STATUS_MAP[status] ?? KOKO_STATUS_MAP[status.toUpperCase()];
-  return mapped === PAYMENT_STATUS.PAID;
-}
-
 function kokoOrderIdCandidates(orderId: string, referenceNumber?: string): string[] {
   const ids = new Set<string>();
   const add = (value?: string) => {
@@ -460,11 +455,11 @@ export class KokoGateway implements PaymentGateway {
           'Koko: RSA signature verification failed — confirming with orderView',
         );
         const viewed = await this.queryOrderView(orderId);
-        if (viewed && isKokoSuccessStatus(viewed.status)) {
+        if (viewed) {
           const mappedFromView =
             KOKO_STATUS_MAP[viewed.status] ??
             KOKO_STATUS_MAP[viewed.status.toUpperCase()] ??
-            PAYMENT_STATUS.PAID;
+            PAYMENT_STATUS.FAILED;
           return {
             valid: true,
             gatewayTxnId: viewed.trnId || trnId,
@@ -475,12 +470,9 @@ export class KokoGateway implements PaymentGateway {
             payload,
           };
         }
-        if (!isKokoSuccessStatus(status)) {
-          return { valid: false };
-        }
         logger.warn(
-          { gateway: 'koko', orderId },
-          'Koko: accepting SUCCESS callback without RSA/orderView match',
+          { gateway: 'koko', orderId, status },
+          'Koko: accepting callback status without RSA/orderView match',
         );
       }
     } else if (!publicKey) {

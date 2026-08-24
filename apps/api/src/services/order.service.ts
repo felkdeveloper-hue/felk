@@ -342,6 +342,40 @@ export class OrderService {
     );
   }
 
+  /** Used by payment catch-up to remove orders that were created without a captured payment. */
+  async cancelAsSystem(id: string, reason: string, actor: ActorMeta = {}) {
+    const order = await this.findById(id);
+    if (order.status === ORDER_STATUS.CANCELLED) {
+      return this.toSummary(order);
+    }
+    if (!CANCELLABLE_ORDER_STATUSES.includes(order.status as never)) {
+      return this.toSummary(order);
+    }
+
+    for (const item of order.items) {
+      if (!item.warehouseId) continue;
+      try {
+        await inventoryService.applyMovement(
+          {
+            warehouseId: item.warehouseId.toString(),
+            variantId: item.variantId.toString(),
+            type: MOVEMENT_TYPE.RETURN,
+            quantity: item.quantity,
+            referenceType: 'order_cancel',
+            referenceId: order._id.toString(),
+            note: `Order ${order.orderNumber} cancelled`,
+          },
+          actor,
+        );
+      } catch {
+        /* already reversed */
+      }
+    }
+
+    order.cancelReason = reason;
+    return this.transitionTo(order, ORDER_STATUS.CANCELLED, reason, actor);
+  }
+
   private async transitionTo(
     order: OrderDocument,
     status: OrderStatus,

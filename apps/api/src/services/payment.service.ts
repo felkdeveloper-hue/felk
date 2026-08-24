@@ -777,6 +777,16 @@ export class PaymentService {
     });
 
     const newStatus = verification.status ?? PAYMENT_STATUS.FAILED;
+    const alreadyCaptured = PAYMENT_TERMINAL_SUCCESS_STATUSES.includes(payment.status as never);
+    const isRefundUpdate =
+      newStatus === PAYMENT_STATUS.REFUNDED || newStatus === PAYMENT_STATUS.PARTIALLY_REFUNDED;
+    if (alreadyCaptured && newStatus !== PAYMENT_STATUS.PAID && !isRefundUpdate) {
+      webhook.processed = true;
+      webhook.processingResult = 'ignored_after_paid';
+      await webhook.save();
+      return { ok: true, status: payment.status };
+    }
+
     const processingTimeMs = Date.now() - startedAt;
 
     await PaymentTransactionModel.create({
@@ -1141,6 +1151,14 @@ export class PaymentService {
         await payment.save();
         attempt.status = PAYMENT_ATTEMPT_STATUS.FAILED;
         await attempt.save();
+        try {
+          await checkoutService.releaseForPaymentFailure(
+            payment.checkoutId.toString(),
+            `Koko return ${mapped} — release unpaid hold`,
+          );
+        } catch {
+          /* already released */
+        }
       }
       return { ok: false, redirectUrl: cancelUrl };
     }
@@ -1211,7 +1229,9 @@ export class PaymentService {
     const since = new Date(Date.now() - 12 * 60 * 60 * 1000);
     const payments = await PaymentModel.find({
       method: { $in: [PAYMENT_METHOD.KOKO, PAYMENT_METHOD.PAYHERE] },
-      status: { $in: [PAYMENT_STATUS.PENDING, PAYMENT_STATUS.PROCESSING] },
+      status: {
+        $in: [PAYMENT_STATUS.PENDING, PAYMENT_STATUS.PROCESSING, PAYMENT_STATUS.EXPIRED],
+      },
       isDeleted: false,
       createdAt: { $gte: since },
     })
@@ -1237,7 +1257,11 @@ export class PaymentService {
   private async reconcilePendingGatewayPayment(payment: PaymentDocument): Promise<void> {
     if (payment.method === PAYMENT_METHOD.COD) return;
     if (PAYMENT_TERMINAL_SUCCESS_STATUSES.includes(payment.status as never)) return;
-    if (payment.status !== PAYMENT_STATUS.PENDING && payment.status !== PAYMENT_STATUS.PROCESSING) {
+    if (
+      payment.status !== PAYMENT_STATUS.PENDING &&
+      payment.status !== PAYMENT_STATUS.PROCESSING &&
+      payment.status !== PAYMENT_STATUS.EXPIRED
+    ) {
       return;
     }
 
@@ -1265,7 +1289,33 @@ export class PaymentService {
       );
       return;
     }
-    if (!result || result.status !== PAYMENT_STATUS.PAID) return;
+    if (!result) return;
+
+    if (
+      result.status === PAYMENT_STATUS.FAILED ||
+      result.status === PAYMENT_STATUS.CANCELLED ||
+      result.status === PAYMENT_STATUS.EXPIRED
+    ) {
+      payment.status = result.status;
+      payment.failedAt = payment.failedAt ?? new Date();
+      payment.failureReason = payment.failureReason ?? `Gateway reported status: ${result.status}`;
+      await payment.save();
+      if (attempt) {
+        attempt.status = PAYMENT_ATTEMPT_STATUS.FAILED;
+        await attempt.save();
+      }
+      try {
+        await checkoutService.releaseForPaymentFailure(
+          payment.checkoutId.toString(),
+          `Gateway ${payment.method} ${result.status} — release unpaid hold`,
+        );
+      } catch {
+        /* already released */
+      }
+      return;
+    }
+
+    if (result.status !== PAYMENT_STATUS.PAID) return;
 
     payment.status = PAYMENT_STATUS.PAID;
     payment.paidAt = payment.paidAt ?? new Date();

@@ -105,6 +105,25 @@ describe('Koko gateway', () => {
     }
   });
 
+  it('accepts FAILED callbacks so insufficient-funds attempts are not left as processing', async () => {
+    const { KokoGateway } = await import('@/services/gateways/koko.gateway.js');
+    const gateway = new KokoGateway();
+    const body = new URLSearchParams({
+      orderId: 'PAY-MT5U46JR-A9B8F7-A1',
+      trnId: 'TX-FAIL',
+      status: 'FAILED',
+    }).toString();
+
+    const result = await gateway.verifyWebhook({
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      rawBody: Buffer.from(body),
+    });
+
+    expect(result.valid).toBe(true);
+    expect(result.status).toBe('failed');
+    expect(result.orderId).toBe('PAY-MT5U46JR-A9B8F7-A1');
+  });
+
   it('returns valid=false when orderId or status is missing', async () => {
     const { KokoGateway } = await import('@/services/gateways/koko.gateway.js');
     const gateway = new KokoGateway();

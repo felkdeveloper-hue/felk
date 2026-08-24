@@ -10,6 +10,7 @@ import {
   catchUpOrphanPaidGatewayPayments,
   recoverConfirmedMintpayOrders,
   recoverConfirmedKokoOrders,
+  voidUnverifiedKokoAutoOrders,
 } from '@/services/order-payment-consumer.service.js';
 import { startCronJobs } from '@/cron/index.js';
 import { resetEmailTransporter, verifyEmailTransporter } from '@/services/email/transporter.js';
@@ -86,18 +87,6 @@ async function bootstrap(): Promise<void> {
       .catch((error) => {
         logger.error({ err: error }, 'COD catch-up scan failed');
       });
-    catchUpOrphanPaidGatewayPayments()
-      .then(({ scanned, created }) => {
-        if (created > 0) {
-          logger.info(
-            { scanned, created },
-            'Paid-gateway catch-up: created orders from verified payments',
-          );
-        }
-      })
-      .catch((error) => {
-        logger.error({ err: error }, 'Paid-gateway catch-up scan failed');
-      });
     recoverConfirmedMintpayOrders()
       .then(({ scanned, recovered }) => {
         const created = recovered.filter((row) => row.orderNumber);
@@ -120,13 +109,27 @@ async function bootstrap(): Promise<void> {
       .catch((error) => {
         logger.error({ err: error }, 'Mintpay confirmed-order recovery failed');
       });
-    recoverConfirmedKokoOrders()
-      .then(({ scanned, recovered }) => {
-        const created = recovered.filter((row) => row.orderNumber);
+    voidUnverifiedKokoAutoOrders()
+      .then(async (voided) => {
+        if (voided.voided.length > 0) {
+          logger.warn(
+            { voided: voided.voided },
+            'Koko: cancelled admin orders that were not captured by Paykoko',
+          );
+        }
+        const orphan = await catchUpOrphanPaidGatewayPayments();
+        if (orphan.created > 0) {
+          logger.info(
+            { scanned: orphan.scanned, created: orphan.created },
+            'Paid-gateway catch-up: created orders from verified payments',
+          );
+        }
+        const koko = await recoverConfirmedKokoOrders();
+        const created = koko.recovered.filter((row) => row.orderNumber);
         if (created.length > 0) {
           logger.info(
             {
-              scanned,
+              scanned: koko.scanned,
               created: created.length,
               orders: created.map((row) => ({
                 referenceNumber: row.referenceNumber,
@@ -135,12 +138,12 @@ async function bootstrap(): Promise<void> {
                 amount: row.amount,
               })),
             },
-            'Koko recovery: created missing orders from confirmed Paykoko payments',
+            'Koko recovery: created missing orders from captured Paykoko payments',
           );
         }
       })
       .catch((error) => {
-        logger.error({ err: error }, 'Koko confirmed-order recovery failed');
+        logger.error({ err: error }, 'Gateway payment/order sync failed');
       });
   } catch (error) {
     logger.warn({ err: error }, 'MongoDB unavailable — starting in degraded mode');
