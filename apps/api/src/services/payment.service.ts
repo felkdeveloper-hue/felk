@@ -57,6 +57,8 @@ import {
   mintpayFailHashMessage,
   mintpaySuccessHashMessage,
 } from '@/services/gateways/mintpay.gateway.js';
+import { KOKO_RECOVER_LOOKBACK_MS } from '@/utils/koko-auto-recover.js';
+import { webhookRecordNeedsReplay } from '@/utils/webhook-replay.js';
 
 function toPlain(doc: { toObject: () => Record<string, unknown> }) {
   return doc.toObject();
@@ -675,6 +677,7 @@ export class PaymentService {
     const eventId = this.computeWebhookEventId(gatewayKey, req.headers, rawBody);
 
     let webhook;
+    let replayed = false;
     try {
       webhook = await PaymentWebhookModel.create({
         gateway: gatewayKey,
@@ -688,8 +691,9 @@ export class PaymentService {
           null,
       });
     } catch (error) {
-      // Duplicate eventId — replay attempt or gateway retry. Idempotent no-op.
-      if (this.isDuplicateKeyError(error)) {
+      if (!this.isDuplicateKeyError(error)) throw error;
+      webhook = await PaymentWebhookModel.findOne({ gateway: gatewayKey, eventId });
+      if (!webhook || !webhookRecordNeedsReplay(webhook)) {
         await writeAuditLog({
           action: PAYMENT_AUDIT.WEBHOOK_RECEIVED,
           resourceType: 'payment_webhooks',
@@ -697,21 +701,39 @@ export class PaymentService {
         });
         return { ok: true, duplicate: true };
       }
-      throw error;
+      replayed = true;
+      logger.info(
+        { gateway: gatewayKey, eventId, previousResult: webhook.processingResult },
+        'Replaying gateway webhook that did not finish',
+      );
     }
 
-    await writeAuditLog({
-      action: PAYMENT_AUDIT.WEBHOOK_RECEIVED,
-      resourceType: 'payment_webhooks',
-      resourceId: webhook._id.toString(),
-      metadata: { gateway: gatewayKey, eventId },
-    });
+    if (!replayed) {
+      await writeAuditLog({
+        action: PAYMENT_AUDIT.WEBHOOK_RECEIVED,
+        resourceType: 'payment_webhooks',
+        resourceId: webhook._id.toString(),
+        metadata: { gateway: gatewayKey, eventId },
+      });
+    }
 
-    const verification = await gateway.verifyWebhook({
-      headers: req.headers,
-      rawBody,
-      callbackHmac: req.callbackHmac,
-    });
+    let verification;
+    try {
+      verification = await gateway.verifyWebhook({
+        headers: req.headers,
+        rawBody,
+        callbackHmac: req.callbackHmac,
+      });
+    } catch (err) {
+      webhook.processed = false;
+      webhook.processingResult = 'error';
+      await webhook.save();
+      logger.error(
+        { err, gateway: gatewayKey, eventId },
+        'Gateway webhook verification crashed — left open for retry',
+      );
+      return { ok: false, reason: 'error' as const };
+    }
     webhook.verified = Boolean(verification.valid);
 
     if (!verification.valid) {
@@ -727,241 +749,302 @@ export class PaymentService {
       return { ok: false, reason: 'invalid_signature' as const };
     }
 
-    const attempt = await this.findAttemptForGateway(
-      gatewayKey,
-      String(verification.orderId ?? ''),
-    );
+    try {
+      const attempt = await this.findAttemptForGateway(
+        gatewayKey,
+        String(verification.orderId ?? ''),
+      );
 
-    if (!attempt) {
-      return this.failVerification(webhook, gatewayKey, 'unknown_order');
-    }
+      if (!attempt) {
+        return this.failVerification(webhook, gatewayKey, 'unknown_order');
+      }
 
-    const payment = await PaymentModel.findOne({ _id: attempt.paymentId, isDeleted: false });
-    if (!payment) {
-      return this.failVerification(webhook, gatewayKey, 'unknown_payment');
-    }
+      const payment = await PaymentModel.findOne({ _id: attempt.paymentId, isDeleted: false });
+      if (!payment) {
+        return this.failVerification(webhook, gatewayKey, 'unknown_payment');
+      }
 
-    webhook.paymentId = payment._id;
+      webhook.paymentId = payment._id;
 
-    if (payment.method !== gatewayKey) {
-      return this.failVerification(webhook, gatewayKey, 'gateway_mismatch', payment);
-    }
+      if (payment.method !== gatewayKey) {
+        return this.failVerification(webhook, gatewayKey, 'gateway_mismatch', payment);
+      }
 
-    const amountOk =
-      verification.amount === undefined ||
-      Number.isNaN(Number(verification.amount)) ||
-      Math.abs(Number(verification.amount) - payment.amount) <= 0.01;
-    if (!amountOk) {
-      return this.failVerification(webhook, gatewayKey, 'amount_mismatch', payment, true);
-    }
+      const amountOk =
+        verification.amount === undefined ||
+        Number.isNaN(Number(verification.amount)) ||
+        Math.abs(Number(verification.amount) - payment.amount) <= 0.01;
+      if (!amountOk) {
+        return this.failVerification(webhook, gatewayKey, 'amount_mismatch', payment, true);
+      }
 
-    const currencyOk =
-      !verification.currency ||
-      verification.currency.toUpperCase() === payment.currency.toUpperCase();
-    if (!currencyOk) {
-      return this.failVerification(webhook, gatewayKey, 'currency_mismatch', payment, true);
-    }
+      const currencyOk =
+        !verification.currency ||
+        verification.currency.toUpperCase() === payment.currency.toUpperCase();
+      if (!currencyOk) {
+        return this.failVerification(webhook, gatewayKey, 'currency_mismatch', payment, true);
+      }
 
-    const checkoutStillExists = await CheckoutSessionModel.exists({
-      _id: payment.checkoutId,
-    });
-    if (!checkoutStillExists) {
-      await writePaymentLog({
-        paymentId: payment._id.toString(),
-        action: 'webhook.checkout_missing',
-        level: 'warn',
-        message: 'Checkout session no longer exists — payment still recorded',
+      const checkoutStillExists = await CheckoutSessionModel.exists({
+        _id: payment.checkoutId,
       });
-    }
+      if (!checkoutStillExists) {
+        await writePaymentLog({
+          paymentId: payment._id.toString(),
+          action: 'webhook.checkout_missing',
+          level: 'warn',
+          message: 'Checkout session no longer exists — payment still recorded',
+        });
+      }
 
-    await writeAuditLog({
-      action: PAYMENT_AUDIT.VERIFICATION_SUCCESS,
-      resourceType: 'payments',
-      resourceId: payment._id.toString(),
-      metadata: { gateway: gatewayKey, gatewayTxnId: verification.gatewayTxnId },
-    });
-
-    const newStatus = verification.status ?? PAYMENT_STATUS.FAILED;
-    const alreadyCaptured = PAYMENT_TERMINAL_SUCCESS_STATUSES.includes(payment.status as never);
-    const isRefundUpdate =
-      newStatus === PAYMENT_STATUS.REFUNDED || newStatus === PAYMENT_STATUS.PARTIALLY_REFUNDED;
-    if (alreadyCaptured && newStatus !== PAYMENT_STATUS.PAID && !isRefundUpdate) {
-      webhook.processed = true;
-      webhook.processingResult = 'ignored_after_paid';
-      await webhook.save();
-      return { ok: true, status: payment.status };
-    }
-
-    const processingTimeMs = Date.now() - startedAt;
-
-    await PaymentTransactionModel.create({
-      paymentId: payment._id,
-      attemptId: attempt._id,
-      gateway: gatewayKey,
-      gatewayTransactionId: verification.gatewayTxnId ?? null,
-      referenceNumber: payment.referenceNumber,
-      amount: verification.amount ?? payment.amount,
-      currency: verification.currency ?? payment.currency,
-      status: newStatus,
-      gatewayResponse: verification.payload ?? null,
-      rawPayload: rawBodyToString(rawBody),
-      signature: webhook.signature,
-      verificationResult: { valid: true, reason: null },
-      processingTimeMs,
-      retryCount: Math.max(0, payment.attemptCount - 1),
-    });
-
-    attempt.status = PAYMENT_TERMINAL_SUCCESS_STATUSES.includes(newStatus as never)
-      ? PAYMENT_ATTEMPT_STATUS.SUCCEEDED
-      : newStatus === PAYMENT_STATUS.PROCESSING
-        ? PAYMENT_ATTEMPT_STATUS.PROCESSING
-        : PAYMENT_ATTEMPT_STATUS.FAILED;
-    await attempt.save();
-
-    payment.status = newStatus;
-    if (newStatus === PAYMENT_STATUS.PAID) payment.paidAt = new Date();
-    if (
-      [PAYMENT_STATUS.FAILED, PAYMENT_STATUS.CANCELLED, PAYMENT_STATUS.EXPIRED].includes(
-        newStatus as never,
-      )
-    ) {
-      payment.failedAt = new Date();
-      payment.failureReason = `Gateway reported status: ${newStatus}`;
-    }
-    if (verification.gatewayTxnId) {
-      payment.metadata = {
-        ...payment.metadata,
-        gatewayTxnId: verification.gatewayTxnId,
-        ...(gatewayKey === 'payhere' ? { payherePaymentId: verification.gatewayTxnId } : {}),
-      };
-    }
-    await payment.save();
-
-    webhook.processed = true;
-    webhook.processingResult = 'success';
-    await webhook.save();
-
-    if (newStatus === PAYMENT_STATUS.PAID) {
       await writeAuditLog({
-        action: PAYMENT_AUDIT.PAYMENT_COMPLETED,
+        action: PAYMENT_AUDIT.VERIFICATION_SUCCESS,
         resourceType: 'payments',
         resourceId: payment._id.toString(),
-        after: toPlain(payment),
+        metadata: { gateway: gatewayKey, gatewayTxnId: verification.gatewayTxnId },
       });
-      await publishPaymentEvent(
-        PAYMENT_EVENT_TYPE.PAYMENT_SUCCEEDED,
-        {
+
+      const newStatus = verification.status ?? PAYMENT_STATUS.FAILED;
+      const alreadyCaptured = PAYMENT_TERMINAL_SUCCESS_STATUSES.includes(payment.status as never);
+      const isRefundUpdate =
+        newStatus === PAYMENT_STATUS.REFUNDED || newStatus === PAYMENT_STATUS.PARTIALLY_REFUNDED;
+      if (alreadyCaptured && newStatus !== PAYMENT_STATUS.PAID && !isRefundUpdate) {
+        webhook.processed = true;
+        webhook.processingResult = 'ignored_after_paid';
+        await webhook.save();
+        return { ok: true, status: payment.status };
+      }
+
+      const processingTimeMs = Date.now() - startedAt;
+
+      await PaymentTransactionModel.create({
+        paymentId: payment._id,
+        attemptId: attempt._id,
+        gateway: gatewayKey,
+        gatewayTransactionId: verification.gatewayTxnId ?? null,
+        referenceNumber: payment.referenceNumber,
+        amount: verification.amount ?? payment.amount,
+        currency: verification.currency ?? payment.currency,
+        status: newStatus,
+        gatewayResponse: verification.payload ?? null,
+        rawPayload: rawBodyToString(rawBody),
+        signature: webhook.signature,
+        verificationResult: { valid: true, reason: null },
+        processingTimeMs,
+        retryCount: Math.max(0, payment.attemptCount - 1),
+      });
+
+      attempt.status = PAYMENT_TERMINAL_SUCCESS_STATUSES.includes(newStatus as never)
+        ? PAYMENT_ATTEMPT_STATUS.SUCCEEDED
+        : newStatus === PAYMENT_STATUS.PROCESSING
+          ? PAYMENT_ATTEMPT_STATUS.PROCESSING
+          : PAYMENT_ATTEMPT_STATUS.FAILED;
+      await attempt.save();
+
+      payment.status = newStatus;
+      if (newStatus === PAYMENT_STATUS.PAID) payment.paidAt = new Date();
+      if (
+        [PAYMENT_STATUS.FAILED, PAYMENT_STATUS.CANCELLED, PAYMENT_STATUS.EXPIRED].includes(
+          newStatus as never,
+        )
+      ) {
+        payment.failedAt = new Date();
+        payment.failureReason = `Gateway reported status: ${newStatus}`;
+      }
+      if (verification.gatewayTxnId) {
+        payment.metadata = {
+          ...payment.metadata,
+          gatewayTxnId: verification.gatewayTxnId,
+          ...(gatewayKey === 'payhere' ? { payherePaymentId: verification.gatewayTxnId } : {}),
+        };
+      }
+      await payment.save();
+
+      webhook.processed = true;
+      webhook.processingResult = 'success';
+      await webhook.save();
+
+      if (newStatus === PAYMENT_STATUS.PAID) {
+        await writeAuditLog({
+          action: PAYMENT_AUDIT.PAYMENT_COMPLETED,
+          resourceType: 'payments',
+          resourceId: payment._id.toString(),
+          after: toPlain(payment),
+        });
+        await publishPaymentEvent(
+          PAYMENT_EVENT_TYPE.PAYMENT_SUCCEEDED,
+          {
+            paymentId: payment._id.toString(),
+            checkoutToken: payment.checkoutToken,
+            amount: payment.amount,
+            currency: payment.currency,
+            gatewayTxnId: verification.gatewayTxnId,
+          },
+          { paymentId: payment._id.toString(), checkoutId: payment.checkoutId.toString() },
+        );
+        await handlePaymentSucceededEvent({
           paymentId: payment._id.toString(),
           checkoutToken: payment.checkoutToken,
           amount: payment.amount,
           currency: payment.currency,
-          gatewayTxnId: verification.gatewayTxnId,
-        },
-        { paymentId: payment._id.toString(), checkoutId: payment.checkoutId.toString() },
-      );
-      await handlePaymentSucceededEvent({
-        paymentId: payment._id.toString(),
-        checkoutToken: payment.checkoutToken,
-        amount: payment.amount,
-        currency: payment.currency,
-        method: payment.method,
-      });
+          method: payment.method,
+        });
 
-      // Send payment success email (fire-and-forget)
-      void (async () => {
-        try {
-          const customer = await customerService
-            .getById(payment.customerId.toString())
-            .catch(() => null);
-          if (customer) {
-            const tpl = paymentSuccessfulEmail({
-              name:
-                (customer as { firstName?: string; email: string }).firstName ??
-                (customer as { email: string }).email,
-              orderNumber: payment.referenceNumber,
-              amount: payment.amount,
-              currency: payment.currency,
-              method: payment.method,
-            });
-            await emailQueueService.enqueue({
-              ...tpl,
-              to: (customer as { email: string }).email,
-              templateKey: 'payment_successful',
-            });
+        // Send payment success email (fire-and-forget)
+        void (async () => {
+          try {
+            const customer = await customerService
+              .getById(payment.customerId.toString())
+              .catch(() => null);
+            if (customer) {
+              const tpl = paymentSuccessfulEmail({
+                name:
+                  (customer as { firstName?: string; email: string }).firstName ??
+                  (customer as { email: string }).email,
+                orderNumber: payment.referenceNumber,
+                amount: payment.amount,
+                currency: payment.currency,
+                method: payment.method,
+              });
+              await emailQueueService.enqueue({
+                ...tpl,
+                to: (customer as { email: string }).email,
+                templateKey: 'payment_successful',
+              });
+            }
+          } catch {
+            /* non-blocking */
           }
-        } catch {
-          /* non-blocking */
-        }
-      })();
-    } else if (newStatus === PAYMENT_STATUS.AUTHORIZED) {
-      await publishPaymentEvent(
-        PAYMENT_EVENT_TYPE.PAYMENT_AUTHORIZED,
-        { paymentId: payment._id.toString(), checkoutToken: payment.checkoutToken },
-        { paymentId: payment._id.toString(), checkoutId: payment.checkoutId.toString() },
-      );
-    } else {
-      await writeAuditLog({
-        action: PAYMENT_AUDIT.PAYMENT_FAILED,
-        resourceType: 'payments',
-        resourceId: payment._id.toString(),
-        metadata: { status: newStatus },
-      });
-      await publishPaymentEvent(
-        PAYMENT_EVENT_TYPE.PAYMENT_FAILED,
-        {
-          paymentId: payment._id.toString(),
-          checkoutToken: payment.checkoutToken,
-          status: newStatus,
-        },
-        { paymentId: payment._id.toString(), checkoutId: payment.checkoutId.toString() },
-      );
-
-      // Restore Available immediately — do not wait solely on the event consumer.
-      try {
-        await checkoutService.releaseForPaymentFailure(
-          payment.checkoutId.toString(),
-          `Gateway reported ${newStatus} — release unpaid hold`,
+        })();
+      } else if (newStatus === PAYMENT_STATUS.AUTHORIZED) {
+        await publishPaymentEvent(
+          PAYMENT_EVENT_TYPE.PAYMENT_AUTHORIZED,
+          { paymentId: payment._id.toString(), checkoutToken: payment.checkoutToken },
+          { paymentId: payment._id.toString(), checkoutId: payment.checkoutId.toString() },
         );
-      } catch {
-        /* already released / no hold */
+      } else {
+        await writeAuditLog({
+          action: PAYMENT_AUDIT.PAYMENT_FAILED,
+          resourceType: 'payments',
+          resourceId: payment._id.toString(),
+          metadata: { status: newStatus },
+        });
+        await publishPaymentEvent(
+          PAYMENT_EVENT_TYPE.PAYMENT_FAILED,
+          {
+            paymentId: payment._id.toString(),
+            checkoutToken: payment.checkoutToken,
+            status: newStatus,
+          },
+          { paymentId: payment._id.toString(), checkoutId: payment.checkoutId.toString() },
+        );
+
+        // Restore Available immediately — do not wait solely on the event consumer.
+        try {
+          await checkoutService.releaseForPaymentFailure(
+            payment.checkoutId.toString(),
+            `Gateway reported ${newStatus} — release unpaid hold`,
+          );
+        } catch {
+          /* already released / no hold */
+        }
+
+        // Send payment failed email (fire-and-forget)
+        void (async () => {
+          try {
+            const customer = await customerService
+              .getById(payment.customerId.toString())
+              .catch(() => null);
+            if (customer) {
+              const tpl = paymentFailedEmail({
+                name:
+                  (customer as { firstName?: string; email: string }).firstName ??
+                  (customer as { email: string }).email,
+                orderNumber: payment.referenceNumber,
+                amount: payment.amount,
+                currency: payment.currency,
+                reason: newStatus,
+              });
+              await emailQueueService.enqueue({
+                ...tpl,
+                to: (customer as { email: string }).email,
+                templateKey: 'payment_failed',
+              });
+            }
+          } catch {
+            /* non-blocking */
+          }
+        })();
       }
 
-      // Send payment failed email (fire-and-forget)
-      void (async () => {
-        try {
-          const customer = await customerService
-            .getById(payment.customerId.toString())
-            .catch(() => null);
-          if (customer) {
-            const tpl = paymentFailedEmail({
-              name:
-                (customer as { firstName?: string; email: string }).firstName ??
-                (customer as { email: string }).email,
-              orderNumber: payment.referenceNumber,
-              amount: payment.amount,
-              currency: payment.currency,
-              reason: newStatus,
-            });
-            await emailQueueService.enqueue({
-              ...tpl,
-              to: (customer as { email: string }).email,
-              templateKey: 'payment_failed',
-            });
-          }
-        } catch {
-          /* non-blocking */
+      await writePaymentLog({
+        paymentId: payment._id.toString(),
+        action: 'webhook.processed',
+        message: `Webhook from ${gatewayKey} processed — status now ${newStatus}`,
+        metadata: { gatewayTxnId: verification.gatewayTxnId, processingTimeMs },
+      });
+
+      return { ok: true, status: newStatus };
+    } catch (err) {
+      webhook.processed = false;
+      webhook.processingResult = 'error';
+      await webhook.save();
+      logger.error(
+        { err, gateway: gatewayKey, eventId },
+        'Gateway webhook processing crashed — left open for retry',
+      );
+      return { ok: false, reason: 'error' as const };
+    }
+  }
+
+  /**
+   * Re-run Koko SUCCESS callbacks that were stored but never finished.
+   * A crashed first attempt used to block Koko retries as "duplicate".
+   */
+  async replayUnprocessedKokoWebhooks(): Promise<{
+    scanned: number;
+    replayed: number;
+    paid: number;
+  }> {
+    const since = new Date(Date.now() - KOKO_RECOVER_LOOKBACK_MS);
+    const webhooks = await PaymentWebhookModel.find({
+      gateway: PAYMENT_METHOD.KOKO,
+      createdAt: { $gte: since },
+      $or: [
+        { processed: false },
+        { processingResult: { $in: ['invalid_signature', 'error', 'unknown_order'] } },
+      ],
+    })
+      .sort({ createdAt: -1 })
+      .limit(50);
+
+    let replayed = 0;
+    let paid = 0;
+    for (const webhook of webhooks) {
+      if (!webhookRecordNeedsReplay(webhook)) continue;
+      const raw = String(webhook.rawPayload ?? '');
+      if (!raw || !/status=SUCCESS|["']SUCCESS["']/i.test(raw)) continue;
+      if (webhook.paymentId) {
+        const existing = await PaymentModel.findById(webhook.paymentId);
+        if (existing && PAYMENT_TERMINAL_SUCCESS_STATUSES.includes(existing.status as never)) {
+          webhook.processed = true;
+          webhook.verified = true;
+          webhook.processingResult = 'ignored_after_paid';
+          await webhook.save();
+          continue;
         }
-      })();
+      }
+
+      const result = await this.handleWebhook('koko', {
+        headers: (webhook.headers ?? {}) as Record<string, string | string[] | undefined>,
+        rawBody: Buffer.from(raw),
+        body: {},
+      });
+      replayed += 1;
+      if (result.status === PAYMENT_STATUS.PAID) paid += 1;
     }
 
-    await writePaymentLog({
-      paymentId: payment._id.toString(),
-      action: 'webhook.processed',
-      message: `Webhook from ${gatewayKey} processed — status now ${newStatus}`,
-      metadata: { gatewayTxnId: verification.gatewayTxnId, processingTimeMs },
-    });
-
-    return { ok: true, status: newStatus };
+    return { scanned: webhooks.length, replayed, paid };
   }
 
   /**

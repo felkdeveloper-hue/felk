@@ -411,6 +411,7 @@ export class KokoGateway implements PaymentGateway {
   async queryOrderView(
     orderId: string,
     pluginVersion = PLUGIN_VERSION,
+    opts?: { timeoutMs?: number; maxAttempts?: number },
   ): Promise<{
     orderId: string;
     trnId: string;
@@ -444,11 +445,15 @@ export class KokoGateway implements PaymentGateway {
     });
 
     try {
-      const { data } = await fetchWithRetry<unknown>(kokoOrderViewUrl(), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: body.toString(),
-      });
+      const { data } = await fetchWithRetry<unknown>(
+        kokoOrderViewUrl(),
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: body.toString(),
+        },
+        opts,
+      );
       const payload = typeof data === 'string' ? parseWebhookPayload(data) : flattenKokoView(data);
       const viewedOrderId = kokoCallbackField(payload, 'orderId', '_orderId');
       const trnId = kokoCallbackField(payload, 'trnId', 'trn_id', 'transactionId');
@@ -529,7 +534,10 @@ export class KokoGateway implements PaymentGateway {
     const cryptoOk = rsaOk || bodyHmacOk || fieldHmacOk;
 
     if (!cryptoOk) {
-      const viewed = await this.queryOrderView(orderId);
+      const viewed = await this.queryOrderView(orderId, PLUGIN_VERSION, {
+        timeoutMs: 4000,
+        maxAttempts: 1,
+      });
       if (viewed) {
         const mappedFromView =
           KOKO_STATUS_MAP[viewed.status] ??

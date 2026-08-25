@@ -5,7 +5,11 @@ export const KOKO_RECOVER_LOOKBACK_MS = 21 * 24 * 60 * 60 * 1000;
  * Merchant-dashboard captures reported to us that never got a webhook/return.
  * Do not add processing/failed attempts here — only Success-tab captures.
  */
-export const CONFIRMED_KOKO_CAPTURED_PREFIXES = ['PAY-MT4OEBC4-B8BAD7', 'PAY-MT4OEBC4'] as const;
+export const CONFIRMED_KOKO_CAPTURED_PREFIXES = [
+  'PAY-MT4OEBC4-B8BAD7',
+  'PAY-MT4OEBC4',
+  'PAY-MT848AC4',
+] as const;
 
 /** Admin orders created from unverified Koko auto-recovery (money was never captured). */
 export const UNVERIFIED_KOKO_ORDER_NUMBERS = [

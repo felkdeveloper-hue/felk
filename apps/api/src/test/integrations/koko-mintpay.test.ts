@@ -138,6 +138,36 @@ describe('Koko gateway', () => {
     expect(kokoReturnHmacMatches('PAY-OTHER-A1', sig)).toBe(false);
   });
 
+  it('accepts SUCCESS when Koko RSA signature matches orderId+trnId+status', async () => {
+    const { createSign } = await import('node:crypto');
+    const { publicKey, privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+    const pub = publicKey.export({ type: 'spki', format: 'pem' }).toString();
+    const priv = privateKey.export({ type: 'pkcs1', format: 'pem' }).toString();
+    const orderId = 'PAY-SIGNED-A1';
+    const trnId = '25ea0615e923bac462e2eee65829c5b0';
+    const status = 'SUCCESS';
+    const signer = createSign('SHA256');
+    signer.update(orderId + trnId + status);
+    const signature = signer.sign(priv, 'base64');
+
+    const koko = appConfig.payment.koko as { publicKey?: string };
+    const previous = koko.publicKey;
+    koko.publicKey = pub;
+    try {
+      const { KokoGateway } = await import('@/services/gateways/koko.gateway.js');
+      const gateway = new KokoGateway();
+      const result = await gateway.verifyWebhook({
+        headers: {},
+        rawBody: new URLSearchParams({ orderId, trnId, status, signature }).toString(),
+      });
+      expect(result.valid).toBe(true);
+      expect(result.status).toBe('paid');
+      expect(result.gatewayTxnId).toBe(trnId);
+    } finally {
+      koko.publicKey = previous;
+    }
+  });
+
   it('accepts SUCCESS on HMAC-bound IPN when Koko sends a transaction id', async () => {
     const { KokoGateway, kokoReturnHmac } = await import('@/services/gateways/koko.gateway.js');
     const gateway = new KokoGateway();

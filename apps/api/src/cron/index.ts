@@ -110,12 +110,14 @@ async function runPaymentOrderSync() {
     } = await import('@/services/order-payment-consumer.service.js');
     const { paymentService } = await import('@/services/payment.service.js');
     const voided = await voidUnverifiedKokoAutoOrders();
+    const replayed = await paymentService.replayUnprocessedKokoWebhooks();
     const open = await paymentService.reconcileOpenGatewayPayments();
     const koko = await recoverConfirmedKokoOrders();
     const orphan = await catchUpOrphanPaidGatewayPayments();
     if (
       orphan.created > 0 ||
       open.paid > 0 ||
+      replayed.paid > 0 ||
       koko.recovered.length > 0 ||
       voided.voided.length > 0
     ) {
@@ -123,6 +125,7 @@ async function runPaymentOrderSync() {
         {
           orphanCreated: orphan.created,
           gatewayPaid: open.paid,
+          kokoReplayed: replayed.paid,
           kokoRecovered: koko.recovered.length,
           kokoVoided: voided.voided,
           kokoOrders: koko.recovered.map((row) => ({

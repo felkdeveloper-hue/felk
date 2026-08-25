@@ -1,7 +1,12 @@
 import { randomBytes } from 'node:crypto';
 import { Types } from 'mongoose';
 import { OrderModel, type OrderItemSubdocument } from '@/models/order.models.js';
-import { PaymentModel, PaymentEventModel, PaymentAttemptModel } from '@/models/payment.models.js';
+import {
+  PaymentModel,
+  PaymentEventModel,
+  PaymentAttemptModel,
+  PaymentWebhookModel,
+} from '@/models/payment.models.js';
 import { CheckoutSessionModel, type CheckoutSessionDocument } from '@/models/checkout.models.js';
 import { CustomerModel } from '@/models/customer.models.js';
 import { ProductModel, ProductVariantModel, ProductMediaModel } from '@/models/product.models.js';
@@ -685,8 +690,33 @@ export async function recoverConfirmedKokoOrders(): Promise<{
       const viewed = await kokoGateway.verifyTransaction(orderId);
       const viewedPaid = viewed?.status === PAYMENT_STATUS.PAID;
       const merchantCaptured = kokoReferenceIsConfirmedCapture(payment.referenceNumber);
-      if (!viewedPaid && !merchantCaptured) continue;
+      let storedTxnId: string | undefined;
+      let storedPaid = false;
+      if (!viewedPaid && !merchantCaptured) {
+        const escapedOrderId = orderId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const stored = await PaymentWebhookModel.find({
+          gateway: PAYMENT_METHOD.KOKO,
+          createdAt: { $gte: since },
+          rawPayload: new RegExp(escapedOrderId),
+        })
+          .sort({ createdAt: -1 })
+          .limit(3);
+        for (const row of stored) {
+          if (!row.rawPayload) continue;
+          const verified = await kokoGateway.verifyWebhook({
+            headers: {},
+            rawBody: row.rawPayload,
+          });
+          if (verified.valid && verified.status === PAYMENT_STATUS.PAID) {
+            storedPaid = true;
+            storedTxnId = verified.gatewayTxnId;
+            break;
+          }
+        }
+      }
+      if (!viewedPaid && !merchantCaptured && !storedPaid) continue;
 
+      const gatewayTxnId = viewed?.gatewayTxnId || storedTxnId;
       payment.status = PAYMENT_STATUS.PAID;
       payment.paidAt = payment.paidAt ?? new Date();
       payment.failureReason = null;
@@ -694,13 +724,14 @@ export async function recoverConfirmedKokoOrders(): Promise<{
         ...payment.metadata,
         kokoReconciled: true,
         kokoAutoRecovered: false,
-        ...(merchantCaptured && !viewedPaid ? { kokoMerchantConfirmed: true } : {}),
-        ...(viewed?.gatewayTxnId ? { gatewayTxnId: viewed.gatewayTxnId } : {}),
+        ...(merchantCaptured && !viewedPaid && !storedPaid ? { kokoMerchantConfirmed: true } : {}),
+        ...(storedPaid ? { kokoWebhookConfirmed: true } : {}),
+        ...(gatewayTxnId ? { gatewayTxnId } : {}),
       };
       await payment.save();
       if (attempt) {
         attempt.status = 'succeeded';
-        if (viewed?.gatewayTxnId) attempt.gatewayPaymentId = viewed.gatewayTxnId;
+        if (gatewayTxnId) attempt.gatewayPaymentId = gatewayTxnId;
         await attempt.save();
       }
       logger.info(
@@ -708,6 +739,7 @@ export async function recoverConfirmedKokoOrders(): Promise<{
           referenceNumber: payment.referenceNumber,
           viewedPaid,
           merchantCaptured,
+          storedPaid,
         },
         'Koko recovery: captured payment confirmed — creating admin order',
       );
@@ -719,7 +751,7 @@ export async function recoverConfirmedKokoOrders(): Promise<{
           amount: payment.amount,
           currency: payment.currency,
           method: payment.method,
-          gatewayTxnId: viewed?.gatewayTxnId,
+          gatewayTxnId,
         },
         { paymentId: payment._id.toString(), checkoutId: payment.checkoutId.toString() },
       );
