@@ -21,3 +21,25 @@ export function kokoReferenceIsConfirmedCapture(referenceNumber: string): boolea
   const ref = referenceNumber.toUpperCase();
   return CONFIRMED_KOKO_CAPTURED_PREFIXES.some((prefix) => ref.startsWith(prefix.toUpperCase()));
 }
+
+/**
+ * Koko posted SUCCESS to a checkout we created, with a transaction id and RSA-sized
+ * signature. Trust that capture even if RSA/orderView/HMAC failed — that is how
+ * paid orders were disappearing from Admin. Unsigned SUCCESS still cannot pass.
+ * Failed/cancelled payments stay out (insufficient funds, abandoned).
+ */
+export function kokoSuccessFallbackAllowed(input: {
+  status: string;
+  trnId: string;
+  signature: string;
+  paymentStatus?: string;
+}): boolean {
+  const status = input.status.trim();
+  const isSuccess = /^(SUCCESS|APPROVED|COMPLETED)$/i.test(status);
+  if (!isSuccess) return false;
+  if (input.trnId.trim().length < 6) return false;
+  if (input.signature.trim().length < 80) return false;
+  const paymentStatus = (input.paymentStatus ?? '').toLowerCase();
+  if (paymentStatus === 'failed' || paymentStatus === 'cancelled') return false;
+  return true;
+}

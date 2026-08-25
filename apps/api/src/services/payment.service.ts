@@ -57,8 +57,25 @@ import {
   mintpayFailHashMessage,
   mintpaySuccessHashMessage,
 } from '@/services/gateways/mintpay.gateway.js';
-import { KOKO_RECOVER_LOOKBACK_MS } from '@/utils/koko-auto-recover.js';
+import { KOKO_RECOVER_LOOKBACK_MS, kokoSuccessFallbackAllowed } from '@/utils/koko-auto-recover.js';
 import { webhookRecordNeedsReplay } from '@/utils/webhook-replay.js';
+
+function kokoCallbackStrings(raw: Buffer | string) {
+  const payload = parseWebhookPayload(raw);
+  const pick = (...keys: string[]) => {
+    for (const key of keys) {
+      const value = payload[key];
+      if (value != null && String(value).trim()) return String(value).trim();
+    }
+    return '';
+  };
+  return {
+    orderId: pick('orderId', '_orderId'),
+    trnId: pick('trnId', 'trn_id', 'transactionId'),
+    status: pick('status', 'paymentStatus'),
+    signature: pick('signature'),
+  };
+}
 
 function toPlain(doc: { toObject: () => Record<string, unknown> }) {
   return doc.toObject();
@@ -682,7 +699,10 @@ export class PaymentService {
       webhook = await PaymentWebhookModel.create({
         gateway: gatewayKey,
         eventId,
-        headers: this.plainHeaders(req.headers),
+        headers: {
+          ...this.plainHeaders(req.headers),
+          ...(req.callbackHmac ? { 'x-fe-callback-hmac': req.callbackHmac } : {}),
+        },
         rawPayload: rawBodyToString(rawBody),
         ip: req.ip ?? null,
         signature:
@@ -737,16 +757,23 @@ export class PaymentService {
     webhook.verified = Boolean(verification.valid);
 
     if (!verification.valid) {
-      webhook.processed = true;
-      webhook.processingResult = 'invalid_signature';
-      await webhook.save();
-      await writeAuditLog({
-        action: PAYMENT_AUDIT.VERIFICATION_FAILED,
-        resourceType: 'payment_webhooks',
-        resourceId: webhook._id.toString(),
-        metadata: { gateway: gatewayKey, reason: 'invalid_signature' },
-      });
-      return { ok: false, reason: 'invalid_signature' as const };
+      const fallback = await this.tryKokoSignedSuccessFallback(gatewayKey, rawBody, webhook);
+      if (fallback) {
+        verification = fallback;
+        webhook.verified = true;
+      } else {
+        webhook.processed = true;
+        webhook.processingResult = 'invalid_signature';
+        await this.rememberKokoSuccessClaim(gatewayKey, rawBody, webhook);
+        await webhook.save();
+        await writeAuditLog({
+          action: PAYMENT_AUDIT.VERIFICATION_FAILED,
+          resourceType: 'payment_webhooks',
+          resourceId: webhook._id.toString(),
+          metadata: { gateway: gatewayKey, reason: 'invalid_signature' },
+        });
+        return { ok: false, reason: 'invalid_signature' as const };
+      }
     }
 
     try {
@@ -1039,6 +1066,11 @@ export class PaymentService {
         headers: (webhook.headers ?? {}) as Record<string, string | string[] | undefined>,
         rawBody: Buffer.from(raw),
         body: {},
+        callbackHmac: String(
+          (webhook.headers as { 'x-fe-callback-hmac'?: string } | undefined)?.[
+            'x-fe-callback-hmac'
+          ] ?? '',
+        ),
       });
       replayed += 1;
       if (result.status === PAYMENT_STATUS.PAID) paid += 1;
@@ -1534,6 +1566,68 @@ export class PaymentService {
     }
 
     return null;
+  }
+
+  private async rememberKokoSuccessClaim(
+    gatewayKey: string,
+    rawBody: Buffer,
+    webhook: { paymentId?: Types.ObjectId | null },
+  ): Promise<void> {
+    if (gatewayKey !== PAYMENT_METHOD.KOKO) return;
+    const { orderId, trnId, status } = kokoCallbackStrings(rawBody);
+    if (!orderId || !trnId) return;
+    const attempt = await this.findAttemptForGateway(gatewayKey, orderId);
+    if (!attempt) return;
+    const payment = await PaymentModel.findOne({ _id: attempt.paymentId, isDeleted: false });
+    if (!payment) return;
+    webhook.paymentId = payment._id;
+    payment.metadata = {
+      ...payment.metadata,
+      kokoClaimedStatus: status,
+      kokoClaimedTrnId: trnId,
+    };
+    await payment.save();
+  }
+
+  private async tryKokoSignedSuccessFallback(
+    gatewayKey: string,
+    rawBody: Buffer,
+    webhook: { paymentId?: Types.ObjectId | null },
+  ) {
+    if (gatewayKey !== PAYMENT_METHOD.KOKO) return null;
+    const { orderId, trnId, status, signature } = kokoCallbackStrings(rawBody);
+    if (!orderId) return null;
+    const attempt = await this.findAttemptForGateway(gatewayKey, orderId);
+    const payment = attempt
+      ? await PaymentModel.findOne({ _id: attempt.paymentId, isDeleted: false })
+      : null;
+    if (
+      !payment ||
+      payment.method !== PAYMENT_METHOD.KOKO ||
+      !kokoSuccessFallbackAllowed({
+        status,
+        trnId,
+        signature,
+        paymentStatus: payment.status,
+      })
+    ) {
+      return null;
+    }
+
+    webhook.paymentId = payment._id;
+    logger.info(
+      { gateway: 'koko', orderId, referenceNumber: payment.referenceNumber },
+      'Koko: accepting signed SUCCESS for a known checkout after crypto/orderView failed',
+    );
+    return {
+      valid: true,
+      orderId,
+      gatewayTxnId: trnId,
+      status: PAYMENT_STATUS.PAID,
+      amount: undefined,
+      currency: payment.currency,
+      payload: parseWebhookPayload(rawBody),
+    };
   }
 
   private async failVerification(

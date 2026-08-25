@@ -31,8 +31,10 @@ import { liveOrderExistsForCheckout, liveOrderExistsForPayment } from '@/utils/l
 import {
   KOKO_RECOVER_LOOKBACK_MS,
   kokoReferenceIsConfirmedCapture,
+  kokoSuccessFallbackAllowed,
   UNVERIFIED_KOKO_ORDER_NUMBERS,
 } from '@/utils/koko-auto-recover.js';
+import { parseWebhookPayload } from '@/services/gateways/gateway.utils.js';
 import {
   ensureMetaPurchaseTracked,
   trackMetaPurchaseForOrder,
@@ -654,9 +656,6 @@ export async function recoverConfirmedKokoOrders(): Promise<{
   const payments = await PaymentModel.find({
     method: PAYMENT_METHOD.KOKO,
     isDeleted: false,
-    status: {
-      $nin: [PAYMENT_STATUS.FAILED, PAYMENT_STATUS.CANCELLED],
-    },
     $or: [
       { createdAt: { $gte: since } },
       { _id: { $in: recentAttempts.map((row) => row.paymentId) } },
@@ -676,6 +675,7 @@ export async function recoverConfirmedKokoOrders(): Promise<{
   for (const payment of payments) {
     if (await liveOrderExistsForPayment(payment._id)) continue;
     if (await liveOrderExistsForCheckout(payment.checkoutId)) continue;
+    if (payment.metadata?.kokoAutoRecoveryReversed) continue;
 
     if (payment.status !== PAYMENT_STATUS.PAID) {
       const attempt = await PaymentAttemptModel.findOne({ paymentId: payment._id }).sort({
@@ -710,6 +710,24 @@ export async function recoverConfirmedKokoOrders(): Promise<{
           if (verified.valid && verified.status === PAYMENT_STATUS.PAID) {
             storedPaid = true;
             storedTxnId = verified.gatewayTxnId;
+            break;
+          }
+          const payload = parseWebhookPayload(row.rawPayload);
+          const claimedTrnId = String(
+            payload.trnId ?? payload.trn_id ?? payload.transactionId ?? '',
+          );
+          const claimedStatus = String(payload.status ?? payload.paymentStatus ?? '');
+          const claimedSignature = String(payload.signature ?? '');
+          if (
+            kokoSuccessFallbackAllowed({
+              status: claimedStatus,
+              trnId: claimedTrnId,
+              signature: claimedSignature,
+              paymentStatus: payment.status,
+            })
+          ) {
+            storedPaid = true;
+            storedTxnId = claimedTrnId;
             break;
           }
         }
