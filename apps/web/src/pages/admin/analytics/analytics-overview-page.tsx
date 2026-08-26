@@ -21,14 +21,24 @@ function kpi(metric?: KpiMetric | null): KpiMetric {
   return metric ?? EMPTY_KPI;
 }
 
+/** Landers must never read below unique visitors (funnel invariant / old API without landers). */
+function resolveLanders(landers: KpiMetric | undefined, visitors: KpiMetric): KpiMetric {
+  if (!landers) return visitors;
+  return {
+    value: Math.max(landers.value, visitors.value),
+    prev: Math.max(landers.prev, visitors.prev),
+    pctChange: landers.pctChange,
+  };
+}
+
 export function AnalyticsOverviewPage() {
   const [filter, setFilter] = useState<AnalyticsFilter>({ period: '7d' });
   const overview = useAnalyticsOverview(filter);
 
   const data = overview.data;
   const periodLabel = data?.periodLabel || formatAnalyticsPeriodLabel(filter);
-  const landers = kpi(data?.landers);
   const visitors = kpi(data?.totalVisitors);
+  const landers = resolveLanders(data?.landers, visitors);
   const users = kpi(data?.totalUsers);
   const loggedIn = kpi(data?.loggedInUsers);
 

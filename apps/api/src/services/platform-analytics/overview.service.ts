@@ -47,18 +47,19 @@ function makeMetric(current: number, previous: number): KpiMetric {
 
 /**
  * LANDERS ≈ Meta "landing page views": every time someone opens the site.
- * Sessions are the primary signal; distinct page-view sessions catch landings
- * that never got a session row (in-app browsers killing the tab early).
+ * Prefer sessions; fall back to entry page-views / any page-view sessions when
+ * in-app browsers die before a session row is written.
  */
 async function countLandingEvents(
   sessionMatch: Record<string, unknown>,
   pageMatch: Record<string, unknown>,
 ): Promise<number> {
-  const [sessions, pageViewSessions] = await Promise.all([
+  const [sessions, entryViews, pageViewSessions] = await Promise.all([
     SessionModel.countDocuments(sessionMatch),
+    PageViewModel.countDocuments({ ...pageMatch, isEntry: true }),
     PageViewModel.distinct('sessionId', pageMatch).then((ids) => ids.length),
   ]);
-  return Math.max(sessions, pageViewSessions);
+  return Math.max(sessions, entryViews, pageViewSessions);
 }
 
 /** Unique IPs in match (fallback visitorId when ipHash missing). */

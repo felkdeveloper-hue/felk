@@ -2,6 +2,7 @@ name: Deploy API to EC2
 
 # Auto-deploys the backend whenever main changes API-related code.
 # One-time setup: add GitHub secrets listed in docs/ec2-auto-deploy.md
+# workflow_dispatch: re-run manually from Actions if a push is skipped.
 on:
   push:
     branches: [main]
