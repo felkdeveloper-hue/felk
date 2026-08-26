@@ -55,9 +55,15 @@ export interface OverviewData {
   period: { from: string; to: string };
   /** e.g. "Last 7 days" — matches the selected filter */
   periodLabel?: string;
+  /** Total sessions in period — equivalent to Meta "landing page views". */
+  landers: KpiMetric;
+  /** Unique IPs that visited in period. */
   totalVisitors: KpiMetric;
   uniqueVisitors: KpiMetric;
+  /** Visitor records linked to a signed-in account. */
   loggedInUsers: KpiMetric;
+  /** Customer accounts (email sign-up) created in period. */
+  totalUsers: KpiMetric;
   newUsersToday: number;
   returningVisitors: KpiMetric;
   activeNow: number;

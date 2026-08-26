@@ -50,11 +50,12 @@ export function PaymentMethodSelector({ value, onChange, disabled }: PaymentMeth
                 >
                   <img
                     src={option.logoSrc}
-                    alt=""
+                    alt={`${option.label} logo`}
                     width={140}
                     height={36}
                     className="h-9 w-auto max-w-full object-contain"
-                    loading="lazy"
+                    decoding="async"
+                    fetchPriority="high"
                   />
                 </div>
                 <RadioGroupItem

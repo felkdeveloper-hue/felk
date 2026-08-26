@@ -1,4 +1,4 @@
-import { Bell, LogOut, Menu, Moon, Search, Sun } from 'lucide-react';
+import { Bell, LogOut, Menu, Moon, Sun } from 'lucide-react';
 import { useLogoutMutation } from '@/hooks/auth';
 import { useAuthStore, useAdminUiStore } from '@/store';
 import { cn } from '@/lib/utils';
@@ -47,21 +47,11 @@ export function AdminTopbar() {
           <Menu className="size-4" />
         </button>
 
-        <div className="min-w-0 lg:hidden">
-          <p className="truncate font-serif text-lg tracking-tight text-[var(--admin-ink)]">
+        <div className="min-w-0">
+          <p className="truncate font-serif text-lg tracking-tight text-[var(--admin-ink)] lg:hidden">
             FE Admin
           </p>
         </div>
-
-        <label className="relative hidden max-w-md flex-1 sm:block">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
-          <input
-            type="search"
-            placeholder="Search catalog, orders, customers…"
-            className="focus:border-[var(--admin-accent)]/40 focus:ring-[var(--admin-accent)]/25 w-full rounded-lg border border-[var(--admin-line)] bg-[var(--admin-panel)] py-2.5 pl-10 pr-3 text-sm outline-none transition placeholder:text-neutral-400 focus:ring-1"
-            disabled
-          />
-        </label>
       </div>
 
       <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">

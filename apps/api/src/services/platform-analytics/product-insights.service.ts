@@ -54,7 +54,9 @@ export async function getProductInsights(productId: string, filter: AnalyticsFil
     (byName.product_viewed ?? 0) + (byName.product_detail_opened ?? 0) + (pageStats[0]?.views ?? 0);
   const wishlistAdds = byName.add_to_wishlist ?? 0;
   const cartAdds = byName.add_to_cart ?? 0;
-  const purchases = byName.payment_completed ?? orders.length;
+  // Use the higher of tracked events vs actual orders — events can be missing if
+  // the browser closed before the analytics batch fired, but orders are always real.
+  const purchases = Math.max(byName.payment_completed ?? 0, orders.length);
 
   let revenue = 0;
   const buyerIds = new Set<string>();

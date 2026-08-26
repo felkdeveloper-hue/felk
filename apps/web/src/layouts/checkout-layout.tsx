@@ -50,7 +50,7 @@ export function CheckoutLayout() {
             </>
           ) : null}
 
-          <div key={pathname} className="mt-8">
+          <div className="mt-8">
             <Outlet />
           </div>
         </main>

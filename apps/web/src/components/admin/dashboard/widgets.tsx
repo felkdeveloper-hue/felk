@@ -1,5 +1,6 @@
 import { memo, useMemo } from 'react';
 import { Link } from '@tanstack/react-router';
+import { MousePointerClick, Eye, Users } from 'lucide-react';
 import {
   Bar,
   BarChart,
@@ -141,12 +142,64 @@ const VisitorsWidget = memo(function VisitorsWidget({
   if (q.isLoading) return <LoadingBlock />;
   if (!q.data) return <AnalyticsEmpty />;
   const label = q.data.periodLabel || periodLabel(period);
+
+  const rows = [
+    {
+      key: 'landers',
+      icon: MousePointerClick,
+      color: 'text-purple-600',
+      bg: 'from-purple-500/10',
+      label: 'LANDERS',
+      value: q.data.landers?.value ?? 0,
+      sub: 'Every session (like Meta landings)',
+    },
+    {
+      key: 'visitors',
+      icon: Eye,
+      color: 'text-teal-600',
+      bg: 'from-teal-500/10',
+      label: 'VISITORS',
+      value: q.data.totalVisitors.value,
+      sub: 'Unique IPs — real distinct people',
+    },
+    {
+      key: 'users',
+      icon: Users,
+      color: 'text-blue-600',
+      bg: 'from-blue-500/10',
+      label: 'USERS',
+      value: q.data.totalUsers?.value ?? 0,
+      sub: 'New email sign-ups',
+    },
+  ];
+
   return (
-    <KpiCardWithDelta
-      title="Visitors"
-      metric={q.data.totalVisitors}
-      hint={withPeriodHint('Unique IPs', label)}
-    />
+    <WidgetFrame
+      title={`Audience · ${label}`}
+      href={ADMIN_ROUTES.analyticsOverview}
+      collapsed={placement.collapsed}
+    >
+      <div className="flex flex-col gap-2">
+        {rows.map(({ key, icon: Icon, color, bg, label: rowLabel, value, sub }) => (
+          <div
+            key={key}
+            className={`flex items-center gap-3 rounded-lg bg-gradient-to-r ${bg} to-transparent px-3 py-2`}
+          >
+            <Icon className={`h-4 w-4 shrink-0 ${color}`} />
+            <div className="min-w-0 flex-1">
+              <div className={`text-[9px] font-bold uppercase tracking-widest ${color}`}>
+                {rowLabel}
+              </div>
+              <div className="text-muted-foreground text-[10px] leading-tight">{sub}</div>
+            </div>
+            <div className="shrink-0 text-lg font-bold tabular-nums">{value.toLocaleString()}</div>
+          </div>
+        ))}
+        <div className="text-muted-foreground mt-1 text-center text-[10px]">
+          {withPeriodHint('Tap for full analytics', label)}
+        </div>
+      </div>
+    </WidgetFrame>
   );
 });
 

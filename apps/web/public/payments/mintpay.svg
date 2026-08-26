@@ -1,5 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 40" role="img" aria-label="Mintpay">
-  <rect width="40" height="40" rx="10" fill="#00A86B"/>
-  <path fill="#fff" d="M11 27V13h4.2l4.1 8.4L23.4 13H27.6v14h-4.1v-7.4L20 26.2h-2.8l-3.5-6.6V27H11z"/>
-  <text x="52" y="27" font-family="Inter, Arial, sans-serif" font-size="20" font-weight="700" fill="#00A86B">mintpay</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 48" role="img" aria-label="Mintpay">
+  <!-- Mintpay wordmark: navy pill + mint bars + intpay -->
+  <rect width="200" height="48" rx="24" fill="#0B1F3A"/>
+  <!-- stylized mint bars (the "m") -->
+  <g fill="#A8C5D8" transform="translate(18,12)">
+    <path d="M2.2 22L6.8 2.5c.35-1.5 2.4-1.5 2.75 0L14 22c.2.85-.45 1.6-1.3 1.6H3.5c-.85 0-1.5-.75-1.3-1.6z"/>
+    <path d="M16.2 22L20.8 2.5c.35-1.5 2.4-1.5 2.75 0L28 22c.2.85-.45 1.6-1.3 1.6h-9.2c-.85 0-1.5-.75-1.3-1.6z"/>
+    <path d="M30.2 22L34.8 2.5c.35-1.5 2.4-1.5 2.75 0L42 22c.2.85-.45 1.6-1.3 1.6h-9.2c-.85 0-1.5-.75-1.3-1.6z"/>
+  </g>
+  <text x="68" y="31" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="600" fill="#FFFFFF" letter-spacing="0.5">intpay</text>
 </svg>

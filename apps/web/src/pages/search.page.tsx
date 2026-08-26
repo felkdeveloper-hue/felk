@@ -12,7 +12,18 @@ export function SearchPage() {
   const { state, setSearch, clearFilters } = useCatalogSearchParams();
   const [input, setInput] = useState(state.q ?? '');
   const search = useSearchExperience(input);
-  const query = useInfiniteProducts({ ...state, q: search.debouncedQuery || state.q });
+
+  // Prefer committed URL query when it matches the input (suggestion / Enter),
+  // so a stale debounce cannot keep searching the previous letter.
+  const qForProducts = useMemo(() => {
+    const urlQ = (state.q ?? '').trim();
+    const typed = input.trim();
+    const debounced = search.debouncedQuery.trim();
+    if (urlQ && urlQ === typed) return urlQ;
+    return debounced || urlQ;
+  }, [state.q, input, search.debouncedQuery]);
+
+  const query = useInfiniteProducts({ ...state, q: qForProducts });
 
   const products = useMemo(() => {
     const flat = query.data?.pages.flatMap((page) => page.data) ?? [];
@@ -31,15 +42,21 @@ export function SearchPage() {
     setInput(state.q ?? '');
   }, [state.q]);
 
+  // Live-type sync: only push debounced input → URL when the input still matches.
+  // Suggestion clicks set input + URL immediately; without this guard a stale debounce
+  // (e.g. "t") would overwrite "tops" and look like the chip does nothing.
   useEffect(() => {
-    if (!search.debouncedQuery) return;
-    setSearch({ q: search.debouncedQuery }, { replace: true });
-  }, [search.debouncedQuery, setSearch]);
+    const debounced = search.debouncedQuery.trim();
+    if (!debounced) return;
+    if (input.trim() !== debounced) return;
+    if ((state.q ?? '').trim() === debounced) return;
+    setSearch({ q: debounced }, { replace: true });
+  }, [search.debouncedQuery, input, state.q, setSearch]);
 
   const lastTrackedQuery = useRef<string | null>(null);
 
   useEffect(() => {
-    const q = (search.debouncedQuery || state.q || '').trim();
+    const q = qForProducts;
     if (!q || query.isLoading || query.isFetching) return;
     if (total == null) return;
     const key = `${q}:${total}`;
@@ -49,7 +66,7 @@ export function SearchPage() {
     if (total === 0) {
       trackCommerceEvent('search_zero_results', null, { query: q, resultCount: 0 });
     }
-  }, [search.debouncedQuery, state.q, total, query.isLoading, query.isFetching]);
+  }, [qForProducts, total, query.isLoading, query.isFetching]);
 
   const submit = (term: string, fromSuggestion = false) => {
     const normalized = term.trim();

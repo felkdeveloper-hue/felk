@@ -112,7 +112,6 @@ export function CheckoutPaymentPage() {
             <PaymentMethodSelector
               value={paymentMethod}
               onChange={setPaymentMethod}
-              disabled={refreshCheckout.isPending}
             />
 
             <CheckoutNavigation
@@ -120,7 +119,6 @@ export function CheckoutPaymentPage() {
               onNext={handleContinue}
               nextLabel="Review order"
               nextDisabled={!paymentMethod}
-              isSubmitting={refreshCheckout.isPending}
             />
           </div>
         </section>

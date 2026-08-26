@@ -259,7 +259,7 @@ export function CheckoutReviewPage() {
     Boolean(session && !session.shippingAddress && shippingAddressId) &&
     (refreshCheckout.isPending || !addressHealAttempted.current);
 
-  if (sessionQuery.isLoading) {
+  if (sessionQuery.isLoading && !session) {
     return (
       <>
         <Seo title="Review order" description="Review and place your order." noIndex />

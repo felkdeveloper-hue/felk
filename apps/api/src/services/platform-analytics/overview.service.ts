@@ -22,9 +22,15 @@ export interface KpiMetric {
 export interface OverviewData {
   period: { from: Date; to: Date };
   periodLabel: string;
+  /** Total sessions started in period — equivalent to Meta "landing page views". */
+  landers: KpiMetric;
+  /** Unique IPs that visited in period. */
   totalVisitors: KpiMetric;
   uniqueVisitors: KpiMetric;
+  /** Visitor docs linked to a registered account. */
   loggedInUsers: KpiMetric;
+  /** Registered customer accounts created in period. */
+  totalUsers: KpiMetric;
   newUsersToday: number;
   returningVisitors: KpiMetric;
   activeNow: number;
@@ -119,6 +125,12 @@ export async function getOverview(filter: AnalyticsFilter): Promise<OverviewData
     activeNow,
     newToday,
     sToday,
+    // LANDERS: total sessions = equivalent to Meta "landing page views" (not IP-deduplicated)
+    landCur,
+    landPrev,
+    // USERS: registered customer accounts created in period
+    usersCur,
+    usersPrev,
   ] = await Promise.all([
     countUniqueVisitorIps(visitorCur),
     countUniqueVisitorIps(visitorPrev),
@@ -163,14 +175,30 @@ export async function getOverview(filter: AnalyticsFilter): Promise<OverviewData
     SessionModel.countDocuments({
       startedAt: { $gte: todayRange.from, $lte: todayRange.to },
     }),
+    // Total sessions in period — closest metric to Meta "landing page views"
+    SessionModel.countDocuments(sessionCur),
+    SessionModel.countDocuments(sessionPrev),
+    // Customer accounts created in period
+    UserModel.countDocuments({
+      isDeleted: false,
+      roleKey: 'customer',
+      createdAt: { $gte: range.from, $lte: range.to },
+    }),
+    UserModel.countDocuments({
+      isDeleted: false,
+      roleKey: 'customer',
+      createdAt: { $gte: prev.from, $lte: prev.to },
+    }),
   ]);
 
   return {
     period: range,
     periodLabel: formatPeriodLabel(filter),
+    landers: makeMetric(landCur, landPrev),
     totalVisitors: makeMetric(tv, pvTv),
     uniqueVisitors: makeMetric(tv, pvTv),
     loggedInUsers: makeMetric(li, pvLi),
+    totalUsers: makeMetric(usersCur, usersPrev),
     newUsersToday: newToday,
     returningVisitors: makeMetric(ret, pvRet),
     activeNow,

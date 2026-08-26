@@ -91,7 +91,7 @@ export function AnalyticsSearchPage() {
     <PageMotion>
       <AdminPageHeader
         title="Search Analytics"
-        description="Most searched keywords, zero-result searches, and search-to-purchase conversion."
+        description="Most searched keywords, zero-result searches, and search-to-purchase conversion. CTR = (result + suggestion clicks) ÷ searches. Abandon % = search sessions with no add-to-cart."
         actions={
           <AnalyticsExportButton
             reportType="search"

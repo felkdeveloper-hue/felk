@@ -73,9 +73,10 @@ export function useCheckoutSessionQuery(checkoutRef?: string | null) {
     },
     // Never hit /checkout while logged out — stale tokens caused 401 spam + slow guest UX.
     enabled: Boolean(ref && accessToken),
-    staleTime: 1000 * 60,
+    // Keep steps instant: trust cache for 2 minutes; mutations update the cache directly.
+    staleTime: 1000 * 60 * 2,
     gcTime: 1000 * 60 * 10,
-    refetchOnMount: 'always',
+    refetchOnMount: false,
     refetchOnWindowFocus: false,
     retry: false,
     placeholderData: (previous) =>

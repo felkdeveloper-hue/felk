@@ -5,12 +5,13 @@ import { Button } from '@fe-platform/ui';
 import {
   AdminErrorState,
   AdminPageHeader,
+  AdminStatCard,
   DataTable,
   ListToolbar,
   PageMotion,
 } from '@/components/admin';
 import { ADMIN_ROUTES, QUERY_KEYS } from '@/constants';
-import { useAdminPermissions } from '@/hooks/admin';
+import { useAdminPermissions, useRevenueDashboard } from '@/hooks/admin';
 import { cn, formatCurrency, formatDate } from '@/lib/utils';
 import { formatOrderAddress, ordersApi } from '@/services/sdk/admin';
 import { orderReceivedAt } from '@/utils/orders';
@@ -68,6 +69,9 @@ export function OrdersListPage() {
     queryFn: () => ordersApi.list(params),
   });
 
+  const revenue = useRevenueDashboard({ period: '30d' });
+  const orderStats = revenue.data;
+
   if (query.isError) {
     return <AdminErrorState message="Unable to load orders." onRetry={() => query.refetch()} />;
   }
@@ -75,6 +79,33 @@ export function OrdersListPage() {
   return (
     <PageMotion>
       <AdminPageHeader title="Orders" description="Review, filter, and update customer orders." />
+
+      <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <AdminStatCard
+          title="Avg order value"
+          value={
+            orderStats ? formatCurrency(orderStats.aov, 'LKR') : revenue.isLoading ? '…' : '—'
+          }
+          hint="Last 30 days"
+        />
+        <AdminStatCard
+          title="Orders (30d)"
+          value={orderStats?.orderCount ?? (revenue.isLoading ? '…' : '—')}
+          hint="Paid / completed in period"
+        />
+        <AdminStatCard
+          title="Orders today"
+          value={orderStats?.todayOrders ?? (revenue.isLoading ? '…' : '—')}
+          hint={orderStats ? `Revenue ${formatCurrency(orderStats.today, 'LKR')}` : 'Today so far'}
+        />
+        <AdminStatCard
+          title="This month"
+          value={orderStats?.monthOrders ?? (revenue.isLoading ? '…' : '—')}
+          hint={
+            orderStats ? `Revenue ${formatCurrency(orderStats.month, 'LKR')}` : 'Calendar month'
+          }
+        />
+      </div>
 
       <ListToolbar
         search={search}

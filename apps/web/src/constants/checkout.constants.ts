@@ -59,23 +59,25 @@ export const PAYMENT_METHOD_OPTIONS: PaymentMethodOption[] = [
     description: 'Visa, Mastercard & local banking',
     enabled: true,
     logoSrc: '/payments/payhere.svg',
-    accent: '#1A73E8',
+    accent: '#00A9E0',
   },
   {
     id: 'koko',
     label: 'Koko',
     description: 'Buy now, pay later in installments',
     enabled: true,
-    logoSrc: '/payments/koko.svg',
-    accent: '#6C2BD9',
+    // Official KOKO brand mark (pink/blue 3D wordmark)
+    logoSrc: '/payments/koko-logo.png',
+    accent: '#FF6BB5',
   },
   {
     id: 'mintpay',
     label: 'Mintpay',
     description: 'Flexible interest-free payments',
     enabled: true,
-    logoSrc: '/payments/mintpay.svg',
-    accent: '#00A86B',
+    // Official Mintpay navy pill wordmark
+    logoSrc: '/payments/mintpay-pill.png',
+    accent: '#0B1F3A',
   },
   {
     id: 'cod',

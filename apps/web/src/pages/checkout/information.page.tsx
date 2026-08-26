@@ -297,25 +297,19 @@ export function CheckoutInformationPage() {
     const billingId = billingSameAsShipping ? shippingAddressId : billingAddressId;
     if (!billingId) return;
 
-    // Apply addresses + fixed standard shipping in one refresh, then go to payment.
-    // Do not extend/create inventory reservations here — that happens at Place Order.
-    refreshCheckout.mutate(
-      {
-        checkoutRef: session.checkoutToken,
-        payload: {
-          shippingAddressId,
-          billingAddressId: billingId,
-          shippingMethod: 'standard',
-          deliveryMethod: 'delivery',
-        },
+    // Instant step change — do not block the UI on network. Persist addresses in the
+    // background; payment/review already heal missing snapshots if needed.
+    useCheckoutStore.getState().setSelectedShippingMethod('standard');
+    void navigate({ to: ROUTES.checkoutPayment });
+    refreshCheckout.mutate({
+      checkoutRef: session.checkoutToken,
+      payload: {
+        shippingAddressId,
+        billingAddressId: billingId,
+        shippingMethod: 'standard',
+        deliveryMethod: 'delivery',
       },
-      {
-        onSuccess: () => {
-          useCheckoutStore.getState().setSelectedShippingMethod('standard');
-          void navigate({ to: ROUTES.checkoutPayment });
-        },
-      },
-    );
+    });
   };
 
   const handleExtend = () => {
@@ -478,9 +472,9 @@ export function CheckoutInformationPage() {
                   !sessionReady ||
                   !shippingAddressId ||
                   (!billingSameAsShipping && !billingAddressId) ||
-                  !addresses?.some((address) => address.id === shippingAddressId)
+                  !addresses?.some((address) => address.id === shippingAddressId) ||
+                  sessionPending
                 }
-                isSubmitting={refreshCheckout.isPending || sessionPending}
               />
             </div>
           ) : (
