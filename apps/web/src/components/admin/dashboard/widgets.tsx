@@ -150,7 +150,7 @@ const VisitorsWidget = memo(function VisitorsWidget({
       color: 'text-purple-600',
       bg: 'from-purple-500/10',
       label: 'LANDERS',
-      value: q.data.landers?.value ?? 0,
+      value: q.data.landers?.value ?? q.data.totalVisitors.value,
       sub: 'Every session (like Meta landings)',
     },
     {
@@ -176,7 +176,7 @@ const VisitorsWidget = memo(function VisitorsWidget({
   return (
     <WidgetFrame
       title={`Audience · ${label}`}
-      href={ADMIN_ROUTES.analyticsOverview}
+      href={ADMIN_ROUTES.analytics}
       collapsed={placement.collapsed}
     >
       <div className="flex flex-col gap-2">
@@ -460,7 +460,8 @@ const TrafficWidget = memo(function TrafficWidget({
               </p>
               <p className="mt-0.5 text-lg font-semibold leading-tight">{top.label}</p>
               <p className="text-muted-foreground text-xs">
-                {top.pct}% of {totalVisits.toLocaleString()} visit{totalVisits !== 1 ? 's' : ''}
+                {top.pct}% of {totalVisits.toLocaleString()} unique visitor
+                {totalVisits !== 1 ? 's' : ''} (website tracking — not ad Reach)
                 {top.channel ? ` · ${top.channel}` : ''}
               </p>
             </div>

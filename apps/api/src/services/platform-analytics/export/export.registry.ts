@@ -96,10 +96,22 @@ const reports: ExportReportDefinition[] = [
           const d = await getOverview(ctx.filter);
           return [
             {
+              metric: 'Landers',
+              value: d.landers.value,
+              prev: d.landers.prev,
+              pctChange: d.landers.pctChange,
+            },
+            {
               metric: 'Total Visitors',
               value: d.totalVisitors.value,
               prev: d.totalVisitors.prev,
               pctChange: d.totalVisitors.pctChange,
+            },
+            {
+              metric: 'Total Users',
+              value: d.totalUsers.value,
+              prev: d.totalUsers.prev,
+              pctChange: d.totalUsers.pctChange,
             },
             {
               metric: 'Logged-in Users',
@@ -140,7 +152,9 @@ const reports: ExportReportDefinition[] = [
     getKpis: async (ctx) => {
       const d = await getOverview(ctx.filter);
       return [
+        { label: 'Landers', value: d.landers.value },
         { label: 'Visitors', value: d.totalVisitors.value },
+        { label: 'Users', value: d.totalUsers.value },
         { label: 'Page Views', value: d.totalPageViews.value },
         { label: 'Bounce Rate', value: `${d.bounceRate.value}%` },
         { label: 'Active Now', value: d.activeNow },
@@ -171,18 +185,30 @@ const reports: ExportReportDefinition[] = [
             ctx.scope === 'page'
               ? (await getVisitors(filter)).data
               : await fetchAllPages(getVisitors, filter);
-          return rows.map((r) => ({
-            visitorId: r.visitorId,
-            userId: r.userId ? String(r.userId) : '',
-            country: r.geo?.countryCode ?? r.geo?.country ?? '',
-            city: r.geo?.city ?? '',
-            device: r.device?.type ?? '',
-            browser: r.device?.browser ?? '',
-            trafficSource: r.trafficSource,
-            totalVisits: r.totalVisits,
-            isReturning: r.isReturning,
-            lastSeenAt: r.lastSeenAt,
-          }));
+          return rows.map((row) => {
+            const r = row as Record<string, unknown> & {
+              visitorId?: string;
+              userId?: unknown;
+              geo?: { countryCode?: string; country?: string; city?: string };
+              device?: { type?: string; browser?: string | null };
+              trafficSource?: string;
+              totalVisits?: number;
+              isReturning?: boolean;
+              lastSeenAt?: unknown;
+            };
+            return {
+              visitorId: r.visitorId ?? '',
+              userId: r.userId ? String(r.userId) : '',
+              country: r.geo?.countryCode ?? r.geo?.country ?? '',
+              city: r.geo?.city ?? '',
+              device: r.device?.type ?? '',
+              browser: r.device?.browser ?? '',
+              trafficSource: r.trafficSource,
+              totalVisits: r.totalVisits,
+              isReturning: r.isReturning,
+              lastSeenAt: r.lastSeenAt,
+            };
+          });
         },
       },
     ],

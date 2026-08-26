@@ -119,6 +119,20 @@ export function returnBucket(gapMs: number): '1h' | '1d' | '7d' | '30d' | 'new' 
   return '30d';
 }
 
+/** Start a fresh session (new ad click in the same tab, or idle timeout). */
+export function startNewSession(): { sessionId: string; startedAt: Date; isNew: boolean } {
+  sessionId = null;
+  sessionStartedAt = null;
+  resetEngagementMetrics();
+  try {
+    sessionStorage.removeItem(SESSION_ID_KEY);
+    sessionStorage.removeItem(SESSION_START_KEY);
+  } catch {
+    /* ignore */
+  }
+  return getOrCreateSession();
+}
+
 export function getOrCreateSession(): { sessionId: string; startedAt: Date; isNew: boolean } {
   if (sessionId) return { sessionId, startedAt: new Date(sessionStartedAt!), isNew: false };
 

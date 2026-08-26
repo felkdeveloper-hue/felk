@@ -45,6 +45,22 @@ function makeMetric(current: number, previous: number): KpiMetric {
   return { value: current, prev: previous, pctChange: getPctChange(current, previous) };
 }
 
+/**
+ * LANDERS ≈ Meta "landing page views": every time someone opens the site.
+ * Sessions are the primary signal; distinct page-view sessions catch landings
+ * that never got a session row (in-app browsers killing the tab early).
+ */
+async function countLandingEvents(
+  sessionMatch: Record<string, unknown>,
+  pageMatch: Record<string, unknown>,
+): Promise<number> {
+  const [sessions, pageViewSessions] = await Promise.all([
+    SessionModel.countDocuments(sessionMatch),
+    PageViewModel.distinct('sessionId', pageMatch).then((ids) => ids.length),
+  ]);
+  return Math.max(sessions, pageViewSessions);
+}
+
 /** Unique IPs in match (fallback visitorId when ipHash missing). */
 async function countUniqueVisitorIps(match: Record<string, unknown>): Promise<number> {
   const rows = await VisitorModel.aggregate<{ n: number }>([
@@ -125,7 +141,7 @@ export async function getOverview(filter: AnalyticsFilter): Promise<OverviewData
     activeNow,
     newToday,
     sToday,
-    // LANDERS: total sessions = equivalent to Meta "landing page views" (not IP-deduplicated)
+    // LANDERS: every landing in period (sessions / page-view sessions / unique IPs)
     landCur,
     landPrev,
     // USERS: registered customer accounts created in period
@@ -175,9 +191,8 @@ export async function getOverview(filter: AnalyticsFilter): Promise<OverviewData
     SessionModel.countDocuments({
       startedAt: { $gte: todayRange.from, $lte: todayRange.to },
     }),
-    // Total sessions in period — closest metric to Meta "landing page views"
-    SessionModel.countDocuments(sessionCur),
-    SessionModel.countDocuments(sessionPrev),
+    countLandingEvents(sessionCur, pageCur),
+    countLandingEvents(sessionPrev, pagePrev),
     // Customer accounts created in period
     UserModel.countDocuments({
       isDeleted: false,
@@ -194,7 +209,7 @@ export async function getOverview(filter: AnalyticsFilter): Promise<OverviewData
   return {
     period: range,
     periodLabel: formatPeriodLabel(filter),
-    landers: makeMetric(landCur, landPrev),
+    landers: makeMetric(Math.max(landCur, tv), Math.max(landPrev, pvTv)),
     totalVisitors: makeMetric(tv, pvTv),
     uniqueVisitors: makeMetric(tv, pvTv),
     loggedInUsers: makeMetric(li, pvLi),

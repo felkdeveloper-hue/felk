@@ -1,6 +1,7 @@
 import { getVisitorId } from './visitor-id';
 import {
   getOrCreateSession,
+  startNewSession,
   refreshIdleTimer,
   setupEngagementTracking,
   getEngagementMetrics,
@@ -27,8 +28,34 @@ let clickCount = 0;
 let pageCount = 0;
 let pageViewId: string | null = null;
 let heartbeatInterval: ReturnType<typeof setInterval> | null = null;
-let isSetup = false;
+/** Ref-count for React Strict Mode — avoid double teardown/setup wiping listeners. */
+let setupRefCount = 0;
 let sessionStartEmitted = false;
+
+const LAST_CLICK_KEY = '_fe_land_clid';
+
+/** Each new ad click in the same tab is a new lander (matches Meta LPVs). */
+function rotateSessionIfNewAdClick(): boolean {
+  if (typeof window === 'undefined') return false;
+  const params = new URLSearchParams(window.location.search);
+  const clid =
+    params.get('fbclid') || params.get('gclid') || params.get('ttclid') || params.get('msclkid');
+  if (!clid) return false;
+  try {
+    const prev = sessionStorage.getItem(LAST_CLICK_KEY);
+    if (prev === clid) return false;
+    sessionStorage.setItem(LAST_CLICK_KEY, clid);
+    if (!prev) return false;
+    startNewSession();
+    sessionStartEmitted = false;
+    pageCount = 0;
+    currentPath = null;
+    pageViewId = null;
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 function getScrollDepth(): number {
   const el = document.documentElement;
@@ -127,6 +154,7 @@ function commitCurrentPageView(isFinal = false) {
   const visitorId = getVisitorId();
 
   const view = {
+    pageViewId: pageViewId ?? crypto.randomUUID(),
     sessionId,
     visitorId,
     path: currentPath,
@@ -169,6 +197,7 @@ function emitSessionStartIfNeeded(sessionId: string, visitorId: string, isNew: b
 }
 
 export function trackRouteChange(newPath: string) {
+  rotateSessionIfNewAdClick();
   if (newPath === currentPath) return;
 
   if (currentPath) {
@@ -201,6 +230,21 @@ export function trackRouteChange(newPath: string) {
       startedAt: startedAt.toISOString(),
       entryPage: newPath,
     });
+    // Send the landing immediately — IG/FB in-app browsers often kill the
+    // webview before pagehide, which used to drop the lander entirely.
+    queuePageView({
+      pageViewId,
+      sessionId,
+      visitorId,
+      path: newPath,
+      title: document.title ?? null,
+      viewedAt: new Date(pageEnterTime).toISOString(),
+      timeOnPageMs: 0,
+      scrollDepth: 0,
+      isEntry: true,
+      isExit: false,
+    });
+    void flush();
   }
 
   refreshIdleTimer(() => {
@@ -225,10 +269,13 @@ export function trackEvent(name: string, properties?: Record<string, unknown>) {
 }
 
 export function setup() {
-  if (isSetup || typeof window === 'undefined') return;
-  isSetup = true;
+  // Ref-count so React Strict Mode remount does not tear down live listeners mid-session.
+  setupRefCount += 1;
+  if (setupRefCount > 1) return;
+  if (typeof window === 'undefined') return;
 
   captureAttribution();
+  rotateSessionIfNewAdClick();
   setupEngagementTracking();
 
   document.addEventListener('scroll', onScroll, { passive: true });
@@ -255,8 +302,8 @@ export function setup() {
 }
 
 export function teardown() {
-  if (!isSetup) return;
-  isSetup = false;
+  setupRefCount = Math.max(0, setupRefCount - 1);
+  if (setupRefCount > 0) return;
 
   document.removeEventListener('scroll', onScroll);
   document.removeEventListener('visibilitychange', onVisibilityChange);

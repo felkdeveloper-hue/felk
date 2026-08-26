@@ -56,14 +56,14 @@ export interface OverviewData {
   /** e.g. "Last 7 days" — matches the selected filter */
   periodLabel?: string;
   /** Total sessions in period — equivalent to Meta "landing page views". */
-  landers: KpiMetric;
+  landers?: KpiMetric;
   /** Unique IPs that visited in period. */
   totalVisitors: KpiMetric;
   uniqueVisitors: KpiMetric;
   /** Visitor records linked to a signed-in account. */
   loggedInUsers: KpiMetric;
   /** Customer accounts (email sign-up) created in period. */
-  totalUsers: KpiMetric;
+  totalUsers?: KpiMetric;
   newUsersToday: number;
   returningVisitors: KpiMetric;
   activeNow: number;
@@ -199,8 +199,85 @@ export interface TrafficSourceRow {
   source: string;
   label: string;
   channel?: string;
+  /** Unique visitors — same as uniqueVisitors (backward compatible). */
   count: number;
+  uniqueVisitors?: number;
+  /** Sessions attributed to this source in the period. */
+  visits?: number;
+  pageViews?: number;
   pct: number;
+  metric?: string;
+}
+
+export interface MetaAdsPerformanceData {
+  configured: boolean;
+  available: boolean;
+  timezone: string;
+  period: { from: string; to: string };
+  lastSync: {
+    status: string | null;
+    lastSuccessAt: string | null;
+    lastAttemptAt: string | null;
+    lastError: string | null;
+    lastSyncedFrom: string | null;
+    lastSyncedTo: string | null;
+    stale: boolean;
+  };
+  platform: string;
+  totals: {
+    reach: number | null;
+    impressions: number | null;
+    linkClicks: number | null;
+    outboundClicks: number | null;
+    landingPageViews: number | null;
+    spend: number | null;
+    cpc: number | null;
+    cpm: number | null;
+    ctr: number | null;
+    currency: string | null;
+  };
+  campaigns: Array<{
+    campaignId: string | null;
+    campaignName: string | null;
+    reach: number | null;
+    impressions: number | null;
+    linkClicks: number | null;
+    outboundClicks: number | null;
+    landingPageViews: number | null;
+    spend: number | null;
+    cpc: number | null;
+    cpm: number | null;
+    ctr: number | null;
+  }>;
+  daily: Array<{
+    date: string;
+    reach: number | null;
+    impressions: number | null;
+    linkClicks: number | null;
+    spend: number | null;
+  }>;
+  disclaimer: string;
+}
+
+export interface AdsReconciliationData {
+  timezone: string;
+  period: { from: string; to: string };
+  website: {
+    facebookAdsUniqueVisitors: number;
+    instagramAdsUniqueVisitors: number;
+    metaAdsUniqueVisitorsTotal: number;
+  };
+  meta: {
+    available: boolean;
+    reach: number | null;
+    impressions: number | null;
+    linkClicks: number | null;
+    landingPageViews: number | null;
+    outboundClicks: number | null;
+    spend: number | null;
+  };
+  notes: string[];
+  flags: string[];
 }
 
 export interface EventBreakdownRow {
@@ -262,6 +339,26 @@ export const adminAnalyticsApi = {
 
   getTrafficSources(filter: AnalyticsFilter = {}): Promise<TrafficSourceRow[]> {
     return http.get<TrafficSourceRow[]>(`/analytics/admin/traffic${buildQuery(filter)}`);
+  },
+
+  getMetaAdsPerformance(filter: AnalyticsFilter = {}): Promise<MetaAdsPerformanceData> {
+    return http.get<MetaAdsPerformanceData>(`/analytics/admin/ads/meta${buildQuery(filter)}`);
+  },
+
+  syncMetaAds(): Promise<{
+    ok: boolean;
+    skipped?: boolean;
+    reason?: string;
+    since?: string;
+    until?: string;
+    rowsUpserted?: number;
+    error?: string;
+  }> {
+    return http.post('/analytics/admin/ads/meta/sync', {});
+  },
+
+  getAdsReconciliation(filter: AnalyticsFilter = {}): Promise<AdsReconciliationData> {
+    return http.get<AdsReconciliationData>(`/analytics/admin/ads/reconcile${buildQuery(filter)}`);
   },
 
   getProductAnalytics(filter: AnalyticsFilter = {}): Promise<ProductAnalyticsData> {

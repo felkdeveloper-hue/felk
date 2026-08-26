@@ -10,15 +10,16 @@ import {
   AnalyticsExportButton,
 } from '@/components/admin/analytics';
 import { useAnalyticsOverview } from '@/hooks/admin';
-import type { AnalyticsFilter } from '@/services/sdk/admin';
+import type { AnalyticsFilter, KpiMetric } from '@/services/sdk/admin';
 import { ADMIN_ROUTES } from '@/constants';
 import { formatAnalyticsPeriodLabel, withPeriodHint } from '@/lib/analytics-period-label';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+
+const EMPTY_KPI: KpiMetric = { value: 0, prev: 0, pctChange: 0 };
+
+function kpi(metric?: KpiMetric | null): KpiMetric {
+  return metric ?? EMPTY_KPI;
+}
 
 export function AnalyticsOverviewPage() {
   const [filter, setFilter] = useState<AnalyticsFilter>({ period: '7d' });
@@ -26,6 +27,10 @@ export function AnalyticsOverviewPage() {
 
   const data = overview.data;
   const periodLabel = data?.periodLabel || formatAnalyticsPeriodLabel(filter);
+  const landers = kpi(data?.landers);
+  const visitors = kpi(data?.totalVisitors);
+  const users = kpi(data?.totalUsers);
+  const loggedIn = kpi(data?.loggedInUsers);
 
   return (
     <PageMotion>
@@ -97,24 +102,24 @@ export function AnalyticsOverviewPage() {
                           <Info className="text-muted-foreground h-3 w-3 cursor-help" />
                         </TooltipTrigger>
                         <TooltipContent side="top" className="max-w-[220px] text-xs">
-                          Total sessions started in this period. Each time someone opens your site
-                          = 1 lander, even if it's the same person visiting again. Matches Meta
+                          Total sessions started in this period. Each time someone opens your site =
+                          1 lander, even if it's the same person visiting again. Matches Meta
                           "landing page views".
                         </TooltipContent>
                       </Tooltip>
                     </p>
                     <p className="mt-0.5 text-2xl font-bold tabular-nums">
-                      {data.landers.value.toLocaleString()}
+                      {landers.value.toLocaleString()}
                     </p>
                     <p className="text-muted-foreground text-[10px]">
                       Total landings · {periodLabel}
                     </p>
-                    {data.landers.pctChange !== 0 && (
+                    {landers.pctChange !== 0 && (
                       <p
-                        className={`mt-0.5 text-[10px] font-medium ${data.landers.pctChange > 0 ? 'text-green-600' : 'text-red-500'}`}
+                        className={`mt-0.5 text-[10px] font-medium ${landers.pctChange > 0 ? 'text-green-600' : 'text-red-500'}`}
                       >
-                        {data.landers.pctChange > 0 ? '+' : ''}
-                        {data.landers.pctChange.toFixed(1)}% vs prev period
+                        {landers.pctChange > 0 ? '+' : ''}
+                        {landers.pctChange.toFixed(1)}% vs prev period
                       </p>
                     )}
                   </div>
@@ -138,17 +143,15 @@ export function AnalyticsOverviewPage() {
                       </Tooltip>
                     </p>
                     <p className="mt-0.5 text-2xl font-bold tabular-nums">
-                      {data.totalVisitors.value.toLocaleString()}
+                      {visitors.value.toLocaleString()}
                     </p>
-                    <p className="text-muted-foreground text-[10px]">
-                      Unique IPs · {periodLabel}
-                    </p>
-                    {data.totalVisitors.pctChange !== 0 && (
+                    <p className="text-muted-foreground text-[10px]">Unique IPs · {periodLabel}</p>
+                    {visitors.pctChange !== 0 && (
                       <p
-                        className={`mt-0.5 text-[10px] font-medium ${data.totalVisitors.pctChange > 0 ? 'text-green-600' : 'text-red-500'}`}
+                        className={`mt-0.5 text-[10px] font-medium ${visitors.pctChange > 0 ? 'text-green-600' : 'text-red-500'}`}
                       >
-                        {data.totalVisitors.pctChange > 0 ? '+' : ''}
-                        {data.totalVisitors.pctChange.toFixed(1)}% vs prev period
+                        {visitors.pctChange > 0 ? '+' : ''}
+                        {visitors.pctChange.toFixed(1)}% vs prev period
                       </p>
                     )}
                   </div>
@@ -167,48 +170,41 @@ export function AnalyticsOverviewPage() {
                         <TooltipContent side="top" className="max-w-[220px] text-xs">
                           Registered accounts created with an email address in this period. These
                           are visitors who took the step to sign up. Logged-in sessions:{' '}
-                          {data.loggedInUsers.value.toLocaleString()} total.
+                          {loggedIn.value.toLocaleString()} total.
                         </TooltipContent>
                       </Tooltip>
                     </p>
                     <p className="mt-0.5 text-2xl font-bold tabular-nums">
-                      {data.totalUsers.value.toLocaleString()}
+                      {users.value.toLocaleString()}
                     </p>
                     <p className="text-muted-foreground text-[10px]">
                       New sign-ups · {periodLabel}
                     </p>
-                    {data.totalUsers.pctChange !== 0 && (
+                    {users.pctChange !== 0 && (
                       <p
-                        className={`mt-0.5 text-[10px] font-medium ${data.totalUsers.pctChange > 0 ? 'text-green-600' : 'text-red-500'}`}
+                        className={`mt-0.5 text-[10px] font-medium ${users.pctChange > 0 ? 'text-green-600' : 'text-red-500'}`}
                       >
-                        {data.totalUsers.pctChange > 0 ? '+' : ''}
-                        {data.totalUsers.pctChange.toFixed(1)}% vs prev period
+                        {users.pctChange > 0 ? '+' : ''}
+                        {users.pctChange.toFixed(1)}% vs prev period
                       </p>
                     )}
                     <p className="text-muted-foreground mt-1 text-[10px]">
-                      {data.loggedInUsers.value} logged-in sessions
+                      {loggedIn.value} logged-in sessions
                     </p>
                   </div>
                 </div>
               </div>
 
               {/* Funnel arrow indicator */}
-              <div className="mt-3 flex items-center justify-center gap-2 text-[10px] text-[var(--admin-ink)]/50">
-                <span className="font-medium">
-                  {data.landers.value.toLocaleString()} landings
-                </span>
+              <div className="text-[var(--admin-ink)]/50 mt-3 flex items-center justify-center gap-2 text-[10px]">
+                <span className="font-medium">{landers.value.toLocaleString()} landings</span>
                 <span>→</span>
-                <span className="font-medium">
-                  {data.totalVisitors.value.toLocaleString()} unique people
-                </span>
+                <span className="font-medium">{visitors.value.toLocaleString()} unique people</span>
                 <span>→</span>
-                <span className="font-medium">
-                  {data.totalUsers.value.toLocaleString()} signed up
-                </span>
-                {data.landers.value > 0 && (
+                <span className="font-medium">{users.value.toLocaleString()} signed up</span>
+                {landers.value > 0 && (
                   <span className="ml-2 rounded bg-[var(--admin-line)] px-1.5 py-0.5 font-semibold">
-                    {Math.round((data.totalUsers.value / data.landers.value) * 100 * 10) / 10}%
-                    conversion
+                    {Math.round((users.value / landers.value) * 100 * 10) / 10}% conversion
                   </span>
                 )}
               </div>

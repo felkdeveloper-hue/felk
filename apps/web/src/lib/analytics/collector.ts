@@ -6,6 +6,7 @@ const FLUSH_INTERVAL_MS = 5_000;
 const MAX_QUEUE_SIZE = 50;
 
 interface PageViewItem {
+  pageViewId?: string;
   sessionId: string;
   visitorId: string;
   path: string;
@@ -119,6 +120,14 @@ async function send(payload: CollectPayload): Promise<void> {
 }
 
 export function queuePageView(item: PageViewItem): void {
+  // Deduplicate same pageViewId still in the client queue (Strict Mode / double commit).
+  if (item.pageViewId) {
+    const idx = pageViewQueue.findIndex((p) => p.pageViewId === item.pageViewId);
+    if (idx >= 0) {
+      pageViewQueue[idx] = item;
+      return;
+    }
+  }
   pageViewQueue.push(item);
   if (pageViewQueue.length >= MAX_QUEUE_SIZE) {
     void flush();
