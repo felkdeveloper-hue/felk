@@ -1,5 +1,6 @@
 import { captureAttribution } from './attribution';
 import { useAuthStore } from '@/store/auth-store';
+import { shouldSkipAnalyticsCollect } from './skip';
 
 const ENDPOINT = `${import.meta.env.VITE_API_URL ?? '/api/v1'}/analytics/collect`;
 const FLUSH_INTERVAL_MS = 5_000;
@@ -93,6 +94,16 @@ function getDeviceType(): 'desktop' | 'mobile' | 'tablet' | 'unknown' {
 }
 
 async function send(payload: CollectPayload): Promise<void> {
+  const samplePath =
+    payload.pageViews?.[0]?.path ??
+    payload.session?.entryPage ??
+    payload.session?.lastPage ??
+    payload.heartbeat?.path ??
+    payload.visitor?.landingPath ??
+    null;
+  // Staff /admin traffic must not reach collect (landers/visitors stay shopper-only).
+  if (shouldSkipAnalyticsCollect(samplePath)) return;
+
   const body = JSON.stringify(payload);
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   try {

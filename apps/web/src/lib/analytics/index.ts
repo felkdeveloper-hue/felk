@@ -4,6 +4,7 @@ export { trackRouteChange, trackEvent, setup, teardown } from './auto-track';
 export { flush, startFlushInterval, stopFlushInterval, queueEvent } from './collector';
 export { captureAttribution, getPersistedAttribution, pickFirstTouch } from './attribution';
 export { hasAnalyticsConsent, hasMarketingConsent, setCookieConsent } from './consent';
+export { isAdminAnalyticsPath, shouldSkipAnalyticsCollect } from './skip';
 export {
   trackCommerceEvent,
   productMetaFrom,

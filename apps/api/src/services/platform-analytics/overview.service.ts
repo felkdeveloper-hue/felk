@@ -12,6 +12,7 @@ import {
   getPctChange,
   formatPeriodLabel,
 } from './date-range.util.js';
+import { excludeAdminAudience, resolveStaffUserIds } from './admin-traffic.util.js';
 
 export interface KpiMetric {
   value: number;
@@ -115,14 +116,37 @@ export async function getOverview(filter: AnalyticsFilter): Promise<OverviewData
   const prev = getComparisonRange(range);
   const todayRange = resolveDateRange({ period: 'today' });
 
-  const visitorCur = await visitorActivityMatch(filter, range);
-  const visitorPrev = await visitorActivityMatch(filter, prev);
-  const sessionCur = buildSessionMatch(filter, range);
-  const sessionPrev = buildSessionMatch(filter, prev);
-  const pageCur = buildPageViewMatch(filter, range);
-  const pagePrev = buildPageViewMatch(filter, prev);
+  // Staff/admin + /admin path traffic must not inflate Meta-style landers/visitors.
+  const staffIds = await resolveStaffUserIds();
+
+  const visitorCur = excludeAdminAudience(
+    await visitorActivityMatch(filter, range),
+    staffIds,
+    'landingPath',
+  );
+  const visitorPrev = excludeAdminAudience(
+    await visitorActivityMatch(filter, prev),
+    staffIds,
+    'landingPath',
+  );
+  const sessionCur = excludeAdminAudience(buildSessionMatch(filter, range), staffIds, 'entryPage');
+  const sessionPrev = excludeAdminAudience(buildSessionMatch(filter, prev), staffIds, 'entryPage');
+  const pageCur = excludeAdminAudience(buildPageViewMatch(filter, range), staffIds, 'path');
+  const pagePrev = excludeAdminAudience(buildPageViewMatch(filter, prev), staffIds, 'path');
 
   const activeCutoff = new Date(Date.now() - 2 * 60 * 1000);
+  const activeMatch = excludeAdminAudience(
+    { lastActiveAt: { $gte: activeCutoff } },
+    staffIds,
+    'entryPage',
+  );
+  const sessionsTodayMatch = excludeAdminAudience(
+    {
+      startedAt: { $gte: todayRange.from, $lte: todayRange.to },
+    },
+    staffIds,
+    'entryPage',
+  );
 
   const [
     tv,
@@ -183,15 +207,13 @@ export async function getOverview(filter: AnalyticsFilter): Promise<OverviewData
       { $match: sessionPrev },
       { $group: { _id: null, avg: { $avg: '$pageCount' } } },
     ]).then((r) => Math.round((r[0]?.avg ?? 1) * 10) / 10),
-    SessionModel.countDocuments({ lastActiveAt: { $gte: activeCutoff } }),
+    SessionModel.countDocuments(activeMatch),
     // Real user/guest accounts created today (Colombo), not visitor cookies.
     UserModel.countDocuments({
       isDeleted: false,
       createdAt: { $gte: todayRange.from, $lte: todayRange.to },
     }),
-    SessionModel.countDocuments({
-      startedAt: { $gte: todayRange.from, $lte: todayRange.to },
-    }),
+    SessionModel.countDocuments(sessionsTodayMatch),
     countLandingEvents(sessionCur, pageCur),
     countLandingEvents(sessionPrev, pagePrev),
     // Customer accounts created in period
