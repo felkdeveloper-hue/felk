@@ -1,11 +1,7 @@
-import { VisitorModel, SessionModel, PageViewModel } from '@/models/analytics/index.js';
+import { SessionModel, PageViewModel } from '@/models/analytics/index.js';
 import { UserModel } from '@/models/user.model.js';
 import type { AnalyticsFilter } from '@/schemas/analytics/index.js';
-import {
-  buildVisitorMatch,
-  buildSessionMatch,
-  buildPageViewMatch,
-} from './analytics-query.builder.js';
+import { buildSessionMatch, buildPageViewMatch } from './analytics-query.builder.js';
 import {
   resolveDateRange,
   getComparisonRange,
@@ -13,6 +9,7 @@ import {
   formatPeriodLabel,
 } from './date-range.util.js';
 import { excludeAdminAudience, resolveStaffUserIds } from './admin-traffic.util.js';
+import { countUniqueVisitorIpsFromActivity } from './unique-ip.util.js';
 
 export interface KpiMetric {
   value: number;
@@ -63,54 +60,6 @@ async function countLandingEvents(
   return Math.max(sessions, entryViews, pageViewSessions);
 }
 
-/** Unique IPs in match (fallback visitorId when ipHash missing). */
-async function countUniqueVisitorIps(match: Record<string, unknown>): Promise<number> {
-  const rows = await VisitorModel.aggregate<{ n: number }>([
-    { $match: match },
-    {
-      $group: {
-        _id: {
-          $cond: [
-            {
-              $and: [
-                { $ne: ['$ipHash', null] },
-                { $ne: ['$ipHash', ''] },
-                { $ne: ['$ipHash', 'unknown'] },
-              ],
-            },
-            { $concat: ['ip:', '$ipHash'] },
-            { $concat: ['v:', '$visitorId'] },
-          ],
-        },
-      },
-    },
-    { $count: 'n' },
-  ]);
-  return rows[0]?.n ?? 0;
-}
-
-async function visitorActivityMatch(
-  filter: AnalyticsFilter,
-  range: { from: Date; to: Date },
-): Promise<Record<string, unknown>> {
-  const base = await buildVisitorMatch(filter, range);
-  const {
-    lastSeenAt: _ignored,
-    $or: searchOr,
-    ...rest
-  } = base as Record<string, unknown> & { lastSeenAt?: unknown; $or?: unknown };
-
-  const dateOr = [
-    { lastSeenAt: { $gte: range.from, $lte: range.to } },
-    { firstSeenAt: { $gte: range.from, $lte: range.to } },
-  ];
-
-  return {
-    ...rest,
-    ...(Array.isArray(searchOr) ? { $and: [{ $or: searchOr }, { $or: dateOr }] } : { $or: dateOr }),
-  };
-}
-
 export async function getOverview(filter: AnalyticsFilter): Promise<OverviewData> {
   const range = resolveDateRange(filter);
   const prev = getComparisonRange(range);
@@ -119,16 +68,6 @@ export async function getOverview(filter: AnalyticsFilter): Promise<OverviewData
   // Staff/admin + /admin path traffic must not inflate Meta-style landers/visitors.
   const staffIds = await resolveStaffUserIds();
 
-  const visitorCur = excludeAdminAudience(
-    await visitorActivityMatch(filter, range),
-    staffIds,
-    'landingPath',
-  );
-  const visitorPrev = excludeAdminAudience(
-    await visitorActivityMatch(filter, prev),
-    staffIds,
-    'landingPath',
-  );
   const sessionCur = excludeAdminAudience(buildSessionMatch(filter, range), staffIds, 'entryPage');
   const sessionPrev = excludeAdminAudience(buildSessionMatch(filter, prev), staffIds, 'entryPage');
   const pageCur = excludeAdminAudience(buildPageViewMatch(filter, range), staffIds, 'path');
@@ -173,12 +112,14 @@ export async function getOverview(filter: AnalyticsFilter): Promise<OverviewData
     usersCur,
     usersPrev,
   ] = await Promise.all([
-    countUniqueVisitorIps(visitorCur),
-    countUniqueVisitorIps(visitorPrev),
-    VisitorModel.countDocuments({ ...visitorCur, userId: { $ne: null } }),
-    VisitorModel.countDocuments({ ...visitorPrev, userId: { $ne: null } }),
-    countUniqueVisitorIps({ ...visitorCur, isReturning: true }),
-    countUniqueVisitorIps({ ...visitorPrev, isReturning: true }),
+    // VISITORS: unique IPs from in-period landings (not Visitor.lastSeenAt — that
+    // drops yesterday's people once they return today).
+    countUniqueVisitorIpsFromActivity(pageCur, sessionCur),
+    countUniqueVisitorIpsFromActivity(pagePrev, sessionPrev),
+    countUniqueVisitorIpsFromActivity(pageCur, sessionCur, { userId: { $ne: null } }),
+    countUniqueVisitorIpsFromActivity(pagePrev, sessionPrev, { userId: { $ne: null } }),
+    countUniqueVisitorIpsFromActivity(pageCur, sessionCur, { isReturning: true }),
+    countUniqueVisitorIpsFromActivity(pagePrev, sessionPrev, { isReturning: true }),
     SessionModel.aggregate<{ avg: number }>([
       { $match: { ...sessionCur, durationMs: { $ne: null } } },
       { $group: { _id: null, avg: { $avg: '$durationMs' } } },

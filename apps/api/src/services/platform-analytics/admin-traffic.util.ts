@@ -29,18 +29,23 @@ export async function resolveStaffUserIds(): Promise<Types.ObjectId[]> {
 /**
  * Narrow a session/visitor/page-view match so staff-linked rows and `/admin` paths
  * do not inflate landers / visitors / related overview audience KPIs.
+ *
+ * Uses `$nor` (not `$nin` / `$not`) so guest rows with `userId: null` / missing path
+ * stay included — `$nin` alone is fine for nulls, but `$not+$regex` on path fields
+ * has been observed to over-exclude in composed `$and` audience queries.
  */
 export function excludeAdminAudience(
   match: Record<string, unknown>,
   staffIds: Types.ObjectId[],
   pathField?: 'entryPage' | 'path' | 'landingPath' | 'lastPage',
 ): Record<string, unknown> {
-  const clauses: Record<string, unknown>[] = [match];
+  const nor: Record<string, unknown>[] = [];
   if (staffIds.length > 0) {
-    clauses.push({ userId: { $nin: staffIds } });
+    nor.push({ userId: { $in: staffIds } });
   }
   if (pathField) {
-    clauses.push({ [pathField]: { $not: { $regex: ADMIN_PATH_REGEX.source, $options: 'i' } } });
+    nor.push({ [pathField]: { $regex: ADMIN_PATH_REGEX.source, $options: 'i' } });
   }
-  return clauses.length === 1 ? match : { $and: clauses };
+  if (nor.length === 0) return match;
+  return { $and: [match, { $nor: nor }] };
 }

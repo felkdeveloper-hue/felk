@@ -23,13 +23,48 @@ describe('admin traffic exclusion', () => {
     expect(isStaffRoleKey(null)).toBe(false);
   });
 
-  it('adds staff + path exclusions under $and', () => {
+  it('adds staff + path exclusions under $nor (guests with null userId stay matchable)', () => {
     const id = new Types.ObjectId();
-    const result = excludeAdminAudience({ startedAt: { $gte: new Date() } }, [id], 'entryPage');
+    const base = { startedAt: { $gte: new Date() } };
+    const result = excludeAdminAudience(base, [id], 'entryPage');
+    expect(result).toEqual({
+      $and: [
+        base,
+        {
+          $nor: [
+            { userId: { $in: [id] } },
+            { entryPage: { $regex: expect.any(String), $options: 'i' } },
+          ],
+        },
+      ],
+    });
+    const nor = (result as { $and: { $nor: Record<string, unknown>[] }[] }).$and[1].$nor;
+    // Must NOT use userId:$nin — guests (userId null) must remain in the audience.
+    expect(
+      nor.some(
+        (c) =>
+          'userId' in c &&
+          c.userId &&
+          typeof c.userId === 'object' &&
+          '$nin' in (c.userId as object),
+      ),
+    ).toBe(false);
+    expect(nor[0]).toEqual({ userId: { $in: [id] } });
+  });
+
+  it('leaves match unchanged when there are no staff ids and no path field', () => {
+    const base = { viewedAt: { $gte: new Date() } };
+    expect(excludeAdminAudience(base, [])).toBe(base);
+  });
+
+  it('path-only exclusion still uses $nor so null paths are kept', () => {
+    const base = { lastSeenAt: { $gte: new Date() } };
+    const result = excludeAdminAudience(base, [], 'landingPath');
     expect(result).toHaveProperty('$and');
     const and = (result as { $and: unknown[] }).$and;
-    expect(and).toHaveLength(3);
-    expect(and[1]).toEqual({ userId: { $nin: [id] } });
-    expect(and[2]).toMatchObject({ entryPage: { $not: expect.any(Object) } });
+    expect(and).toHaveLength(2);
+    expect(and[1]).toEqual({
+      $nor: [{ landingPath: { $regex: expect.any(String), $options: 'i' } }],
+    });
   });
 });

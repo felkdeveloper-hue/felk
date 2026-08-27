@@ -3,7 +3,14 @@ import { Types } from 'mongoose';
 import { VisitorModel } from '@/models/analytics/index.js';
 import { UserModel } from '@/models/user.model.js';
 import type { AnalyticsFilter } from '@/schemas/analytics/index.js';
-import { buildVisitorMatch, resolveDateRange } from './analytics-query.builder.js';
+import {
+  buildPageViewMatch,
+  buildSessionMatch,
+  buildVisitorMatch,
+  resolveDateRange,
+} from './analytics-query.builder.js';
+import { excludeAdminAudience, resolveStaffUserIds } from './admin-traffic.util.js';
+import { resolveActiveVisitorIds } from './unique-ip.util.js';
 import { anonymizeIp } from './geoip.util.js';
 import { formatAttribution } from './source-attribution.util.js';
 import { parsePagination, buildPaginationMeta } from '@/utils/pagination.js';
@@ -21,35 +28,44 @@ function hashIp(ip: string | undefined | null): string | null {
  * - 7D / 30D / multi-day: still one row per IP across the whole range
  *   (same IP returning on later days does not inflate the multi-day total).
  * - Same IP on a *new* calendar day increases that day's Today count.
+ *
+ * Activity is taken from page views ∪ sessions in-range (not Visitor.lastSeenAt),
+ * so a return visit on a later day does not erase prior-day landings.
  */
 export async function getVisitors(filter: AnalyticsFilter) {
   const { page, limit } = parsePagination({ page: filter.page, limit: filter.limit });
   const skip = (page - 1) * limit;
   const range = resolveDateRange(filter);
-  const base = await buildVisitorMatch(filter, range);
+  const staffIds = await resolveStaffUserIds();
+  const pageMatch = excludeAdminAudience(buildPageViewMatch(filter, range), staffIds, 'path');
+  const sessionMatch = excludeAdminAudience(
+    buildSessionMatch(filter, range),
+    staffIds,
+    'entryPage',
+  );
+  const activeIds = await resolveActiveVisitorIds(pageMatch, sessionMatch);
 
-  // Include first landing in period even if lastSeenAt was written oddly.
+  const base = await buildVisitorMatch(filter, range);
+  // Drop lastSeenAt window — membership comes from in-period landings above.
   const {
     lastSeenAt: _ignored,
     $or: searchOr,
     ...rest
   } = base as Record<string, unknown> & { lastSeenAt?: unknown; $or?: unknown };
 
-  const dateOr = [
-    { lastSeenAt: { $gte: range.from, $lte: range.to } },
-    { firstSeenAt: { $gte: range.from, $lte: range.to } },
-  ];
-
   const match: Record<string, unknown> = {
     ...rest,
-    ...(Array.isArray(searchOr) ? { $and: [{ $or: searchOr }, { $or: dateOr }] } : { $or: dateOr }),
+    visitorId: { $in: activeIds.length ? activeIds : ['__none__'] },
+    ...(Array.isArray(searchOr) ? { $or: searchOr } : {}),
   };
+  // Staff-linked visitor rows (if any survived activity filters) stay out of the list.
+  const audienceMatch = excludeAdminAudience(match, staffIds, 'landingPath');
 
   const grouped = await VisitorModel.aggregate<{
     _id: string;
     doc: Record<string, unknown>;
   }>([
-    { $match: match },
+    { $match: audienceMatch },
     { $sort: { lastSeenAt: -1 } },
     {
       $group: {
