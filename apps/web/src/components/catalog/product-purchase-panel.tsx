@@ -14,6 +14,7 @@ import { AppError } from '@/lib/errors';
 import { productMetaFrom, trackCommerceEvent } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
 import { useFlashSale } from '@/contexts/flash-sale-context';
+import { useFlashSaleEligibility } from '@/hooks/use-flash-sale-eligibility';
 import { useAuthStore } from '@/store';
 import { PriceDisplay } from './price-display';
 import { BnplInstallmentHint } from './bnpl-installment-hint';
@@ -129,6 +130,8 @@ export function ProductPurchasePanel({
 
   const isAuthed = useAuthStore((state) => Boolean(state.accessToken && state.user));
   const { isFlashSaleActive, formattedTime } = useFlashSale();
+  const { eligible: flashEligible } = useFlashSaleEligibility(product);
+  const showFlashSale = isAuthed && isFlashSaleActive && flashEligible;
 
   const selectedVariant = useMemo(
     () => variants.find((v) => v.id === selectedVariantId) ?? variants[0],
@@ -151,7 +154,7 @@ export function ProductPurchasePanel({
   // Flash sale: 20% off the current display price (sale price if exists, else regular price)
   const flashBasePrice = liveSalePrice ?? livePrice;
   const flashPrice =
-    isAuthed && isFlashSaleActive && flashBasePrice && flashBasePrice.amount > 0
+    showFlashSale && flashBasePrice && flashBasePrice.amount > 0
       ? { ...flashBasePrice, amount: Math.round(flashBasePrice.amount * 0.8) }
       : undefined;
 

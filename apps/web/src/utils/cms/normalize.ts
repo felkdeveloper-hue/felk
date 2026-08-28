@@ -13,6 +13,7 @@ import type {
   SocialLink,
 } from '@/services/sdk/cms';
 import { env } from '@/config/env';
+import { resolveBrandSiteName } from '@/config/site';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -250,6 +251,6 @@ export function extractSeo(page?: CmsPage | null, settings?: PublicSettings) {
     description: asString(seo.description) || page?.excerpt,
     image: asString(seo.ogImage) || page?.featuredImageUrl,
     canonical: asString(seo.canonicalUrl) || undefined,
-    siteName: storeName,
+    siteName: resolveBrandSiteName(storeName),
   };
 }

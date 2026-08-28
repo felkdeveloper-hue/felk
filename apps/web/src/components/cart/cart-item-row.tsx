@@ -12,6 +12,8 @@ import { productMetaFrom, trackCommerceEvent } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store';
 import { useFlashSale } from '@/contexts/flash-sale-context';
+import { useFlashSaleEligibilityForCategories } from '@/hooks/use-flash-sale-eligibility';
+import { applyFlashDiscount } from '@/utils/flash-sale-eligibility';
 
 function lineMeta(item: CartLineItem) {
   return productMetaFrom(
@@ -42,12 +44,17 @@ export function CartItemRow({ item, compact, validationMessage, className }: Car
   const removeMutation = useRemoveCartItemMutation();
   const isAuthed = useAuthStore((state) => Boolean(state.accessToken && state.user));
   const { isFlashSaleActive } = useFlashSale();
+  const { eligible: flashEligible } = useFlashSaleEligibilityForCategories({
+    categoryId: item.categoryId,
+    categoryIds: item.categoryIds,
+    subcategoryId: item.subcategoryId,
+  });
+  const flashEnabled = isAuthed && isFlashSaleActive && flashEligible;
 
   const displayPrice = item.salePrice ?? item.unitPrice;
   const currency = item.currency ?? 'LKR';
 
-  // Flash sale: 20% off for logged-in users with active sale only
-  const flashUnitPrice = isAuthed && isFlashSaleActive ? Math.round(displayPrice * 0.8) : null;
+  const flashUnitPrice = flashEnabled ? applyFlashDiscount(displayPrice, true) : null;
   const flashTotalPrice = flashUnitPrice !== null ? flashUnitPrice * item.quantity : null;
 
   return (

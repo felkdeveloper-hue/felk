@@ -1,8 +1,9 @@
 import { useNavigate } from '@tanstack/react-router';
 import { useQueryClient } from '@tanstack/react-query';
+import { useMemo } from 'react';
 import { Trash2, Zap } from 'lucide-react';
 import { formatCurrency } from '@/utils/format';
-import type { CheckoutSession } from '@/services/sdk';
+import type { CheckoutSession, Product } from '@/services/sdk';
 import { Image } from '@/components/media/image';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
@@ -13,6 +14,11 @@ import { useCheckoutStore, useAuthStore } from '@/store';
 import { QUERY_KEYS, ROUTES } from '@/constants';
 import { trackCommerceEvent } from '@/lib/analytics';
 import { useFlashSale } from '@/contexts/flash-sale-context';
+import { useCategorySlugLookup } from '@/hooks/use-flash-sale-eligibility';
+import {
+  applyFlashDiscount,
+  isProductFlashSaleEligible,
+} from '@/utils/flash-sale-eligibility';
 
 export interface CheckoutOrderSummaryProps {
   session: CheckoutSession;
@@ -25,7 +31,7 @@ export function CheckoutOrderSummary({ session, editable = false }: CheckoutOrde
   const queryClient = useQueryClient();
   const { isFlashSaleActive } = useFlashSale();
   const isAuthed = useAuthStore((state) => Boolean(state.accessToken && state.user));
-  // Flash sale active only when logged in and personal timer is running
+  const slugByCategoryId = useCategorySlugLookup();
   const flashEnabled = isAuthed && isFlashSaleActive;
   const { totals, currency } = session;
   const updateMutation = useUpdateCartItemMutation();
@@ -39,6 +45,30 @@ export function CheckoutOrderSummary({ session, editable = false }: CheckoutOrde
   );
   const lines = cached?.lines ?? session.lines;
   const displayTotals = cached?.totals ?? totals;
+
+  const lineEligibility = useMemo(() => {
+    return lines.map((line) => {
+      const product =
+        queryClient.getQueryData<Product>(QUERY_KEYS.products.detail(line.productId)) ??
+        queryClient
+          .getQueriesData<Product>({ queryKey: ['products'] })
+          .map(([, value]) => value)
+          .find((entry) => entry?.id === line.productId);
+      const eligible = product ? isProductFlashSaleEligible(product, slugByCategoryId) : true;
+      return { line, eligible };
+    });
+  }, [lines, queryClient, slugByCategoryId]);
+
+  const flashSubtotal = flashEnabled
+    ? lineEligibility.reduce(
+        (sum, entry) =>
+          sum + applyFlashDiscount(entry.line.lineSubtotal, entry.eligible),
+        0,
+      )
+    : null;
+  const flashSaving =
+    flashSubtotal !== null ? displayTotals.subtotal - flashSubtotal : 0;
+  const hasFlashDiscount = flashSaving > 0;
 
   const patchSessionLines = (nextLines: CheckoutSession['lines']) => {
     const next: CheckoutSession = {
@@ -87,9 +117,10 @@ export function CheckoutOrderSummary({ session, editable = false }: CheckoutOrde
     <aside className="border-border/70 bg-card/90 rounded-[1.75rem] border p-6 shadow-[var(--shadow-elevated)] backdrop-blur">
       <h2 className="font-display text-lg font-bold uppercase tracking-tight">Order summary</h2>
       <ul className="mt-4 space-y-4">
-        {lines.map((line) => {
+        {lineEligibility.map(({ line, eligible }) => {
           const cartItemId = line.cartItemId;
           const canEdit = editable && Boolean(cartItemId);
+          const lineFlashEnabled = flashEnabled && eligible;
 
           return (
             <li key={`${line.variantId}-${cartItemId ?? line.sku}`} className="flex gap-3 text-sm">
@@ -113,13 +144,13 @@ export function CheckoutOrderSummary({ session, editable = false }: CheckoutOrde
                       </p>
                     )}
                   </div>
-                  {flashEnabled ? (
+                  {lineFlashEnabled ? (
                     <div className="shrink-0 text-right">
                       <p className="text-muted-foreground text-xs line-through">
                         {formatCurrency(line.lineSubtotal, currency)}
                       </p>
                       <p className="font-semibold" style={{ color: '#f97316' }}>
-                        {formatCurrency(Math.round(line.lineSubtotal * 0.8), currency)}
+                        {formatCurrency(applyFlashDiscount(line.lineSubtotal, true), currency)}
                       </p>
                     </div>
                   ) : (
@@ -228,7 +259,7 @@ export function CheckoutOrderSummary({ session, editable = false }: CheckoutOrde
 
       <Separator className="my-4" />
 
-      {flashEnabled ? (
+      {flashEnabled && hasFlashDiscount ? (
         <div
           className="mb-3 flex items-center gap-1.5 rounded-lg px-3 py-2 text-[11px] font-semibold"
           style={{
@@ -246,13 +277,13 @@ export function CheckoutOrderSummary({ session, editable = false }: CheckoutOrde
         <div className="flex justify-between">
           <dt className="text-muted-foreground">Subtotal</dt>
           <dd>
-            {flashEnabled ? (
+            {flashEnabled && hasFlashDiscount && flashSubtotal !== null ? (
               <span className="flex items-baseline gap-1.5">
                 <span className="text-muted-foreground text-xs line-through">
                   {formatCurrency(displayTotals.subtotal, currency)}
                 </span>
                 <span className="font-semibold" style={{ color: '#f97316' }}>
-                  {formatCurrency(Math.round(displayTotals.subtotal * 0.8), currency)}
+                  {formatCurrency(flashSubtotal, currency)}
                 </span>
               </span>
             ) : (
@@ -260,13 +291,13 @@ export function CheckoutOrderSummary({ session, editable = false }: CheckoutOrde
             )}
           </dd>
         </div>
-        {flashEnabled ? (
+        {flashEnabled && hasFlashDiscount ? (
           <div className="flex justify-between" style={{ color: '#f97316' }}>
             <dt className="flex items-center gap-1">
               <Zap className="size-3" />
               Flash Sale (20% off)
             </dt>
-            <dd>-{formatCurrency(Math.round(displayTotals.subtotal * 0.2), currency)}</dd>
+            <dd>-{formatCurrency(flashSaving, currency)}</dd>
           </div>
         ) : null}
         {displayTotals.discount > 0 && !flashEnabled ? (
@@ -298,11 +329,11 @@ export function CheckoutOrderSummary({ session, editable = false }: CheckoutOrde
 
       <div className="flex justify-between text-base font-semibold">
         <span>Total</span>
-        <span style={flashEnabled ? { color: '#f97316' } : undefined}>
-          {flashEnabled
+        <span style={flashEnabled && hasFlashDiscount ? { color: '#f97316' } : undefined}>
+          {flashEnabled && hasFlashDiscount && flashSubtotal !== null
             ? formatCurrency(
                 Math.round(
-                  displayTotals.subtotal * 0.8 +
+                  flashSubtotal +
                     (displayTotals.shipping ?? 0) +
                     (displayTotals.tax ?? 0) -
                     (displayTotals.discount ?? 0) -

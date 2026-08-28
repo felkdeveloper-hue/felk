@@ -5,5 +5,6 @@ Disallow: /checkout/
 Disallow: /cart
 Disallow: /auth/
 Disallow: /api/
+Disallow: /admin/
 
-Sitemap: /sitemap.xml
+Sitemap: https://fe.lk/sitemap.xml

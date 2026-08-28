@@ -14,12 +14,53 @@ export function buildAbsoluteUrl(path: string): string {
   return `${origin}${path.startsWith('/') ? path : `/${path}`}`;
 }
 
+/** Public-facing brand name — always "Fashion Edge", never the internal app name. */
+export const BRAND_NAME = 'Fashion Edge' as const;
+export const BRAND_SHORT = 'FE' as const;
+export const DEFAULT_SEO_TITLE =
+  `${BRAND_NAME} (${BRAND_SHORT}) | Modern Fashion eCommerce — Sri Lanka` as const;
+
+export function formatSeoTitle(pageTitle?: string | null): string {
+  const suffix = `${BRAND_NAME} (${BRAND_SHORT})`;
+  const normalized = pageTitle?.trim();
+
+  if (
+    !normalized ||
+    normalized === BRAND_NAME ||
+    normalized === BRAND_SHORT ||
+    normalized === suffix ||
+    normalized === DEFAULT_SEO_TITLE ||
+    normalized === `${BRAND_SHORT} | ${BRAND_SHORT}` ||
+    normalized === `${BRAND_SHORT} | ${BRAND_NAME}`
+  ) {
+    return DEFAULT_SEO_TITLE;
+  }
+
+  if (normalized.includes('|') && (normalized.includes(BRAND_NAME) || normalized.includes(BRAND_SHORT))) {
+    return normalized;
+  }
+
+  return `${normalized} | ${suffix}`;
+}
+
+export function resolveBrandSiteName(cmsStoreName?: string | null): string {
+  const value = cmsStoreName?.trim();
+  if (!value || value === BRAND_SHORT || value === 'FE Platform') return BRAND_NAME;
+  return value;
+}
+
 export const siteConfig = {
-  name: env.appName === 'FE' ? 'Fashion Edge' : env.appName,
-  shortName: 'FE',
+  /** Customer-facing store name for SEO and UI copy. */
+  name: BRAND_NAME,
+  shortName: BRAND_SHORT,
+  /** Internal Vite app label (e.g. "FE Platform") — not used in SEO titles. */
+  appName: env.appName,
   domain: 'fe.lk',
+  defaultTitle: DEFAULT_SEO_TITLE,
   defaultDescription:
-    'Fashion Edge (fe.lk) — trend-driven women’s clothing online in Sri Lanka. New trends, varieties, and designs from Kandy & Colombo. Shop dresses, tops, jeans, and more.',
+    'Fashion Edge (FE) at fe.lk — modern women’s fashion online in Sri Lanka. Shop dresses, tops, jeans, bags & shoes. Stores in Kandy & Colombo. Free styling tips & early access to new drops.',
+  defaultOgImagePath: '/og-image.png',
+  logoPath: '/favicon.svg',
   searchPath: '/search',
   social: {
     facebook: 'https://www.facebook.com/fashionedge.lk/',

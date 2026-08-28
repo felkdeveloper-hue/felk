@@ -206,13 +206,16 @@ export function toJsonLdScript(value: object): string {
 /** Default Fashion Edge brand SEO keywords. */
 export const FE_SEO_KEYWORDS = [
   'fashion edge',
+  'Fashion Edge Sri Lanka',
   'fe',
   'FE',
   'fe.lk',
+  'fashion edge kandy',
+  'fashion edge colombo',
   'FE cloth website',
-  'Fashion Edge Sri Lanka',
   'online fashion Sri Lanka',
-  'clothing store Kandy',
   'women clothing Sri Lanka',
-  'women fashion Colombo',
+  'women fashion sri lanka',
+  'clothing store Kandy',
+  'modern fashion ecommerce',
 ].join(', ');

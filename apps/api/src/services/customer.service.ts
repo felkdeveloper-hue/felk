@@ -407,6 +407,70 @@ export class CustomerService {
     if (count === 0) return this.seedLoyaltyTiers();
     return LoyaltyTierModel.find({ isDeleted: false }).sort({ sortOrder: 1 });
   }
+
+  /** Admin: reset the member 1-hour flash sale window for one customer. */
+  async grantFlashSale(customerId: string, actor?: ActorMeta) {
+    const customer = await this.getById(customerId);
+    const now = new Date();
+    customer.flashSaleStartTime = now;
+    await customer.save();
+
+    void writeAuditLog({
+      action: CUSTOMER_AUDIT.PROFILE_UPDATED,
+      resourceType: 'customers',
+      resourceId: customer._id.toString(),
+      actorUserId: actor?.userId,
+      ip: actor?.ip,
+      requestId: actor?.requestId,
+      metadata: { flashSaleGranted: true, flashSaleStartTime: now.toISOString() },
+    });
+
+    return this.buildFlashSaleStatus(now);
+  }
+
+  /** Admin: grant flash sale to many customers at once. */
+  async grantFlashSaleBulk(customerIds: string[], actor?: ActorMeta) {
+    const uniqueIds = [...new Set(customerIds.map(String))].filter(Boolean);
+    if (!uniqueIds.length) {
+      throw ApiError.badRequest('No customer IDs provided');
+    }
+
+    const now = new Date();
+    const result = await CustomerModel.updateMany(
+      { _id: { $in: uniqueIds }, isDeleted: false },
+      { $set: { flashSaleStartTime: now } },
+    );
+
+    void writeAuditLog({
+      action: CUSTOMER_AUDIT.PROFILE_UPDATED,
+      resourceType: 'customers',
+      resourceId: 'bulk',
+      actorUserId: actor?.userId,
+      ip: actor?.ip,
+      requestId: actor?.requestId,
+      metadata: {
+        flashSaleGrantedBulk: true,
+        customerCount: uniqueIds.length,
+        modifiedCount: result.modifiedCount,
+        flashSaleStartTime: now.toISOString(),
+      },
+    });
+
+    return {
+      updated: result.modifiedCount,
+      requested: uniqueIds.length,
+      ...this.buildFlashSaleStatus(now),
+    };
+  }
+
+  buildFlashSaleStatus(startTime: Date) {
+    const FLASH_SALE_DURATION_MS = 60 * 60 * 1000;
+    return {
+      flashSaleStartTime: startTime.toISOString(),
+      isActive: true,
+      expiresAt: new Date(startTime.getTime() + FLASH_SALE_DURATION_MS).toISOString(),
+    };
+  }
 }
 
 export const customerService = new CustomerService();

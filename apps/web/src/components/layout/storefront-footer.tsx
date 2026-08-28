@@ -11,7 +11,7 @@ import { NewsletterSignupSection } from '@/components/storefront/newsletter-sign
 
 /** Fashion Edge (fe.lk) public details — used when CMS has not been seeded yet. */
 const FE_FALLBACK = {
-  storeName: 'FE',
+  storeName: 'Fashion Edge',
   tagline: 'Modern fashion for every day',
   companyLinks: [
     { label: 'About', href: ROUTES.about },

@@ -5,6 +5,7 @@ import { Eye, Heart, Plus } from 'lucide-react';
 import type { Product } from '@/services/sdk';
 import { productsApi } from '@/services/sdk';
 import { useFlashSale } from '@/contexts/flash-sale-context';
+import { useFlashSaleEligibility } from '@/hooks/use-flash-sale-eligibility';
 import { ProductCardImage } from '@/components/catalog/product-card-image';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -107,6 +108,8 @@ function ProductCardComponent({
 
   const isAuthed = useAuthStore((state) => Boolean(state.accessToken && state.user));
   const { isFlashSaleActive, formattedTime } = useFlashSale();
+  const { eligible: flashEligible } = useFlashSaleEligibility(product);
+  const showFlashSale = isAuthed && isFlashSaleActive && flashEligible;
   const resolvedVariantId = resolveVariantId(undefined, product);
   const isInWishlist = useIsInWishlist(product.id, resolvedVariantId);
   const wishlistQuery = useDefaultWishlistQuery();
@@ -398,7 +401,7 @@ function ProductCardComponent({
                 Save {discountPct}%
               </Badge>
             ) : null}
-            {isAuthed && isFlashSaleActive ? (
+            {showFlashSale ? (
               <Badge
                 className="rounded-none px-1.5 text-[9px] font-bold uppercase tracking-wide text-white sm:px-2 sm:text-[10px]"
                 style={{
@@ -535,7 +538,7 @@ function ProductCardComponent({
             />
           </div>
 
-          {flashPrice && displayPrice && isAuthed && isFlashSaleActive ? (
+          {flashPrice && displayPrice && showFlashSale ? (
             /* Logged-in users: show struck-through price + orange 20%-off flash price */
             <div className="space-y-0.5">
               <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">

@@ -446,7 +446,7 @@ export class CartService {
     const variantIds = [...new Set(items.map((item) => item.variantId.toString()))];
     const [products, inventoryRows] = await Promise.all([
       ProductModel.find({ _id: { $in: productIds }, isDeleted: false })
-        .select('slug')
+        .select('slug categoryId categoryIds subcategoryId')
         .lean(),
       InventoryItemModel.find({
         variantId: { $in: variantIds },
@@ -456,6 +456,18 @@ export class CartService {
         .lean(),
     ]);
     const slugByProductId = new Map(products.map((product) => [String(product._id), product.slug]));
+    const categoryByProductId = new Map(
+      products.map((product) => [
+        String(product._id),
+        {
+          categoryId: product.categoryId ? String(product.categoryId) : undefined,
+          categoryIds: Array.isArray(product.categoryIds)
+            ? product.categoryIds.map((id) => String(id))
+            : undefined,
+          subcategoryId: product.subcategoryId ? String(product.subcategoryId) : undefined,
+        },
+      ]),
+    );
 
     const availableByVariant = new Map<string, number>();
     const trackedVariants = new Set<string>();
@@ -481,6 +493,7 @@ export class CartService {
       return {
         ...toPlain(item),
         productSlug: slugByProductId.get(item.productId.toString()) ?? null,
+        ...(categoryByProductId.get(item.productId.toString()) ?? {}),
         availableQuantity: tracked ? available : null,
         inStock,
         stockStatus: inStock ? stockStatus : INVENTORY_STATUS.OUT_OF_STOCK,

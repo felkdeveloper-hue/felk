@@ -10,6 +10,7 @@ import { useAuthStore } from '@/store';
 import { selectCartItemCount, useCartStore } from '@/store/cart-store';
 import { useUiStore } from '@/store/ui-store';
 import { getSetting } from '@/utils/cms';
+import { siteConfig } from '@/config';
 import { FeLogo } from '@/components/brand/fe-logo';
 import { Button } from '@/components/ui/button';
 import { HeaderSearchField } from '@/components/search/header-search-field';
@@ -84,7 +85,9 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
 
   const { data: settings } = usePublicSettings();
   const storeName =
-    getSetting<string>(settings, 'store.name') ?? getSetting<string>(settings, 'storeName') ?? 'FE';
+    getSetting<string>(settings, 'store.name') ??
+    getSetting<string>(settings, 'storeName') ??
+    siteConfig.name;
 
   const cartCount = useCartStore(selectCartItemCount);
   const toggleSearch = useUiStore((state) => state.toggleSearch);

@@ -7,6 +7,7 @@ import {
   adminUpdateUserSchema,
   adminUserIdParamsSchema,
   adminUserListQuerySchema,
+  adminGrantFlashSaleBulkSchema,
   adminUserService,
 } from '@/services/admin-user.service.js';
 import { asyncHandler } from '@/utils/async-handler.js';
@@ -48,6 +49,16 @@ usersRouter.post(
   }),
 );
 
+usersRouter.post(
+  '/flash-sale/grant-bulk',
+  authorizeAny(P.USERS_UPDATE, P.USERS_MANAGE),
+  validate({ body: adminGrantFlashSaleBulkSchema }),
+  asyncHandler(async (req, res) => {
+    const result = await adminUserService.grantFlashSaleBulk(req.body.userIds, actor(req));
+    ApiResponse.success(res, result, result.message);
+  }),
+);
+
 usersRouter.get(
   '/:userId',
   authorizeAny(P.USERS_READ, P.USERS_MANAGE),
@@ -78,6 +89,16 @@ usersRouter.post(
       req.body.password,
       actor(req),
     );
+    ApiResponse.success(res, result, result.message);
+  }),
+);
+
+usersRouter.post(
+  '/:userId/flash-sale/grant',
+  authorizeAny(P.USERS_UPDATE, P.USERS_MANAGE),
+  validate({ params: adminUserIdParamsSchema }),
+  asyncHandler(async (req, res) => {
+    const result = await adminUserService.grantFlashSale(String(req.params.userId), actor(req));
     ApiResponse.success(res, result, result.message);
   }),
 );

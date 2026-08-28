@@ -17,7 +17,20 @@ export default defineConfig({
       ? [
           VitePWA({
             registerType: 'autoUpdate',
-            includeAssets: ['favicon.svg', 'offline.html', 'robots.txt'],
+            includeAssets: [
+              'favicon.svg',
+              'favicon-32.png',
+              'favicon-48.png',
+              'apple-touch-icon.png',
+              'icon-192.png',
+              'icon-512.png',
+              'og-image.svg',
+              'og-image.png',
+              'manifest.webmanifest',
+              'offline.html',
+              'robots.txt',
+              'sitemap.xml',
+            ],
             manifest: false,
             workbox: {
               navigateFallback: '/index.html',

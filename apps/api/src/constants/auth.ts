@@ -66,4 +66,6 @@ export const AUDIT_ACTIONS = {
   USER_DELETED: 'auth.user_deleted',
   USER_STATUS_CHANGED: 'auth.user_status_changed',
   ADMIN_PASSWORD_SET: 'auth.admin_password_set',
+  FLASH_SALE_GRANTED: 'auth.flash_sale_granted',
+  FLASH_SALE_GRANTED_BULK: 'auth.flash_sale_granted_bulk',
 } as const;

@@ -33,6 +33,7 @@ import {
 import { buildPaginationMeta, getPaginationSkip, parsePagination } from '@/utils/pagination.js';
 import { parseSort } from '@/utils/sorting.js';
 import { orderReceivedAt, paymentReceivedAt } from '@/utils/order-received-at.js';
+import { customerService } from '@/services/customer.service.js';
 
 const passwordSchema = z
   .string()
@@ -53,6 +54,12 @@ export type AdminUserListQuery = z.infer<typeof adminUserListQuerySchema>;
 export const adminUserIdParamsSchema = z.object({
   userId: objectIdSchema,
 });
+
+export const adminGrantFlashSaleBulkSchema = z.object({
+  userIds: z.array(objectIdSchema).min(1).max(500),
+});
+
+export type AdminGrantFlashSaleBulkInput = z.infer<typeof adminGrantFlashSaleBulkSchema>;
 
 export const adminSetPasswordSchema = z.object({
   password: passwordSchema,
@@ -856,6 +863,85 @@ export class AdminUserService {
     });
 
     return { message: 'User deleted', userId: user._id.toString() };
+  }
+
+  async grantFlashSale(userId: string, actor: AdminActorMeta) {
+    await this.getActiveUser(userId);
+    const customer = await CustomerModel.findOne({ userId, isDeleted: false });
+    if (!customer) {
+      throw ApiError.badRequest(
+        'This user has no customer profile yet. Ask them to sign in once, then try again.',
+        undefined,
+        'NO_CUSTOMER_PROFILE',
+      );
+    }
+
+    const status = await customerService.grantFlashSale(customer._id.toString(), {
+      userId: actor.userId,
+      ip: actor.ip,
+      requestId: actor.requestId,
+    });
+
+    await writeAuditLog({
+      action: AUDIT_ACTIONS.FLASH_SALE_GRANTED,
+      resourceType: 'user',
+      resourceId: userId,
+      actorUserId: actor.userId,
+      ip: actor.ip,
+      requestId: actor.requestId,
+      metadata: { flashSaleGranted: true, customerId: customer._id.toString(), ...status },
+    });
+
+    return {
+      userId,
+      customerId: customer._id.toString(),
+      message: '1-hour flash sale granted',
+      ...status,
+    };
+  }
+
+  async grantFlashSaleBulk(userIds: string[], actor: AdminActorMeta) {
+    const uniqueUserIds = [...new Set(userIds.map(String))].filter(Boolean);
+    const customers = await CustomerModel.find({
+      userId: { $in: uniqueUserIds },
+      isDeleted: false,
+    }).select('_id userId');
+
+    if (!customers.length) {
+      throw ApiError.badRequest(
+        'None of the selected users have a customer profile yet.',
+        undefined,
+        'NO_CUSTOMER_PROFILES',
+      );
+    }
+
+    const customerIds = customers.map((customer) => customer._id.toString());
+    const result = await customerService.grantFlashSaleBulk(customerIds, {
+      userId: actor.userId,
+      ip: actor.ip,
+      requestId: actor.requestId,
+    });
+
+    await writeAuditLog({
+      action: AUDIT_ACTIONS.FLASH_SALE_GRANTED_BULK,
+      resourceType: 'user',
+      resourceId: 'bulk',
+      actorUserId: actor.userId,
+      ip: actor.ip,
+      requestId: actor.requestId,
+      metadata: {
+        flashSaleGrantedBulk: true,
+        userIds: uniqueUserIds,
+        customerIds,
+        ...result,
+      },
+    });
+
+    return {
+      message: `Flash sale granted to ${result.updated} customer${result.updated === 1 ? '' : 's'}`,
+      skipped: uniqueUserIds.length - customers.length,
+      ...result,
+    };
   }
 }
 

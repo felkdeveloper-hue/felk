@@ -19,6 +19,9 @@ export interface CartLineItem {
   priceChanged?: boolean;
   priceDifference?: number;
   currency?: string;
+  categoryId?: string;
+  categoryIds?: string[];
+  subcategoryId?: string;
   price?: { amount: number; currency: string };
   salePriceMoney?: { amount: number; currency: string };
   inStock?: boolean;

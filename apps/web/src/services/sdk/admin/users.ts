@@ -172,4 +172,27 @@ export const usersApi = {
   remove(userId: string): Promise<MessageResult> {
     return http.delete<MessageResult>(`/users/${userId}`);
   },
+
+  grantFlashSale(userId: string): Promise<{
+    userId: string;
+    customerId: string;
+    message: string;
+    flashSaleStartTime: string;
+    expiresAt: string;
+    isActive: boolean;
+  }> {
+    return http.post(`/users/${userId}/flash-sale/grant`);
+  },
+
+  grantFlashSaleBulk(userIds: string[]): Promise<{
+    message: string;
+    updated: number;
+    skipped?: number;
+    requested?: number;
+    flashSaleStartTime: string;
+    expiresAt: string;
+    isActive: boolean;
+  }> {
+    return http.post('/users/flash-sale/grant-bulk', { userIds });
+  },
 };

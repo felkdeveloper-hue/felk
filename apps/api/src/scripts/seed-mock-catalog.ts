@@ -697,10 +697,14 @@ async function seedHomepage() {
 
 async function seedStoreSettings() {
   const settings = [
-    ['store.name', 'FE', 'store'],
-    ['storeName', 'FE', 'store'],
+    ['store.name', 'Fashion Edge', 'store'],
+    ['storeName', 'Fashion Edge', 'store'],
     ['store.tagline', 'Modern fashion for every day', 'store'],
-    ['seo.description', 'Shop Fashion Edge — modern fashion for every day at fe.lk.', 'seo'],
+    [
+      'seo.description',
+      'Fashion Edge (FE) at fe.lk — modern women’s fashion online in Sri Lanka. Shop dresses, tops, jeans, bags & shoes from Kandy & Colombo.',
+      'seo',
+    ],
     ['contact.email', 'support@fe.lk', 'contact'],
     ['contactEmail', 'support@fe.lk', 'contact'],
     ['contact.phone', '081 220 4315', 'contact'],

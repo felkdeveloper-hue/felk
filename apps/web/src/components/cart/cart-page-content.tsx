@@ -22,6 +22,8 @@ import { ErrorState } from '@/components/ui/error-state';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertTriangle } from 'lucide-react';
 import { useFlashSale } from '@/contexts/flash-sale-context';
+import { useCategorySlugLookup } from '@/hooks/use-flash-sale-eligibility';
+import { computeFlashAdjustedSubtotal, computeFlashSaving } from '@/utils/flash-sale-eligibility';
 
 function getIssueForItem(
   itemId: string,
@@ -56,6 +58,7 @@ export function CartPageContent() {
   const authUser = useAuthStore((state) => state.user);
   const isAuthed = useAuthStore((state) => Boolean(state.accessToken && state.user));
   const { isFlashSaleActive } = useFlashSale();
+  const slugByCategoryId = useCategorySlugLookup();
   const isGuestCheckout = isGuestCheckoutUser(authUser);
   const isStaff = isStaffUser(authUser);
   const flashEnabled = isAuthed && isFlashSaleActive;
@@ -122,6 +125,25 @@ export function CartPageContent() {
     );
   }
 
+  const flashSubtotal =
+    flashEnabled && cart.items.length
+      ? computeFlashAdjustedSubtotal(cart.items, slugByCategoryId)
+      : null;
+  const flashSaving =
+    flashSubtotal !== null && cart.items.length
+      ? computeFlashSaving(cart.items, slugByCategoryId)
+      : 0;
+  const hasFlashDiscount = flashSaving > 0;
+  const shippingAmount = previewShippingAmount(cart.totals.shipping, isStaff);
+  const regularTotal =
+    cart.totals.shipping > 0 ? cart.totals.total : cart.totals.total + shippingAmount;
+  const flashGrandTotal =
+    flashSubtotal !== null && hasFlashDiscount
+      ? Math.round(
+          flashSubtotal + shippingAmount + (cart.totals.tax ?? 0) - (cart.totals.discount ?? 0),
+        )
+      : null;
+
   return (
     <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
       <section aria-labelledby="cart-items-heading" className="space-y-4 pb-28 lg:pb-0">
@@ -155,7 +177,7 @@ export function CartPageContent() {
 
       <div className="space-y-4 lg:sticky lg:top-24 lg:self-start">
         <CartPromotionsPanel />
-        <CartOrderSummary totals={cart.totals} validation={validation} />
+        <CartOrderSummary totals={cart.totals} items={cart.items} validation={validation} />
         <div className="hidden space-y-3 lg:block">
           {!hasHydrated ? (
             <Button className="w-full" size="lg" disabled loading>
@@ -195,40 +217,22 @@ export function CartPageContent() {
             <span className="text-muted-foreground text-[10px] font-bold uppercase tracking-[0.16em]">
               Total
             </span>
-            {flashEnabled ? (
+            {flashEnabled && hasFlashDiscount ? (
               <span className="flex items-baseline gap-1.5">
                 <Zap className="mb-0.5 size-3.5 shrink-0" style={{ color: '#f97316' }} />
                 <span className="text-muted-foreground text-sm tabular-nums line-through">
-                  {formatCurrency(
-                    cart.totals.shipping > 0
-                      ? cart.totals.total
-                      : cart.totals.total + previewShippingAmount(cart.totals.shipping, isStaff),
-                    cart.totals.currency ?? 'LKR',
-                  )}
+                  {formatCurrency(regularTotal, cart.totals.currency ?? 'LKR')}
                 </span>
                 <span
                   className="font-display text-lg font-bold tabular-nums tracking-tight"
                   style={{ color: '#f97316' }}
                 >
-                  {formatCurrency(
-                    Math.round(
-                      cart.totals.subtotal * 0.8 +
-                        previewShippingAmount(cart.totals.shipping, isStaff) +
-                        (cart.totals.tax ?? 0) -
-                        (cart.totals.discount ?? 0),
-                    ),
-                    cart.totals.currency ?? 'LKR',
-                  )}
+                  {formatCurrency(flashGrandTotal ?? regularTotal, cart.totals.currency ?? 'LKR')}
                 </span>
               </span>
             ) : (
               <span className="font-display text-foreground text-lg font-bold tabular-nums tracking-tight">
-                {formatCurrency(
-                  cart.totals.shipping > 0
-                    ? cart.totals.total
-                    : cart.totals.total + previewShippingAmount(cart.totals.shipping, isStaff),
-                  cart.totals.currency ?? 'LKR',
-                )}
+                {formatCurrency(regularTotal, cart.totals.currency ?? 'LKR')}
               </span>
             )}
           </div>

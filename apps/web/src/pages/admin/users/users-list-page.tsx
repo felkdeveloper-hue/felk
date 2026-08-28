@@ -84,6 +84,7 @@ export function UsersListPage() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [createForm, setCreateForm] = useState({
     firstName: '',
     lastName: '',
@@ -183,6 +184,29 @@ export function UsersListPage() {
     },
   });
 
+  const grantFlashSaleMutation = useMutation({
+    mutationFn: (userId: string) => usersApi.grantFlashSale(userId),
+    onSuccess: (result) => {
+      toast.success(result.message || '1-hour flash sale granted');
+      invalidateUsers();
+    },
+    onError: (error) => {
+      toast.error(errorMessage(error, 'Unable to grant flash sale'));
+    },
+  });
+
+  const grantFlashSaleBulkMutation = useMutation({
+    mutationFn: (userIds: string[]) => usersApi.grantFlashSaleBulk(userIds),
+    onSuccess: (result) => {
+      toast.success(result.message);
+      setSelectedIds([]);
+      invalidateUsers();
+    },
+    onError: (error) => {
+      toast.error(errorMessage(error, 'Unable to grant flash sale in bulk'));
+    },
+  });
+
   const createMutation = useMutation({
     mutationFn: () =>
       usersApi.create({
@@ -246,6 +270,34 @@ export function UsersListPage() {
     setPasswordMutation.mutate({ userId: passwordTarget.id, password: newPassword });
   };
 
+  const toggleRow = (id: string) => {
+    setSelectedIds((current) =>
+      current.includes(id) ? current.filter((entry) => entry !== id) : [...current, id],
+    );
+  };
+
+  const toggleAllRows = () => {
+    const rows = query.data?.data ?? [];
+    const allIds = rows.map((row) => row.id);
+    const allSelected = allIds.length > 0 && allIds.every((id) => selectedIds.includes(id));
+    setSelectedIds(allSelected ? [] : allIds);
+  };
+
+  const submitBulkFlashSale = () => {
+    if (!selectedIds.length) {
+      toast.error('Select at least one user');
+      return;
+    }
+    if (
+      !window.confirm(
+        `Grant a fresh 1-hour 20% flash sale to ${selectedIds.length} selected user${selectedIds.length === 1 ? '' : 's'}?`,
+      )
+    ) {
+      return;
+    }
+    grantFlashSaleBulkMutation.mutate(selectedIds);
+  };
+
   if (query.isError) {
     return <AdminErrorState message="Unable to load users." onRetry={() => query.refetch()} />;
   }
@@ -288,21 +340,34 @@ export function UsersListPage() {
         totalPages={query.data?.meta.totalPages ?? 1}
         onPageChange={setPage}
         bulkActions={
-          <select
-            value={roleKey}
-            onChange={(event) => {
-              setRoleKey(event.target.value);
-              setPage(1);
-            }}
-            className="rounded-lg border border-[var(--admin-line)] bg-[var(--admin-panel-soft)] px-3 py-2 text-sm text-[var(--admin-ink)]"
-          >
-            <option value="">All roles</option>
-            {ROLE_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+          <div className="flex w-full flex-wrap items-center gap-2">
+            <select
+              value={roleKey}
+              onChange={(event) => {
+                setRoleKey(event.target.value);
+                setPage(1);
+              }}
+              className="rounded-lg border border-[var(--admin-line)] bg-[var(--admin-panel-soft)] px-3 py-2 text-sm text-[var(--admin-ink)]"
+            >
+              <option value="">All roles</option>
+              {ROLE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            {userPerms.update ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={!selectedIds.length || grantFlashSaleBulkMutation.isPending}
+                onClick={submitBulkFlashSale}
+              >
+                Grant 1hr flash sale ({selectedIds.length || 0})
+              </Button>
+            ) : null}
+          </div>
         }
       />
 
@@ -311,6 +376,9 @@ export function UsersListPage() {
         isLoading={query.isLoading}
         getRowId={(row) => row.id}
         emptyMessage="No users found."
+        selectedIds={selectedIds}
+        onToggleRow={userPerms.update ? toggleRow : undefined}
+        onToggleAll={userPerms.update ? toggleAllRows : undefined}
         columns={[
           {
             id: 'user',
@@ -448,6 +516,29 @@ export function UsersListPage() {
                 >
                   View
                 </Link>
+                {userPerms.update ? (
+                  <button
+                    type="button"
+                    className={cn(actionBtn, actionSecondary)}
+                    disabled={grantFlashSaleMutation.isPending || !row.customerId}
+                    title={
+                      row.customerId
+                        ? 'Grant a fresh 1-hour 20% flash sale'
+                        : 'User must sign in once before flash sale can be granted'
+                    }
+                    onClick={() => {
+                      if (
+                        window.confirm(
+                          `Grant a fresh 1-hour 20% flash sale to ${displayName(row)}?`,
+                        )
+                      ) {
+                        grantFlashSaleMutation.mutate(row.id);
+                      }
+                    }}
+                  >
+                    Grant flash sale
+                  </button>
+                ) : null}
                 {userPerms.update ? (
                   <button
                     type="button"

@@ -27,7 +27,8 @@ export function HomePage() {
     getSetting<string>(settings, 'store.description') ??
     siteConfig.defaultDescription;
   const origin = buildAbsoluteUrl('/');
-  const logoUrl = getSetting<string>(settings, 'store.logo') ?? buildAbsoluteUrl('/favicon.svg');
+  const logoUrl = getSetting<string>(settings, 'store.logo') ?? buildAbsoluteUrl(siteConfig.logoPath);
+  const ogImageUrl = buildAbsoluteUrl(siteConfig.defaultOgImagePath);
   const sameAs = [
     siteConfig.social.facebook,
     siteConfig.social.instagram,
@@ -37,15 +38,15 @@ export function HomePage() {
   return (
     <>
       <Seo
-        title="Women’s Clothing Online Sri Lanka"
+        title={siteConfig.defaultTitle}
         description={description}
         url={origin}
-        siteName="Fashion Edge"
-        image={logoUrl}
+        siteName={siteConfig.name}
+        image={ogImageUrl}
         jsonLd={[
           buildOrganizationJsonLd({
             name: 'Fashion Edge',
-            alternateName: ['FE', 'fe.', 'fe.lk', 'FE cloth website'],
+            alternateName: ['FE', 'fe.', 'fe.lk', 'Fashion Edge Sri Lanka', 'FE cloth website'],
             url: 'https://fe.lk',
             logo: logoUrl,
             sameAs,

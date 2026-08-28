@@ -1,5 +1,5 @@
 import { formatCurrency } from '@/utils';
-import type { CartTotals, CartValidationResult } from '@/services/sdk';
+import type { CartLineItem, CartTotals, CartValidationResult } from '@/services/sdk';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { previewShippingAmount } from '@/constants/checkout.constants';
@@ -7,35 +7,53 @@ import { useAuthStore } from '@/store';
 import { isStaffUser } from '@/utils/auth-redirect';
 import { Zap } from 'lucide-react';
 import { useFlashSale } from '@/contexts/flash-sale-context';
+import { useCategorySlugLookup } from '@/hooks/use-flash-sale-eligibility';
+import {
+  computeFlashAdjustedSubtotal,
+  computeFlashSaving,
+} from '@/utils/flash-sale-eligibility';
 
 export interface CartOrderSummaryProps {
   totals: CartTotals;
+  items?: CartLineItem[];
   validation?: CartValidationResult;
 }
 
-export function CartOrderSummary({ totals, validation }: CartOrderSummaryProps) {
+export function CartOrderSummary({ totals, items = [], validation }: CartOrderSummaryProps) {
   const currency = totals.currency ?? 'LKR';
   const authUser = useAuthStore((state) => state.user);
   const isAuthed = useAuthStore((state) => Boolean(state.accessToken && state.user));
   const { isFlashSaleActive } = useFlashSale();
+  const slugByCategoryId = useCategorySlugLookup();
   const isStaff = isStaffUser(authUser);
   const shipping = previewShippingAmount(totals.shipping, isStaff);
   const displayTotal = totals.shipping > 0 ? totals.total : totals.total + shipping;
 
-  // Flash sale: 20% off subtotal for logged-in users with active sale only
   const flashEnabled = isAuthed && isFlashSaleActive;
-  const flashSubtotal = flashEnabled ? Math.round(totals.subtotal * 0.8) : null;
-  const flashSaving = flashSubtotal !== null ? totals.subtotal - flashSubtotal : 0;
+  const flashSubtotal =
+    flashEnabled && items.length
+      ? computeFlashAdjustedSubtotal(items, slugByCategoryId)
+      : flashEnabled
+        ? Math.round(totals.subtotal * 0.8)
+        : null;
+  const flashSaving =
+    flashSubtotal !== null && items.length
+      ? computeFlashSaving(items, slugByCategoryId)
+      : flashSubtotal !== null
+        ? totals.subtotal - flashSubtotal
+        : 0;
   const flashTotal =
     flashSubtotal !== null
       ? Math.round(flashSubtotal + shipping + (totals.tax ?? 0) - (totals.discount ?? 0))
       : null;
 
+  const hasAnyFlashDiscount = flashSaving > 0;
+
   return (
     <aside className="border-border bg-card space-y-4 rounded-xl border p-5">
       <h2 className="text-base font-semibold">Price summary</h2>
 
-      {flashEnabled ? (
+      {flashEnabled && hasAnyFlashDiscount ? (
         <div
           className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-[11px] font-semibold"
           style={{
@@ -59,7 +77,7 @@ export function CartOrderSummary({ totals, validation }: CartOrderSummaryProps) 
         <div className="flex justify-between">
           <dt className="text-muted-foreground">Subtotal</dt>
           <dd>
-            {flashSubtotal !== null ? (
+            {flashSubtotal !== null && hasAnyFlashDiscount ? (
               <span className="flex items-baseline gap-1.5">
                 <span className="text-muted-foreground text-xs line-through">
                   {formatCurrency(totals.subtotal, currency)}
@@ -104,8 +122,10 @@ export function CartOrderSummary({ totals, validation }: CartOrderSummaryProps) 
 
       <div className="flex justify-between text-base font-semibold">
         <span>Total</span>
-        <span style={flashTotal !== null ? { color: '#f97316' } : undefined}>
-          {formatCurrency(flashTotal ?? displayTotal, currency)}
+        <span style={flashTotal !== null && hasAnyFlashDiscount ? { color: '#f97316' } : undefined}>
+          {flashTotal !== null && hasAnyFlashDiscount
+            ? formatCurrency(flashTotal, currency)
+            : formatCurrency(displayTotal, currency)}
         </span>
       </div>
     </aside>

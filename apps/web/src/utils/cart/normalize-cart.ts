@@ -49,6 +49,11 @@ export function normalizeCartLineItem(raw: unknown): CartLineItem {
       record.availableQuantity != null && Number.isFinite(Number(record.availableQuantity))
         ? Number(record.availableQuantity)
         : undefined,
+    categoryId: record.categoryId ? String(record.categoryId) : undefined,
+    categoryIds: Array.isArray(record.categoryIds)
+      ? record.categoryIds.map((id) => String(id))
+      : undefined,
+    subcategoryId: record.subcategoryId ? String(record.subcategoryId) : undefined,
   };
 }
 
