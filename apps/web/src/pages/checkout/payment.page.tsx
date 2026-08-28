@@ -41,6 +41,16 @@ export function CheckoutPaymentPage() {
     }
   }, [checkoutToken]);
 
+  // Keep flash-sale totals in sync before the shopper continues to review / PayHere.
+  useEffect(() => {
+    if (!session?.checkoutToken || refreshCheckout.isPending) return;
+    refreshCheckout.mutate({
+      checkoutRef: session.checkoutToken,
+      payload: {},
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.checkoutToken]);
+
   useEffect(() => {
     if (!isCheckoutPaymentEnabled(paymentMethod)) {
       setPaymentMethod(defaultCheckoutPaymentMethod());
@@ -109,10 +119,7 @@ export function CheckoutPaymentPage() {
             />
             <CheckoutValidationAlert issues={session.validationIssues} />
 
-            <PaymentMethodSelector
-              value={paymentMethod}
-              onChange={setPaymentMethod}
-            />
+            <PaymentMethodSelector value={paymentMethod} onChange={setPaymentMethod} />
 
             <CheckoutNavigation
               backTo={ROUTES.checkout}

@@ -164,6 +164,17 @@ export function CheckoutReviewPage() {
     }
   }, [checkoutToken]);
 
+  // Refresh totals on review so Amount Due includes the active flash sale (matches PayHere).
+  useEffect(() => {
+    if (!session?.checkoutToken || refreshCheckout.isPending) return;
+    refreshCheckout.mutate({
+      checkoutRef: session.checkoutToken,
+      payload: {},
+    });
+    // Only on first mount / token change — not on every session update.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.checkoutToken]);
+
   // If the session lost its shipping snapshot (common after failed payment / stale
   // checkout), re-attach the address the shopper already picked on Information.
   useEffect(() => {

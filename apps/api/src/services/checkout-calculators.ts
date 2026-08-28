@@ -1,6 +1,7 @@
 import { ShippingZoneModel, TaxConfigModel } from '@/models/settings.models.js';
 import {
   FIRST_ORDER_DISCOUNT,
+  FLASH_SALE_DISCOUNT,
   SHIPPING_METHOD,
   type ShippingMethod,
 } from '@/constants/checkout.js';
@@ -191,6 +192,20 @@ export function applyFirstOrderDiscount(subtotal: number) {
     amount,
     percent: FIRST_ORDER_DISCOUNT.PERCENT,
     message: FIRST_ORDER_DISCOUNT.LABEL,
+  };
+}
+
+/** Member flash sale — 20% off eligible line subtotal (shoes excluded upstream). */
+export function applyFlashSaleDiscount(eligibleSubtotal: number) {
+  const amount = Number(
+    ((Math.max(0, eligibleSubtotal) * FLASH_SALE_DISCOUNT.PERCENT) / 100).toFixed(2),
+  );
+  return {
+    status: 'applied' as const,
+    code: FLASH_SALE_DISCOUNT.CODE,
+    amount,
+    percent: FLASH_SALE_DISCOUNT.PERCENT,
+    message: FLASH_SALE_DISCOUNT.LABEL,
   };
 }
 

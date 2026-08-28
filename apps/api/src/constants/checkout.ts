@@ -42,6 +42,16 @@ export const FIRST_ORDER_DISCOUNT = {
   LABEL: '5% off your first order',
 } as const;
 
+/** Member flash sale — 20% off eligible items for 60 minutes after login/grant. */
+export const FLASH_SALE_DISCOUNT = {
+  CODE: 'FLASH20',
+  PERCENT: 20,
+  LABEL: 'Flash Sale — 20% OFF',
+  DURATION_MS: 60 * 60 * 1000,
+  /** Category slugs excluded from the extra 20% off. */
+  EXCLUDED_CATEGORY_SLUGS: ['shoes'] as readonly string[],
+} as const;
+
 export const CHECKOUT_AUDIT = {
   STARTED: 'checkout.started',
   RESERVATION_CREATED: 'checkout.reservation_created',

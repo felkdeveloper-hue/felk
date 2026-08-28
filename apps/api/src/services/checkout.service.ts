@@ -4,12 +4,15 @@ import { CheckoutSessionModel, type CheckoutSessionDocument } from '@/models/che
 import { OrderModel } from '@/models/order.models.js';
 import { InventoryItemModel, WarehouseModel } from '@/models/inventory.models.js';
 import { CustomerAddressModel, CustomerModel } from '@/models/customer.models.js';
+import { ProductModel } from '@/models/product.models.js';
+import { CategoryModel } from '@/models/master-data.models.js';
 import { cartService } from '@/services/cart.service.js';
 import { reservationService } from '@/services/reservation.service.js';
 import { customerService } from '@/services/customer.service.js';
 import {
   applyCouponPlaceholder,
   applyFirstOrderDiscount,
+  applyFlashSaleDiscount,
   applyGiftCardPlaceholder,
   calculateShipping,
   calculateTax,
@@ -24,6 +27,7 @@ import {
   CHECKOUT_STATUS,
   DELIVERY_METHOD,
   FIRST_ORDER_DISCOUNT,
+  FLASH_SALE_DISCOUNT,
   SHIPPING_METHOD,
   type ShippingMethod,
 } from '@/constants/checkout.js';
@@ -314,7 +318,6 @@ export class CheckoutService {
 
     // Suppress the first-order discount when the customer has an active flash sale
     // (flash sale window = 60 minutes from flashSaleStartTime).
-    const FLASH_SALE_DURATION_MS = 60 * 60 * 1000;
     let customerHasActiveFlashSale = false;
     if (session.customerId) {
       const customer = await CustomerModel.findById(session.customerId)
@@ -322,15 +325,57 @@ export class CheckoutService {
         .lean();
       if (customer?.flashSaleStartTime) {
         const elapsed = Date.now() - new Date(customer.flashSaleStartTime).getTime();
-        customerHasActiveFlashSale = elapsed >= 0 && elapsed < FLASH_SALE_DURATION_MS;
+        customerHasActiveFlashSale = elapsed >= 0 && elapsed < FLASH_SALE_DISCOUNT.DURATION_MS;
       }
     }
 
     const couponCode = (session.coupon as { code?: string | null } | null)?.code ?? null;
     const couponAmount = Number((session.coupon as { amount?: number } | null)?.amount ?? 0);
-    if (!isGuestCheckout && !hasPriorOrder && subtotal > 0 && !customerHasActiveFlashSale) {
+
+    if (customerHasActiveFlashSale && session.lines.length > 0) {
+      // Apply real 20% flash discount on eligible lines (shoes excluded) so
+      // PayHere / Amount Due charge the same price shown in the order summary.
+      const productIds = [
+        ...new Set(session.lines.map((line) => String(line.productId)).filter(Boolean)),
+      ];
+      const [products, excludedCategories] = await Promise.all([
+        ProductModel.find({ _id: { $in: productIds }, isDeleted: false })
+          .select('categoryId categoryIds subcategoryId')
+          .lean(),
+        CategoryModel.find({
+          slug: { $in: [...FLASH_SALE_DISCOUNT.EXCLUDED_CATEGORY_SLUGS] },
+          isDeleted: false,
+        })
+          .select('_id')
+          .lean(),
+      ]);
+      const excludedCategoryIds = new Set(excludedCategories.map((row) => String(row._id)));
+      const productById = new Map(products.map((product) => [String(product._id), product]));
+
+      let eligibleSubtotal = 0;
+      for (const line of session.lines) {
+        const product = productById.get(String(line.productId));
+        const categoryIds = [
+          product?.categoryId ? String(product.categoryId) : null,
+          product?.subcategoryId ? String(product.subcategoryId) : null,
+          ...(Array.isArray(product?.categoryIds)
+            ? product.categoryIds.map((id) => String(id))
+            : []),
+        ].filter(Boolean) as string[];
+        const isExcluded = categoryIds.some((id) => excludedCategoryIds.has(id));
+        if (!isExcluded) {
+          eligibleSubtotal += Number(line.lineSubtotal ?? 0);
+        }
+      }
+
+      session.coupon = applyFlashSaleDiscount(eligibleSubtotal);
+    } else if (!isGuestCheckout && !hasPriorOrder && subtotal > 0) {
       session.coupon = applyFirstOrderDiscount(subtotal);
-    } else if (couponCode === FIRST_ORDER_DISCOUNT.CODE || (!couponAmount && !couponCode)) {
+    } else if (
+      couponCode === FIRST_ORDER_DISCOUNT.CODE ||
+      couponCode === FLASH_SALE_DISCOUNT.CODE ||
+      (!couponAmount && !couponCode)
+    ) {
       session.coupon = applyCouponPlaceholder(opts?.couponCode);
     }
 
@@ -572,6 +617,9 @@ export class CheckoutService {
         session.status as never,
       )
     ) {
+      // Re-apply flash sale / coupons so PayHere charges the discounted Amount Due.
+      await this.recalculate(session);
+      await session.save();
       return session;
     }
 
@@ -585,6 +633,7 @@ export class CheckoutService {
         session.status = CHECKOUT_STATUS.READY;
         session.reservationExpiresAt = null;
         session.expiresAt = null;
+        await this.recalculate(session);
         await session.save();
         return session;
       }

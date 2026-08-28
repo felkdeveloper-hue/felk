@@ -15,10 +15,7 @@ import { QUERY_KEYS, ROUTES } from '@/constants';
 import { trackCommerceEvent } from '@/lib/analytics';
 import { useFlashSale } from '@/contexts/flash-sale-context';
 import { useCategorySlugLookup } from '@/hooks/use-flash-sale-eligibility';
-import {
-  applyFlashDiscount,
-  isProductFlashSaleEligible,
-} from '@/utils/flash-sale-eligibility';
+import { applyFlashDiscount, isProductFlashSaleEligible } from '@/utils/flash-sale-eligibility';
 
 export interface CheckoutOrderSummaryProps {
   session: CheckoutSession;
@@ -45,6 +42,18 @@ export function CheckoutOrderSummary({ session, editable = false }: CheckoutOrde
   );
   const lines = cached?.lines ?? session.lines;
   const displayTotals = cached?.totals ?? totals;
+  const couponCode =
+    typeof session.coupon?.code === 'string'
+      ? session.coupon.code
+      : typeof cached?.coupon?.code === 'string'
+        ? cached.coupon.code
+        : null;
+  // Prefer server-applied FLASH20 so Amount Due / PayHere match the summary Total.
+  const serverFlashApplied =
+    couponCode === 'FLASH20' ||
+    (displayTotals.discount > 0 &&
+      typeof session.coupon?.message === 'string' &&
+      /flash sale/i.test(session.coupon.message));
 
   const lineEligibility = useMemo(() => {
     return lines.map((line) => {
@@ -59,16 +68,31 @@ export function CheckoutOrderSummary({ session, editable = false }: CheckoutOrde
     });
   }, [lines, queryClient, slugByCategoryId]);
 
-  const flashSubtotal = flashEnabled
+  const clientFlashSubtotal = flashEnabled
     ? lineEligibility.reduce(
-        (sum, entry) =>
-          sum + applyFlashDiscount(entry.line.lineSubtotal, entry.eligible),
+        (sum, entry) => sum + applyFlashDiscount(entry.line.lineSubtotal, entry.eligible),
         0,
       )
     : null;
-  const flashSaving =
-    flashSubtotal !== null ? displayTotals.subtotal - flashSubtotal : 0;
+  const clientFlashSaving =
+    clientFlashSubtotal !== null ? displayTotals.subtotal - clientFlashSubtotal : 0;
+
+  const flashSaving = serverFlashApplied ? displayTotals.discount : clientFlashSaving;
+  const flashSubtotal = serverFlashApplied
+    ? Math.round(displayTotals.subtotal - displayTotals.discount)
+    : clientFlashSubtotal;
   const hasFlashDiscount = flashSaving > 0;
+  const showFlashUi = (serverFlashApplied || flashEnabled) && hasFlashDiscount;
+  const payableTotal = serverFlashApplied
+    ? displayTotals.grandTotal
+    : flashEnabled && flashSubtotal !== null && hasFlashDiscount
+      ? Math.round(
+          flashSubtotal +
+            (displayTotals.shipping ?? 0) +
+            (displayTotals.tax ?? 0) -
+            (displayTotals.giftCard ?? 0),
+        )
+      : displayTotals.grandTotal;
 
   const patchSessionLines = (nextLines: CheckoutSession['lines']) => {
     const next: CheckoutSession = {
@@ -120,7 +144,7 @@ export function CheckoutOrderSummary({ session, editable = false }: CheckoutOrde
         {lineEligibility.map(({ line, eligible }) => {
           const cartItemId = line.cartItemId;
           const canEdit = editable && Boolean(cartItemId);
-          const lineFlashEnabled = flashEnabled && eligible;
+          const lineFlashEnabled = (flashEnabled || serverFlashApplied) && eligible;
 
           return (
             <li key={`${line.variantId}-${cartItemId ?? line.sku}`} className="flex gap-3 text-sm">
@@ -259,7 +283,7 @@ export function CheckoutOrderSummary({ session, editable = false }: CheckoutOrde
 
       <Separator className="my-4" />
 
-      {flashEnabled && hasFlashDiscount ? (
+      {showFlashUi ? (
         <div
           className="mb-3 flex items-center gap-1.5 rounded-lg px-3 py-2 text-[11px] font-semibold"
           style={{
@@ -277,7 +301,7 @@ export function CheckoutOrderSummary({ session, editable = false }: CheckoutOrde
         <div className="flex justify-between">
           <dt className="text-muted-foreground">Subtotal</dt>
           <dd>
-            {flashEnabled && hasFlashDiscount && flashSubtotal !== null ? (
+            {showFlashUi && flashSubtotal !== null ? (
               <span className="flex items-baseline gap-1.5">
                 <span className="text-muted-foreground text-xs line-through">
                   {formatCurrency(displayTotals.subtotal, currency)}
@@ -291,7 +315,7 @@ export function CheckoutOrderSummary({ session, editable = false }: CheckoutOrde
             )}
           </dd>
         </div>
-        {flashEnabled && hasFlashDiscount ? (
+        {showFlashUi ? (
           <div className="flex justify-between" style={{ color: '#f97316' }}>
             <dt className="flex items-center gap-1">
               <Zap className="size-3" />
@@ -300,7 +324,7 @@ export function CheckoutOrderSummary({ session, editable = false }: CheckoutOrde
             <dd>-{formatCurrency(flashSaving, currency)}</dd>
           </div>
         ) : null}
-        {displayTotals.discount > 0 && !flashEnabled ? (
+        {displayTotals.discount > 0 && !showFlashUi ? (
           <div className="flex justify-between text-emerald-700">
             <dt>
               {(typeof session.coupon?.message === 'string' && session.coupon.message) ||
@@ -329,19 +353,8 @@ export function CheckoutOrderSummary({ session, editable = false }: CheckoutOrde
 
       <div className="flex justify-between text-base font-semibold">
         <span>Total</span>
-        <span style={flashEnabled && hasFlashDiscount ? { color: '#f97316' } : undefined}>
-          {flashEnabled && hasFlashDiscount && flashSubtotal !== null
-            ? formatCurrency(
-                Math.round(
-                  flashSubtotal +
-                    (displayTotals.shipping ?? 0) +
-                    (displayTotals.tax ?? 0) -
-                    (displayTotals.discount ?? 0) -
-                    (displayTotals.giftCard ?? 0),
-                ),
-                currency,
-              )
-            : formatCurrency(displayTotals.grandTotal, currency)}
+        <span style={showFlashUi ? { color: '#f97316' } : undefined}>
+          {formatCurrency(payableTotal, currency)}
         </span>
       </div>
     </aside>
