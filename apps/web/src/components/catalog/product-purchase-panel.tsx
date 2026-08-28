@@ -13,7 +13,10 @@ import type { Product, ProductMedia, ProductMoney, ProductVariant } from '@/serv
 import { AppError } from '@/lib/errors';
 import { productMetaFrom, trackCommerceEvent } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
+import { useFlashSale } from '@/contexts/flash-sale-context';
+import { useAuthStore } from '@/store';
 import { PriceDisplay } from './price-display';
+import { BnplInstallmentHint } from './bnpl-installment-hint';
 import { ProductColorSelector } from './product-color-selector';
 import { ProductRatingSummary } from './product-rating-summary';
 import { ProductSizeSelector, isSizeOutOfStock } from './product-size-selector';
@@ -124,6 +127,9 @@ export function ProductPurchasePanel({
   const [sizeError, setSizeError] = useState(false);
   const variants = product.variants ?? [];
 
+  const isAuthed = useAuthStore((state) => Boolean(state.accessToken && state.user));
+  const { isFlashSaleActive, formattedTime } = useFlashSale();
+
   const selectedVariant = useMemo(
     () => variants.find((v) => v.id === selectedVariantId) ?? variants[0],
     [variants, selectedVariantId],
@@ -141,6 +147,13 @@ export function ProductPurchasePanel({
     (selectedVariant?.price && selectedVariant.price.amount > 0
       ? selectedVariant.price
       : undefined) ?? product.price;
+
+  // Flash sale: 20% off the current display price (sale price if exists, else regular price)
+  const flashBasePrice = liveSalePrice ?? livePrice;
+  const flashPrice =
+    isAuthed && isFlashSaleActive && flashBasePrice && flashBasePrice.amount > 0
+      ? { ...flashBasePrice, amount: Math.round(flashBasePrice.amount * 0.8) }
+      : undefined;
 
   const colors = [...new Set(variants.map((v) => v.colorId).filter(Boolean))] as string[];
   const hasSeparateSizeSelector = variants.some((v) => v.sizeId);
@@ -322,15 +335,64 @@ export function ProductPurchasePanel({
         ) : null}
 
         <div className="space-y-1">
-          <PriceDisplay
-            premium
-            size="md"
-            price={livePrice}
-            salePrice={liveSalePrice}
-            compareAtPrice={compareAt}
-            discountPercent={product.isOnSale ? product.discountPercent : undefined}
-            className="[&_span.font-bold]:text-xl lg:[&_span.font-bold]:text-2xl [&_span]:tracking-tight"
-          />
+          {flashPrice && flashBasePrice ? (
+            /* Logged-in users with active flash sale: 20% off */
+            <div className="space-y-1">
+              <div className="mb-1">
+                <span
+                  className="inline-flex items-center gap-1 rounded-none px-2 py-0.5 text-[11px] font-bold uppercase tracking-[0.14em] text-white"
+                  style={{
+                    background: 'linear-gradient(90deg, #ff4500, #ff8c00)',
+                    boxShadow: '0 0 8px rgba(255,80,0,0.45)',
+                  }}
+                >
+                  ⚡ +20% OFF · {formattedTime}
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2.5 [&_span]:tracking-tight">
+                {/* Case 2: already has a sale price — show ~~original~~ ~~red sale~~ orange final */}
+                {liveSalePrice && livePrice && livePrice.amount > liveSalePrice.amount ? (
+                  <>
+                    <span className="text-muted-foreground text-sm line-through sm:text-base">
+                      {formatCurrency(livePrice.amount, livePrice.currency)}
+                    </span>
+                    <span
+                      className="text-sm font-bold line-through sm:text-base"
+                      style={{ color: '#ef4444' }}
+                    >
+                      {formatCurrency(liveSalePrice.amount, liveSalePrice.currency)}
+                    </span>
+                  </>
+                ) : (
+                  /* Case 1: no existing sale — show ~~base price~~ then orange flash price */
+                  <span className="text-muted-foreground text-sm line-through sm:text-base">
+                    {formatCurrency(flashBasePrice.amount, flashBasePrice.currency)}
+                  </span>
+                )}
+                <span
+                  className="text-xl font-bold tracking-tight lg:text-2xl"
+                  style={{ color: '#f97316' }}
+                >
+                  {formatCurrency(flashPrice.amount, flashPrice.currency)}
+                </span>
+              </div>
+              <BnplInstallmentHint
+                amount={flashPrice.amount}
+                currency={flashPrice.currency}
+                size="md"
+              />
+            </div>
+          ) : (
+            <PriceDisplay
+              premium
+              size="md"
+              price={livePrice}
+              salePrice={liveSalePrice}
+              compareAtPrice={compareAt}
+              discountPercent={product.isOnSale ? product.discountPercent : undefined}
+              className="[&_span.font-bold]:text-xl lg:[&_span.font-bold]:text-2xl [&_span]:tracking-tight"
+            />
+          )}
           <p className="text-muted-foreground text-[11px] tracking-wide lg:text-xs">
             Inclusive of all taxes
           </p>
