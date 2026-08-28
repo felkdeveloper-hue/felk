@@ -42,15 +42,15 @@ const SOCIAL_PLATFORMS: Array<{ pattern: RegExp; label: string }> = [
 
 /** UTM / campaign aliases — `ig` and `instagram` are the same source. */
 const SOURCE_ALIASES: Array<{ pattern: RegExp; label: string }> = [
-  { pattern: /^(ig|insta|instagram)$/i, label: 'Instagram' },
-  { pattern: /^(fb|facebook|meta)$/i, label: 'Facebook' },
-  { pattern: /^(tt|tiktok)$/i, label: 'TikTok' },
-  { pattern: /^(yt|youtube)$/i, label: 'YouTube' },
-  { pattern: /^(wa|whatsapp)$/i, label: 'WhatsApp' },
-  { pattern: /^(x|twitter)$/i, label: 'X (Twitter)' },
-  { pattern: /^(li|linkedin)$/i, label: 'LinkedIn' },
-  { pattern: /^(pin|pinterest)$/i, label: 'Pinterest' },
-  { pattern: /^(google|gads|adwords)$/i, label: 'Google' },
+  { pattern: /^(ig|insta|instagram)(\.com)?$/i, label: 'Instagram' },
+  { pattern: /^(fb|facebook|meta)(\.com)?$/i, label: 'Facebook' },
+  { pattern: /^(tt|tiktok)(\.com)?$/i, label: 'TikTok' },
+  { pattern: /^(yt|youtube)(\.com)?$/i, label: 'YouTube' },
+  { pattern: /^(wa|whatsapp)(\.com)?$/i, label: 'WhatsApp' },
+  { pattern: /^(x|twitter)(\.com)?$/i, label: 'X (Twitter)' },
+  { pattern: /^(li|linkedin)(\.com)?$/i, label: 'LinkedIn' },
+  { pattern: /^(pin|pinterest)(\.com)?$/i, label: 'Pinterest' },
+  { pattern: /^(google|gads|adwords)(\.com)?$/i, label: 'Google' },
 ];
 
 function canonicalSourceLabel(value: string | null | undefined): string | null {

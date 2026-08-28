@@ -4,6 +4,8 @@ import { StorefrontFooter, StorefrontHeader } from '@/components/layout';
 import { FloatingSearch } from '@/components/layout/floating-search';
 import { MobileBottomNav } from '@/components/navigation/mobile-bottom-nav';
 import { AccountNav } from '@/components/account';
+import { FloatingSocialBar } from '@/components/storefront/floating-social-bar';
+import { ReviewRequestPrompt } from '@/components/reviews/review-request-prompt';
 import { ADMIN_ROUTES } from '@/constants';
 import { useAuthStore } from '@/store';
 import { isStaffUser } from '@/utils/auth-redirect';
@@ -35,6 +37,8 @@ export function CustomerLayout() {
         <StorefrontFooter />
         <MobileBottomNav />
         <FloatingSearch />
+        <FloatingSocialBar />
+        <ReviewRequestPrompt />
       </div>
     </AnalyticsProvider>
   );

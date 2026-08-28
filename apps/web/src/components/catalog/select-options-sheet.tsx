@@ -22,7 +22,6 @@ import { resolveProductGalleryMedia } from '@/utils/catalog/resolve-gallery-medi
 import type { Product, ProductVariant } from '@/services/sdk';
 import { PriceDisplay } from './price-display';
 import { ProductColorSelector } from './product-color-selector';
-import { ProductOffersSection } from './product-offers-section';
 import { ProductSizeSelector, isSizeOutOfStock } from './product-size-selector';
 import { VariantSelector } from './variant-selector';
 
@@ -486,8 +485,6 @@ export function SelectOptionsSheet({ product, open, onOpenChange }: SelectOption
                   </button>
                 ) : null}
               </div>
-
-              <ProductOffersSection />
             </div>
           </div>
         </div>

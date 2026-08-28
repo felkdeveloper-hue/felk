@@ -133,12 +133,7 @@ export const authController = {
   }),
 
   verifyEmail: asyncHandler(async (req, res) => {
-    const result = await authService.verifyEmail(
-      req.body.email,
-      req.body.code,
-      meta(req),
-      req.body,
-    );
+    const result = await authService.verifyEmail(req.body.email, req.body.code, meta(req));
     setAuthCookies(res, {
       accessToken: result.accessToken,
       refreshToken: result.refreshToken,

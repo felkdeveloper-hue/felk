@@ -15,10 +15,12 @@ import { productMetaFrom, trackCommerceEvent } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
 import { PriceDisplay } from './price-display';
 import { ProductColorSelector } from './product-color-selector';
-import { ProductDeliveryCheck } from './product-delivery-check';
-import { ProductOffersSection } from './product-offers-section';
+import { ProductRatingSummary } from './product-rating-summary';
 import { ProductSizeSelector, isSizeOutOfStock } from './product-size-selector';
 import { VariantSelector } from './variant-selector';
+import { DeliveryTrustCue } from './delivery-trust-cue';
+import { getSeededReviewSummary } from '@/lib/seeded-reviews';
+import { isProductLowStock, isProductSoldOut } from '@/utils/catalog/stock';
 
 function resolveDealPrice(product: Product): ProductMoney | undefined {
   const display = product.salePrice ?? product.effectivePrice ?? product.price;
@@ -166,7 +168,16 @@ export function ProductPurchasePanel({
   const isSelectionOutOfStock =
     colorHasNoSizes ||
     (hasSeparateSizeSelector ? selectedSizeOutOfStock : selectedVariantOutOfStock);
-  const productOutOfStock = product.inStock === false || product.status === 'out_of_stock';
+  const productOutOfStock = isProductSoldOut(product);
+  const showLowStock = isProductLowStock(product);
+
+  const seeded = getSeededReviewSummary(product.id, product.name, product.slug);
+  const ratingAverage =
+    product.averageRating && product.averageRating > 0 && (product.reviewCount ?? 0) >= 5
+      ? product.averageRating
+      : seeded.average;
+  const ratingCount =
+    product.reviewCount && product.reviewCount >= 5 ? product.reviewCount : seeded.total;
 
   const isInCart = useMemo(
     () => Boolean(cartVariantId && cart?.items?.some((item) => item.variantId === cartVariantId)),
@@ -302,6 +313,14 @@ export function ProductPurchasePanel({
           />
         </div>
 
+        <ProductRatingSummary average={ratingAverage} count={ratingCount} />
+
+        {showLowStock ? (
+          <p className="text-sm font-semibold uppercase tracking-[0.12em] text-red-600">
+            Low in Stock
+          </p>
+        ) : null}
+
         <div className="space-y-1">
           <PriceDisplay
             premium
@@ -315,6 +334,7 @@ export function ProductPurchasePanel({
           <p className="text-muted-foreground text-[11px] tracking-wide lg:text-xs">
             Inclusive of all taxes
           </p>
+          {!productOutOfStock ? <DeliveryTrustCue className="pt-1" /> : null}
         </div>
 
         {dealPrice ? (
@@ -477,11 +497,6 @@ export function ProductPurchasePanel({
             {buyNowMutation.isPending ? 'Please wait…' : 'Buy it now'}
           </button>
         ) : null}
-      </div>
-
-      <div className="border-border/60 space-y-4 border-t pt-4 lg:space-y-6 lg:border-0 lg:pt-0">
-        <ProductOffersSection />
-        <ProductDeliveryCheck paymentOption={product.paymentOption} />
       </div>
     </div>
   );

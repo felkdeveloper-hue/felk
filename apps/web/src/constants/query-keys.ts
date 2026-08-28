@@ -36,6 +36,7 @@ export const QUERY_KEYS = {
     savedItems: () => ['customers', 'me', 'saved-items'] as const,
     rewards: () => ['customers', 'me', 'rewards'] as const,
     referrals: () => ['customers', 'me', 'referrals'] as const,
+    flashSale: () => ['customers', 'me', 'flash-sale'] as const,
   },
   cart: {
     current: () => ['cart'] as const,

@@ -20,6 +20,7 @@ let analyticsSweepTimer: ReturnType<typeof setInterval> | null = null;
 let reservationSweepTimer: ReturnType<typeof setInterval> | null = null;
 let storefrontWarmupTimer: ReturnType<typeof setInterval> | null = null;
 let paymentOrderSyncTimer: ReturnType<typeof setInterval> | null = null;
+let metaAdsSyncTimer: ReturnType<typeof setInterval> | null = null;
 
 async function runEmailSweep() {
   try {
@@ -142,6 +143,28 @@ async function runPaymentOrderSync() {
   }
 }
 
+async function runMetaAdsSync() {
+  try {
+    const { runScheduledMetaAdsSync } =
+      await import('@/services/analytics/meta-ads-sync.service.js');
+    const result = await runScheduledMetaAdsSync();
+    if (result.skipped) {
+      logger.debug({ reason: result.reason }, 'Meta ads sync skipped');
+      return;
+    }
+    if (!result.ok) {
+      logger.warn({ error: result.error }, 'Meta ads sync completed with error');
+      return;
+    }
+    logger.info(
+      { since: result.since, until: result.until, rows: result.rowsUpserted },
+      'Cron: Meta ads insights synced',
+    );
+  } catch (err) {
+    logger.error({ err }, 'Meta ads sync error');
+  }
+}
+
 export function startCronJobs(): void {
   logger.info('Cron: starting retry sweep jobs');
 
@@ -165,6 +188,17 @@ export function startCronJobs(): void {
     void runPaymentOrderSync();
   }, PAYMENT_ORDER_SYNC_INTERVAL_MS);
 
+  // Interval from env (default 6h). Dynamic import keeps startup light when Meta ads unset.
+  void import('@/config/app.config.js').then(({ appConfig }) => {
+    const hours = appConfig.analytics.metaAds.syncIntervalHours;
+    const intervalMs = hours * 60 * 60 * 1000;
+    metaAdsSyncTimer = setInterval(() => {
+      void runMetaAdsSync();
+    }, intervalMs);
+    // First sync ~2 min after boot (after DB is warm)
+    setTimeout(() => void runMetaAdsSync(), 120_000);
+  });
+
   // Run once shortly after startup
   setTimeout(() => void runEmailSweep(), 5_000);
   setTimeout(() => void runAnalyticsSweep(), 5_000);
@@ -179,10 +213,12 @@ export function stopCronJobs(): void {
   if (reservationSweepTimer) clearInterval(reservationSweepTimer);
   if (storefrontWarmupTimer) clearInterval(storefrontWarmupTimer);
   if (paymentOrderSyncTimer) clearInterval(paymentOrderSyncTimer);
+  if (metaAdsSyncTimer) clearInterval(metaAdsSyncTimer);
   emailSweepTimer = null;
   analyticsSweepTimer = null;
   reservationSweepTimer = null;
   storefrontWarmupTimer = null;
   paymentOrderSyncTimer = null;
+  metaAdsSyncTimer = null;
   logger.info('Cron: retry sweep jobs stopped');
 }

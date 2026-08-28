@@ -20,9 +20,24 @@ function formatInstallmentAmount(amount: number, currency = 'LKR'): string {
   return `${currency} ${formatted}`;
 }
 
+/** Official PayHere wordmark: Pay (blue) + Here (golden italic). */
+function PayHereMark({ className }: { className?: string }) {
+  return (
+    <span
+      className={cn(
+        'inline-flex shrink-0 items-baseline font-semibold italic leading-none',
+        className,
+      )}
+      aria-label="PayHere"
+    >
+      <span style={{ color: '#2E5BCC' }}>Pay</span>
+      <span style={{ color: '#F9A51A' }}>Here</span>
+    </span>
+  );
+}
+
 /**
- * Premium Mintpay + KOKO installment lines shown under product prices.
- * Uses the official Mintpay pill badge and KOKO brand logo.
+ * Premium Mintpay + KOKO + PayHere installment lines shown under product prices.
  */
 export function BnplInstallmentHint({
   amount,
@@ -39,12 +54,12 @@ export function BnplInstallmentHint({
   return (
     <div
       className={cn(
-        'flex flex-col gap-[3px] overflow-visible pt-1 pb-1 font-medium uppercase tracking-[0.03em]',
+        'flex flex-col gap-[3px] overflow-visible pb-1 pt-1 font-medium uppercase tracking-[0.03em]',
         isMd ? 'text-[11px] sm:text-xs' : 'text-[9.5px] leading-[1.35] sm:text-[10.5px]',
         className,
       )}
       style={{ color: '#8a8a8a' }}
-      aria-label={`Or ${INSTALLMENT_COUNT} payments of ${installmentLabel} with Mintpay or KOKO`}
+      aria-label={`Or ${INSTALLMENT_COUNT} payments of ${installmentLabel} with Mintpay, KOKO, or PayHere`}
     >
       <p className="flex flex-wrap items-center gap-x-[5px] gap-y-0.5">
         <span>
@@ -68,7 +83,6 @@ export function BnplInstallmentHint({
         <span>
           Or {INSTALLMENT_COUNT} x {installmentLabel} with
         </span>
-        {/* Official 3D KOKO wordmark — static display, not clickable */}
         <span className="inline-flex shrink-0 items-center overflow-visible py-0.5" aria-hidden>
           <img
             src="/payments/koko-logo.png"
@@ -84,6 +98,8 @@ export function BnplInstallmentHint({
             draggable={false}
           />
         </span>
+        <span className="uppercase tracking-[0.03em]">or</span>
+        <PayHereMark className={isMd ? 'text-[13px]' : 'text-[11.5px]'} />
       </p>
     </div>
   );

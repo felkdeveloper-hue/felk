@@ -1,5 +1,5 @@
 import { Link, useRouterState } from '@tanstack/react-router';
-import { Heart, LogOut, Search, ShoppingBag, UserRound } from 'lucide-react';
+import { Heart, LogOut, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ROUTES } from '@/constants';
 import { useLogoutMutation } from '@/hooks/auth';
@@ -10,6 +10,7 @@ import { useAuthStore } from '@/store';
 import { selectCartItemCount, useCartStore } from '@/store/cart-store';
 import { useUiStore } from '@/store/ui-store';
 import { getSetting } from '@/utils/cms';
+import { FeLogo } from '@/components/brand/fe-logo';
 import { Button } from '@/components/ui/button';
 import { HeaderSearchField } from '@/components/search/header-search-field';
 import {
@@ -24,6 +25,8 @@ import { MainNav, type NavItem } from '@/components/navigation/main-nav';
 import { MobileNav } from '@/components/navigation/mobile-nav';
 import { GenderMegaMenu } from '@/components/navigation/gender-mega-menu';
 import { MegaMenuPlaceholder } from '@/components/navigation/mega-menu-placeholder';
+import { NotificationBell } from '@/components/storefront/notification-bell';
+import { FlashSaleCountdown } from '@/components/storefront/flash-sale-countdown';
 
 const DEFAULT_NAV: NavItem[] = [
   { label: 'Women', href: ROUTES.products, gender: 'women' },
@@ -32,6 +35,34 @@ const DEFAULT_NAV: NavItem[] = [
 ];
 
 const iconStroke = '[&_svg]:size-[1.15rem] [&_svg]:stroke-[1.35]';
+
+/** Minimal bob-style profile silhouette (img-2 reference). */
+function PremiumProfileIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden>
+      <path d="M12 3.25c-2.95 0-5.35 2.35-5.35 5.25 0 1.55.68 2.95 1.75 3.85-1.35.85-2.9 2.45-2.9 4.65V19h12.5v-2c0-2.2-1.55-3.8-2.9-4.65 1.07-.9 1.75-2.3 1.75-3.85 0-2.9-2.4-5.25-5.35-5.25zm0 1.75c1.55 0 2.8 1.15 2.8 2.55 0 1.4-1.25 2.55-2.8 2.55s-2.8-1.15-2.8-2.55c0-1.4 1.25-2.55 2.8-2.55z" />
+    </svg>
+  );
+}
+
+/** Minimal shopping bag icon (img-3 reference). */
+function PremiumCartIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      className={className}
+      stroke="currentColor"
+      strokeWidth="1.65"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M8.25 9V7.75a3.75 3.75 0 1 1 7.5 0V9" />
+      <path d="M6.75 9h10.5l-.85 10.25H7.6L6.75 9Z" />
+    </svg>
+  );
+}
 
 export interface StorefrontHeaderProps {
   navItems?: NavItem[];
@@ -99,11 +130,12 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
             to={ROUTES.home}
             preload="intent"
             className={cn(
-              'font-display flex items-center text-[1.35rem] font-bold uppercase leading-none tracking-[-0.04em] transition-colors lg:text-[1.85rem]',
-              lightChrome ? 'text-white' : 'text-foreground',
+              'flex items-center transition-opacity hover:opacity-90',
+              lightChrome ? 'drop-shadow-sm' : undefined,
             )}
+            aria-label={storeName}
           >
-            {storeName}
+            <FeLogo size={40} inverted={lightChrome} className="lg:h-[46px] lg:w-[46px]" />
           </Link>
         </div>
 
@@ -130,6 +162,8 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
             lightChrome={lightChrome}
             className="hidden w-40 shrink-0 xl:block xl:w-48 2xl:w-56"
           />
+
+          <FlashSaleCountdown lightChrome={lightChrome} className="hidden sm:flex" />
 
           <div className="flex shrink-0 items-center gap-0.5">
             <Button
@@ -158,6 +192,9 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
               </Link>
             </Button>
 
+            {/* Notification bell */}
+            <NotificationBell lightChrome={lightChrome} />
+
             {isAuthed ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -167,7 +204,7 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
                     aria-label={`Account, ${accountLabel}`}
                     className={iconBtn}
                   >
-                    <UserRound />
+                    <PremiumProfileIcon />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="min-w-44 rounded-none">
@@ -198,7 +235,7 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
             ) : (
               <Button variant="ghost" size="icon" aria-label="Sign in" asChild className={iconBtn}>
                 <Link to={ROUTES.authLogin} preload="intent">
-                  <UserRound />
+                  <PremiumProfileIcon />
                 </Link>
               </Button>
             )}
@@ -211,7 +248,7 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
               className={cn('relative', iconBtn)}
             >
               <Link to={ROUTES.cart} preload="intent">
-                <ShoppingBag />
+                <PremiumCartIcon />
                 {cartCount > 0 ? (
                   <span className="bg-accent text-accent-foreground absolute right-1 top-1 flex size-4 items-center justify-center rounded-full text-[9px] font-semibold tracking-tight">
                     {cartCount > 9 ? '9+' : cartCount}

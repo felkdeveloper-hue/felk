@@ -74,6 +74,8 @@ export type {
   DeviceBreakdownData,
   GeoBreakdownData,
   TrafficSourceRow,
+  MetaAdsPerformanceData,
+  AdsReconciliationData,
   EventBreakdownRow,
   ProductCountRow,
   ProductConversionRow,

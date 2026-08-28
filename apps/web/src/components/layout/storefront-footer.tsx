@@ -3,6 +3,7 @@ import { useCmsPages, useContactInfos, usePublicSettings, useSocialLinks } from 
 import { ROUTES, type RoutePath } from '@/constants';
 import { cn } from '@/lib/utils';
 import { getSetting } from '@/utils/cms';
+import { FeLogo } from '@/components/brand/fe-logo';
 import { Container } from '@/components/layout/container';
 import { Separator } from '@/components/ui/separator';
 import { SocialIconLink } from '@/components/storefront/social-icon-link';
@@ -101,9 +102,13 @@ export function StorefrontFooter() {
           <Link
             to={ROUTES.home}
             preload="intent"
-            className="font-display text-foreground text-3xl font-bold uppercase tracking-tight"
+            className="inline-flex items-center gap-3 transition-opacity hover:opacity-90"
+            aria-label={storeName}
           >
-            {storeName}
+            <FeLogo size={48} />
+            <span className="font-display text-foreground text-xl font-bold uppercase tracking-tight">
+              Fashion Edge
+            </span>
           </Link>
           <p className="text-muted-foreground max-w-xs text-sm leading-relaxed">{tagline}</p>
 

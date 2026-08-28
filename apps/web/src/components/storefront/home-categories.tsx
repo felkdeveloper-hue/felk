@@ -80,7 +80,7 @@ export function HomeCategoriesSection() {
                   <div className="bg-muted aspect-[3/4] w-full" />
                 )}
                 <div className="bg-linear-to-t absolute inset-0 from-black/70 via-black/15 to-transparent transition-opacity duration-300 group-hover:from-black/80" />
-                <div className="absolute inset-x-0 bottom-0 flex justify-center px-2 pb-3 pt-8 sm:pb-4">
+                <div className="absolute inset-x-0 bottom-0 flex flex-col items-center px-2 pb-3 pt-8 sm:pb-4">
                   <h3 className="text-center text-[10px] font-bold uppercase tracking-[0.14em] text-white transition-transform duration-300 group-hover:-translate-y-0.5 sm:text-[11px] lg:text-xs">
                     {category.name}
                   </h3>

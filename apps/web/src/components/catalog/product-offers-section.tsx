@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Copy, Check, Tag } from 'lucide-react';
 import { toast } from 'sonner';
+import { useFlashSale } from '@/contexts/flash-sale-context';
 
 const DEFAULT_OFFERS = [
   {
@@ -12,6 +13,7 @@ const DEFAULT_OFFERS = [
 
 export function ProductOffersSection() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const { isFlashSaleActive } = useFlashSale();
 
   const copyCode = async (id: string, code: string) => {
     try {
@@ -23,6 +25,37 @@ export function ProductOffersSection() {
       toast.error('Unable to copy code');
     }
   };
+
+  // During an active flash sale, the 20% extra off supersedes the 5% prepaid offer.
+  // Show the flash sale notice instead.
+  if (isFlashSaleActive) {
+    return (
+      <section aria-labelledby="product-offers" className="space-y-3">
+        <h2
+          id="product-offers"
+          className="text-[11px] font-semibold uppercase tracking-[0.16em] lg:text-sm lg:normal-case lg:tracking-normal"
+        >
+          Active offer
+        </h2>
+        <div
+          className="rounded-xl border p-4"
+          style={{
+            background: 'linear-gradient(135deg, #fff7ed, #fff0dc)',
+            borderColor: 'rgba(255,120,0,0.3)',
+          }}
+        >
+          <div className="flex items-start gap-2">
+            <span className="mt-0.5 text-base">⚡</span>
+            <p className="text-[13px] leading-snug lg:text-sm">
+              <span className="font-bold text-orange-700">Flash Sale Active!</span> You already have{' '}
+              <span className="font-bold text-red-600">20% extra off</span> on everything. The
+              PREPAID5 offer is not stackable during flash sale and will be available once it ends.
+            </p>
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section aria-labelledby="product-offers" className="space-y-3">

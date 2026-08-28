@@ -7,6 +7,7 @@ import corsetBannerMobile from '@/assets/images/Categories/corset-banner-mobile.
 import jeansBanner from '@/assets/images/Categories/jeans-banner.webp';
 import jeansBannerMobile from '@/assets/images/Categories/jeans-banner-mobile.webp';
 import oversizedBanner from '@/assets/images/Categories/oversized-banner.webp';
+import { BlurredBannerImage } from '@/components/media/blurred-banner-image';
 import { cn } from '@/lib/utils';
 
 type HeroArt = {
@@ -96,8 +97,6 @@ const TAGLINES: Record<string, string> = {
   corset: 'Shape. Style. Confidence.',
 };
 
-const MOBILE_MEDIA = '(max-width: 767px)';
-
 export interface CatalogCategoryHeroProps {
   title: string;
   /** Slug or gender key used to pick the curated fallback. */
@@ -133,7 +132,6 @@ export function CatalogCategoryHero({
   const [visible, setVisible] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  /* Reveal text on mount with a slight delay so it feels intentional. */
   useEffect(() => {
     const t = setTimeout(() => setVisible(true), 80);
     return () => clearTimeout(t);
@@ -152,23 +150,16 @@ export function CatalogCategoryHero({
         className,
       )}
     >
-      <picture>
-        {art.mobile ? <source media={MOBILE_MEDIA} srcSet={art.mobile} /> : null}
-        <img
-          src={art.desktop}
-          alt=""
-          aria-hidden
-          loading="eager"
-          decoding="async"
-          fetchPriority="high"
-          onLoad={() => setLoaded(true)}
-          className={cn(
-            'duration-1200 absolute inset-0 h-full w-full object-cover transition-[opacity,transform] ease-out',
-            art.objectClass,
-            loaded ? 'scale-100 opacity-100' : 'scale-[1.03] opacity-0',
-          )}
-        />
-      </picture>
+      <BlurredBannerImage
+        src={art.desktop}
+        mobileSrc={art.mobile}
+        alt=""
+        loading="eager"
+        fetchPriority="high"
+        objectClass={art.objectClass}
+        onLoad={() => setLoaded(true)}
+        className={cn(!loaded && 'opacity-95')}
+      />
 
       {/* Light readability veil — campaign art already carries its own type */}
       <div
@@ -183,7 +174,7 @@ export function CatalogCategoryHero({
       {showCopy ? (
         <div
           className={cn(
-            'absolute inset-0 flex flex-col items-center justify-end pb-10 text-white transition-[opacity,transform] duration-700 ease-out sm:pb-14',
+            'absolute inset-0 z-[1] flex flex-col items-center justify-end pb-10 text-white transition-[opacity,transform] duration-700 ease-out sm:pb-14',
             visible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0',
           )}
         >

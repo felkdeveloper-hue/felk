@@ -85,6 +85,7 @@ export interface CustomerDocument extends Document {
   lifetimeValue: number;
   orderCount: number;
   metadata?: Record<string, unknown>;
+  flashSaleStartTime?: Date | null;
   isDeleted: boolean;
   deletedAt?: Date | null;
   createdAt: Date;
@@ -136,6 +137,7 @@ const customerSchema = new Schema<CustomerDocument>(
     lifetimeValue: { type: Number, default: 0 },
     orderCount: { type: Number, default: 0 },
     metadata: { type: Schema.Types.Mixed, default: {} },
+    flashSaleStartTime: { type: Date, default: null },
     ...softDelete,
   },
   { timestamps: true, collection: 'customers' },

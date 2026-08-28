@@ -326,17 +326,20 @@ export function ProductDetailPage() {
           description: product.shortDescription ?? product.description,
           images: (galleryMedia.length ? galleryMedia : allMedia).map((item) => item.url),
           sku: selectedVariant?.sku ?? product.sku,
+          brand: 'Fashion Edge',
           price: price?.amount,
           currency: price?.currency,
           inStock: product.inStock !== false && product.status !== 'out_of_stock',
           url: buildAbsoluteUrl(`/products/${product.slug}`),
+          ratingValue: product.averageRating,
+          reviewCount: product.reviewCount,
         })}
       />
 
       <SizeGuideModal />
 
-      <Container className="py-6 sm:py-10">
-        <div className="mb-5 flex items-start gap-2 sm:mb-6 sm:gap-3">
+      <Container className="pb-6 pt-2 sm:pb-10 sm:pt-3">
+        <div className="mb-1.5 flex items-center gap-1 sm:mb-2 sm:gap-2">
           <button
             type="button"
             aria-label="Go back"
@@ -347,11 +350,11 @@ export function ProductDetailPage() {
               }
               void navigate({ to: ROUTES.products });
             }}
-            className="text-foreground -ml-1.5 inline-flex size-11 shrink-0 items-center justify-center transition-opacity active:opacity-70"
+            className="text-foreground -ml-1 inline-flex size-10 shrink-0 items-center justify-center transition-opacity active:opacity-70"
           >
             <ArrowLeft className="size-5" strokeWidth={1.75} />
           </button>
-          <ProductBreadcrumb className="min-w-0 flex-1 pt-2.5" items={breadcrumbItems} />
+          <ProductBreadcrumb className="min-w-0 flex-1 pt-0.5" items={breadcrumbItems} />
         </div>
 
         <div className="grid gap-5 lg:grid-cols-2 lg:gap-10 xl:gap-14">
@@ -414,7 +417,11 @@ export function ProductDetailPage() {
           warrantyAvailable={product.warrantyAvailable}
           warrantyDetails={product.warrantyDetails}
         />
-        <ProductReviewsSection productId={product.id} />
+        <ProductReviewsSection
+          productId={product.id}
+          productName={product.name}
+          productSlug={product.slug}
+        />
 
         <div className="mt-8 space-y-6 lg:mt-12 lg:space-y-8">
           <ProductCategoryLinks product={product} />

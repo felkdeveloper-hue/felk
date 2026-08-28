@@ -21,6 +21,7 @@ export type {
   CustomerPreferenceValues,
   CustomerNotificationPreferences,
   CustomerProfile,
+  FlashSaleStatus,
   RecentlyViewedItem,
   ReferralSummary,
   RewardBalance,

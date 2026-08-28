@@ -57,6 +57,11 @@ import {
   importDashboardLayout,
   getDashboardCatalog,
 } from '@/services/platform-analytics/index.js';
+import {
+  getMetaAdsPerformance,
+  getAdsReconciliation,
+  syncMetaAdsInsights,
+} from '@/services/analytics/meta-ads-sync.service.js';
 
 export const analyticsRouter = Router();
 
@@ -196,6 +201,41 @@ adminAnalytics.get(
     const filter = req.query as ReturnType<typeof analyticsFilterSchema.parse>;
     const data = await getTrafficSources(filter);
     ApiResponse.success(res, data, 'Traffic sources');
+  }),
+);
+
+adminAnalytics.get(
+  '/ads/meta',
+  validate({ query: analyticsFilterSchema }),
+  asyncHandler(async (req, res) => {
+    const filter = req.query as ReturnType<typeof analyticsFilterSchema.parse>;
+    const data = await getMetaAdsPerformance(filter);
+    ApiResponse.success(res, data, 'Meta ads performance');
+  }),
+);
+
+adminAnalytics.post(
+  '/ads/meta/sync',
+  asyncHandler(async (_req, res) => {
+    const data = await syncMetaAdsInsights({ recentDays: 7 });
+    if (data.skipped) {
+      ApiResponse.success(res, data, data.reason ?? 'Sync skipped');
+      return;
+    }
+    if (!data.ok) {
+      throw new ApiError(HTTP_STATUS.SERVICE_UNAVAILABLE, data.error ?? 'Meta ads sync failed');
+    }
+    ApiResponse.success(res, data, 'Meta ads synced');
+  }),
+);
+
+adminAnalytics.get(
+  '/ads/reconcile',
+  validate({ query: analyticsFilterSchema }),
+  asyncHandler(async (req, res) => {
+    const filter = req.query as ReturnType<typeof analyticsFilterSchema.parse>;
+    const data = await getAdsReconciliation(filter);
+    ApiResponse.success(res, data, 'Ads reconciliation');
   }),
 );
 

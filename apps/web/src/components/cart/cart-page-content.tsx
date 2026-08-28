@@ -12,6 +12,7 @@ import { customersApi } from '@/services/sdk';
 import { isGuestCheckoutUser } from '@/utils/auth/guest-checkout';
 import { isStaffUser } from '@/utils/auth-redirect';
 import { previewShippingAmount } from '@/constants/checkout.constants';
+import { Zap } from 'lucide-react';
 import { CartItemRow } from '@/components/cart/cart-item-row';
 import { CartOrderSummary } from '@/components/cart/cart-order-summary';
 import { CartPromotionsPanel } from '@/components/cart/cart-promotions-panel';
@@ -20,6 +21,7 @@ import { Button } from '@/components/ui/button';
 import { ErrorState } from '@/components/ui/error-state';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertTriangle } from 'lucide-react';
+import { useFlashSale } from '@/contexts/flash-sale-context';
 
 function getIssueForItem(
   itemId: string,
@@ -53,8 +55,10 @@ export function CartPageContent() {
   const hasHydrated = useAuthStore((state) => state.hasHydrated);
   const authUser = useAuthStore((state) => state.user);
   const isAuthed = useAuthStore((state) => Boolean(state.accessToken && state.user));
+  const { isFlashSaleActive } = useFlashSale();
   const isGuestCheckout = isGuestCheckoutUser(authUser);
   const isStaff = isStaffUser(authUser);
+  const flashEnabled = isAuthed && isFlashSaleActive;
 
   const cart = cartQuery.data;
   const validation = cart?.validation;
@@ -191,14 +195,42 @@ export function CartPageContent() {
             <span className="text-muted-foreground text-[10px] font-bold uppercase tracking-[0.16em]">
               Total
             </span>
-            <span className="font-display text-foreground text-lg font-bold tabular-nums tracking-tight">
-              {formatCurrency(
-                cart.totals.shipping > 0
-                  ? cart.totals.total
-                  : cart.totals.total + previewShippingAmount(cart.totals.shipping, isStaff),
-                cart.totals.currency ?? 'LKR',
-              )}
-            </span>
+            {flashEnabled ? (
+              <span className="flex items-baseline gap-1.5">
+                <Zap className="mb-0.5 size-3.5 shrink-0" style={{ color: '#f97316' }} />
+                <span className="text-muted-foreground text-sm tabular-nums line-through">
+                  {formatCurrency(
+                    cart.totals.shipping > 0
+                      ? cart.totals.total
+                      : cart.totals.total + previewShippingAmount(cart.totals.shipping, isStaff),
+                    cart.totals.currency ?? 'LKR',
+                  )}
+                </span>
+                <span
+                  className="font-display text-lg font-bold tabular-nums tracking-tight"
+                  style={{ color: '#f97316' }}
+                >
+                  {formatCurrency(
+                    Math.round(
+                      cart.totals.subtotal * 0.8 +
+                        previewShippingAmount(cart.totals.shipping, isStaff) +
+                        (cart.totals.tax ?? 0) -
+                        (cart.totals.discount ?? 0),
+                    ),
+                    cart.totals.currency ?? 'LKR',
+                  )}
+                </span>
+              </span>
+            ) : (
+              <span className="font-display text-foreground text-lg font-bold tabular-nums tracking-tight">
+                {formatCurrency(
+                  cart.totals.shipping > 0
+                    ? cart.totals.total
+                    : cart.totals.total + previewShippingAmount(cart.totals.shipping, isStaff),
+                  cart.totals.currency ?? 'LKR',
+                )}
+              </span>
+            )}
           </div>
           {!hasHydrated ? (
             <Button

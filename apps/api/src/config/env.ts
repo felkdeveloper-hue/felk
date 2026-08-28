@@ -121,6 +121,24 @@ const envSchema = z
     /** Meta Events Manager Test Events code — appended to CAPI payloads while testing. */
     META_TEST_EVENT_CODE: z.string().optional(),
 
+    /**
+     * Meta Marketing API (Ads Insights) — server-side only.
+     * Token needs ads_read (and ideally ads_management read) on the ad account.
+     * Falls back to META_CAPI_TOKEN only when META_ADS_ACCESS_TOKEN is unset.
+     */
+    META_ADS_ACCESS_TOKEN: z.string().optional(),
+    /** Ad account id with or without act_ prefix, e.g. act_123 or 123 */
+    META_AD_ACCOUNT_ID: z.string().optional(),
+    /** Days of history to pull on scheduled sync (default 30). */
+    META_ADS_SYNC_LOOKBACK_DAYS: z.coerce.number().int().min(1).max(90).default(30),
+    /** Hours between automatic Meta ads syncs (default 6). */
+    META_ADS_SYNC_INTERVAL_HOURS: z.coerce.number().int().min(1).max(24).default(6),
+    /** When true (default), skip obvious bots/crawlers on /analytics/collect. */
+    ANALYTICS_BOT_FILTER: z
+      .enum(['true', 'false'])
+      .default('true')
+      .transform((v) => v === 'true'),
+
     TIKTOK_PIXEL_ID: z.string().optional(),
     TIKTOK_ACCESS_TOKEN: z.string().optional(),
 

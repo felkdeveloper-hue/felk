@@ -7,6 +7,7 @@ import type {
 } from '@/services/sdk/products';
 import type { Category } from '@/services/sdk/categories';
 import { env } from '@/config/env';
+import { getSeededReviewSummary } from '@/lib/seeded-reviews';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -169,10 +170,25 @@ export function normalizeProduct(raw: unknown): Product {
           ? trackedVariants.some((variant) => (variant.stock ?? 0) > 0)
           : undefined;
 
+  const id = pickId(record);
+  const name = String(record.name ?? '');
+  const slug = String(record.slug ?? '');
+  const apiAverage =
+    typeof record.averageRating === 'number'
+      ? record.averageRating
+      : typeof record.rating === 'number'
+        ? record.rating
+        : undefined;
+  const apiReviewCount = typeof record.reviewCount === 'number' ? record.reviewCount : undefined;
+  const seeded =
+    !apiAverage || !apiReviewCount || apiReviewCount < 5
+      ? getSeededReviewSummary(id || slug || name, name, slug)
+      : null;
+
   return {
-    id: pickId(record),
-    name: String(record.name ?? ''),
-    slug: String(record.slug ?? ''),
+    id,
+    name,
+    slug,
     shortDescription:
       typeof record.shortDescription === 'string' ? record.shortDescription : undefined,
     description: typeof record.description === 'string' ? record.description : undefined,
@@ -220,13 +236,8 @@ export function normalizeProduct(raw: unknown): Product {
     warrantyAvailable: Boolean(record.warrantyAvailable),
     warrantyDetails:
       typeof record.warrantyDetails === 'string' ? record.warrantyDetails : undefined,
-    averageRating:
-      typeof record.averageRating === 'number'
-        ? record.averageRating
-        : typeof record.rating === 'number'
-          ? record.rating
-          : undefined,
-    reviewCount: typeof record.reviewCount === 'number' ? record.reviewCount : undefined,
+    averageRating: seeded ? seeded.average : apiAverage,
+    reviewCount: seeded ? seeded.total : apiReviewCount,
     defaultVariantId: record.defaultVariantId ? String(record.defaultVariantId) : undefined,
     variantCount: typeof record.variantCount === 'number' ? record.variantCount : undefined,
     requiresOptionSelection:

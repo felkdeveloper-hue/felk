@@ -56,6 +56,7 @@ const sessionPayloadSchema = z.object({
 });
 
 const pageViewPayloadSchema = z.object({
+  pageViewId: z.string().uuid().optional(),
   sessionId: z.string().uuid(),
   visitorId: z.string().uuid(),
   path: z.string().max(2000),

@@ -12,6 +12,8 @@ export {
   useDeviceBreakdown,
   useGeoBreakdown,
   useTrafficSources,
+  useMetaAdsPerformance,
+  useAdsReconciliation,
   useProductAnalytics,
   useProductInterest,
   useCartAnalytics,

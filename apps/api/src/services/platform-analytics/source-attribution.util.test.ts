@@ -93,4 +93,33 @@ describe('source attribution', () => {
       detectInAppSource('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Instagram 310.0.0'),
     ).toBe('instagram');
   });
+
+  it('labels organic Facebook referral separately from Facebook Ads', () => {
+    expect(
+      formatAttribution({
+        trafficSource: 'social',
+        referrer: 'https://l.facebook.com/',
+      }).label,
+    ).toBe('Facebook');
+
+    expect(
+      formatAttribution({
+        trafficSource: 'paid_social',
+        utmSource: 'facebook',
+        utmMedium: 'paid_social',
+        fbclid: 'abc',
+      }).label,
+    ).toBe('Facebook Ads');
+  });
+
+  it('normalizes facebook.com / fb utm_source aliases without dropping paid signal', () => {
+    expect(
+      formatAttribution({
+        trafficSource: 'paid_social',
+        utmSource: 'facebook.com',
+        utmMedium: 'cpc',
+        fbclid: 'x',
+      }).label,
+    ).toBe('Facebook Ads');
+  });
 });

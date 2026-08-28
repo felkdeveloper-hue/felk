@@ -341,6 +341,57 @@ customersRouter.delete(
   }),
 );
 
+/* Flash sale — me */
+customersRouter.get(
+  '/me/flash-sale',
+  authorizeAny(...selfAccount),
+  asyncHandler(async (req, res) => {
+    const customer = await resolveMeCustomer(req);
+    const startTime = customer.flashSaleStartTime ?? null;
+    const FLASH_SALE_DURATION_MS = 60 * 60 * 1000; // 1 hour
+    const isActive =
+      startTime != null && Date.now() - new Date(startTime).getTime() < FLASH_SALE_DURATION_MS;
+    ApiResponse.success(res, {
+      flashSaleStartTime: startTime ? new Date(startTime).toISOString() : null,
+      isActive,
+      expiresAt: startTime
+        ? new Date(new Date(startTime).getTime() + FLASH_SALE_DURATION_MS).toISOString()
+        : null,
+    });
+  }),
+);
+
+customersRouter.post(
+  '/me/flash-sale/start',
+  authorizeAny(...selfAccount),
+  asyncHandler(async (req, res) => {
+    const customer = await resolveMeCustomer(req);
+    if (customer.flashSaleStartTime) {
+      const FLASH_SALE_DURATION_MS = 60 * 60 * 1000;
+      const isActive =
+        Date.now() - new Date(customer.flashSaleStartTime).getTime() < FLASH_SALE_DURATION_MS;
+      ApiResponse.success(res, {
+        flashSaleStartTime: new Date(customer.flashSaleStartTime).toISOString(),
+        isActive,
+        expiresAt: new Date(
+          new Date(customer.flashSaleStartTime).getTime() + FLASH_SALE_DURATION_MS,
+        ).toISOString(),
+        alreadyStarted: true,
+      });
+      return;
+    }
+    const now = new Date();
+    await customer.updateOne({ flashSaleStartTime: now });
+    const FLASH_SALE_DURATION_MS = 60 * 60 * 1000;
+    ApiResponse.success(res, {
+      flashSaleStartTime: now.toISOString(),
+      isActive: true,
+      expiresAt: new Date(now.getTime() + FLASH_SALE_DURATION_MS).toISOString(),
+      alreadyStarted: false,
+    });
+  }),
+);
+
 /* Rewards / referrals — me */
 customersRouter.get(
   '/me/rewards',

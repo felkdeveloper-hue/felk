@@ -3,7 +3,7 @@ import { Types } from 'mongoose';
 import { CheckoutSessionModel, type CheckoutSessionDocument } from '@/models/checkout.models.js';
 import { OrderModel } from '@/models/order.models.js';
 import { InventoryItemModel, WarehouseModel } from '@/models/inventory.models.js';
-import { CustomerAddressModel } from '@/models/customer.models.js';
+import { CustomerAddressModel, CustomerModel } from '@/models/customer.models.js';
 import { cartService } from '@/services/cart.service.js';
 import { reservationService } from '@/services/reservation.service.js';
 import { customerService } from '@/services/customer.service.js';
@@ -311,9 +311,24 @@ export class CheckoutService {
       isDeleted: false,
       status: { $nin: [ORDER_STATUS.CANCELLED, ORDER_STATUS.REFUNDED] },
     });
+
+    // Suppress the first-order discount when the customer has an active flash sale
+    // (flash sale window = 60 minutes from flashSaleStartTime).
+    const FLASH_SALE_DURATION_MS = 60 * 60 * 1000;
+    let customerHasActiveFlashSale = false;
+    if (session.customerId) {
+      const customer = await CustomerModel.findById(session.customerId)
+        .select('flashSaleStartTime')
+        .lean();
+      if (customer?.flashSaleStartTime) {
+        const elapsed = Date.now() - new Date(customer.flashSaleStartTime).getTime();
+        customerHasActiveFlashSale = elapsed >= 0 && elapsed < FLASH_SALE_DURATION_MS;
+      }
+    }
+
     const couponCode = (session.coupon as { code?: string | null } | null)?.code ?? null;
     const couponAmount = Number((session.coupon as { amount?: number } | null)?.amount ?? 0);
-    if (!isGuestCheckout && !hasPriorOrder && subtotal > 0) {
+    if (!isGuestCheckout && !hasPriorOrder && subtotal > 0 && !customerHasActiveFlashSale) {
       session.coupon = applyFirstOrderDiscount(subtotal);
     } else if (couponCode === FIRST_ORDER_DISCOUNT.CODE || (!couponAmount && !couponCode)) {
       session.coupon = applyCouponPlaceholder(opts?.couponCode);

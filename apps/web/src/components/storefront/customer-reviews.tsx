@@ -1,6 +1,6 @@
-import { Star } from 'lucide-react';
 import { Section } from '@/components/common/section';
 import { Container } from '@/components/layout/container';
+import { StarRating } from '@/components/ui/star-rating';
 import type { HomeSection } from '@/services/sdk/cms';
 import { MotionReveal, MotionItem } from './motion-reveal';
 
@@ -42,13 +42,8 @@ export function CustomerReviewsSection({ section }: CustomerReviewsSectionProps)
           {reviews.map((review) => (
             <MotionItem key={review.id}>
               <figure className="border-border bg-card rounded-2xl border p-6">
-                <div
-                  className="text-primary mb-4 flex gap-1"
-                  aria-label={`${review.rating ?? 5} out of 5 stars`}
-                >
-                  {Array.from({ length: review.rating ?? 5 }, (_, i) => (
-                    <Star key={i} className="size-4 fill-current" />
-                  ))}
+                <div className="mb-4">
+                  <StarRating value={review.rating ?? 5} size="md" />
                 </div>
                 <blockquote className="text-foreground text-sm leading-relaxed">
                   &ldquo;{review.quote}&rdquo;

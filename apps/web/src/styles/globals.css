@@ -606,3 +606,41 @@ body,
 .admin-btn-danger:hover:not(:disabled) {
   background: rgba(185, 28, 28, 0.08);
 }
+
+/* Delivery trust — subtle truck motion */
+@keyframes fe-truck-nudge {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(2px);
+  }
+}
+
+.fe-truck-motion {
+  animation: fe-truck-nudge 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fe-truck-motion {
+    animation: none;
+  }
+}
+
+/* Premium toasts — hide sonner’s coloured progress bar */
+[data-sonner-toaster] [data-sonner-toast] [data-progress],
+[data-sonner-toaster]
+  [data-sonner-toast]
+  [data-styled='true']
+  > [data-content]
+  + div[style*='transform'] {
+  display: none !important;
+}
+
+[data-sonner-toaster] [data-rich-colors='true'] [data-sonner-toast][data-type='success'],
+[data-sonner-toaster] [data-sonner-toast][data-type='success'] {
+  background: #fff !important;
+  border-color: rgba(0, 0, 0, 0.1) !important;
+  color: #171717 !important;
+}

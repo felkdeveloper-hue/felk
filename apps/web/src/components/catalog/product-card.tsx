@@ -1,9 +1,10 @@
 import { memo, useCallback, useRef, useState, type TouchEvent } from 'react';
 import { Link } from '@tanstack/react-router';
 import { useQueryClient } from '@tanstack/react-query';
-import { Eye, Heart, Plus, Star } from 'lucide-react';
+import { Eye, Heart, Plus } from 'lucide-react';
 import type { Product } from '@/services/sdk';
 import { productsApi } from '@/services/sdk';
+import { useFlashSale } from '@/contexts/flash-sale-context';
 import { ProductCardImage } from '@/components/catalog/product-card-image';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -23,7 +24,10 @@ import { QUERY_KEYS } from '@/constants';
 import { resolveVariantId } from '@/utils/cart';
 import { productMetaFrom, trackCommerceEvent } from '@/lib/analytics';
 import { PriceDisplay } from './price-display';
+import { formatCurrency } from '@/utils';
+import { BnplInstallmentHint } from './bnpl-installment-hint';
 import { QuickViewModal } from './quick-view-modal';
+import { isProductLowStock, isProductSoldOut } from '@/utils/catalog/stock';
 
 export interface ProductCardProps {
   product: Product;
@@ -102,6 +106,7 @@ function ProductCardComponent({
   const didSwipe = useRef(false);
 
   const isAuthed = useAuthStore((state) => Boolean(state.accessToken && state.user));
+  const { isFlashSaleActive, formattedTime } = useFlashSale();
   const resolvedVariantId = resolveVariantId(undefined, product);
   const isInWishlist = useIsInWishlist(product.id, resolvedVariantId);
   const wishlistQuery = useDefaultWishlistQuery();
@@ -114,6 +119,11 @@ function ProductCardComponent({
   const liveSale =
     product.salePrice && product.salePrice.amount > 0 ? product.salePrice : undefined;
   const displayPrice = liveSale ?? product.effectivePrice ?? product.price;
+  // Flash sale price: always apply 20% off to the current display price
+  const flashPrice =
+    displayPrice && displayPrice.amount > 0
+      ? { ...displayPrice, amount: Math.round(displayPrice.amount * 0.8) }
+      : undefined;
   const originalPrice = liveSale ? product.price : product.compareAtPrice;
   const discountPct =
     displayPrice &&
@@ -271,7 +281,8 @@ function ProductCardComponent({
     lastTap.current = now;
   };
 
-  const isSoldOut = product.inStock === false || product.status === 'out_of_stock';
+  const isSoldOut = isProductSoldOut(product);
+  const isLowStock = isProductLowStock(product);
 
   const openQuickAdd = (event: React.MouseEvent) => {
     event.preventDefault();
@@ -387,12 +398,34 @@ function ProductCardComponent({
                 Save {discountPct}%
               </Badge>
             ) : null}
-            {product.inStock === false || product.status === 'out_of_stock' ? (
+            {isAuthed && isFlashSaleActive ? (
+              <Badge
+                className="rounded-none px-1.5 text-[9px] font-bold uppercase tracking-wide text-white sm:px-2 sm:text-[10px]"
+                style={{
+                  background: 'linear-gradient(90deg, #ff4500, #ff8c00)',
+                  boxShadow: '0 0 8px rgba(255,80,0,0.5)',
+                  animation: 'flash-badge-pulse 2s ease-in-out infinite',
+                }}
+              >
+                ⚡ +20% OFF · {formattedTime}
+                <style>{`
+                  @keyframes flash-badge-pulse {
+                    0%, 100% { box-shadow: 0 0 8px rgba(255,80,0,0.5); }
+                    50%       { box-shadow: 0 0 16px rgba(255,80,0,0.9); }
+                  }
+                `}</style>
+              </Badge>
+            ) : null}
+            {isSoldOut ? (
               <Badge
                 variant="outline"
                 className="bg-card/90 rounded-none text-[9px] sm:text-[10px]"
               >
                 Sold out
+              </Badge>
+            ) : isLowStock ? (
+              <Badge className="rounded-none bg-red-600/95 px-1.5 text-[9px] font-bold uppercase tracking-wide text-white sm:px-2 sm:text-[10px]">
+                Low in Stock
               </Badge>
             ) : null}
           </div>
@@ -428,11 +461,11 @@ function ProductCardComponent({
 
           {averageRating != null ? (
             <div
-              className="bg-card absolute bottom-2 left-2 flex items-center gap-1 rounded-md px-1.5 py-0.5 shadow-[var(--shadow-soft)] transition-opacity lg:group-hover:opacity-0"
+              className="bg-white/92 absolute bottom-2 left-2 flex items-center gap-0.5 rounded-full border border-white/70 px-2 py-0.5 shadow-[0_2px_14px_-4px_rgba(0,0,0,0.28)] backdrop-blur-[2px] transition-opacity lg:group-hover:opacity-0"
               aria-label={`Rated ${averageRating} out of 5`}
             >
-              <Star className="size-3 fill-amber-400 text-amber-400" aria-hidden />
-              <span className="text-foreground text-[11px] font-bold leading-none">
+              <span className="text-[9.5px] leading-none text-amber-400">★</span>
+              <span className="text-[10.5px] font-bold tabular-nums leading-none tracking-tight text-neutral-800">
                 {averageRating.toFixed(1)}
               </span>
             </div>
@@ -502,13 +535,52 @@ function ProductCardComponent({
             />
           </div>
 
-          <PriceDisplay
-            price={product.price}
-            salePrice={liveSale}
-            compareAtPrice={product.compareAtPrice}
-            discountPercent={product.isOnSale ? product.discountPercent : undefined}
-            className="[&_*]:text-[13px] lg:[&_*]:text-sm"
-          />
+          {flashPrice && displayPrice && isAuthed && isFlashSaleActive ? (
+            /* Logged-in users: show struck-through price + orange 20%-off flash price */
+            <div className="space-y-0.5">
+              <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
+                {/* Case 2: product already has a sale — show ~~original~~ ~~red sale~~ orange final */}
+                {liveSale && originalPrice && originalPrice.amount > displayPrice.amount ? (
+                  <>
+                    <span className="text-muted-foreground text-[12px] line-through lg:text-[13px]">
+                      {formatCurrency(
+                        originalPrice.amount,
+                        originalPrice.currency ?? displayPrice.currency,
+                      )}
+                    </span>
+                    <span
+                      className="text-[12px] line-through lg:text-[13px]"
+                      style={{ color: '#ef4444' }}
+                    >
+                      {formatCurrency(displayPrice.amount, displayPrice.currency)}
+                    </span>
+                  </>
+                ) : (
+                  /* Case 1: no existing sale — show ~~base price~~ then orange flash price */
+                  <span className="text-muted-foreground text-[12px] line-through lg:text-[13px]">
+                    {formatCurrency(displayPrice.amount, displayPrice.currency)}
+                  </span>
+                )}
+                <span
+                  className="text-[13px] font-bold tracking-tight lg:text-sm"
+                  style={{ color: '#f97316' }}
+                >
+                  {formatCurrency(flashPrice.amount, flashPrice.currency)}
+                </span>
+              </div>
+              <BnplInstallmentHint amount={flashPrice.amount} currency={flashPrice.currency} />
+            </div>
+          ) : (
+            /* Guests: regular price with installment lines */
+            <PriceDisplay
+              price={product.price}
+              salePrice={liveSale}
+              compareAtPrice={product.compareAtPrice}
+              discountPercent={product.isOnSale ? product.discountPercent : undefined}
+              className="[&_*]:text-[13px] lg:[&_*]:text-sm"
+              showInstallments={true}
+            />
+          )}
         </div>
       </article>
 

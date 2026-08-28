@@ -1,5 +1,5 @@
-import { Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { StarRating } from '@/components/ui/star-rating';
 
 export interface ProductRatingBadgeProps {
   averageRating?: number;
@@ -24,7 +24,7 @@ export function ProductRatingBadge({
       )}
       aria-label={`Rated ${display} out of 5 from ${reviewCount ?? 0} reviews`}
     >
-      <Star className="size-4 fill-amber-400 text-amber-400" />
+      <StarRating value={display} size="md" />
       <span>{display.toFixed(1)}</span>
       {reviewCount != null && reviewCount > 0 ? (
         <>

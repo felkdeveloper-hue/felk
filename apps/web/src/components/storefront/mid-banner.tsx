@@ -95,7 +95,18 @@ function HomeStripBanner({
             width={1920}
             height={823}
             sizes="100vw"
-            className="absolute inset-0 h-full w-full object-cover object-center"
+            className="pointer-events-none absolute inset-0 h-full w-full scale-110 object-cover blur-2xl brightness-[0.55]"
+            loading="lazy"
+            decoding="async"
+            aria-hidden
+          />
+          <img
+            src={src}
+            alt={alt}
+            width={1920}
+            height={823}
+            sizes="100vw"
+            className="absolute inset-0 h-full w-full object-contain object-center"
             loading="lazy"
             decoding="async"
           />

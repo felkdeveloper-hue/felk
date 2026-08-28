@@ -1,6 +1,7 @@
 import { Schema, model, type Document, type Types } from 'mongoose';
 
 export interface PageViewDocument extends Document {
+  pageViewId?: string | null;
   sessionId: string;
   visitorId: string;
   userId?: Types.ObjectId | null;
@@ -18,6 +19,7 @@ export interface PageViewDocument extends Document {
 
 const pageViewSchema = new Schema<PageViewDocument>(
   {
+    pageViewId: { type: String, default: null },
     sessionId: { type: String, required: true, index: true },
     visitorId: { type: String, required: true, index: true },
     userId: { type: Schema.Types.ObjectId, ref: 'User', default: null },
@@ -39,5 +41,9 @@ pageViewSchema.index({ path: 1, viewedAt: -1 });
 pageViewSchema.index({ sessionId: 1, viewedAt: 1 });
 pageViewSchema.index({ visitorId: 1, viewedAt: -1 });
 pageViewSchema.index({ viewedAt: -1 });
+pageViewSchema.index(
+  { pageViewId: 1 },
+  { unique: true, partialFilterExpression: { pageViewId: { $type: 'string' } } },
+);
 
 export const PageViewModel = model<PageViewDocument>('PaPageView', pageViewSchema);

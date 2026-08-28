@@ -63,6 +63,7 @@ export function HomeSplitBannersSection() {
         <FashionPromoBanner
           key={banner.id}
           size="full"
+          imageMode="cover"
           title={banner.title}
           eyebrow={banner.subtitle}
           ctaLabel={banner.ctaLabel ?? 'Shop Now'}

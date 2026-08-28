@@ -170,36 +170,6 @@ async function repairUserEmailIndex() {
   );
 }
 
-/** Replace global unique paymentId with live-order partial uniques (no duplicate admin orders). */
-async function repairOrderLiveIndexes() {
-  const db = mongoose.connection.db;
-  if (!db) return;
-
-  const collection = db.collection('orders');
-  const indexes = await collection.indexes().catch(() => []);
-  for (const index of indexes) {
-    if (!index.name || index.name === '_id_') continue;
-    const key = index.key as { paymentId?: number; checkoutId?: number };
-    const isOldPaymentUnique =
-      index.unique &&
-      key.paymentId === 1 &&
-      !index.partialFilterExpression &&
-      index.name !== 'paymentId_live_unique';
-    const isOldCheckoutUnique =
-      index.unique &&
-      key.checkoutId === 1 &&
-      index.name !== 'checkoutId_live_unique' &&
-      !index.partialFilterExpression;
-    if (isOldPaymentUnique || isOldCheckoutUnique) {
-      await collection.dropIndex(index.name);
-      logger.info({ index: index.name }, 'Dropped legacy orders unique index');
-    }
-  }
-
-  const { OrderModel } = await import('@/models/order.models.js');
-  await OrderModel.syncIndexes();
-}
-
 class DatabaseManager {
   private status: DatabaseStatus = 'disconnected';
   private lastError: Error | null = null;
@@ -293,10 +263,6 @@ class DatabaseManager {
 
         await repairUserEmailIndex().catch((error: unknown) => {
           logger.warn({ err: error }, 'User email index repair skipped');
-        });
-
-        await repairOrderLiveIndexes().catch((error: unknown) => {
-          logger.warn({ err: error }, 'Order live unique index repair skipped');
         });
 
         // One-time rate bump: standard flat shipping 400 → 500 LKR.

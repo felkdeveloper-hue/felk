@@ -3,6 +3,8 @@ import type { Request } from 'express';
 import type { Types } from 'mongoose';
 import { VisitorModel, SessionModel, PageViewModel, EventModel } from '@/models/analytics/index.js';
 import { UserModel } from '@/models/user.model.js';
+import { appConfig } from '@/config/app.config.js';
+import { logger } from '@/config/logger.js';
 import type {
   CollectBody,
   VisitorPayload,
@@ -17,6 +19,7 @@ import {
   detectInAppSource,
   pickFirstTouchAttribution,
 } from './source-attribution.util.js';
+import { evaluateAnalyticsBotFilter } from './bot-filter.util.js';
 import type { GeoData } from '@/models/analytics/index.js';
 
 function mergeGeo(existing: GeoData | null | undefined, incoming: GeoData): GeoData {
@@ -151,6 +154,8 @@ async function upsertVisitor(
 
   const mergedGeo = mergeGeo(existing?.geo as GeoData | undefined, geo);
 
+  // totalVisits increments only when a new session is created (see upsertSession).
+  const wasNew = !existing;
   await VisitorModel.findOneAndUpdate(
     { visitorId: payload.visitorId },
     {
@@ -159,6 +164,7 @@ async function upsertVisitor(
         ipHash: ipKey,
         firstSeenAt: new Date(),
         isReturning: Boolean(priorByIp),
+        totalVisits: 0,
         ...firstTouchFields,
       },
       $set: {
@@ -169,16 +175,30 @@ async function upsertVisitor(
         ...firstTouchFields,
         ...(userId ? { userId } : {}),
       },
-      $inc: { totalVisits: 1 },
     },
     { upsert: true, new: false },
   );
 
-  // Mark as returning on subsequent visits
-  await VisitorModel.updateOne(
-    { visitorId: payload.visitorId, totalVisits: { $gt: 1 } },
-    { $set: { isReturning: true } },
-  );
+  // Heartbeat may have created a session before the visitor row existed — catch up.
+  if (wasNew) {
+    const sessionCount = await SessionModel.countDocuments({ visitorId: payload.visitorId });
+    if (sessionCount > 0) {
+      await VisitorModel.updateOne(
+        { visitorId: payload.visitorId },
+        {
+          $set: {
+            totalVisits: sessionCount,
+            isReturning: sessionCount > 1 || Boolean(priorByIp),
+          },
+        },
+      );
+    }
+  } else {
+    await VisitorModel.updateOne(
+      { visitorId: payload.visitorId, totalVisits: { $gt: 1 } },
+      { $set: { isReturning: true } },
+    );
+  }
 
   if (userId) {
     const country = mergedGeo.country ?? mergedGeo.countryCode ?? null;
@@ -216,7 +236,9 @@ async function upsertSession(
     .lean();
   const sessionTrafficSource = visitorDoc?.trafficSource ?? 'direct';
 
-  await SessionModel.findOneAndUpdate(
+  const existingBefore = await SessionModel.exists({ sessionId: payload.sessionId });
+
+  const result = await SessionModel.updateOne(
     { sessionId: payload.sessionId },
     {
       $setOnInsert: {
@@ -251,8 +273,23 @@ async function upsertSession(
         ...(userId ? { userId } : {}),
       },
     },
-    { upsert: true, new: false },
+    { upsert: true },
   );
+
+  // Count a visit once per new session (not on every heartbeat / visitor upsert).
+  if (!existingBefore && result.upsertedCount === 1) {
+    const updated = await VisitorModel.findOneAndUpdate(
+      { visitorId: payload.visitorId },
+      { $inc: { totalVisits: 1 } },
+      { new: true },
+    );
+    if (updated && updated.totalVisits > 1) {
+      await VisitorModel.updateOne(
+        { visitorId: payload.visitorId },
+        { $set: { isReturning: true } },
+      );
+    }
+  }
 
   // Not a bounce if more than 1 page
   if (payload.pageCount && payload.pageCount > 1) {
@@ -282,6 +319,7 @@ async function insertPageViews(
   }
 
   const docs = views.map((v) => ({
+    ...(v.pageViewId ? { pageViewId: v.pageViewId } : {}),
     sessionId: v.sessionId,
     visitorId: v.visitorId,
     userId: userId ?? null,
@@ -297,7 +335,11 @@ async function insertPageViews(
     country: geo.countryCode ?? geo.country ?? null,
   }));
 
-  await PageViewModel.insertMany(docs, { ordered: false });
+  try {
+    await PageViewModel.insertMany(docs, { ordered: false });
+  } catch {
+    /* duplicate pageViewId — ignore */
+  }
 }
 
 async function insertEvents(
@@ -349,9 +391,10 @@ async function processHeartbeat(
   currentPage?: string | null,
 ): Promise<void> {
   const now = new Date();
+  const existed = await SessionModel.exists({ sessionId });
   // Always revive the session — mobile browsers often fire pagehide/beforeunload
   // and mark isActive=false when switching apps; a later heartbeat must bring them back.
-  await SessionModel.findOneAndUpdate(
+  const result = await SessionModel.updateOne(
     { sessionId },
     {
       $set: {
@@ -372,21 +415,43 @@ async function processHeartbeat(
     },
     { upsert: true },
   );
+  if (!existed && result.upsertedCount === 1) {
+    await VisitorModel.updateOne({ visitorId }, { $inc: { totalVisits: 1 } });
+  }
   await VisitorModel.updateOne({ visitorId }, { $set: { lastSeenAt: now } }, { upsert: false });
 }
 
 export async function processCollect(body: CollectBody, req: Request): Promise<void> {
+  const ua = typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'] : null;
+  const samplePath =
+    body.pageViews?.[0]?.path ??
+    body.session?.entryPage ??
+    body.session?.lastPage ??
+    body.heartbeat?.path ??
+    body.visitor?.landingPath ??
+    null;
+
+  const botCheck = evaluateAnalyticsBotFilter({
+    userAgent: ua,
+    path: samplePath,
+    enabled: appConfig.analytics.botFilter,
+  });
+  if (botCheck.exclude) {
+    logger.debug({ reason: botCheck.reason }, 'Analytics collect skipped (bot/invalid)');
+    return;
+  }
+
   const userId = req.user?.id as Types.ObjectId | undefined;
 
-  const ops: Promise<void>[] = [];
-
+  // Visitor before session so totalVisits $inc finds the visitor row.
   if (body.visitor) {
-    ops.push(upsertVisitor(body.visitor, req, userId));
+    await upsertVisitor(body.visitor, req, userId);
+  }
+  if (body.session) {
+    await upsertSession(body.session, req, userId);
   }
 
-  if (body.session) {
-    ops.push(upsertSession(body.session, req, userId));
-  }
+  const ops: Promise<void>[] = [];
 
   if (body.pageViews?.length) {
     ops.push(insertPageViews(body.pageViews, userId, req));

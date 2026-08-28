@@ -100,6 +100,12 @@ export interface RewardHistoryEntry {
   createdAt: string;
 }
 
+export interface FlashSaleStatus {
+  flashSaleStartTime: string | null;
+  isActive: boolean;
+  expiresAt: string | null;
+}
+
 export interface ReferralSummary {
   code: string;
   invitations: unknown[];
@@ -272,5 +278,15 @@ export const customersApi = {
 
   acceptReferral(referralCode: string): Promise<MessageResult> {
     return http.post<MessageResult>('/customers/me/referrals/accept', { referralCode });
+  },
+
+  getFlashSale(): Promise<FlashSaleStatus> {
+    return http.get<FlashSaleStatus>('/customers/me/flash-sale');
+  },
+
+  startFlashSale(): Promise<FlashSaleStatus & { alreadyStarted: boolean }> {
+    return http.post<FlashSaleStatus & { alreadyStarted: boolean }>(
+      '/customers/me/flash-sale/start',
+    );
   },
 };

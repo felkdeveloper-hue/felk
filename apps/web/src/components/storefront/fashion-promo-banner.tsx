@@ -1,5 +1,5 @@
 import { CmsLink } from '@/components/common/cms-link';
-import { Image } from '@/components/media/image';
+import { BlurredBannerImage } from '@/components/media/blurred-banner-image';
 import { cn } from '@/lib/utils';
 
 export interface FashionPromoBannerProps {
@@ -13,13 +13,15 @@ export interface FashionPromoBannerProps {
   imageAlt: string;
   /** Full viewport height (matches hero / editorial) */
   size?: 'full' | 'half';
+  /** `cover` = full-bleed zoom; `contain-blur` = padded contain with blurred fill. */
+  imageMode?: 'cover' | 'contain-blur';
   className?: string;
   imageClassName?: string;
 }
 
 /**
- * Full-bleed fashion tile. Image stays static on hover.
- * SHOP NOW uses a sharp outline; white fills downward on button hover.
+ * Full-bleed fashion tile. Default uses contain + blurred fill; pass `imageMode="cover"`
+ * for zoomed full-bleed panels (e.g. home split banners).
  */
 export function FashionPromoBanner({
   title,
@@ -30,6 +32,7 @@ export function FashionPromoBanner({
   mobileImageSrc,
   imageAlt,
   size = 'half',
+  imageMode = 'contain-blur',
   className,
   imageClassName,
 }: FashionPromoBannerProps) {
@@ -37,20 +40,34 @@ export function FashionPromoBanner({
     <CmsLink
       href={href}
       className={cn(
-        'relative block overflow-hidden',
+        'relative block overflow-hidden bg-zinc-950',
         size === 'full' ? 'min-h-[100svh] w-full' : 'min-h-[70svh] w-full sm:min-h-[85svh]',
         className,
       )}
     >
-      <Image
-        src={imageSrc}
-        sources={
-          mobileImageSrc ? [{ media: '(max-width: 767px)', srcSet: mobileImageSrc }] : undefined
-        }
-        alt={imageAlt}
-        className={cn('absolute inset-0 h-full w-full object-cover', imageClassName)}
-        containerClassName="absolute inset-0"
-      />
+      {imageMode === 'cover' ? (
+        <picture>
+          {mobileImageSrc ? <source media="(max-width: 767px)" srcSet={mobileImageSrc} /> : null}
+          <img
+            src={imageSrc}
+            alt={imageAlt}
+            loading="lazy"
+            decoding="async"
+            className={cn(
+              'absolute inset-0 h-full w-full object-cover transition-transform duration-700 ease-out',
+              imageClassName,
+            )}
+          />
+        </picture>
+      ) : (
+        <BlurredBannerImage
+          src={imageSrc}
+          mobileSrc={mobileImageSrc}
+          alt={imageAlt}
+          objectClass={imageClassName}
+          loading="lazy"
+        />
+      )}
 
       <div
         aria-hidden
@@ -67,7 +84,6 @@ export function FashionPromoBanner({
           {title}
         </h2>
 
-        {/* Pill outline CTA — white slides down from the top on hover */}
         <span
           data-radius="pill"
           className={cn(

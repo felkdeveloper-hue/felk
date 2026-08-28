@@ -132,6 +132,16 @@ export const appConfig = {
       testEventCode: env.META_TEST_EVENT_CODE,
       configured: Boolean(env.META_CAPI_TOKEN && env.META_PIXEL_ID),
     },
+    metaAds: {
+      token: env.META_ADS_ACCESS_TOKEN || env.META_CAPI_TOKEN,
+      adAccountId: env.META_AD_ACCOUNT_ID,
+      syncLookbackDays: env.META_ADS_SYNC_LOOKBACK_DAYS,
+      syncIntervalHours: env.META_ADS_SYNC_INTERVAL_HOURS,
+      configured: Boolean(
+        (env.META_ADS_ACCESS_TOKEN || env.META_CAPI_TOKEN) && env.META_AD_ACCOUNT_ID,
+      ),
+    },
+    botFilter: env.ANALYTICS_BOT_FILTER,
     tiktok: {
       pixelId: env.TIKTOK_PIXEL_ID,
       accessToken: env.TIKTOK_ACCESS_TOKEN,

@@ -80,7 +80,7 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
         permissions: [PERMISSIONS.ANALYTICS_VIEW],
       },
       {
-        label: 'Traffic',
+        label: 'Traffic & Ads',
         to: ADMIN_ROUTES.analyticsTraffic,
         icon: BarChart3,
         permissions: [PERMISSIONS.ANALYTICS_VIEW],

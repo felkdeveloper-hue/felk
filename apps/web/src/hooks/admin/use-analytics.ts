@@ -20,6 +20,8 @@ export const analyticsKeys = {
   devices: (f: AnalyticsFilter) => ['analytics', 'devices', f] as const,
   geo: (f: AnalyticsFilter) => ['analytics', 'geo', f] as const,
   traffic: (f: AnalyticsFilter) => ['analytics', 'traffic', f] as const,
+  metaAds: (f: AnalyticsFilter) => ['analytics', 'meta-ads', f] as const,
+  adsReconcile: (f: AnalyticsFilter) => ['analytics', 'ads-reconcile', f] as const,
   products: (f: AnalyticsFilter) => ['analytics', 'products', f] as const,
   productInterest: (id: string, f: AnalyticsFilter) =>
     ['analytics', 'product-interest', id, f] as const,
@@ -127,6 +129,23 @@ export function useTrafficSources(filter: AnalyticsFilter = {}) {
     queryFn: () => adminAnalyticsApi.getTrafficSources(filter),
     staleTime: STALE_TIME,
     refetchInterval: POLL_INTERVAL,
+  });
+}
+
+export function useMetaAdsPerformance(filter: AnalyticsFilter = {}) {
+  return useQuery({
+    queryKey: analyticsKeys.metaAds(filter),
+    queryFn: () => adminAnalyticsApi.getMetaAdsPerformance(filter),
+    staleTime: STALE_TIME,
+    refetchInterval: POLL_INTERVAL,
+  });
+}
+
+export function useAdsReconciliation(filter: AnalyticsFilter = {}) {
+  return useQuery({
+    queryKey: analyticsKeys.adsReconcile(filter),
+    queryFn: () => adminAnalyticsApi.getAdsReconciliation(filter),
+    staleTime: STALE_TIME,
   });
 }
 

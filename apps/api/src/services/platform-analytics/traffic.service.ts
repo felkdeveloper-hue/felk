@@ -1,27 +1,47 @@
-import { VisitorModel } from '@/models/analytics/index.js';
+import { VisitorModel, SessionModel, PageViewModel } from '@/models/analytics/index.js';
 import { UserModel } from '@/models/user.model.js';
 import type { AnalyticsFilter } from '@/schemas/analytics/index.js';
 import { buildVisitorMatch, resolveDateRange, type MongoMatch } from './analytics-query.builder.js';
 import { formatAttribution } from './source-attribution.util.js';
+import { ANALYTICS_TIMEZONE } from './date-range.util.js';
 
 type SourceRow = {
   source: string;
   label: string;
   channel: string;
-  keys: Set<string>;
+  /** Unique visitor keys (v:/ip:/u:) */
+  visitorKeys: Set<string>;
+  visitorIds: Set<string>;
+};
+
+export type TrafficSourceResult = {
+  source: string;
+  label: string;
+  channel: string;
+  /** @deprecated Prefer uniqueVisitors — kept for backward-compatible dashboards/widgets. */
+  count: number;
+  /** Unique browsers (or unique IPs for Direct). First-party tracking only. */
+  uniqueVisitors: number;
+  /** Sessions attributed to visitors in this source for the period. */
+  visits: number;
+  /** Page views from those visitors in the period. */
+  pageViews: number;
+  pct: number;
+  metric: 'website_unique_visitors';
 };
 
 /**
- * Traffic sources for the selected period — visitor-based (same model as production).
+ * Traffic sources for the selected period — first-party website tracking only.
  *
- * - Counts landings / active visitors, whether or not they create an account.
+ * These numbers are NOT Meta Reach / Impressions / Ad Manager metrics.
+ *
  * - Ads / social / search: unique browsers (visitorId).
  * - Direct: unique IPs.
  * - Also includes registered/guest users whose saved acquisition source falls
  *   in the period (lastLoginAt), so Users-row sources are not missing from
  *   Sources when their visitor row was mis-labeled Direct.
  */
-export async function getTrafficSources(filter: AnalyticsFilter) {
+export async function getTrafficSources(filter: AnalyticsFilter): Promise<TrafficSourceResult[]> {
   const range = resolveDateRange(filter);
   const base = await buildVisitorMatch(filter, range);
   const {
@@ -59,6 +79,7 @@ export async function getTrafficSources(filter: AnalyticsFilter) {
       hasTtclid: boolean;
     };
     uniqueKeys: string[];
+    visitorIds: string[];
   }>([
     { $match: match },
     {
@@ -97,6 +118,7 @@ export async function getTrafficSources(filter: AnalyticsFilter) {
             ],
           },
         },
+        visitorIds: { $addToSet: '$visitorId' },
       },
     },
   ]);
@@ -117,13 +139,15 @@ export async function getTrafficSources(filter: AnalyticsFilter) {
     });
     const existing = merged.get(attribution.label);
     if (existing) {
-      for (const key of row.uniqueKeys) existing.keys.add(key);
+      for (const key of row.uniqueKeys) existing.visitorKeys.add(key);
+      for (const id of row.visitorIds) existing.visitorIds.add(id);
     } else {
       merged.set(attribution.label, {
         source: row._id.trafficSource || 'direct',
         label: attribution.label,
         channel: attribution.channel,
-        keys: new Set(row.uniqueKeys),
+        visitorKeys: new Set(row.uniqueKeys),
+        visitorIds: new Set(row.visitorIds),
       });
     }
   }
@@ -156,32 +180,83 @@ export async function getTrafficSources(filter: AnalyticsFilter) {
     const key = acq?.visitorId ? `v:${acq.visitorId}` : `u:${String(user._id)}`;
     const existing = merged.get(label);
     if (existing) {
-      // Prefer non-direct: if this IP was only in Direct, still add user key here.
-      existing.keys.add(key);
+      existing.visitorKeys.add(key);
+      if (acq?.visitorId) existing.visitorIds.add(acq.visitorId);
     } else {
       merged.set(label, {
         source: acq?.trafficSource || 'paid_social',
         label,
         channel: acq?.sourceChannel || '',
-        keys: new Set([key]),
+        visitorKeys: new Set([key]),
+        visitorIds: new Set(acq?.visitorId ? [acq.visitorId] : []),
       });
     }
   }
 
-  const ranked = [...merged.values()]
-    .map((row) => ({
-      source: row.source,
-      label: row.label,
-      channel: row.channel,
-      count: row.keys.size,
-    }))
-    .filter((row) => row.count > 0)
-    .sort((a, b) => b.count - a.count);
+  const allVisitorIds = [...new Set([...merged.values()].flatMap((r) => [...r.visitorIds]))];
 
-  const total = ranked.reduce((sum, row) => sum + row.count, 0);
+  const sessionCounts = new Map<string, number>();
+  const pageViewCounts = new Map<string, number>();
+
+  if (allVisitorIds.length) {
+    const [sessions, pageViews] = await Promise.all([
+      SessionModel.aggregate<{ _id: string; count: number }>([
+        {
+          $match: {
+            visitorId: { $in: allVisitorIds },
+            startedAt: { $gte: range.from, $lte: range.to },
+          },
+        },
+        { $group: { _id: '$visitorId', count: { $sum: 1 } } },
+      ]),
+      PageViewModel.aggregate<{ _id: string; count: number }>([
+        {
+          $match: {
+            visitorId: { $in: allVisitorIds },
+            viewedAt: { $gte: range.from, $lte: range.to },
+          },
+        },
+        { $group: { _id: '$visitorId', count: { $sum: 1 } } },
+      ]),
+    ]);
+    for (const s of sessions) sessionCounts.set(s._id, s.count);
+    for (const p of pageViews) pageViewCounts.set(p._id, p.count);
+  }
+
+  const ranked = [...merged.values()]
+    .map((row) => {
+      let visits = 0;
+      let pageViews = 0;
+      for (const vid of row.visitorIds) {
+        visits += sessionCounts.get(vid) ?? 0;
+        pageViews += pageViewCounts.get(vid) ?? 0;
+      }
+      // Fallback: if we have unique visitors but no session docs yet, treat unique as visits.
+      const uniqueVisitors = row.visitorKeys.size;
+      if (visits === 0 && uniqueVisitors > 0) visits = uniqueVisitors;
+
+      return {
+        source: row.source,
+        label: row.label,
+        channel: row.channel,
+        uniqueVisitors,
+        visits,
+        pageViews,
+        count: uniqueVisitors,
+        metric: 'website_unique_visitors' as const,
+      };
+    })
+    .filter((row) => row.uniqueVisitors > 0)
+    .sort((a, b) => b.uniqueVisitors - a.uniqueVisitors);
+
+  const total = ranked.reduce((sum, row) => sum + row.uniqueVisitors, 0);
 
   return ranked.map((row) => ({
     ...row,
-    pct: total > 0 ? Math.round((row.count / total) * 1000) / 10 : 0,
+    pct: total > 0 ? Math.round((row.uniqueVisitors / total) * 1000) / 10 : 0,
   }));
+}
+
+export function getTrafficTimezone(): string {
+  return ANALYTICS_TIMEZONE;
 }

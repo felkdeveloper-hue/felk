@@ -10,6 +10,8 @@ import { Image } from '@/components/media/image';
 import { QuantitySelector } from '@/components/cart/quantity-selector';
 import { productMetaFrom, trackCommerceEvent } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
+import { useAuthStore } from '@/store';
+import { useFlashSale } from '@/contexts/flash-sale-context';
 
 function lineMeta(item: CartLineItem) {
   return productMetaFrom(
@@ -38,9 +40,15 @@ export interface CartItemRowProps {
 export function CartItemRow({ item, compact, validationMessage, className }: CartItemRowProps) {
   const updateMutation = useUpdateCartItemMutation();
   const removeMutation = useRemoveCartItemMutation();
+  const isAuthed = useAuthStore((state) => Boolean(state.accessToken && state.user));
+  const { isFlashSaleActive } = useFlashSale();
 
   const displayPrice = item.salePrice ?? item.unitPrice;
   const currency = item.currency ?? 'LKR';
+
+  // Flash sale: 20% off for logged-in users with active sale only
+  const flashUnitPrice = isAuthed && isFlashSaleActive ? Math.round(displayPrice * 0.8) : null;
+  const flashTotalPrice = flashUnitPrice !== null ? flashUnitPrice * item.quantity : null;
 
   return (
     <motion.article
@@ -180,10 +188,30 @@ export function CartItemRow({ item, compact, validationMessage, className }: Car
           />
 
           <div className="text-right">
-            <p className="text-sm font-medium">{formatCurrency(item.totalPrice, currency)}</p>
-            <p className="text-muted-foreground text-xs">
-              {formatCurrency(displayPrice, currency)} each
-            </p>
+            {flashTotalPrice !== null ? (
+              <>
+                <p className="text-muted-foreground text-xs line-through">
+                  {formatCurrency(item.totalPrice, currency)}
+                </p>
+                <p className="text-sm font-bold" style={{ color: '#f97316' }}>
+                  {formatCurrency(flashTotalPrice, currency)}
+                </p>
+                <p className="text-muted-foreground text-xs">
+                  <span className="line-through">{formatCurrency(displayPrice, currency)}</span>{' '}
+                  <span style={{ color: '#f97316' }}>
+                    {formatCurrency(flashUnitPrice!, currency)}
+                  </span>{' '}
+                  each
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-medium">{formatCurrency(item.totalPrice, currency)}</p>
+                <p className="text-muted-foreground text-xs">
+                  {formatCurrency(displayPrice, currency)} each
+                </p>
+              </>
+            )}
           </div>
         </div>
 
