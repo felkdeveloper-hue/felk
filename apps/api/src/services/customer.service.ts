@@ -12,6 +12,7 @@ import { ApiError } from '@/utils/errors/api-error.js';
 import { buildPaginationMeta, getPaginationSkip, parsePagination } from '@/utils/pagination.js';
 import { parseSort } from '@/utils/sorting.js';
 import { CUSTOMER_AUDIT, CUSTOMER_STATUS, LOYALTY_TIER } from '@/constants/customer.js';
+import { FLASH_SALE_DISCOUNT } from '@/constants/checkout.js';
 import type { AuthenticatedUser } from '@/types/index.js';
 
 function toPlain(doc: { toObject: () => Record<string, unknown> }) {
@@ -428,6 +429,43 @@ export class CustomerService {
     return this.buildFlashSaleStatus(now);
   }
 
+  /**
+   * One-time return bonus: only customers with metadata.returnFlashSaleBonusPending
+   * get extra minutes on their next flash-sale status check (site visit while signed in).
+   * Extends an active window, or restores a short window if already expired.
+   */
+  async applyReturnFlashSaleBonusIfPending(customer: {
+    _id: { toString(): string };
+    flashSaleStartTime?: Date | null;
+    metadata?: Record<string, unknown> | null;
+    updateOne: (update: Record<string, unknown>) => Promise<unknown>;
+  }) {
+    if (customer.metadata?.returnFlashSaleBonusPending !== true) {
+      return { applied: false as const, startTime: customer.flashSaleStartTime ?? null };
+    }
+
+    const durationMs = FLASH_SALE_DISCOUNT.DURATION_MS;
+    const rawBonus = Number(customer.metadata?.returnFlashSaleBonusMs);
+    const bonusMs = Number.isFinite(rawBonus) && rawBonus > 0 ? rawBonus : 15 * 60 * 1000;
+    const now = Date.now();
+    const priorStart = customer.flashSaleStartTime
+      ? new Date(customer.flashSaleStartTime).getTime()
+      : null;
+    const stillActive = priorStart != null && now - priorStart < durationMs;
+
+    const nextStart = stillActive
+      ? new Date(priorStart! - bonusMs)
+      : new Date(now - (durationMs - bonusMs));
+
+    await customer.updateOne({
+      flashSaleStartTime: nextStart,
+      'metadata.returnFlashSaleBonusPending': false,
+      'metadata.returnFlashSaleBonusAppliedAt': new Date().toISOString(),
+    });
+
+    return { applied: true as const, startTime: nextStart };
+  }
+
   /** Admin: grant flash sale to many customers at once. */
   async grantFlashSaleBulk(customerIds: string[], actor?: ActorMeta) {
     const uniqueIds = [...new Set(customerIds.map(String))].filter(Boolean);
@@ -464,11 +502,11 @@ export class CustomerService {
   }
 
   buildFlashSaleStatus(startTime: Date) {
-    const FLASH_SALE_DURATION_MS = 60 * 60 * 1000;
+    const durationMs = FLASH_SALE_DISCOUNT.DURATION_MS;
     return {
       flashSaleStartTime: startTime.toISOString(),
       isActive: true,
-      expiresAt: new Date(startTime.getTime() + FLASH_SALE_DURATION_MS).toISOString(),
+      expiresAt: new Date(startTime.getTime() + durationMs).toISOString(),
     };
   }
 }

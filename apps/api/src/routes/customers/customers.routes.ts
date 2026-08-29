@@ -1,5 +1,6 @@
 import { Router, type Request } from 'express';
 import { PERMISSIONS } from '@/constants/permissions.js';
+import { FLASH_SALE_DISCOUNT } from '@/constants/checkout.js';
 import { authenticate, authorizeAny, validate } from '@/middlewares/index.js';
 import { actorFromRequest } from '@/services/cms-crud.service.js';
 import { customerService } from '@/services/customer.service.js';
@@ -348,17 +349,18 @@ customersRouter.get(
   authorizeAny(...selfAccount),
   asyncHandler(async (req, res) => {
     const customer = await resolveMeCustomer(req);
-    const startTime = customer.flashSaleStartTime ?? null;
-    const FLASH_SALE_DURATION_MS = 60 * 60 * 1000; // 1 hour
-    const isActive =
-      startTime != null && Date.now() - new Date(startTime).getTime() < FLASH_SALE_DURATION_MS;
+    const bonus = await customerService.applyReturnFlashSaleBonusIfPending(customer);
+    const startTime = bonus.startTime;
+    const durationMs = FLASH_SALE_DISCOUNT.DURATION_MS;
+    const isActive = startTime != null && Date.now() - new Date(startTime).getTime() < durationMs;
     ApiResponse.success(res, {
       flashSaleStartTime: startTime ? new Date(startTime).toISOString() : null,
       isActive,
       expiresAt: startTime
-        ? new Date(new Date(startTime).getTime() + FLASH_SALE_DURATION_MS).toISOString()
+        ? new Date(new Date(startTime).getTime() + durationMs).toISOString()
         : null,
       apologyFlashSalePending: customer.metadata?.apologyFlashSalePending === true,
+      returnBonusApplied: bonus.applied,
     });
   }),
 );
@@ -368,7 +370,7 @@ customersRouter.post(
   authorizeAny(...selfAccount),
   asyncHandler(async (req, res) => {
     const customer = await resolveMeCustomer(req);
-    const FLASH_SALE_DURATION_MS = 60 * 60 * 1000;
+    const durationMs = FLASH_SALE_DISCOUNT.DURATION_MS;
     const apologyPending = customer.metadata?.apologyFlashSalePending === true;
 
     if (apologyPending) {
@@ -380,21 +382,33 @@ customersRouter.post(
       ApiResponse.success(res, {
         flashSaleStartTime: now.toISOString(),
         isActive: true,
-        expiresAt: new Date(now.getTime() + FLASH_SALE_DURATION_MS).toISOString(),
+        expiresAt: new Date(now.getTime() + durationMs).toISOString(),
         alreadyStarted: false,
         apologyRedeemed: true,
       });
       return;
     }
 
+    // Apply a pending one-time return bonus before returning current status.
+    const bonus = await customerService.applyReturnFlashSaleBonusIfPending(customer);
+    if (bonus.applied && bonus.startTime) {
+      ApiResponse.success(res, {
+        flashSaleStartTime: new Date(bonus.startTime).toISOString(),
+        isActive: true,
+        expiresAt: new Date(bonus.startTime.getTime() + durationMs).toISOString(),
+        alreadyStarted: true,
+        returnBonusApplied: true,
+      });
+      return;
+    }
+
     if (customer.flashSaleStartTime) {
-      const isActive =
-        Date.now() - new Date(customer.flashSaleStartTime).getTime() < FLASH_SALE_DURATION_MS;
+      const isActive = Date.now() - new Date(customer.flashSaleStartTime).getTime() < durationMs;
       ApiResponse.success(res, {
         flashSaleStartTime: new Date(customer.flashSaleStartTime).toISOString(),
         isActive,
         expiresAt: new Date(
-          new Date(customer.flashSaleStartTime).getTime() + FLASH_SALE_DURATION_MS,
+          new Date(customer.flashSaleStartTime).getTime() + durationMs,
         ).toISOString(),
         alreadyStarted: true,
       });
@@ -405,7 +419,7 @@ customersRouter.post(
     ApiResponse.success(res, {
       flashSaleStartTime: now.toISOString(),
       isActive: true,
-      expiresAt: new Date(now.getTime() + FLASH_SALE_DURATION_MS).toISOString(),
+      expiresAt: new Date(now.getTime() + durationMs).toISOString(),
       alreadyStarted: false,
     });
   }),
