@@ -32,3 +32,4 @@ export {
   type AnalyticsProvider,
   type AnalyticsEventStatus,
 } from './analytics.model.js';
+export { NotificationModel, type NotificationDocument } from './notification.model.js';

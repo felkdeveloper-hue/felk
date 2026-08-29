@@ -104,6 +104,26 @@ export interface FlashSaleStatus {
   flashSaleStartTime: string | null;
   isActive: boolean;
   expiresAt: string | null;
+  apologyFlashSalePending?: boolean;
+}
+
+export type CustomerNotificationSeverity = 'info' | 'success' | 'warning' | 'error';
+
+export interface CustomerNotification {
+  id: string;
+  title: string;
+  message: string;
+  severity: CustomerNotificationSeverity;
+  linkUrl?: string | null;
+  linkLabel?: string | null;
+  isRead: boolean;
+  readAt?: string | null;
+  createdAt: string;
+}
+
+export interface CustomerNotificationsResponse {
+  notifications: CustomerNotification[];
+  unreadCount: number;
 }
 
 export interface ReferralSummary {
@@ -288,5 +308,17 @@ export const customersApi = {
     return http.post<FlashSaleStatus & { alreadyStarted: boolean }>(
       '/customers/me/flash-sale/start',
     );
+  },
+
+  getNotifications(): Promise<CustomerNotificationsResponse> {
+    return http.get<CustomerNotificationsResponse>('/customers/me/notifications');
+  },
+
+  markNotificationRead(notificationId: string): Promise<CustomerNotification> {
+    return http.patch<CustomerNotification>(`/customers/me/notifications/${notificationId}/read`);
+  },
+
+  markAllNotificationsRead(): Promise<{ modifiedCount: number }> {
+    return http.patch<{ modifiedCount: number }>('/customers/me/notifications/read-all');
   },
 };

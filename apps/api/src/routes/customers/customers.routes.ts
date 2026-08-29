@@ -8,6 +8,7 @@ import { wishlistService } from '@/services/wishlist.service.js';
 import { recentlyViewedService, savedItemService } from '@/services/recently-viewed.service.js';
 import { rewardService, referralService } from '@/services/reward.service.js';
 import { customerNoteService, customerTagService } from '@/services/customer-notes-tags.service.js';
+import { notificationService } from '@/services/notification.service.js';
 import { asyncHandler } from '@/utils/async-handler.js';
 import { ApiResponse } from '@/utils/response/api-response.js';
 import { ApiError } from '@/utils/errors/api-error.js';
@@ -357,6 +358,7 @@ customersRouter.get(
       expiresAt: startTime
         ? new Date(new Date(startTime).getTime() + FLASH_SALE_DURATION_MS).toISOString()
         : null,
+      apologyFlashSalePending: customer.metadata?.apologyFlashSalePending === true,
     });
   }),
 );
@@ -366,8 +368,26 @@ customersRouter.post(
   authorizeAny(...selfAccount),
   asyncHandler(async (req, res) => {
     const customer = await resolveMeCustomer(req);
+    const FLASH_SALE_DURATION_MS = 60 * 60 * 1000;
+    const apologyPending = customer.metadata?.apologyFlashSalePending === true;
+
+    if (apologyPending) {
+      const now = new Date();
+      await customer.updateOne({
+        flashSaleStartTime: now,
+        'metadata.apologyFlashSalePending': false,
+      });
+      ApiResponse.success(res, {
+        flashSaleStartTime: now.toISOString(),
+        isActive: true,
+        expiresAt: new Date(now.getTime() + FLASH_SALE_DURATION_MS).toISOString(),
+        alreadyStarted: false,
+        apologyRedeemed: true,
+      });
+      return;
+    }
+
     if (customer.flashSaleStartTime) {
-      const FLASH_SALE_DURATION_MS = 60 * 60 * 1000;
       const isActive =
         Date.now() - new Date(customer.flashSaleStartTime).getTime() < FLASH_SALE_DURATION_MS;
       ApiResponse.success(res, {
@@ -382,13 +402,51 @@ customersRouter.post(
     }
     const now = new Date();
     await customer.updateOne({ flashSaleStartTime: now });
-    const FLASH_SALE_DURATION_MS = 60 * 60 * 1000;
     ApiResponse.success(res, {
       flashSaleStartTime: now.toISOString(),
       isActive: true,
       expiresAt: new Date(now.getTime() + FLASH_SALE_DURATION_MS).toISOString(),
       alreadyStarted: false,
     });
+  }),
+);
+
+/* Notifications — me */
+customersRouter.get(
+  '/me/notifications',
+  authorizeAny(...selfAccount),
+  asyncHandler(async (req, res) => {
+    if (!req.user) throw ApiError.unauthorized();
+    const notifications = await notificationService.listForUser(req.user.id);
+    const unreadCount = await notificationService.unreadCount(req.user.id);
+    ApiResponse.success(res, { notifications, unreadCount });
+  }),
+);
+
+customersRouter.patch(
+  '/me/notifications/read-all',
+  authorizeAny(...selfAccount),
+  asyncHandler(async (req, res) => {
+    if (!req.user) throw ApiError.unauthorized();
+    ApiResponse.success(
+      res,
+      await notificationService.markAllRead(req.user.id),
+      'All notifications marked as read',
+    );
+  }),
+);
+
+customersRouter.patch(
+  '/me/notifications/:notificationId/read',
+  authorizeAny(...selfAccount),
+  validate({ params: z.object({ notificationId: z.string().min(1) }) }),
+  asyncHandler(async (req, res) => {
+    if (!req.user) throw ApiError.unauthorized();
+    ApiResponse.success(
+      res,
+      await notificationService.markRead(req.user.id, String(req.params.notificationId)),
+      'Notification marked as read',
+    );
   }),
 );
 

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link } from '@tanstack/react-router';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bell } from 'lucide-react';
 import { useFlashSale } from '@/contexts/flash-sale-context';
 import { useAuthStore } from '@/store/auth-store';
@@ -10,6 +11,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ROUTES } from '@/constants/routes';
+import { QUERY_KEYS } from '@/constants/query-keys';
+import { customersApi, type CustomerNotification } from '@/services/sdk/customers';
 import { cn } from '@/lib/utils';
 
 interface NotificationBellProps {
@@ -17,12 +20,116 @@ interface NotificationBellProps {
   className?: string;
 }
 
+function severityStyles(severity: CustomerNotification['severity']) {
+  switch (severity) {
+    case 'warning':
+      return {
+        bg: 'linear-gradient(135deg, #fff7ed 0%, #fff0dc 50%, #fff7ed 100%)',
+        icon: '🙏',
+        title: 'text-orange-900',
+        body: 'text-orange-700',
+      };
+    case 'success':
+      return {
+        bg: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 50%, #ecfdf5 100%)',
+        icon: '✅',
+        title: 'text-emerald-900',
+        body: 'text-emerald-700',
+      };
+    case 'error':
+      return {
+        bg: 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 50%, #fef2f2 100%)',
+        icon: '⚠️',
+        title: 'text-red-900',
+        body: 'text-red-700',
+      };
+    default:
+      return {
+        bg: 'linear-gradient(135deg, #f8fafc 0%, #eef2ff 50%, #f8fafc 100%)',
+        icon: '🔔',
+        title: 'text-slate-900',
+        body: 'text-slate-700',
+      };
+  }
+}
+
+function ServerNotificationCard({
+  notification,
+  onRead,
+}: {
+  notification: CustomerNotification;
+  onRead: () => void;
+}) {
+  const styles = severityStyles(notification.severity);
+
+  return (
+    <div className="border-b p-4 last:border-b-0" style={{ background: styles.bg }}>
+      <div className="flex items-start gap-3">
+        <div
+          className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-full text-xl"
+          style={{
+            background: 'linear-gradient(135deg, #ff4500, #ff8c00)',
+            boxShadow: '0 2px 12px rgba(255,80,0,0.25)',
+          }}
+        >
+          {styles.icon}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className={cn('mb-0.5 text-sm font-bold', styles.title)}>{notification.title}</div>
+          <p className={cn('mb-2 text-xs leading-relaxed', styles.body)}>{notification.message}</p>
+          {notification.linkUrl ? (
+            <a
+              href={notification.linkUrl}
+              onClick={onRead}
+              className="inline-block rounded-lg px-3 py-1.5 text-xs font-bold text-white transition-all hover:scale-105"
+              style={{
+                background: 'linear-gradient(135deg, #ff4500, #ff8c00)',
+                boxShadow: '0 2px 10px rgba(255,80,0,0.4)',
+              }}
+            >
+              {notification.linkLabel ?? 'View'}
+            </a>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function NotificationBell({ lightChrome, className }: NotificationBellProps) {
   const isAuthenticated = useAuthStore((state) => Boolean(state.accessToken && state.user));
   const { isFlashSaleActive, formattedTime, timeRemaining } = useFlashSale();
+  const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
 
-  const hasNotification = !isAuthenticated || isFlashSaleActive;
+  const { data: notificationData } = useQuery({
+    queryKey: QUERY_KEYS.customers.notifications(),
+    queryFn: () => customersApi.getNotifications(),
+    enabled: isAuthenticated,
+    staleTime: 1000 * 60,
+    refetchOnWindowFocus: false,
+  });
+
+  const markReadMutation = useMutation({
+    mutationFn: (notificationId: string) => customersApi.markNotificationRead(notificationId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.customers.notifications() });
+    },
+  });
+
+  const markAllReadMutation = useMutation({
+    mutationFn: () => customersApi.markAllNotificationsRead(),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.customers.notifications() });
+    },
+  });
+
+  const serverNotifications = notificationData?.notifications ?? [];
+  const unreadServerCount = notificationData?.unreadCount ?? 0;
+  const flashSaleUnread = isAuthenticated && isFlashSaleActive ? 1 : 0;
+  const guestPromo = !isAuthenticated ? 1 : 0;
+  const totalBadgeCount = unreadServerCount + flashSaleUnread + guestPromo;
+  const hasNotification = totalBadgeCount > 0;
 
   const iconBtn = cn(
     'relative size-11 shrink-0 [&_svg]:size-[1.15rem] [&_svg]:stroke-[1.35]',
@@ -32,8 +139,15 @@ export function NotificationBell({ lightChrome, className }: NotificationBellPro
     className,
   );
 
+  const handleOpenChange = (nextOpen: boolean) => {
+    setOpen(nextOpen);
+    if (nextOpen && isAuthenticated && unreadServerCount > 0) {
+      markAllReadMutation.mutate();
+    }
+  };
+
   return (
-    <DropdownMenu open={open} onOpenChange={setOpen}>
+    <DropdownMenu open={open} onOpenChange={handleOpenChange}>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon" aria-label="Notifications" className={iconBtn}>
           <Bell />
@@ -62,19 +176,28 @@ export function NotificationBell({ lightChrome, className }: NotificationBellPro
         className="w-80 overflow-hidden rounded-xl border-0 p-0 shadow-[0_8px_40px_rgba(0,0,0,0.15)]"
         sideOffset={8}
       >
-        {/* Header */}
         <div className="flex items-center justify-between border-b px-4 py-3">
           <span className="text-sm font-semibold">Notifications</span>
           {hasNotification && (
             <span className="rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-bold text-white">
-              1
+              {totalBadgeCount}
             </span>
           )}
         </div>
 
-        {/* Content */}
+        {serverNotifications.map((notification) => (
+          <ServerNotificationCard
+            key={notification.id}
+            notification={notification}
+            onRead={() => {
+              if (!notification.isRead) {
+                markReadMutation.mutate(notification.id);
+              }
+            }}
+          />
+        ))}
+
         {isFlashSaleActive ? (
-          /* Signed in + active flash sale */
           <div
             className="p-4"
             style={{
@@ -104,7 +227,6 @@ export function NotificationBell({ lightChrome, className }: NotificationBellPro
                   </span>
                   !
                 </p>
-                {/* Progress bar */}
                 <div className="mb-2 h-1.5 w-full overflow-hidden rounded-full bg-orange-200">
                   <div
                     className="h-full rounded-full"
@@ -130,7 +252,6 @@ export function NotificationBell({ lightChrome, className }: NotificationBellPro
             </div>
           </div>
         ) : !isAuthenticated ? (
-          /* Guest / visitor */
           <div
             className="p-4"
             style={{
@@ -179,13 +300,12 @@ export function NotificationBell({ lightChrome, className }: NotificationBellPro
               </div>
             </div>
           </div>
-        ) : (
-          /* Signed in, no active flash sale */
+        ) : serverNotifications.length === 0 ? (
           <div className="flex flex-col items-center justify-center px-4 py-8 text-center">
             <Bell className="text-muted-foreground/40 mb-2 size-8" />
             <p className="text-muted-foreground text-sm">No new notifications</p>
           </div>
-        )}
+        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );

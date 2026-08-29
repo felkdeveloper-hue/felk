@@ -15,6 +15,7 @@
     "seed:home-categories": "tsx src/scripts/seed-home-categories.ts",
     "seed:r2-shoe": "tsx src/scripts/seed-r2-shoe-product.ts",
     "seed:filters": "tsx src/scripts/seed-filter-options.ts",
+    "campaign:aug28": "tsx src/scripts/send-aug28-campaign.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint . --max-warnings 100",
     "lint:fix": "eslint . --fix",

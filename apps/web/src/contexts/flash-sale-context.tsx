@@ -126,12 +126,15 @@ export function FlashSaleProvider({ children }: FlashSaleProviderProps) {
   });
 
   // Start flash sale when user first logs in (no existing flashSaleStartTime)
+  // or when an apology credit is pending from the checkout bug campaign.
   useEffect(() => {
     if (!isAuthenticated || isLoading) return;
     if (flashSaleData === undefined) return;
 
-    if (!flashSaleData.flashSaleStartTime) {
-      // First login — initiate the flash sale
+    const shouldStartFresh =
+      !flashSaleData.flashSaleStartTime || flashSaleData.apologyFlashSalePending === true;
+
+    if (shouldStartFresh) {
       startFlashSaleMutation.mutate();
     } else if (flashSaleData.isActive) {
       // Returning visit with active sale — show popup once per session if not dismissed
