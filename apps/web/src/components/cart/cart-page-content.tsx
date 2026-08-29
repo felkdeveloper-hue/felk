@@ -4,12 +4,11 @@ import { AnimatePresence } from 'framer-motion';
 import { useQueryClient } from '@tanstack/react-query';
 import { QUERY_KEYS, ROUTES } from '@/constants';
 import { useCartQuery } from '@/hooks/cart';
-import { useStartCheckoutMutation } from '@/hooks/checkout';
 import { useAuthStore, useCheckoutStore } from '@/store';
 import { AppError } from '@/lib/errors';
 import { consumePaymentFailedFlag, trackCommerceEvent } from '@/lib/analytics';
 import { formatCurrency } from '@/utils';
-import { customersApi, type CustomerAddress } from '@/services/sdk';
+import { customersApi } from '@/services/sdk';
 import { isGuestCheckoutUser } from '@/utils/auth/guest-checkout';
 import { isStaffUser } from '@/utils/auth-redirect';
 import { previewShippingAmount } from '@/constants/checkout.constants';
@@ -23,7 +22,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useFlashSale } from '@/contexts/flash-sale-context';
 import { useCategorySlugLookup } from '@/hooks/use-flash-sale-eligibility';
 import { computeFlashAdjustedSubtotal, computeFlashSaving } from '@/utils/flash-sale-eligibility';
-import { useCartStore } from '@/store/cart-store';
 
 function getIssueForItem(
   itemId: string,
@@ -54,7 +52,6 @@ export function CartPageContent() {
   const navigate = useNavigate();
   const cartQuery = useCartQuery();
   const queryClient = useQueryClient();
-  const startCheckout = useStartCheckoutMutation();
   const hasHydrated = useAuthStore((state) => state.hasHydrated);
   const authUser = useAuthStore((state) => state.user);
   const isAuthed = useAuthStore((state) => Boolean(state.accessToken && state.user));
@@ -68,41 +65,9 @@ export function CartPageContent() {
   const validation = cart?.validation;
   const checkoutBlocked = cart ? cartHasBlockingStockIssues(cart) : false;
 
-  /** Kick off /checkout/start while navigating so step 1 is ready faster. */
   const goToCheckout = () => {
     useCheckoutStore.getState().resetCheckoutUi();
     queryClient.removeQueries({ queryKey: ['checkout'] });
-
-    const liveCart = useCartStore.getState().cart ?? cart;
-    if (isAuthed && !isGuestCheckout && liveCart?.items?.length) {
-      const cachedAddresses = queryClient.getQueryData<CustomerAddress[]>(
-        QUERY_KEYS.customers.addresses(),
-      );
-      const defaultShipping = cachedAddresses?.find((address) => address.isDefaultShipping);
-      const buyNowItems = useCheckoutStore.getState().buyNowItems;
-      const cartLineItems = liveCart.items
-        .filter((item) => Boolean(item.variantId))
-        .map((item) => ({
-          variantId: String(item.variantId),
-          quantity: item.quantity,
-        }));
-      useCheckoutStore.getState().setPrimingCheckout(true);
-      startCheckout.mutate(
-        {
-          shippingAddressId: defaultShipping?.id,
-          autoReserve: false,
-          ...(buyNowItems?.length
-            ? { items: buyNowItems }
-            : cartLineItems.length
-              ? { items: cartLineItems }
-              : {}),
-        },
-        {
-          onSettled: () => useCheckoutStore.getState().setPrimingCheckout(false),
-        },
-      );
-    }
-
     void navigate({ to: ROUTES.checkout });
   };
 

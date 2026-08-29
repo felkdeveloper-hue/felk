@@ -16,8 +16,6 @@ interface CheckoutState {
   selectedShippingMethod: ShippingMethod;
   selectedPaymentMethod: PaymentMethod | null;
   isRedirectingToGateway: boolean;
-  /** Cart primed /checkout/start while navigating — skip duplicate bootstrap. */
-  isPrimingCheckout: boolean;
 }
 
 interface CheckoutActions {
@@ -29,7 +27,6 @@ interface CheckoutActions {
   setSelectedShippingMethod: (method: ShippingMethod) => void;
   setSelectedPaymentMethod: (method: PaymentMethod | null) => void;
   setRedirectingToGateway: (value: boolean) => void;
-  setPrimingCheckout: (value: boolean) => void;
   resetCheckoutUi: () => void;
 }
 
@@ -44,7 +41,6 @@ const initialState: CheckoutState = {
   selectedShippingMethod: 'standard',
   selectedPaymentMethod: null,
   isRedirectingToGateway: false,
-  isPrimingCheckout: false,
 };
 
 export const useCheckoutStore = create<CheckoutStore>()(
@@ -68,8 +64,6 @@ export const useCheckoutStore = create<CheckoutStore>()(
       setSelectedPaymentMethod: (selectedPaymentMethod) => set({ selectedPaymentMethod }),
 
       setRedirectingToGateway: (isRedirectingToGateway) => set({ isRedirectingToGateway }),
-
-      setPrimingCheckout: (isPrimingCheckout) => set({ isPrimingCheckout }),
 
       resetCheckoutUi: () => set({ ...initialState }),
     }),

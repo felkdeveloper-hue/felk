@@ -58,7 +58,6 @@ export function CheckoutInformationPage() {
   const shippingAddressId = useCheckoutStore((state) => state.selectedShippingAddressId);
   const billingAddressId = useCheckoutStore((state) => state.selectedBillingAddressId);
   const checkoutToken = useCheckoutStore((state) => state.checkoutToken);
-  const isPrimingCheckout = useCheckoutStore((state) => state.isPrimingCheckout);
   const setBillingSameAsShipping = useCheckoutStore((state) => state.setBillingSameAsShipping);
   const setShippingAddressId = useCheckoutStore((state) => state.setSelectedShippingAddressId);
   const setBillingAddressId = useCheckoutStore((state) => state.setSelectedBillingAddressId);
@@ -66,7 +65,6 @@ export function CheckoutInformationPage() {
   const startCheckout = useStartCheckoutMutation();
   const refreshCheckout = useRefreshCheckoutMutation();
   const sessionQuery = useCheckoutSessionQuery();
-  // Prefer live mutation result so Continue unlocks as soon as /checkout/start returns.
   const session = sessionQuery.data ?? startCheckout.data;
   const addressesQuery = useAddressesQuery(isAuthed);
   const { data: addresses } = addressesQuery;
@@ -83,15 +81,6 @@ export function CheckoutInformationPage() {
   }, []);
 
   const beginCheckout = async () => {
-    // Cart already fired /checkout/start while navigating — wait for that result.
-    if (useCheckoutStore.getState().isPrimingCheckout) return;
-
-    // If cart already primed checkout while navigating, reuse that session.
-    const existingToken = useCheckoutStore.getState().checkoutToken;
-    if (existingToken) {
-      const cached = queryClient.getQueryData(QUERY_KEYS.checkout.detail(existingToken));
-      if (cached) return;
-    }
     if (startCheckout.isPending || startCheckout.isSuccess) return;
 
     let storeCart = useCartStore.getState().cart;
@@ -217,23 +206,6 @@ export function CheckoutInformationPage() {
   useEffect(() => {
     if (!hasHydrated || !isAuthed || guestBridgeOpen) return;
     if (startedRef.current) return;
-    // Cart may still be priming /checkout/start — poll briefly then bootstrap if needed.
-    if (useCheckoutStore.getState().isPrimingCheckout) {
-      const timer = window.setInterval(() => {
-        if (useCheckoutStore.getState().isPrimingCheckout) return;
-        window.clearInterval(timer);
-        if (useCheckoutStore.getState().checkoutToken) {
-          startedRef.current = true;
-          return;
-        }
-        if (startedRef.current) return;
-        startedRef.current = true;
-        void beginCheckout().catch(() => {
-          /* surfaced via mutation state */
-        });
-      }, 50);
-      return () => window.clearInterval(timer);
-    }
 
     startedRef.current = true;
 
@@ -318,8 +290,9 @@ export function CheckoutInformationPage() {
 
   const sessionPending =
     recovering ||
-    isPrimingCheckout ||
-    (!session && !bootstrapError && (startCheckout.isPending || sessionQuery.isLoading));
+    (!session &&
+      !bootstrapError &&
+      (startCheckout.isPending || sessionQuery.isLoading || !checkoutToken));
   const sessionReady = Boolean(session?.checkoutToken);
 
   const handleContinue = () => {
