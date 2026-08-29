@@ -10,7 +10,9 @@ describe('admin traffic exclusion', () => {
   it('detects /admin paths only', () => {
     expect(isAdminAnalyticsPath('/admin')).toBe(true);
     expect(isAdminAnalyticsPath('/admin/analytics')).toBe(true);
+    // query-string admin paths must also be excluded (regex includes \? alternative)
     expect(isAdminAnalyticsPath('/admin?x=1')).toBe(true);
+    expect(isAdminAnalyticsPath('/admin?tab=overview')).toBe(true);
     expect(isAdminAnalyticsPath('/administrator')).toBe(false);
     expect(isAdminAnalyticsPath('/')).toBe(false);
     expect(isAdminAnalyticsPath(null)).toBe(false);

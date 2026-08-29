@@ -3,12 +3,11 @@ import { STAFF_ROLES } from '@/constants/auth.js';
 import { UserModel } from '@/models/user.model.js';
 
 /** Admin UI paths — never count as shopper landers/visitors. */
-export const ADMIN_PATH_REGEX = /^\/admin(?:\/|$)/i;
+export const ADMIN_PATH_REGEX = /^\/admin(?:\/|\?|$)/i;
 
 export function isAdminAnalyticsPath(path?: string | null): boolean {
   if (!path) return false;
-  const bare = path.split('?')[0] ?? '';
-  return ADMIN_PATH_REGEX.test(bare);
+  return ADMIN_PATH_REGEX.test(path);
 }
 
 export function isStaffRoleKey(roleKey?: string | null): boolean {
