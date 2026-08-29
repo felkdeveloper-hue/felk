@@ -21,14 +21,9 @@ function kpi(metric?: KpiMetric | null): KpiMetric {
   return metric ?? EMPTY_KPI;
 }
 
-/** Landers must never read below unique visitors (funnel invariant / old API without landers). */
+/** Landers = sessions/landings (independent of unique-IP visitors). Old APIs without landers fall back to visitors. */
 function resolveLanders(landers: KpiMetric | undefined, visitors: KpiMetric): KpiMetric {
-  if (!landers) return visitors;
-  return {
-    value: Math.max(landers.value, visitors.value),
-    prev: Math.max(landers.prev, visitors.prev),
-    pctChange: landers.pctChange,
-  };
+  return landers ?? visitors;
 }
 
 export function AnalyticsOverviewPage() {

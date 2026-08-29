@@ -150,7 +150,7 @@ const VisitorsWidget = memo(function VisitorsWidget({
       color: 'text-purple-600',
       bg: 'from-purple-500/10',
       label: 'LANDERS',
-      value: Math.max(q.data.landers?.value ?? 0, q.data.totalVisitors.value),
+      value: q.data.landers?.value ?? q.data.totalVisitors.value,
       sub: 'Every session (like Meta landings)',
     },
     {

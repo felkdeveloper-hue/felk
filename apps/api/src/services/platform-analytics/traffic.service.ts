@@ -1,15 +1,23 @@
-import { VisitorModel, SessionModel, PageViewModel } from '@/models/analytics/index.js';
+import { VisitorModel, SessionModel, PageViewModel, EventModel } from '@/models/analytics/index.js';
 import { UserModel } from '@/models/user.model.js';
 import type { AnalyticsFilter } from '@/schemas/analytics/index.js';
-import { buildVisitorMatch, resolveDateRange, type MongoMatch } from './analytics-query.builder.js';
+import {
+  buildPageViewMatch,
+  buildSessionMatch,
+  buildVisitorMatch,
+  resolveDateRange,
+  type MongoMatch,
+} from './analytics-query.builder.js';
 import { formatAttribution } from './source-attribution.util.js';
 import { ANALYTICS_TIMEZONE } from './date-range.util.js';
+import { excludeAdminAudience, resolveStaffUserIds } from './admin-traffic.util.js';
+import { resolveActiveVisitorIds, uniqueIpKey } from './unique-ip.util.js';
 
 type SourceRow = {
   source: string;
   label: string;
   channel: string;
-  /** Unique visitor keys (v:/ip:/u:) */
+  /** Unique visitor keys (ip: / v: / u:) */
   visitorKeys: Set<string>;
   visitorIds: Set<string>;
 };
@@ -20,7 +28,7 @@ export type TrafficSourceResult = {
   channel: string;
   /** @deprecated Prefer uniqueVisitors — kept for backward-compatible dashboards/widgets. */
   count: number;
-  /** Unique browsers (or unique IPs for Direct). First-party tracking only. */
+  /** Unique IPs (ipHash) attributed to this source in the period. */
   uniqueVisitors: number;
   /** Sessions attributed to visitors in this source for the period. */
   visits: number;
@@ -33,16 +41,35 @@ export type TrafficSourceResult = {
 /**
  * Traffic sources for the selected period — first-party website tracking only.
  *
- * These numbers are NOT Meta Reach / Impressions / Ad Manager metrics.
+ * Formula (reconciles with Overview unique visitors):
+ * 1. Active visitorIds = page views ∪ sessions ∪ events in period (admin-excluded).
+ * 2. Load VisitorModel rows for those IDs (trafficSource / UTM / click ids).
+ * 3. Group by formatAttribution; uniqueVisitors = |uniqueIpKey(ipHash, visitorId)|.
+ * 4. Do not filter to firstSeenAt-only or non-direct lastSeen — that undercounted
+ *    returning IPs (Overview hundreds vs Traffic ~9).
  *
- * - Ads / social / search: unique browsers (visitorId).
- * - Direct: unique IPs.
- * - Also includes registered/guest users whose saved acquisition source falls
- *   in the period (lastLoginAt), so Users-row sources are not missing from
- *   Sources when their visitor row was mis-labeled Direct.
+ * These numbers are NOT Meta Reach / Impressions / Ad Manager metrics.
  */
 export async function getTrafficSources(filter: AnalyticsFilter): Promise<TrafficSourceResult[]> {
   const range = resolveDateRange(filter);
+  const staffIds = await resolveStaffUserIds();
+
+  const pageMatch = excludeAdminAudience(buildPageViewMatch(filter, range), staffIds, 'path');
+  const sessionMatch = excludeAdminAudience(
+    buildSessionMatch(filter, range),
+    staffIds,
+    'entryPage',
+  );
+  const eventMatch = excludeAdminAudience(
+    { occurredAt: { $gte: range.from, $lte: range.to } },
+    staffIds,
+    'path',
+  );
+
+  const activeIds = await resolveActiveVisitorIds(pageMatch, sessionMatch, eventMatch);
+
+  // Dimension filters from visitor match (country/device/q/source) — drop date window;
+  // membership is activity-based above, same as Overview visitors.
   const base = await buildVisitorMatch(filter, range);
   const {
     lastSeenAt: _ignored,
@@ -53,101 +80,45 @@ export async function getTrafficSources(filter: AnalyticsFilter): Promise<Traffi
     $or?: unknown;
   };
 
-  const dateOr = [
-    { firstSeenAt: { $gte: range.from, $lte: range.to } },
-    {
-      lastSeenAt: { $gte: range.from, $lte: range.to },
-      trafficSource: { $exists: true, $nin: ['direct', null, ''] },
-    },
-  ];
-
   const match: MongoMatch = {
     ...rest,
-    ...(Array.isArray(searchOr) ? { $and: [{ $or: searchOr }, { $or: dateOr }] } : { $or: dateOr }),
+    visitorId: { $in: activeIds.length ? activeIds : ['__none__'] },
+    ...(Array.isArray(searchOr) ? { $or: searchOr } : {}),
   };
+  const audienceMatch = excludeAdminAudience(match, staffIds, 'landingPath');
 
-  const results = await VisitorModel.aggregate<{
-    _id: {
-      trafficSource: string;
-      utmSource: string;
-      utmMedium: string;
-      utmCampaign: string;
-      referrer: string;
-      inAppSource: string;
-      hasFbclid: boolean;
-      hasGclid: boolean;
-      hasTtclid: boolean;
-    };
-    uniqueKeys: string[];
-    visitorIds: string[];
-  }>([
-    { $match: match },
-    {
-      $group: {
-        _id: {
-          trafficSource: { $ifNull: ['$trafficSource', 'direct'] },
-          utmSource: { $ifNull: ['$utmSource', ''] },
-          utmMedium: { $ifNull: ['$utmMedium', ''] },
-          utmCampaign: { $ifNull: ['$utmCampaign', ''] },
-          referrer: { $ifNull: ['$referrer', ''] },
-          inAppSource: { $ifNull: ['$inAppSource', ''] },
-          hasFbclid: { $gt: [{ $strLenCP: { $ifNull: ['$fbclid', ''] } }, 0] },
-          hasGclid: { $gt: [{ $strLenCP: { $ifNull: ['$gclid', ''] } }, 0] },
-          hasTtclid: { $gt: [{ $strLenCP: { $ifNull: ['$ttclid', ''] } }, 0] },
-        },
-        uniqueKeys: {
-          $addToSet: {
-            $cond: [
-              {
-                $ne: [{ $ifNull: ['$trafficSource', 'direct'] }, 'direct'],
-              },
-              { $concat: ['v:', '$visitorId'] },
-              {
-                $cond: [
-                  {
-                    $and: [
-                      { $ne: ['$ipHash', null] },
-                      { $ne: ['$ipHash', ''] },
-                      { $ne: ['$ipHash', 'unknown'] },
-                    ],
-                  },
-                  { $concat: ['ip:', '$ipHash'] },
-                  { $concat: ['v:', '$visitorId'] },
-                ],
-              },
-            ],
-          },
-        },
-        visitorIds: { $addToSet: '$visitorId' },
-      },
-    },
-  ]);
+  const visitors = await VisitorModel.find(audienceMatch)
+    .select(
+      'visitorId ipHash trafficSource utmSource utmMedium utmCampaign referrer inAppSource fbclid gclid ttclid',
+    )
+    .lean();
 
   const merged = new Map<string, SourceRow>();
 
-  for (const row of results) {
+  for (const v of visitors) {
     const attribution = formatAttribution({
-      trafficSource: row._id.trafficSource || 'direct',
-      utmSource: row._id.utmSource || null,
-      utmMedium: row._id.utmMedium || null,
-      utmCampaign: row._id.utmCampaign || null,
-      referrer: row._id.referrer || null,
-      inAppSource: row._id.inAppSource || null,
-      fbclid: row._id.hasFbclid ? '1' : null,
-      gclid: row._id.hasGclid ? '1' : null,
-      ttclid: row._id.hasTtclid ? '1' : null,
+      trafficSource: v.trafficSource || 'direct',
+      utmSource: v.utmSource || null,
+      utmMedium: v.utmMedium || null,
+      utmCampaign: v.utmCampaign || null,
+      referrer: v.referrer || null,
+      inAppSource: v.inAppSource || null,
+      fbclid: v.fbclid || null,
+      gclid: v.gclid || null,
+      ttclid: v.ttclid || null,
     });
+    const ipKey = uniqueIpKey(v.ipHash, v.visitorId);
     const existing = merged.get(attribution.label);
     if (existing) {
-      for (const key of row.uniqueKeys) existing.visitorKeys.add(key);
-      for (const id of row.visitorIds) existing.visitorIds.add(id);
+      existing.visitorKeys.add(ipKey);
+      existing.visitorIds.add(v.visitorId);
     } else {
       merged.set(attribution.label, {
-        source: row._id.trafficSource || 'direct',
+        source: v.trafficSource || 'direct',
         label: attribution.label,
         channel: attribution.channel,
-        visitorKeys: new Set(row.uniqueKeys),
-        visitorIds: new Set(row.visitorIds),
+        visitorKeys: new Set([ipKey]),
+        visitorIds: new Set([v.visitorId]),
       });
     }
   }
@@ -197,9 +168,10 @@ export async function getTrafficSources(filter: AnalyticsFilter): Promise<Traffi
 
   const sessionCounts = new Map<string, number>();
   const pageViewCounts = new Map<string, number>();
+  const eventSessionCounts = new Map<string, number>();
 
   if (allVisitorIds.length) {
-    const [sessions, pageViews] = await Promise.all([
+    const [sessions, pageViews, eventSessions] = await Promise.all([
       SessionModel.aggregate<{ _id: string; count: number }>([
         {
           $match: {
@@ -218,9 +190,22 @@ export async function getTrafficSources(filter: AnalyticsFilter): Promise<Traffi
         },
         { $group: { _id: '$visitorId', count: { $sum: 1 } } },
       ]),
+      // Visit fallback when session docs are sparse but events carried sessionId.
+      EventModel.aggregate<{ _id: string; count: number }>([
+        {
+          $match: {
+            visitorId: { $in: allVisitorIds },
+            occurredAt: { $gte: range.from, $lte: range.to },
+            sessionId: { $type: 'string' },
+          },
+        },
+        { $group: { _id: '$visitorId', sessions: { $addToSet: '$sessionId' } } },
+        { $project: { count: { $size: '$sessions' } } },
+      ]),
     ]);
     for (const s of sessions) sessionCounts.set(s._id, s.count);
     for (const p of pageViews) pageViewCounts.set(p._id, p.count);
+    for (const e of eventSessions) eventSessionCounts.set(e._id, e.count);
   }
 
   const ranked = [...merged.values()]
@@ -228,10 +213,11 @@ export async function getTrafficSources(filter: AnalyticsFilter): Promise<Traffi
       let visits = 0;
       let pageViews = 0;
       for (const vid of row.visitorIds) {
-        visits += sessionCounts.get(vid) ?? 0;
+        const sess = sessionCounts.get(vid) ?? 0;
+        const evSess = eventSessionCounts.get(vid) ?? 0;
+        visits += Math.max(sess, evSess);
         pageViews += pageViewCounts.get(vid) ?? 0;
       }
-      // Fallback: if we have unique visitors but no session docs yet, treat unique as visits.
       const uniqueVisitors = row.visitorKeys.size;
       if (visits === 0 && uniqueVisitors > 0) visits = uniqueVisitors;
 

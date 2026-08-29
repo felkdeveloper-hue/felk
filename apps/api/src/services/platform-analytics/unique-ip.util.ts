@@ -1,4 +1,4 @@
-import { PageViewModel, SessionModel, VisitorModel } from '@/models/analytics/index.js';
+import { EventModel, PageViewModel, SessionModel, VisitorModel } from '@/models/analytics/index.js';
 
 /** Unique-IP key: prefer ipHash, else visitorId (when hash missing/unknown). */
 export function uniqueIpKey(ipHash: string | null | undefined, visitorId: string): string {
@@ -7,20 +7,28 @@ export function uniqueIpKey(ipHash: string | null | undefined, visitorId: string
 }
 
 /**
- * Distinct shopper visitorIds that landed in-period (page views ∪ sessions).
+ * Distinct shopper visitorIds that landed in-period.
+ * Sources: page views ∪ sessions ∪ events (visitorId on events — never sessionId alone).
  * Prefer this over Visitor.lastSeenAt — a return visit today must not erase yesterday.
  */
 export async function resolveActiveVisitorIds(
   pageMatch: Record<string, unknown>,
   sessionMatch: Record<string, unknown>,
+  eventMatch?: Record<string, unknown>,
 ): Promise<string[]> {
-  const [pageIds, sessionIds] = await Promise.all([
+  const [pageIds, sessionIds, eventIds] = await Promise.all([
     PageViewModel.distinct('visitorId', pageMatch),
     SessionModel.distinct('visitorId', sessionMatch),
+    eventMatch
+      ? EventModel.distinct('visitorId', {
+          ...eventMatch,
+          visitorId: { $type: 'string' },
+        })
+      : Promise.resolve([] as string[]),
   ]);
   return [
     ...new Set(
-      [...pageIds, ...sessionIds].filter(
+      [...pageIds, ...sessionIds, ...eventIds].filter(
         (id): id is string => typeof id === 'string' && id.length > 0,
       ),
     ),
@@ -29,8 +37,12 @@ export async function resolveActiveVisitorIds(
 
 /**
  * Count unique IPs among visitorIds that landed in the period.
- * Orphan page-view visitorIds (no visitor row yet) count as `v:{id}` unless
- * `visitorExtra` filters require a visitor document (e.g. isReturning / userId).
+ *
+ * Formula: |{ uniqueIpKey(ipHash, visitorId) for visitor docs matching visitorIds }|
+ * - Prefer ipHash from VisitorModel (same IP ⇒ 1 within the period).
+ * - Orphan activity visitorIds with no Visitor row are skipped (avoids inflating
+ *   "visitors" by counting cookies/session proxies as people).
+ * - When `visitorExtra` is set (e.g. isReturning), only matching visitor docs count.
  */
 export async function countUniqueIpsForVisitorIds(
   visitorIds: string[],
@@ -38,34 +50,25 @@ export async function countUniqueIpsForVisitorIds(
 ): Promise<number> {
   if (visitorIds.length === 0) return 0;
 
-  const hasExtra = Object.keys(visitorExtra).length > 0;
   const visitors = await VisitorModel.find(
     { visitorId: { $in: visitorIds }, ...visitorExtra },
     { visitorId: 1, ipHash: 1 },
   ).lean();
 
   const keys = new Set<string>();
-  const found = new Set<string>();
   for (const v of visitors) {
-    found.add(v.visitorId);
     keys.add(uniqueIpKey(v.ipHash, v.visitorId));
   }
-
-  if (!hasExtra) {
-    for (const id of visitorIds) {
-      if (!found.has(id)) keys.add(`v:${id}`);
-    }
-  }
-
   return keys.size;
 }
 
-/** Unique IPs (or visitorId fallback) that landed under the given activity matches. */
+/** Unique IPs among visitorIds active via page/session/(optional) event matches. */
 export async function countUniqueVisitorIpsFromActivity(
   pageMatch: Record<string, unknown>,
   sessionMatch: Record<string, unknown>,
   visitorExtra: Record<string, unknown> = {},
+  eventMatch?: Record<string, unknown>,
 ): Promise<number> {
-  const visitorIds = await resolveActiveVisitorIds(pageMatch, sessionMatch);
+  const visitorIds = await resolveActiveVisitorIds(pageMatch, sessionMatch, eventMatch);
   return countUniqueIpsForVisitorIds(visitorIds, visitorExtra);
 }

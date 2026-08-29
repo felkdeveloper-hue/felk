@@ -1,4 +1,4 @@
-import { SessionModel, PageViewModel, EventModel, VisitorModel } from '@/models/analytics/index.js';
+import { SessionModel, PageViewModel, EventModel } from '@/models/analytics/index.js';
 import { UserModel } from '@/models/user.model.js';
 import type { AnalyticsFilter } from '@/schemas/analytics/index.js';
 import { buildSessionMatch, buildPageViewMatch } from './analytics-query.builder.js';
@@ -9,7 +9,7 @@ import {
   formatPeriodLabel,
 } from './date-range.util.js';
 import { excludeAdminAudience, resolveStaffUserIds } from './admin-traffic.util.js';
-import { countUniqueVisitorIpsFromActivity, uniqueIpKey } from './unique-ip.util.js';
+import { countUniqueVisitorIpsFromActivity } from './unique-ip.util.js';
 
 export interface KpiMetric {
   value: number;
@@ -44,9 +44,14 @@ function makeMetric(current: number, previous: number): KpiMetric {
 }
 
 /**
- * LANDERS ≈ Meta "landing page views" / GA4 sessions:
- * sessions ∪ entry page-views ∪ distinct page-view sessions ∪ distinct event sessions.
- * Events matter when page-view ingest was dropping (e.g. long SEO titles failing Zod).
+ * LANDERS = total landings/sessions in period (can exceed unique visitors).
+ * Formula: max(
+ *   session docs,
+ *   entry page-views,
+ *   distinct page-view sessionIds,
+ *   distinct event sessionIds
+ * )
+ * Event sessionIds are OK here — each landing/session counts, not unique people.
  */
 async function countLandingEvents(
   sessionMatch: Record<string, unknown>,
@@ -65,72 +70,47 @@ async function countLandingEvents(
   return Math.max(sessions, entryViews, pageViewSessions, eventSessions);
 }
 
-/** Unique IPs from visitors active via page/session OR events OR lastSeen in range. */
-async function countVisitorsWithFallbacks(
-  pageMatch: Record<string, unknown>,
+/** AVG(durationMs) on sessions that recorded duration; empty set → 0. */
+async function avgDurationMs(sessionMatch: Record<string, unknown>): Promise<number> {
+  const r = await SessionModel.aggregate<{ avg: number }>([
+    { $match: { ...sessionMatch, durationMs: { $ne: null } } },
+    { $group: { _id: null, avg: { $avg: '$durationMs' } } },
+  ]);
+  return Math.round(r[0]?.avg ?? 0);
+}
+
+/**
+ * Bounce rate % = bounced sessions / session docs in period.
+ * Only SessionModel rows — never invent a rate from event-session landers alone.
+ * No session docs → 0 (treat as N/A).
+ */
+async function bounceRatePct(sessionMatch: Record<string, unknown>): Promise<number> {
+  const total = await SessionModel.countDocuments(sessionMatch);
+  if (!total) return 0;
+  const bounces = await SessionModel.countDocuments({ ...sessionMatch, isBounce: true });
+  return Math.round((bounces / total) * 100 * 10) / 10;
+}
+
+/**
+ * Avg pages/session = page_views / landers when landers > 0
+ * (honest when session.pageCount defaults to 1 from event-only upserts).
+ * Else AVG(session.pageCount) if session docs exist; else 0 (not a fake 1.0).
+ */
+async function avgPagesPerSession(
   sessionMatch: Record<string, unknown>,
-  eventMatch: Record<string, unknown>,
-  range: { from: Date; to: Date },
-  staffIds: import('mongoose').Types.ObjectId[],
+  pageViews: number,
+  landers: number,
 ): Promise<number> {
-  const fromActivity = await countUniqueVisitorIpsFromActivity(pageMatch, sessionMatch);
-
-  const eventVisitorIds = (await EventModel.distinct('visitorId', {
-    ...eventMatch,
-    visitorId: { $type: 'string' },
-  })) as string[];
-
-  const visitorSeenMatch = excludeAdminAudience(
-    {
-      $or: [
-        { lastSeenAt: { $gte: range.from, $lte: range.to } },
-        { firstSeenAt: { $gte: range.from, $lte: range.to } },
-      ],
-    },
-    staffIds,
-    'landingPath',
-  );
-  const seenVisitors = await VisitorModel.find(visitorSeenMatch, {
-    visitorId: 1,
-    ipHash: 1,
-  }).lean();
-
-  const keys = new Set<string>();
-
-  // Re-resolve activity count via the util already applied; also merge event + seen.
-  if (fromActivity > 0 && eventVisitorIds.length === 0 && seenVisitors.length === 0) {
-    return fromActivity;
+  if (landers > 0) {
+    return Math.round((pageViews / landers) * 10) / 10;
   }
-
-  const activityIds = await PageViewModel.distinct('visitorId', pageMatch);
-  const sessionIds = await SessionModel.distinct('visitorId', sessionMatch);
-  const allIds = [
-    ...new Set(
-      [
-        ...activityIds,
-        ...sessionIds,
-        ...eventVisitorIds,
-        ...seenVisitors.map((v) => v.visitorId),
-      ].filter((id): id is string => typeof id === 'string' && id.length > 0),
-    ),
-  ];
-
-  if (allIds.length === 0) return fromActivity;
-
-  const visitors = await VisitorModel.find(
-    { visitorId: { $in: allIds } },
-    { visitorId: 1, ipHash: 1 },
-  ).lean();
-  const found = new Set<string>();
-  for (const v of visitors) {
-    found.add(v.visitorId);
-    keys.add(uniqueIpKey(v.ipHash, v.visitorId));
-  }
-  for (const id of allIds) {
-    if (!found.has(id)) keys.add(`v:${id}`);
-  }
-
-  return Math.max(keys.size, fromActivity);
+  const total = await SessionModel.countDocuments(sessionMatch);
+  if (!total) return 0;
+  const r = await SessionModel.aggregate<{ avg: number }>([
+    { $match: sessionMatch },
+    { $group: { _id: null, avg: { $avg: '$pageCount' } } },
+  ]);
+  return Math.round((r[0]?.avg ?? 0) * 10) / 10;
 }
 
 export async function getOverview(filter: AnalyticsFilter): Promise<OverviewData> {
@@ -169,89 +149,65 @@ export async function getOverview(filter: AnalyticsFilter): Promise<OverviewData
     staffIds,
     'entryPage',
   );
+  const todayEvents = excludeAdminAudience(
+    {
+      occurredAt: { $gte: todayRange.from, $lte: todayRange.to },
+      sessionId: { $type: 'string' },
+    },
+    staffIds,
+    'path',
+  );
 
   const [
+    // VISITORS: unique ipHash among VisitorModel docs for visitorIds active via
+    // page views ∪ sessions ∪ events — never count event sessionIds as people.
     tv,
     pvTv,
     li,
     pvLi,
+    // RETURNING: unique IPs among those active visitors with isReturning=true
+    // (prior visit / totalVisits>1 set at session ingest).
     ret,
     pvRet,
     dur,
     pvDur,
     br,
     pvBr,
+    // PAGE VIEWS: count of PageView docs in period (admin-excluded).
     pv,
     pvPv,
-    ap,
-    pvAp,
     activeNow,
     newToday,
+    // SESSIONS TODAY: session docs today, else distinct event sessionIds today.
     sToday,
-    // LANDERS: every landing in period (sessions / page-view sessions / event sessions)
     landCur,
     landPrev,
-    // USERS: registered customer accounts created in period
     usersCur,
     usersPrev,
   ] = await Promise.all([
-    // VISITORS: unique IPs from landings + events + visitor lastSeen (GA4-style resilience)
-    countVisitorsWithFallbacks(pageCur, sessionCur, eventCur, range, staffIds),
-    countVisitorsWithFallbacks(pagePrev, sessionPrev, eventPrev, prev, staffIds),
-    countUniqueVisitorIpsFromActivity(pageCur, sessionCur, { userId: { $ne: null } }),
-    countUniqueVisitorIpsFromActivity(pagePrev, sessionPrev, { userId: { $ne: null } }),
-    countUniqueVisitorIpsFromActivity(pageCur, sessionCur, { isReturning: true }),
-    countUniqueVisitorIpsFromActivity(pagePrev, sessionPrev, { isReturning: true }),
-    SessionModel.aggregate<{ avg: number }>([
-      { $match: { ...sessionCur, durationMs: { $ne: null } } },
-      { $group: { _id: null, avg: { $avg: '$durationMs' } } },
-    ]).then((r) => Math.round(r[0]?.avg ?? 0)),
-    SessionModel.aggregate<{ avg: number }>([
-      { $match: { ...sessionPrev, durationMs: { $ne: null } } },
-      { $group: { _id: null, avg: { $avg: '$durationMs' } } },
-    ]).then((r) => Math.round(r[0]?.avg ?? 0)),
-    SessionModel.countDocuments(sessionCur).then(async (total) => {
-      if (!total) return 0;
-      const bounces = await SessionModel.countDocuments({ ...sessionCur, isBounce: true });
-      return Math.round((bounces / total) * 100 * 10) / 10;
-    }),
-    SessionModel.countDocuments(sessionPrev).then(async (total) => {
-      if (!total) return 0;
-      const bounces = await SessionModel.countDocuments({ ...sessionPrev, isBounce: true });
-      return Math.round((bounces / total) * 100 * 10) / 10;
-    }),
+    countUniqueVisitorIpsFromActivity(pageCur, sessionCur, {}, eventCur),
+    countUniqueVisitorIpsFromActivity(pagePrev, sessionPrev, {}, eventPrev),
+    countUniqueVisitorIpsFromActivity(pageCur, sessionCur, { userId: { $ne: null } }, eventCur),
+    countUniqueVisitorIpsFromActivity(pagePrev, sessionPrev, { userId: { $ne: null } }, eventPrev),
+    countUniqueVisitorIpsFromActivity(pageCur, sessionCur, { isReturning: true }, eventCur),
+    countUniqueVisitorIpsFromActivity(pagePrev, sessionPrev, { isReturning: true }, eventPrev),
+    avgDurationMs(sessionCur),
+    avgDurationMs(sessionPrev),
+    bounceRatePct(sessionCur),
+    bounceRatePct(sessionPrev),
     PageViewModel.countDocuments(pageCur),
     PageViewModel.countDocuments(pagePrev),
-    SessionModel.aggregate<{ avg: number }>([
-      { $match: sessionCur },
-      { $group: { _id: null, avg: { $avg: '$pageCount' } } },
-    ]).then((r) => Math.round((r[0]?.avg ?? 1) * 10) / 10),
-    SessionModel.aggregate<{ avg: number }>([
-      { $match: sessionPrev },
-      { $group: { _id: null, avg: { $avg: '$pageCount' } } },
-    ]).then((r) => Math.round((r[0]?.avg ?? 1) * 10) / 10),
     SessionModel.countDocuments(activeMatch),
-    // Real user/guest accounts created today (Colombo), not visitor cookies.
     UserModel.countDocuments({
       isDeleted: false,
       createdAt: { $gte: todayRange.from, $lte: todayRange.to },
     }),
     SessionModel.countDocuments(sessionsTodayMatch).then(async (n) => {
       if (n > 0) return n;
-      // Fallback: distinct event sessions today when session rows were not written
-      const todayEvents = excludeAdminAudience(
-        {
-          occurredAt: { $gte: todayRange.from, $lte: todayRange.to },
-          sessionId: { $type: 'string' },
-        },
-        staffIds,
-        'path',
-      );
       return EventModel.distinct('sessionId', todayEvents).then((ids) => ids.length);
     }),
     countLandingEvents(sessionCur, pageCur, eventCur),
     countLandingEvents(sessionPrev, pagePrev, eventPrev),
-    // Customer accounts created in period
     UserModel.countDocuments({
       isDeleted: false,
       roleKey: 'customer',
@@ -264,10 +220,16 @@ export async function getOverview(filter: AnalyticsFilter): Promise<OverviewData
     }),
   ]);
 
+  const [ap, pvAp] = await Promise.all([
+    avgPagesPerSession(sessionCur, pv, landCur),
+    avgPagesPerSession(sessionPrev, pvPv, landPrev),
+  ]);
+
   return {
     period: range,
     periodLabel: formatPeriodLabel(filter),
-    landers: makeMetric(Math.max(landCur, tv), Math.max(landPrev, pvTv)),
+    // Landers and visitors are independent: landers may exceed unique IPs.
+    landers: makeMetric(landCur, landPrev),
     totalVisitors: makeMetric(tv, pvTv),
     uniqueVisitors: makeMetric(tv, pvTv),
     loggedInUsers: makeMetric(li, pvLi),

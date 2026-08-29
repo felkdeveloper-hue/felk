@@ -43,7 +43,13 @@ export async function getVisitors(filter: AnalyticsFilter) {
     staffIds,
     'entryPage',
   );
-  const activeIds = await resolveActiveVisitorIds(pageMatch, sessionMatch);
+  const eventMatch = excludeAdminAudience(
+    { occurredAt: { $gte: range.from, $lte: range.to } },
+    staffIds,
+    'path',
+  );
+  // Same activity set as Overview visitors (page ∪ session ∪ event visitorIds → unique IP).
+  const activeIds = await resolveActiveVisitorIds(pageMatch, sessionMatch, eventMatch);
 
   const base = await buildVisitorMatch(filter, range);
   // Drop lastSeenAt window — membership comes from in-period landings above.
