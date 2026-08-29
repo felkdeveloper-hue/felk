@@ -55,12 +55,18 @@ const sessionPayloadSchema = z.object({
   isActive: z.boolean().optional(),
 });
 
+/** Long SEO titles must not reject the whole /collect batch (landers would go to 0). */
 const pageViewPayloadSchema = z.object({
   pageViewId: z.string().uuid().optional(),
   sessionId: z.string().uuid(),
   visitorId: z.string().uuid(),
   path: z.string().max(2000),
-  title: z.string().max(500).optional().nullable(),
+  title: z
+    .string()
+    .max(2000)
+    .optional()
+    .nullable()
+    .transform((t) => (t && t.length > 500 ? t.slice(0, 500) : t)),
   referrer: z.string().max(2000).optional().nullable(),
   viewedAt: z.string().datetime(),
   timeOnPageMs: z.number().int().min(0).optional().nullable(),

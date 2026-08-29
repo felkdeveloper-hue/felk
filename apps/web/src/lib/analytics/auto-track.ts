@@ -147,6 +147,11 @@ function pushSessionSnapshot(ending: boolean) {
   });
 }
 
+function truncateTitle(title: string | null | undefined): string | null {
+  if (!title) return null;
+  return title.length > 500 ? title.slice(0, 500) : title;
+}
+
 function commitCurrentPageView(isFinal = false) {
   if (!currentPath || !pageViewId) return;
   const timeOnPageMs = Date.now() - pageEnterTime;
@@ -158,7 +163,7 @@ function commitCurrentPageView(isFinal = false) {
     sessionId,
     visitorId,
     path: currentPath,
-    title: document.title ?? null,
+    title: truncateTitle(document.title),
     viewedAt: new Date(pageEnterTime).toISOString(),
     timeOnPageMs,
     scrollDepth,
@@ -223,6 +228,21 @@ export function trackRouteChange(newPath: string) {
   }
 
   pushSessionSnapshot(false);
+  // Always queue the page view for this route (GA4 page_view). Previously only the
+  // first page of a session was sent immediately — later pages waited for leave and
+  // were easy to lose when collect validation rejected a long title.
+  queuePageView({
+    pageViewId,
+    sessionId,
+    visitorId,
+    path: newPath,
+    title: truncateTitle(document.title),
+    viewedAt: new Date(pageEnterTime).toISOString(),
+    timeOnPageMs: 0,
+    scrollDepth: 0,
+    isEntry: pageCount === 1,
+    isExit: false,
+  });
   if (pageCount === 1) {
     setPendingSession({
       sessionId,
@@ -230,22 +250,8 @@ export function trackRouteChange(newPath: string) {
       startedAt: startedAt.toISOString(),
       entryPage: newPath,
     });
-    // Send the landing immediately — IG/FB in-app browsers often kill the
-    // webview before pagehide, which used to drop the lander entirely.
-    queuePageView({
-      pageViewId,
-      sessionId,
-      visitorId,
-      path: newPath,
-      title: document.title ?? null,
-      viewedAt: new Date(pageEnterTime).toISOString(),
-      timeOnPageMs: 0,
-      scrollDepth: 0,
-      isEntry: true,
-      isExit: false,
-    });
-    void flush();
   }
+  void flush();
 
   refreshIdleTimer(() => {
     commitCurrentPageView(true);
@@ -254,8 +260,19 @@ export function trackRouteChange(newPath: string) {
 }
 
 export function trackEvent(name: string, properties?: Record<string, unknown>) {
-  const { sessionId } = getOrCreateSession();
+  const { sessionId, startedAt } = getOrCreateSession();
   const visitorId = getVisitorId();
+
+  // Keep session warm so landers count even when only commerce events fire.
+  setPendingSession({
+    sessionId,
+    visitorId,
+    startedAt: startedAt.toISOString(),
+    lastPage: window.location.pathname,
+    exitPage: window.location.pathname,
+    isActive: true,
+  });
+  setPendingVisitor(buildVisitorPayload(visitorId));
 
   queueEvent({
     eventId: crypto.randomUUID(),

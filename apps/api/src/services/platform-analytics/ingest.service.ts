@@ -337,8 +337,13 @@ async function insertPageViews(
 
   try {
     await PageViewModel.insertMany(docs, { ordered: false });
-  } catch {
-    /* duplicate pageViewId — ignore */
+  } catch (err: unknown) {
+    const code =
+      err && typeof err === 'object' && 'code' in err ? (err as { code?: number }).code : undefined;
+    // Duplicate pageViewId is expected (retries / Strict Mode). Log anything else.
+    if (code !== 11000) {
+      logger.warn({ err, count: docs.length }, 'PageView insertMany failed');
+    }
   }
 }
 
@@ -443,35 +448,69 @@ export async function processCollect(body: CollectBody, req: Request): Promise<v
 
   const userId = req.user?.id as Types.ObjectId | undefined;
 
+  // Isolate each step — a session/visitor failure must never drop pageViews/events
+  // (that made landers/visitors read 0 while commerce events still arrived).
+  const run = async (label: string, fn: () => Promise<void>) => {
+    try {
+      await fn();
+    } catch (err) {
+      logger.warn({ err, label }, 'Analytics collect step failed');
+    }
+  };
+
   // Visitor before session so totalVisits $inc finds the visitor row.
   if (body.visitor) {
-    await upsertVisitor(body.visitor, req, userId);
+    await run('visitor', () => upsertVisitor(body.visitor!, req, userId));
   }
   if (body.session) {
-    await upsertSession(body.session, req, userId);
+    await run('session', () => upsertSession(body.session!, req, userId));
   }
 
   const ops: Promise<void>[] = [];
 
   if (body.pageViews?.length) {
-    ops.push(insertPageViews(body.pageViews, userId, req));
+    ops.push(run('pageViews', () => insertPageViews(body.pageViews!, userId, req)));
   }
 
   if (body.events?.length) {
-    ops.push(insertEvents(body.events, userId));
+    ops.push(run('events', () => insertEvents(body.events!, userId)));
   }
 
   if (body.heartbeat) {
     ops.push(
-      processHeartbeat(
-        body.heartbeat.sessionId,
-        body.heartbeat.visitorId,
-        body.heartbeat.path ?? null,
+      run('heartbeat', () =>
+        processHeartbeat(
+          body.heartbeat!.sessionId,
+          body.heartbeat!.visitorId,
+          body.heartbeat!.path ?? null,
+        ),
       ),
     );
   }
 
-  await Promise.allSettled(ops);
+  // Also ensure a session row exists for event-only batches (GA4-style session stitch).
+  if (!body.session && !body.heartbeat && body.events?.length) {
+    const ev = body.events.find((e) => e.sessionId && e.visitorId);
+    if (ev?.sessionId && ev.visitorId) {
+      ops.push(
+        run('session-from-event', () =>
+          upsertSession(
+            {
+              sessionId: ev.sessionId!,
+              visitorId: ev.visitorId!,
+              entryPage: ev.path ?? null,
+              lastPage: ev.path ?? null,
+              isActive: true,
+            },
+            req,
+            userId,
+          ),
+        ),
+      );
+    }
+  }
+
+  await Promise.all(ops);
 }
 
 /** Emit a server-side business event directly (no HTTP round-trip). */
