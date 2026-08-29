@@ -11,7 +11,7 @@ import {
 import { formatAttribution } from './source-attribution.util.js';
 import { ANALYTICS_TIMEZONE } from './date-range.util.js';
 import { excludeAdminAudience, resolveStaffUserIds } from './admin-traffic.util.js';
-import { resolveActiveVisitorIds, uniqueIpKey } from './unique-ip.util.js';
+import { excludeStaffVisitorIds, resolveActiveVisitorIds, uniqueIpKey } from './unique-ip.util.js';
 
 type SourceRow = {
   source: string;
@@ -66,7 +66,10 @@ export async function getTrafficSources(filter: AnalyticsFilter): Promise<Traffi
     'path',
   );
 
-  const activeIds = await resolveActiveVisitorIds(pageMatch, sessionMatch, eventMatch);
+  const activeIds = await excludeStaffVisitorIds(
+    await resolveActiveVisitorIds(pageMatch, sessionMatch, eventMatch),
+    staffIds,
+  );
 
   // Dimension filters from visitor match (country/device/q/source) — drop date window;
   // membership is activity-based above, same as Overview visitors.

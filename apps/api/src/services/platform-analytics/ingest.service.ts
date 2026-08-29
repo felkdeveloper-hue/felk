@@ -20,6 +20,7 @@ import {
   pickFirstTouchAttribution,
 } from './source-attribution.util.js';
 import { evaluateAnalyticsBotFilter } from './bot-filter.util.js';
+import { isStaffRoleKey } from './admin-traffic.util.js';
 import type { GeoData } from '@/models/analytics/index.js';
 
 function mergeGeo(existing: GeoData | null | undefined, incoming: GeoData): GeoData {
@@ -458,6 +459,12 @@ async function processHeartbeat(
 }
 
 export async function processCollect(body: CollectBody, req: Request): Promise<void> {
+  // Never ingest staff/admin browsing (storefront or panel) into shopper metrics.
+  if (isStaffRoleKey(req.user?.roleKey)) {
+    logger.debug({ userId: req.user?.id }, 'Analytics collect skipped (staff user)');
+    return;
+  }
+
   const ua = typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'] : null;
   const samplePath =
     body.pageViews?.[0]?.path ??

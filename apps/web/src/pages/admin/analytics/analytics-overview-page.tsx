@@ -151,7 +151,7 @@ export function AnalyticsOverviewPage() {
                       {visitors.value.toLocaleString()}
                     </p>
                     <p className="text-muted-foreground text-[10px]">
-                      1 per IP/device · {periodLabel}
+                      1 per IP/device · no admin · {periodLabel}
                     </p>
                     {visitors.pctChange !== 0 && (
                       <p

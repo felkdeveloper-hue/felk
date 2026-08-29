@@ -2,9 +2,15 @@ import { ADMIN_ROUTES, ROUTES } from '@/constants';
 import { STAFF_ROLES } from '@/constants/admin-permissions';
 import type { AuthUser } from '@/types';
 
-export function isStaffUser(user: Pick<AuthUser, 'roles'> | null | undefined): boolean {
-  if (!user?.roles?.length) return false;
-  return user.roles.some((role) => (STAFF_ROLES as readonly string[]).includes(role));
+export function isStaffUser(
+  user: (Pick<AuthUser, 'roles'> & { roleKey?: string }) | null | undefined,
+): boolean {
+  if (!user) return false;
+  if (user.roles?.length) {
+    if (user.roles.some((role) => (STAFF_ROLES as readonly string[]).includes(role))) return true;
+  }
+  const roleKey = typeof user.roleKey === 'string' ? user.roleKey : undefined;
+  return Boolean(roleKey && (STAFF_ROLES as readonly string[]).includes(roleKey));
 }
 
 /** Destination after login / when a guest route sees an already-authed session. */

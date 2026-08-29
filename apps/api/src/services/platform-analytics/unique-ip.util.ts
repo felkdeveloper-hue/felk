@@ -1,3 +1,4 @@
+import { Types } from 'mongoose';
 import { EventModel, PageViewModel, SessionModel, VisitorModel } from '@/models/analytics/index.js';
 
 /** Unique-IP key: prefer ipHash, else visitorId (when hash missing/unknown). */
@@ -35,20 +36,29 @@ export async function resolveActiveVisitorIds(
   ];
 }
 
+/** Drop cookies that belong to staff/admin accounts (never count as shoppers). */
+export async function excludeStaffVisitorIds(
+  visitorIds: string[],
+  staffIds: Types.ObjectId[],
+): Promise<string[]> {
+  if (visitorIds.length === 0 || staffIds.length === 0) return visitorIds;
+  const staffVids = await VisitorModel.distinct('visitorId', {
+    visitorId: { $in: visitorIds },
+    userId: { $in: staffIds },
+  });
+  if (staffVids.length === 0) return visitorIds;
+  const blocked = new Set(staffVids.filter((id): id is string => typeof id === 'string'));
+  return visitorIds.filter((id) => !blocked.has(id));
+}
+
 /**
- * Count unique people (devices) among visitorIds that landed in the period.
+ * Count unique people for the selected day/period.
  *
- * Rule (product requirement):
- * - Same public IP ⇒ count 1 for the selected day/period
- * - Different IP ⇒ count again
- * - Next calendar period ⇒ count again (date filter is on activity, not lifetime)
- *
- * Formula: |{ uniqueIpKey(ipHash, visitorId) for each active visitorId }|
- * - Prefer ipHash from VisitorModel when present
- * - If no Visitor row / no ipHash yet, still count the browser cookie (visitorId)
- *   so event-only traffic is not dropped (common when visitor upsert lagged)
- * - When `visitorExtra` is set (e.g. isReturning), only matching Visitor docs count
- *   (orphans cannot satisfy those filters)
+ * Rules:
+ * - Same public IP ⇒ 1 (refresh / many tabs / many landings still 1)
+ * - Same device cookie (visitorId) ⇒ 1 when IP unknown
+ * - Staff/admin-linked cookies are removed before counting
+ * - Next calendar day/period ⇒ can count again (activity date filter)
  */
 export async function countUniqueIpsForVisitorIds(
   visitorIds: string[],
@@ -69,7 +79,8 @@ export async function countUniqueIpsForVisitorIds(
     keys.add(uniqueIpKey(v.ipHash, v.visitorId));
   }
 
-  // Guest/device cookies with activity but no Visitor/ipHash yet still count as 1 person.
+  // Guest cookies with activity but no Visitor/ipHash yet — still 1 per cookie.
+  // Refresh keeps the same cookie ⇒ same key ⇒ still 1.
   if (!hasExtra) {
     for (const id of visitorIds) {
       if (!found.has(id)) keys.add(`v:${id}`);
@@ -79,13 +90,15 @@ export async function countUniqueIpsForVisitorIds(
   return keys.size;
 }
 
-/** Unique IPs among visitorIds active via page/session/(optional) event matches. */
+/** Unique IPs/devices among in-period activity (staff cookies removed). */
 export async function countUniqueVisitorIpsFromActivity(
   pageMatch: Record<string, unknown>,
   sessionMatch: Record<string, unknown>,
   visitorExtra: Record<string, unknown> = {},
   eventMatch?: Record<string, unknown>,
+  staffIds: Types.ObjectId[] = [],
 ): Promise<number> {
-  const visitorIds = await resolveActiveVisitorIds(pageMatch, sessionMatch, eventMatch);
+  const rawIds = await resolveActiveVisitorIds(pageMatch, sessionMatch, eventMatch);
+  const visitorIds = await excludeStaffVisitorIds(rawIds, staffIds);
   return countUniqueIpsForVisitorIds(visitorIds, visitorExtra);
 }
