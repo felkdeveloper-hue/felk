@@ -11,4 +11,8 @@ describe('uniqueIpKey', () => {
     expect(uniqueIpKey('', 'vid-1')).toBe('v:vid-1');
     expect(uniqueIpKey('unknown', 'vid-1')).toBe('v:vid-1');
   });
+
+  it('same IP collapses two visitor cookies to one key', () => {
+    expect(uniqueIpKey('same-ip', 'cookie-a')).toBe(uniqueIpKey('same-ip', 'cookie-b'));
+  });
 });

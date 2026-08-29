@@ -390,6 +390,37 @@ async function insertEvents(
   }
 }
 
+async function ensureVisitorStub(
+  visitorId: string,
+  req: Request,
+  userId: Types.ObjectId | undefined,
+  landingPath?: string | null,
+): Promise<void> {
+  const ip = getClientIp(req);
+  const ipKey = hashIp(ip);
+  const now = new Date();
+  await VisitorModel.updateOne(
+    { visitorId },
+    {
+      $setOnInsert: {
+        visitorId,
+        ipHash: ipKey,
+        firstSeenAt: now,
+        isReturning: false,
+        totalVisits: 0,
+        trafficSource: 'direct',
+        landingPath: landingPath ?? null,
+      },
+      $set: {
+        lastSeenAt: now,
+        ipHash: ipKey,
+        ...(userId ? { userId } : {}),
+      },
+    },
+    { upsert: true },
+  );
+}
+
 async function processHeartbeat(
   sessionId: string,
   visitorId: string,
@@ -488,10 +519,16 @@ export async function processCollect(body: CollectBody, req: Request): Promise<v
     );
   }
 
-  // Also ensure a session row exists for event-only batches (GA4-style session stitch).
+  // Also ensure a session + visitor row exists for event-only batches
+  // (visitor stub stores ipHash so unique-IP visitors work without a full visitor payload).
   if (!body.session && !body.heartbeat && body.events?.length) {
     const ev = body.events.find((e) => e.sessionId && e.visitorId);
     if (ev?.sessionId && ev.visitorId) {
+      ops.push(
+        run('visitor-from-event', () =>
+          ensureVisitorStub(ev.visitorId!, req, userId, ev.path ?? null),
+        ),
+      );
       ops.push(
         run('session-from-event', () =>
           upsertSession(
@@ -508,6 +545,15 @@ export async function processCollect(body: CollectBody, req: Request): Promise<v
         ),
       );
     }
+  }
+
+  // Heartbeat without visitor payload — still stamp IP on the visitor cookie.
+  if (body.heartbeat?.visitorId && !body.visitor) {
+    ops.push(
+      run('visitor-from-heartbeat', () =>
+        ensureVisitorStub(body.heartbeat!.visitorId, req, userId, body.heartbeat!.path ?? null),
+      ),
+    );
   }
 
   await Promise.all(ops);

@@ -150,7 +150,9 @@ export function AnalyticsOverviewPage() {
                     <p className="mt-0.5 text-2xl font-bold tabular-nums">
                       {visitors.value.toLocaleString()}
                     </p>
-                    <p className="text-muted-foreground text-[10px]">Unique IPs · {periodLabel}</p>
+                    <p className="text-muted-foreground text-[10px]">
+                      1 per IP/device · {periodLabel}
+                    </p>
                     {visitors.pctChange !== 0 && (
                       <p
                         className={`mt-0.5 text-[10px] font-medium ${visitors.pctChange > 0 ? 'text-green-600' : 'text-red-500'}`}

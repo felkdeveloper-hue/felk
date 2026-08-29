@@ -159,8 +159,8 @@ export async function getOverview(filter: AnalyticsFilter): Promise<OverviewData
   );
 
   const [
-    // VISITORS: unique ipHash among VisitorModel docs for visitorIds active via
-    // page views ∪ sessions ∪ events — never count event sessionIds as people.
+    // VISITORS: unique public IPs (1 per IP per day/period). Guests + customers.
+    // Not sign-ups, not login-only. Same IP same day = 1; next day counts again.
     tv,
     pvTv,
     li,
