@@ -171,6 +171,7 @@ export function CatalogCategoryHero({
         )}
       />
 
+      {/* Mobile flash-sale countdown is shown in the global header */}
       {showCopy ? (
         <div
           className={cn(

@@ -12,15 +12,13 @@ import { customersApi } from '@/services/sdk';
 import { isGuestCheckoutUser } from '@/utils/auth/guest-checkout';
 import { isStaffUser } from '@/utils/auth-redirect';
 import { previewShippingAmount } from '@/constants/checkout.constants';
-import { Zap } from 'lucide-react';
+import { Zap, AlertTriangle } from 'lucide-react';
 import { CartItemRow } from '@/components/cart/cart-item-row';
 import { CartOrderSummary } from '@/components/cart/cart-order-summary';
-import { CartPromotionsPanel } from '@/components/cart/cart-promotions-panel';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { ErrorState } from '@/components/ui/error-state';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertTriangle } from 'lucide-react';
 import { useFlashSale } from '@/contexts/flash-sale-context';
 import { useCategorySlugLookup } from '@/hooks/use-flash-sale-eligibility';
 import { computeFlashAdjustedSubtotal, computeFlashSaving } from '@/utils/flash-sale-eligibility';
@@ -67,8 +65,6 @@ export function CartPageContent() {
   const validation = cart?.validation;
   const checkoutBlocked = cart ? cartHasBlockingStockIssues(cart) : false;
 
-  // Warm saved addresses for signed-in customers only — guest checkout uses inline
-  // address forms and stale tokens here caused noisy 401s on /customers/me/addresses.
   useEffect(() => {
     if (!hasHydrated || !isAuthed || isGuestCheckout || checkoutBlocked) return;
     void queryClient.prefetchQuery({
@@ -88,7 +84,7 @@ export function CartPageContent() {
 
   if (cartQuery.isLoading) {
     return (
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px]" aria-busy="true">
+      <div className="mx-auto grid w-full max-w-6xl gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-8">
         <div className="space-y-4">
           <Skeleton className="h-36 w-full rounded-xl" />
           <Skeleton className="h-36 w-full rounded-xl" />
@@ -113,7 +109,7 @@ export function CartPageContent() {
 
   if (!cart || cart.items.length === 0) {
     return (
-      <div className="border-border/80 bg-muted/40 rounded-[2rem] border border-dashed px-6 py-20 text-center">
+      <div className="border-border/80 bg-muted/40 mx-auto max-w-6xl rounded-[2rem] border border-dashed px-6 py-20 text-center">
         <h2 className="font-display text-3xl font-bold uppercase">Your bag is empty</h2>
         <p className="text-muted-foreground mt-2 text-sm">
           Browse the catalog and add pieces you love.
@@ -145,8 +141,8 @@ export function CartPageContent() {
       : null;
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
-      <section aria-labelledby="cart-items-heading" className="space-y-4 pb-28 lg:pb-0">
+    <div className="mx-auto grid w-full max-w-6xl gap-5 lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-8">
+      <section aria-labelledby="cart-items-heading" className="min-w-0 space-y-4 pb-28 lg:pb-0">
         <h2 id="cart-items-heading" className="sr-only">
           Bag items ({cart.items.length})
         </h2>
@@ -167,7 +163,7 @@ export function CartPageContent() {
               <CartItemRow
                 key={item.id}
                 item={item}
-                className="border-0 px-4 last:border-0 sm:px-5"
+                className="border-0 px-3 last:border-0 sm:px-5"
                 validationMessage={getIssueForItem(item.id, validation)}
               />
             ))}
@@ -175,8 +171,7 @@ export function CartPageContent() {
         </div>
       </section>
 
-      <div className="space-y-4 lg:sticky lg:top-24 lg:self-start">
-        <CartPromotionsPanel />
+      <div className="min-w-0 space-y-4 lg:sticky lg:top-24 lg:self-start">
         <CartOrderSummary totals={cart.totals} items={cart.items} validation={validation} />
         <div className="hidden space-y-3 lg:block">
           {!hasHydrated ? (
@@ -192,7 +187,6 @@ export function CartPageContent() {
               className="w-full"
               size="lg"
               onClick={() => {
-                // Full-bag checkout — clear Buy Now scope + stale session cache.
                 useCheckoutStore.getState().resetCheckoutUi();
                 queryClient.removeQueries({ queryKey: ['checkout'] });
                 void navigate({ to: ROUTES.checkout });
@@ -207,7 +201,6 @@ export function CartPageContent() {
         </div>
       </div>
 
-      {/* Mobile sticky checkout bar */}
       <div
         className="border-border/80 bg-background/95 supports-[backdrop-filter]:bg-background/90 fixed inset-x-0 z-[85] border-t px-4 py-3 backdrop-blur-md lg:hidden"
         style={{ bottom: 'calc(3.5rem + env(safe-area-inset-bottom, 0px))' }}
@@ -238,16 +231,16 @@ export function CartPageContent() {
           </div>
           {!hasHydrated ? (
             <Button
-              className="h-12 w-full rounded-none text-sm font-bold uppercase tracking-[0.14em]"
+              className="h-11 w-full rounded-none text-[12px] font-bold uppercase tracking-[0.1em]"
               size="lg"
               disabled
               loading
             >
-              Checkout
+              Proceed to checkout
             </Button>
           ) : checkoutBlocked ? (
             <Button
-              className="h-12 w-full rounded-none text-sm font-bold uppercase tracking-[0.14em]"
+              className="h-11 w-full rounded-none text-[12px] font-bold uppercase tracking-[0.1em]"
               size="lg"
               disabled
             >
@@ -255,7 +248,7 @@ export function CartPageContent() {
             </Button>
           ) : (
             <Button
-              className="h-12 w-full rounded-none text-sm font-bold uppercase tracking-[0.14em]"
+              className="h-11 w-full rounded-none text-[12px] font-bold uppercase tracking-[0.1em]"
               size="lg"
               onClick={() => {
                 useCheckoutStore.getState().resetCheckoutUi();
@@ -263,7 +256,7 @@ export function CartPageContent() {
                 void navigate({ to: ROUTES.checkout });
               }}
             >
-              Checkout
+              Proceed to checkout
             </Button>
           )}
         </div>

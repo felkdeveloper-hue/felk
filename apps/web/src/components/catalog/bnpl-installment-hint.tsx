@@ -20,24 +20,9 @@ function formatInstallmentAmount(amount: number, currency = 'LKR'): string {
   return `${currency} ${formatted}`;
 }
 
-/** Official PayHere wordmark: Pay (blue) + Here (golden italic). */
-function PayHereMark({ className }: { className?: string }) {
-  return (
-    <span
-      className={cn(
-        'inline-flex shrink-0 items-baseline font-semibold italic leading-none',
-        className,
-      )}
-      aria-label="PayHere"
-    >
-      <span style={{ color: '#2E5BCC' }}>Pay</span>
-      <span style={{ color: '#F9A51A' }}>Here</span>
-    </span>
-  );
-}
-
 /**
  * Premium Mintpay + KOKO + PayHere installment lines shown under product prices.
+ * Mintpay stays on the cashback line (nowrap group) so phones lose one wrap line.
  */
 export function BnplInstallmentHint({
   amount,
@@ -54,32 +39,37 @@ export function BnplInstallmentHint({
   return (
     <div
       className={cn(
-        'flex flex-col gap-[3px] overflow-visible pb-1 pt-1 font-medium uppercase tracking-[0.03em]',
-        isMd ? 'text-[11px] sm:text-xs' : 'text-[9.5px] leading-[1.35] sm:text-[10.5px]',
+        'flex flex-col gap-[2px] overflow-visible pb-1 pt-1 font-medium uppercase tracking-[0.03em]',
+        isMd
+          ? 'text-[11px] sm:text-xs'
+          : 'text-[9px] leading-[1.3] sm:text-[10.5px] sm:leading-[1.35]',
         className,
       )}
       style={{ color: '#8a8a8a' }}
       aria-label={`Or ${INSTALLMENT_COUNT} payments of ${installmentLabel} with Mintpay, KOKO, or PayHere`}
     >
-      <p className="flex flex-wrap items-center gap-x-[5px] gap-y-0.5">
+      <p className="flex flex-wrap items-center gap-x-[4px] gap-y-0.5">
         <span>
-          Or {INSTALLMENT_COUNT} x {installmentLabel} or {MINTPAY_CASHBACK_PERCENT}% cashback with
+          Or {INSTALLMENT_COUNT} x {installmentLabel} or
         </span>
-        <img
-          src="/payments/mintpay-pill.png"
-          alt="Mintpay"
-          width={68}
-          height={17}
-          className={cn(
-            'w-auto shrink-0 object-contain object-left',
-            isMd ? 'h-[15px]' : 'h-[13px]',
-          )}
-          loading="lazy"
-          decoding="async"
-        />
+        <span className="inline-flex items-center gap-x-[4px] whitespace-nowrap">
+          {MINTPAY_CASHBACK_PERCENT}% cashback with
+          <img
+            src="/payments/mintpay-pill.png"
+            alt="Mintpay"
+            width={68}
+            height={17}
+            className={cn(
+              'inline-block w-auto shrink-0 object-contain object-left align-middle',
+              isMd ? 'h-[15px]' : 'h-[12px] sm:h-[13px]',
+            )}
+            loading="lazy"
+            decoding="async"
+          />
+        </span>
       </p>
 
-      <p className="flex flex-wrap items-center gap-x-[5px] gap-y-0.5">
+      <p className="flex flex-wrap items-center gap-x-[4px] gap-y-0.5">
         <span>
           Or {INSTALLMENT_COUNT} x {installmentLabel} with
         </span>
@@ -91,7 +81,7 @@ export function BnplInstallmentHint({
             height={53}
             className={cn(
               'block w-auto max-w-none object-contain object-left',
-              isMd ? 'h-[20px]' : 'h-[18px]',
+              isMd ? 'h-[20px]' : 'h-[16px] sm:h-[18px]',
             )}
             loading="lazy"
             decoding="async"
@@ -99,7 +89,18 @@ export function BnplInstallmentHint({
           />
         </span>
         <span className="uppercase tracking-[0.03em]">or</span>
-        <PayHereMark className={isMd ? 'text-[13px]' : 'text-[11.5px]'} />
+        <img
+          src="/payments/payhere.svg"
+          alt="PayHere"
+          width={72}
+          height={18}
+          className={cn(
+            'inline-block w-auto shrink-0 object-contain object-left align-middle',
+            isMd ? 'h-[14px]' : 'h-[12px] sm:h-[13px]',
+          )}
+          loading="lazy"
+          decoding="async"
+        />
       </p>
     </div>
   );

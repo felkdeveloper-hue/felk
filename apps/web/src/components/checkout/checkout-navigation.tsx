@@ -22,11 +22,11 @@ export function CheckoutNavigation({
   showBack = true,
 }: CheckoutNavigationProps) {
   return (
-    <div className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="mt-5 flex flex-col-reverse gap-2.5 sm:mt-8 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
       {showBack && backTo ? (
-        <Button type="button" variant="outline" asChild className="w-full sm:w-auto">
+        <Button type="button" variant="outline" asChild className="h-10 w-full sm:h-10 sm:w-auto">
           <Link to={backTo}>
-            <ArrowLeft className="size-4" aria-hidden />
+            <ArrowLeft className="size-3.5 sm:size-4" aria-hidden />
             {backLabel}
           </Link>
         </Button>
@@ -37,13 +37,15 @@ export function CheckoutNavigation({
       {onNext ? (
         <Button
           type="button"
-          className="w-full sm:w-auto"
+          className="h-10 w-full text-[13px] sm:h-10 sm:w-auto sm:text-sm"
           onClick={onNext}
           disabled={nextDisabled || isSubmitting}
         >
-          {isSubmitting ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
+          {isSubmitting ? (
+            <Loader2 className="size-3.5 animate-spin sm:size-4" aria-hidden />
+          ) : null}
           {nextLabel}
-          {!isSubmitting ? <ArrowRight className="size-4" aria-hidden /> : null}
+          {!isSubmitting ? <ArrowRight className="size-3.5 sm:size-4" aria-hidden /> : null}
         </Button>
       ) : null}
     </div>

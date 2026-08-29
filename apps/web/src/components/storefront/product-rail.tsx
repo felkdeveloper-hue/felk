@@ -113,7 +113,7 @@ export function ProductRailSection({
         ) : hasProducts ? (
           <HorizontalCarousel
             label={title ?? copy.title}
-            itemClassName="w-[88%] sm:w-[52%] md:w-[40%] lg:w-[31%] xl:w-[24%]"
+            itemClassName="w-[46%] sm:w-[52%] md:w-[40%] lg:w-[31%] xl:w-[24%]"
             scrollByItem
           >
             {query.data!.data.map((product, index) => (
@@ -121,7 +121,7 @@ export function ProductRailSection({
                 key={`${product.id}-${product.defaultVariantId ?? 'default'}`}
                 product={product}
                 priority={eager && index < 2}
-                sizes="(max-width: 640px) 88vw, (max-width: 768px) 52vw, (max-width: 1024px) 40vw, (max-width: 1280px) 31vw, 24vw"
+                sizes="(max-width: 640px) 46vw, (max-width: 768px) 52vw, (max-width: 1024px) 40vw, (max-width: 1280px) 31vw, 24vw"
               />
             ))}
           </HorizontalCarousel>

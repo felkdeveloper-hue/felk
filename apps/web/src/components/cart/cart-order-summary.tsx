@@ -8,10 +8,7 @@ import { isStaffUser } from '@/utils/auth-redirect';
 import { Zap } from 'lucide-react';
 import { useFlashSale } from '@/contexts/flash-sale-context';
 import { useCategorySlugLookup } from '@/hooks/use-flash-sale-eligibility';
-import {
-  computeFlashAdjustedSubtotal,
-  computeFlashSaving,
-} from '@/utils/flash-sale-eligibility';
+import { computeFlashAdjustedSubtotal, computeFlashSaving } from '@/utils/flash-sale-eligibility';
 
 export interface CartOrderSummaryProps {
   totals: CartTotals;
@@ -50,8 +47,8 @@ export function CartOrderSummary({ totals, items = [], validation }: CartOrderSu
   const hasAnyFlashDiscount = flashSaving > 0;
 
   return (
-    <aside className="border-border bg-card space-y-4 rounded-xl border p-5">
-      <h2 className="text-base font-semibold">Price summary</h2>
+    <aside className="border-border bg-card min-w-0 space-y-3 rounded-xl border p-4 sm:space-y-4 sm:p-5">
+      <h2 className="text-sm font-semibold sm:text-base">Price summary</h2>
 
       {flashEnabled && hasAnyFlashDiscount ? (
         <div

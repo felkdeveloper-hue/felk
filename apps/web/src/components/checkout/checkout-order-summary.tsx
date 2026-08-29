@@ -138,17 +138,22 @@ export function CheckoutOrderSummary({ session, editable = false }: CheckoutOrde
   };
 
   return (
-    <aside className="border-border/70 bg-card/90 rounded-[1.75rem] border p-6 shadow-[var(--shadow-elevated)] backdrop-blur">
-      <h2 className="font-display text-lg font-bold uppercase tracking-tight">Order summary</h2>
-      <ul className="mt-4 space-y-4">
+    <aside className="border-border/70 bg-card/90 min-w-0 rounded-xl border p-4 shadow-[var(--shadow-elevated)] backdrop-blur sm:rounded-[1.75rem] sm:p-6">
+      <h2 className="font-display text-base font-bold uppercase tracking-tight sm:text-lg">
+        Order summary
+      </h2>
+      <ul className="mt-3 space-y-3 sm:mt-4 sm:space-y-4">
         {lineEligibility.map(({ line, eligible }) => {
           const cartItemId = line.cartItemId;
           const canEdit = editable && Boolean(cartItemId);
           const lineFlashEnabled = (flashEnabled || serverFlashApplied) && eligible;
 
           return (
-            <li key={`${line.variantId}-${cartItemId ?? line.sku}`} className="flex gap-3 text-sm">
-              <div className="border-border size-14 shrink-0 overflow-hidden rounded-2xl border">
+            <li
+              key={`${line.variantId}-${cartItemId ?? line.sku}`}
+              className="flex gap-2.5 text-xs sm:gap-3 sm:text-sm"
+            >
+              <div className="border-border size-12 shrink-0 overflow-hidden rounded-xl border sm:size-14 sm:rounded-2xl">
                 <Image
                   src={line.thumbnailUrl}
                   alt={line.title}
@@ -158,7 +163,7 @@ export function CheckoutOrderSummary({ session, editable = false }: CheckoutOrde
                   loading="eager"
                 />
               </div>
-              <div className="min-w-0 flex-1 space-y-2">
+              <div className="min-w-0 flex-1 space-y-1.5 sm:space-y-2">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="font-medium leading-snug">{line.title}</p>
@@ -170,7 +175,7 @@ export function CheckoutOrderSummary({ session, editable = false }: CheckoutOrde
                   </div>
                   {lineFlashEnabled ? (
                     <div className="shrink-0 text-right">
-                      <p className="text-muted-foreground text-xs line-through">
+                      <p className="text-muted-foreground text-[10px] line-through sm:text-xs">
                         {formatCurrency(line.lineSubtotal, currency)}
                       </p>
                       <p className="font-semibold" style={{ color: '#f97316' }}>

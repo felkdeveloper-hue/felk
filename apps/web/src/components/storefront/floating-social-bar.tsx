@@ -1,6 +1,7 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSocialLinks } from '@/hooks/cms';
 import { cn } from '@/lib/utils';
+import { X } from 'lucide-react';
 
 const FALLBACK_LINKS = {
   instagram: 'https://www.instagram.com/fashion__edge__/',
@@ -43,19 +44,19 @@ const PLATFORMS: Array<{
   {
     key: 'instagram',
     label: 'Instagram',
-    bg: 'bg-gradient-to-br from-[#FCAF45] via-[#E1306C] to-[#833AB4] hover:brightness-110',
+    bg: 'bg-gradient-to-br from-[#FCAF45] via-[#E1306C] to-[#833AB4]',
     Icon: InstagramIcon,
   },
   {
     key: 'facebook',
     label: 'Facebook',
-    bg: 'bg-[#1877F2] hover:brightness-110',
+    bg: 'bg-[#1877F2]',
     Icon: FacebookIcon,
   },
   {
     key: 'tiktok',
     label: 'TikTok',
-    bg: 'bg-black hover:brightness-125',
+    bg: 'bg-black',
     Icon: TikTokIcon,
   },
 ];
@@ -68,9 +69,10 @@ function resolveUrl(
   return match?.url?.trim() || FALLBACK_LINKS[key];
 }
 
-/** Fixed right-edge social pill — circular bordered icons, Instagram / Facebook / TikTok. */
+/** Fixed social bar — desktop side rail unchanged; mobile FAB expands in place. */
 export function FloatingSocialBar({ className }: { className?: string }) {
   const { data } = useSocialLinks();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   const items = useMemo(
     () =>
@@ -84,40 +86,122 @@ export function FloatingSocialBar({ className }: { className?: string }) {
     [data?.data],
   );
 
+  const primary = items[0];
+
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMobileOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [mobileOpen]);
+
   return (
-    <aside
-      aria-label="Social media"
-      className={cn(
-        'z-60 pointer-events-none fixed right-3 top-1/2 hidden -translate-y-1/2 sm:block',
-        className,
-      )}
-    >
-      <div
+    <>
+      {/* Desktop — unchanged right-edge pill */}
+      <aside
+        aria-label="Social media"
         className={cn(
-          'pointer-events-auto flex flex-col items-center gap-3 px-2.5 py-4',
-          'bg-[#1e1e1e] shadow-[0_16px_48px_-20px_rgba(0,0,0,0.65)] backdrop-blur-lg',
-          'ring-1 ring-inset ring-white/10',
+          'z-60 pointer-events-none fixed right-3 top-1/2 hidden -translate-y-1/2 sm:block',
+          className,
         )}
-        style={{ borderRadius: '999px' }}
       >
-        {items.map(({ key, label, url, bg, Icon }) => (
-          <a
-            key={key}
-            href={url}
-            target="_blank"
-            rel="noreferrer noopener"
-            aria-label={label}
+        <div
+          className={cn(
+            'pointer-events-auto flex flex-col items-center gap-3 px-2.5 py-4',
+            'bg-[#1e1e1e] shadow-[0_16px_48px_-20px_rgba(0,0,0,0.65)] backdrop-blur-lg',
+            'ring-1 ring-inset ring-white/10',
+          )}
+          style={{ borderRadius: '999px' }}
+        >
+          {items.map(({ key, label, url, bg, Icon }) => (
+            <a
+              key={key}
+              href={url}
+              target="_blank"
+              rel="noreferrer noopener"
+              aria-label={label}
+              className={cn(
+                'inline-flex size-10 items-center justify-center rounded-full',
+                'transition-all duration-200 hover:scale-110',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black/40',
+                bg,
+              )}
+            >
+              <Icon className="size-4.5 text-white" />
+            </a>
+          ))}
+        </div>
+      </aside>
+
+      {/* Mobile FAB — collapsed shows one circle; expand reveals all three + close */}
+      <aside
+        aria-label="Social media"
+        className={cn(
+          'pointer-events-none fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] right-3 z-[70] sm:hidden',
+          className,
+        )}
+      >
+        <div className="pointer-events-auto flex flex-col-reverse items-center gap-2.5">
+          {primary ? (
+            <button
+              type="button"
+              aria-label={mobileOpen ? 'Close social links' : `Open ${primary.label}`}
+              aria-expanded={mobileOpen}
+              onClick={() => setMobileOpen((open) => !open)}
+              className={cn(
+                'inline-flex size-12 items-center justify-center rounded-full',
+                'shadow-[0_10px_28px_-10px_rgba(0,0,0,0.55)] ring-2 ring-white/90',
+                'transition-all duration-300 ease-out active:scale-95',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900/40',
+                mobileOpen ? 'bg-neutral-900 text-white' : primary.bg,
+              )}
+            >
+              {mobileOpen ? (
+                <X className="size-5 text-white" strokeWidth={2.25} />
+              ) : (
+                <primary.Icon className="size-5 text-white" />
+              )}
+            </button>
+          ) : null}
+
+          <div
             className={cn(
-              'inline-flex size-10 items-center justify-center rounded-full',
-              'transition-all duration-200 hover:scale-110',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black/40',
-              bg,
+              'flex flex-col-reverse items-center gap-2.5 overflow-hidden transition-all duration-300 ease-out',
+              mobileOpen
+                ? 'max-h-48 translate-y-0 opacity-100'
+                : 'pointer-events-none max-h-0 -translate-y-1 opacity-0',
             )}
+            aria-hidden={!mobileOpen}
           >
-            <Icon className="size-4.5 text-white" />
-          </a>
-        ))}
-      </div>
-    </aside>
+            {items.map(({ key, label, url, bg, Icon }, index) => (
+              <a
+                key={key}
+                href={url}
+                target="_blank"
+                rel="noreferrer noopener"
+                aria-label={label}
+                tabIndex={mobileOpen ? 0 : -1}
+                className={cn(
+                  'inline-flex size-11 items-center justify-center rounded-full',
+                  'shadow-[0_8px_22px_-10px_rgba(0,0,0,0.5)] ring-2 ring-white/90',
+                  'transition-all duration-300 ease-out',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900/40',
+                  bg,
+                )}
+                style={{
+                  transitionDelay: mobileOpen ? `${index * 45}ms` : '0ms',
+                  transform: mobileOpen ? 'scale(1)' : 'scale(0.7)',
+                }}
+                onClick={() => setMobileOpen(false)}
+              >
+                <Icon className="size-[1.1rem] text-white" />
+              </a>
+            ))}
+          </div>
+        </div>
+      </aside>
+    </>
   );
 }

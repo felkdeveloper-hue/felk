@@ -166,7 +166,7 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
             className="hidden w-40 shrink-0 xl:block xl:w-48 2xl:w-56"
           />
 
-          <FlashSaleCountdown lightChrome={lightChrome} className="hidden sm:flex" />
+          <FlashSaleCountdown className="flex shrink-0" />
 
           <div className="flex shrink-0 items-center gap-0.5">
             <Button

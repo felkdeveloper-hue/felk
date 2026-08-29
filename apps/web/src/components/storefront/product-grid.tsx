@@ -13,7 +13,7 @@ import { ProductCard } from './product-card';
 const GRID_COUNT = 12; // 4 columns × 3 rows
 
 const gridLayoutClass =
-  'w-full grid grid-cols-2 gap-4 px-4 sm:grid-cols-2 sm:gap-4 sm:px-4 md:grid-cols-3 md:gap-5 lg:grid-cols-4 lg:gap-6 lg:px-5 xl:px-6';
+  'w-full grid grid-cols-2 gap-2.5 px-3.5 sm:grid-cols-2 sm:gap-4 sm:px-4 md:grid-cols-3 md:gap-5 lg:grid-cols-4 lg:gap-6 lg:px-5 xl:px-6';
 
 function shuffleProducts(products: Product[]): Product[] {
   const next = [...products];

@@ -102,8 +102,6 @@ function ProductCardComponent({
 
   const touchStartX = useRef<number | null>(null);
   const lastTap = useRef(0);
-  const longPressTimer = useRef<number | null>(null);
-  const longPressFired = useRef(false);
   const didSwipe = useRef(false);
 
   const isAuthed = useAuthStore((state) => Boolean(state.accessToken && state.user));
@@ -233,22 +231,9 @@ function ProductCardComponent({
     wishlistQuery.data?.items,
   ]);
 
-  const clearLongPress = () => {
-    if (longPressTimer.current != null) {
-      window.clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
-    }
-  };
-
   const onTouchStart = (event: TouchEvent) => {
     touchStartX.current = event.touches[0]?.clientX ?? null;
-    longPressFired.current = false;
     didSwipe.current = false;
-    clearLongPress();
-    longPressTimer.current = window.setTimeout(() => {
-      longPressFired.current = true;
-      setQuickOpen(true);
-    }, 480);
   };
 
   const onTouchMove = (event: TouchEvent) => {
@@ -256,18 +241,12 @@ function ProductCardComponent({
     const x = event.touches[0]?.clientX;
     if (start != null && x != null && Math.abs(x - start) > 12) {
       didSwipe.current = true;
-      clearLongPress();
     }
   };
 
   const onTouchEnd = (event: TouchEvent) => {
-    clearLongPress();
     touchStartX.current = null;
-    if (longPressFired.current) {
-      event.preventDefault();
-      return;
-    }
-    // Horizontal rail scroll — don't steal the gesture for image cycling or double-tap.
+    // Horizontal rail scroll — don't steal the gesture for double-tap wishlist.
     if (didSwipe.current) {
       didSwipe.current = false;
       lastTap.current = 0;

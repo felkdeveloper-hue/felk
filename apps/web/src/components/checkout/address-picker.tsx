@@ -89,37 +89,49 @@ export function AddressPicker({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 sm:space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <Label className="text-base font-medium">{label}</Label>
-        <Button type="button" variant="outline" size="sm" onClick={() => setDialogOpen(true)}>
-          <Plus className="size-4" aria-hidden />
+        <Label className="text-sm font-medium sm:text-base">{label}</Label>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-8 text-xs sm:h-9 sm:text-sm"
+          onClick={() => setDialogOpen(true)}
+        >
+          <Plus className="size-3.5 sm:size-4" aria-hidden />
           Add address
         </Button>
       </div>
 
       {visible.length === 0 ? (
-        <div className="border-border text-muted-foreground rounded-lg border border-dashed p-6 text-center text-sm">
+        <div className="border-border text-muted-foreground rounded-lg border border-dashed p-4 text-center text-xs sm:p-6 sm:text-sm">
           No saved addresses. Add one to continue.
         </div>
       ) : (
-        <RadioGroup value={selectedId ?? undefined} onValueChange={onSelect} className="space-y-3">
+        <RadioGroup
+          value={selectedId ?? undefined}
+          onValueChange={onSelect}
+          className="space-y-2.5 sm:space-y-3"
+        >
           {visible.map((address) => (
             <label
               key={address.id}
               htmlFor={`address-${address.id}`}
               className={cn(
-                'flex cursor-pointer gap-3 rounded-lg border p-4 transition-colors',
+                'flex min-w-0 cursor-pointer gap-2.5 rounded-lg border p-3 transition-colors sm:gap-3 sm:p-4',
                 selectedId && selectedId === address.id
                   ? 'border-primary ring-primary/30 ring-1'
                   : 'border-border',
               )}
             >
-              <RadioGroupItem value={address.id} id={`address-${address.id}`} className="mt-1" />
-              <div className="min-w-0 flex-1 text-sm">
+              <RadioGroupItem value={address.id} id={`address-${address.id}`} className="mt-0.5" />
+              <div className="min-w-0 flex-1 text-xs sm:text-sm">
                 <p className="font-medium">{address.fullName}</p>
                 {address.phone ? <p className="text-muted-foreground">{address.phone}</p> : null}
-                <p className="text-muted-foreground mt-1">{formatAddressLine(address)}</p>
+                <p className="text-muted-foreground mt-1 break-words">
+                  {formatAddressLine(address)}
+                </p>
               </div>
             </label>
           ))}

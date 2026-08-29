@@ -19,6 +19,7 @@ import {
 } from '@/constants/checkout.constants';
 import { ROUTES } from '@/constants';
 import { useCheckoutSessionQuery, useRefreshCheckoutMutation } from '@/hooks/checkout';
+import { useIsMobile } from '@/hooks';
 import { usePlaceOrderMutation } from '@/hooks/payment';
 import { setCheckoutPlacedFlag } from '@/utils/checkout-placed-flag';
 import { AppError } from '@/lib/errors';
@@ -79,14 +80,25 @@ function ReviewSection({
   className?: string;
 }) {
   return (
-    <section className={cn('border-border bg-card/60 rounded-2xl border p-5', className)}>
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <h3 className="bg-primary text-primary-foreground inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-wide">
-          <Icon className="size-3.5" aria-hidden />
+    <section
+      className={cn(
+        'border-border bg-card/60 min-w-0 rounded-xl border p-3.5 sm:rounded-2xl sm:p-5',
+        className,
+      )}
+    >
+      <div className="mb-3 flex items-start justify-between gap-2 sm:mb-4 sm:gap-3">
+        <h3 className="bg-primary text-primary-foreground inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide sm:gap-2 sm:px-3 sm:py-1.5 sm:text-xs">
+          <Icon className="size-3 sm:size-3.5" aria-hidden />
           {title}
         </h3>
         {editTo ? (
-          <Button type="button" variant="ghost" size="sm" asChild className="h-8 px-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            asChild
+            className="h-7 px-1.5 text-xs sm:h-8 sm:px-2"
+          >
             <Link to={editTo}>
               <Pencil className="size-3.5" aria-hidden />
               {editLabel ?? 'Edit'}
@@ -131,6 +143,7 @@ function AddressDetails({
 
 export function CheckoutReviewPage() {
   const navigate = useNavigate();
+  const isMobile = useIsMobile(640);
   const checkoutToken = useCheckoutStore((state) => state.checkoutToken);
   const paymentMethod = useCheckoutStore((state) => state.selectedPaymentMethod);
   const shippingAddressId = useCheckoutStore((state) => state.selectedShippingAddressId);
@@ -145,6 +158,13 @@ export function CheckoutReviewPage() {
 
   const selectedPayment = paymentOption(paymentMethod);
   const isCod = paymentMethod === 'cod';
+
+  // Mobile skips review — pay from step 2 instead.
+  useEffect(() => {
+    if (isMobile) {
+      void navigate({ to: ROUTES.checkoutPayment, replace: true });
+    }
+  }, [isMobile, navigate]);
 
   useEffect(() => {
     if (!checkoutToken && !sessionQuery.isLoading) {
@@ -270,6 +290,15 @@ export function CheckoutReviewPage() {
     Boolean(session && !session.shippingAddress && shippingAddressId) &&
     (refreshCheckout.isPending || !addressHealAttempted.current);
 
+  if (isMobile) {
+    return (
+      <>
+        <Seo title="Payment" description="Choose a payment method." noIndex />
+        <Skeleton className="h-48 w-full" aria-busy="true" />
+      </>
+    );
+  }
+
   if (sessionQuery.isLoading && !session) {
     return (
       <>
@@ -292,7 +321,7 @@ export function CheckoutReviewPage() {
     return (
       <>
         <Seo title="Review" description="Review your order." noIndex />
-        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]" aria-busy="true">
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-8" aria-busy="true">
           <Skeleton className="h-64 w-full" />
           <Skeleton className="h-64 w-full" />
         </div>
@@ -304,20 +333,20 @@ export function CheckoutReviewPage() {
     <>
       <Seo title="Review order" description="Review and place your order." noIndex />
 
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <section aria-labelledby="checkout-review-heading">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-8">
+        <section aria-labelledby="checkout-review-heading" className="min-w-0">
           <h2
             id="checkout-review-heading"
-            className="font-display text-2xl font-bold tracking-tight"
+            className="font-display text-xl font-bold tracking-tight sm:text-2xl"
           >
             Almost done
           </h2>
-          <p className="text-muted-foreground mt-1 text-sm">
+          <p className="text-muted-foreground mt-1 text-xs sm:text-sm">
             Check everything below, then place your order. You can edit any section before
             confirming.
           </p>
 
-          <div className="mt-6 space-y-4">
+          <div className="mt-4 space-y-3 sm:mt-6 sm:space-y-4">
             <CheckoutExpiryBanner
               session={session}
               onExtend={handleExtend}
@@ -371,15 +400,15 @@ export function CheckoutReviewPage() {
                 editTo={ROUTES.checkoutPayment}
                 editLabel="Change"
               >
-                <div className="flex flex-wrap items-center gap-4">
+                <div className="flex flex-wrap items-center gap-3 sm:gap-4">
                   {selectedPayment ? (
-                    <div className="bg-background border-border/70 flex h-12 w-[148px] items-center justify-center rounded-xl border px-2">
+                    <div className="bg-background border-border/70 flex h-10 w-[120px] items-center justify-center rounded-lg border px-2 sm:h-12 sm:w-[148px] sm:rounded-xl">
                       <img
                         src={selectedPayment.logoSrc}
                         alt=""
                         width={140}
                         height={36}
-                        className="h-9 w-auto max-w-full object-contain"
+                        className="h-7 w-auto max-w-full object-contain sm:h-9"
                       />
                     </div>
                   ) : null}
@@ -467,7 +496,7 @@ export function CheckoutReviewPage() {
           </div>
         </section>
 
-        <div className="lg:sticky lg:top-24 lg:self-start">
+        <div className="min-w-0 lg:sticky lg:top-24 lg:self-start">
           <CheckoutOrderSummary session={session} />
         </div>
       </div>

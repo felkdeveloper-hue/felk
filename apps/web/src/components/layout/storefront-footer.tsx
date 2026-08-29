@@ -1,4 +1,4 @@
-import { Link } from '@tanstack/react-router';
+import { Link, useRouterState } from '@tanstack/react-router';
 import { useCmsPages, useContactInfos, usePublicSettings, useSocialLinks } from '@/hooks/cms';
 import { ROUTES, type RoutePath } from '@/constants';
 import { cn } from '@/lib/utils';
@@ -47,6 +47,11 @@ const FE_FALLBACK = {
 };
 
 export function StorefrontFooter() {
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const hideOnMobileCartOrCheckout =
+    pathname === ROUTES.cart ||
+    pathname.startsWith(`${ROUTES.cart}/`) ||
+    pathname.startsWith(ROUTES.checkout);
   const { data: settings } = usePublicSettings();
   const { data: pagesResult } = useCmsPages();
   const { data: socialResult } = useSocialLinks();
@@ -91,7 +96,10 @@ export function StorefrontFooter() {
   return (
     <footer
       data-slot="storefront-footer"
-      className="border-border border-t bg-[linear-gradient(180deg,hsl(var(--muted))_0%,hsl(var(--background))_40%)]"
+      className={cn(
+        'border-border border-t bg-[linear-gradient(180deg,hsl(var(--muted))_0%,hsl(var(--background))_40%)]',
+        hideOnMobileCartOrCheckout && 'hidden lg:block',
+      )}
     >
       <div className="border-border/70 border-b">
         <NewsletterSignupSection />

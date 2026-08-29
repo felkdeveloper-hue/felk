@@ -333,20 +333,23 @@ export function CheckoutInformationPage() {
         <Seo title="Checkout" description="Continue checkout with your email." noIndex />
         <CheckoutGuestAuthDialog open onAuthenticated={handleGuestAuthenticated} />
 
-        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <section aria-labelledby="checkout-information-heading" className="space-y-8">
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-8">
+          <section
+            aria-labelledby="checkout-information-heading"
+            className="min-w-0 space-y-5 sm:space-y-8"
+          >
             <div>
-              <h2 id="checkout-information-heading" className="text-lg font-semibold">
+              <h2 id="checkout-information-heading" className="text-base font-semibold sm:text-lg">
                 Customer information
               </h2>
-              <p className="text-muted-foreground mt-1 text-sm">
+              <p className="text-muted-foreground mt-1 text-xs sm:text-sm">
                 Confirm your email in the popup to continue — shipping details unlock after sign-in.
               </p>
             </div>
 
-            <div className="border-border bg-muted/30 space-y-3 rounded-xl border border-dashed p-5">
+            <div className="border-border bg-muted/30 space-y-3 rounded-xl border border-dashed p-4 sm:p-5">
               <p className="text-sm font-medium">Contact & shipping</p>
-              <p className="text-muted-foreground text-sm">
+              <p className="text-muted-foreground text-xs sm:text-sm">
                 Email, password / OTP, and delivery address will appear here after you continue in
                 the popup.
               </p>
@@ -361,7 +364,7 @@ export function CheckoutInformationPage() {
                       key={item.id}
                       item={item}
                       compact
-                      className="border-0 px-4 last:border-0 sm:px-5"
+                      className="border-0 px-3 last:border-0 sm:px-5"
                     />
                   ))}
                 </div>
@@ -371,7 +374,7 @@ export function CheckoutInformationPage() {
             )}
           </section>
 
-          <div className="lg:sticky lg:top-24 lg:self-start">
+          <div className="min-w-0 lg:sticky lg:top-24 lg:self-start">
             {guestCart?.totals ? (
               <CartOrderSummary totals={guestCart.totals} validation={guestCart.validation} />
             ) : (
@@ -409,19 +412,19 @@ export function CheckoutInformationPage() {
         />
       ) : null}
 
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <section aria-labelledby="checkout-information-heading">
-          <h2 id="checkout-information-heading" className="text-lg font-semibold">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-8">
+        <section aria-labelledby="checkout-information-heading" className="min-w-0">
+          <h2 id="checkout-information-heading" className="text-base font-semibold sm:text-lg">
             Customer information
           </h2>
-          <p className="text-muted-foreground mt-1 text-sm">
+          <p className="text-muted-foreground mt-1 text-xs sm:text-sm">
             {isGuestCheckout
               ? 'Add your delivery address to continue — no sign-in required.'
               : 'Choose shipping and billing addresses from your saved profile.'}
           </p>
 
           {!bootstrapError || session ? (
-            <div className="mt-6 space-y-8">
+            <div className="mt-4 space-y-5 sm:mt-6 sm:space-y-8">
               {session ? (
                 <>
                   <CheckoutExpiryBanner
@@ -497,14 +500,14 @@ export function CheckoutInformationPage() {
           )}
         </section>
 
-        <div className="space-y-4 lg:sticky lg:top-24 lg:self-start">
+        <div className="min-w-0 space-y-4 lg:sticky lg:top-24 lg:self-start">
           {session ? (
             <CheckoutOrderSummary session={session} editable />
           ) : (
             <>
               {guestCart?.items?.length ? (
                 <div className="border-border bg-card divide-border space-y-0 overflow-hidden rounded-xl border">
-                  <div className="border-border border-b px-4 py-3">
+                  <div className="border-border border-b px-3 py-2.5 sm:px-4 sm:py-3">
                     <h3 className="text-sm font-semibold">Your bag ({guestCart.items.length})</h3>
                   </div>
                   <div className="divide-border divide-y">
@@ -513,7 +516,7 @@ export function CheckoutInformationPage() {
                         key={item.id}
                         item={item}
                         compact
-                        className="border-0 px-4 last:border-0 sm:px-5"
+                        className="border-0 px-3 last:border-0 sm:px-5"
                       />
                     ))}
                   </div>

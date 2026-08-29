@@ -2,12 +2,14 @@ import { useFlashSale } from '@/contexts/flash-sale-context';
 import { cn } from '@/lib/utils';
 
 interface FlashSaleCountdownProps {
-  /** Pass true when the header is transparent/light-chrome (home page hero) */
-  lightChrome?: boolean;
   className?: string;
 }
 
-export function FlashSaleCountdown({ lightChrome, className }: FlashSaleCountdownProps) {
+/**
+ * Flash-sale timer pill — dark red (sale red) on every surface.
+ * Returns null when the countdown hits 00:00 / sale ends.
+ */
+export function FlashSaleCountdown({ className }: FlashSaleCountdownProps) {
   const { isFlashSaleActive, formattedTime, timeRemaining } = useFlashSale();
 
   if (!isFlashSaleActive || timeRemaining <= 0) return null;
@@ -15,37 +17,38 @@ export function FlashSaleCountdown({ lightChrome, className }: FlashSaleCountdow
   return (
     <div
       className={cn(
-        'flash-sale-countdown flex items-center gap-1.5 px-3 py-1 text-xs font-bold',
-        lightChrome ? 'bg-white/10 text-white backdrop-blur-sm' : 'bg-red-600 text-white',
+        'flash-sale-countdown inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-black uppercase tracking-wide text-white sm:gap-1.5 sm:px-2.5 sm:text-xs',
         className,
       )}
       title="Flash Sale — 20% extra off everything!"
       style={{
-        borderRadius: '999px',
+        background: '#C41E3A',
+        boxShadow: '0 2px 10px -2px rgba(196,30,58,0.55)',
         animation:
           timeRemaining < 5 * 60 * 1000 ? 'flash-shake 0.5s ease-in-out infinite' : undefined,
       }}
     >
-      {/* Fire icon */}
       <span
-        className="text-sm leading-none"
+        className="text-sm leading-none sm:text-[15px]"
         aria-hidden
-        style={{ animation: 'flash-fire 1s ease-in-out infinite alternate' }}
+        style={{
+          background: 'linear-gradient(180deg, #FFE566 0%, #FF8C00 100%)',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+          animation: 'flash-fire 1s ease-in-out infinite alternate',
+        }}
       >
         ⚡
       </span>
 
-      {/* Label */}
-      <span className="hidden uppercase tracking-wide sm:inline" style={{ fontSize: '10px' }}>
+      <span className="hidden sm:inline" style={{ fontSize: '10px', letterSpacing: '0.08em' }}>
         Sale
       </span>
 
-      {/* Timer */}
       <span
-        className="font-black tabular-nums"
+        className="tabular-nums"
         style={{
           fontVariantNumeric: 'tabular-nums',
-          textShadow: '0 0 8px rgba(255,200,0,0.6)',
           letterSpacing: '0.04em',
         }}
       >

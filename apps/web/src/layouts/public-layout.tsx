@@ -19,7 +19,7 @@ export function PublicLayout() {
   return (
     <AnalyticsProvider>
       <FlashSaleProvider>
-        <div className="bg-background text-foreground flex min-h-screen flex-col">
+        <div className="bg-background text-foreground flex min-h-screen flex-col overflow-x-clip">
           <ForceLightTheme />
           <CartBootstrap />
           <LiveRegion />
