@@ -5,6 +5,7 @@ import {
   formatOrderDocumentAddress,
   formatPaymentMethodLabel,
 } from './order-document.types.js';
+import { drawFeLogo } from './fe-logo.draw.js';
 
 const NAVY = '#000B26';
 const MUTED = '#9CA3AF';
@@ -13,6 +14,7 @@ const ADDR = '#6B7280';
 const LINE = '#E5E7EB';
 const SETTLEMENT_BG = '#F3F4F6';
 const FOOTER = '#C4C4C4';
+const LOGO_SIZE = 40;
 
 function formatRegistryDate(date: Date): string {
   return date.toLocaleDateString('en-US', {
@@ -44,42 +46,40 @@ export async function generateInvoicePdf(payload: OrderDocumentPayload): Promise
     const left = doc.page.margins.left;
     const right = left + pageWidth;
 
-    // Header — site wordmark FE (not the sample teal badge)
+    // Header — original mint fe. mark
     const headerY = doc.y;
-    doc.font('Helvetica-Bold').fontSize(28).fillColor(INK).text('FE', left, headerY, {
-      lineBreak: false,
-    });
+    drawFeLogo(doc, left, headerY, LOGO_SIZE);
 
-    const brandX = left + 52;
+    const brandX = left + LOGO_SIZE + 12;
     doc
       .font('Helvetica-Bold')
       .fontSize(16)
       .fillColor(INK)
-      .text(payload.branding.storeName, brandX, headerY + 2);
+      .text(payload.branding.storeName, brandX, headerY + 4);
     doc
       .font('Helvetica')
       .fontSize(8)
       .fillColor(MUTED)
-      .text(payload.branding.storeAddress.toUpperCase(), brandX, headerY + 22, {
+      .text(payload.branding.storeAddress.toUpperCase(), brandX, headerY + 24, {
         characterSpacing: 0.8,
       });
 
     const badgeWidth = 186;
     const badgeHeight = 22;
     const badgeX = right - badgeWidth;
-    doc.roundedRect(badgeX, headerY + 4, badgeWidth, badgeHeight, 11).fill(NAVY);
+    doc.roundedRect(badgeX, headerY + 9, badgeWidth, badgeHeight, 11).fill(NAVY);
     doc
       .font('Helvetica-Bold')
       .fontSize(7.5)
       .fillColor('#fff')
-      .text('OFFICIAL ORDER MANIFEST', badgeX, headerY + 11, {
+      .text('OFFICIAL ORDER MANIFEST', badgeX, headerY + 16, {
         width: badgeWidth,
         align: 'center',
         characterSpacing: 1,
       });
 
     // Registry
-    const registryY = headerY + 62;
+    const registryY = headerY + LOGO_SIZE + 28;
     doc.font('Helvetica').fontSize(7.5).fillColor(MUTED).text('INVOICE REGISTRY', left, registryY, {
       characterSpacing: 1.1,
     });

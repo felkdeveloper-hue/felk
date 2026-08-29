@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { Button } from '@fe-platform/ui';
 import { toast } from 'sonner';
 import { AdminErrorState, AdminPageHeader, AdminPanel, PageMotion } from '@/components/admin';
+import { FeLogo } from '@/components/brand/fe-logo';
 import { InvoiceView } from '@/components/orders';
 import { Image } from '@/components/media/image';
 import { Button as UiButton } from '@/components/ui/button';
@@ -507,46 +508,49 @@ export function OrderDetailPage({ orderId }: { orderId: string }) {
                 </dd>
               </div>
             </dl>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" onClick={() => setInvoiceOpen(true)}>
-                View invoice
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => void downloadInvoicePdf()}
-                disabled={downloadingInvoice}
-              >
-                {downloadingInvoice ? (
-                  <Loader2 className="mr-2 size-4 animate-spin" aria-hidden />
-                ) : (
-                  <Download className="mr-2 size-4" aria-hidden />
-                )}
-                {downloadingInvoice ? 'Downloading…' : 'Download invoice PDF'}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => void downloadShippingLabelPdf()}
-                disabled={downloadingLabel}
-              >
-                {downloadingLabel ? (
-                  <Loader2 className="mr-2 size-4 animate-spin" aria-hidden />
-                ) : (
-                  <Download className="mr-2 size-4" aria-hidden />
-                )}
-                {downloadingLabel ? 'Downloading…' : 'Shipping label PDF'}
-              </Button>
-              {orderPerms.update ? (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => sendInvoiceMutation.mutate()}
-                  disabled={sendInvoiceMutation.isPending}
-                >
-                  {sendInvoiceMutation.isPending ? 'Sending…' : 'Send to customer'}
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <FeLogo size={36} className="shrink-0" />
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" onClick={() => setInvoiceOpen(true)}>
+                  View invoice
                 </Button>
-              ) : null}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void downloadInvoicePdf()}
+                  disabled={downloadingInvoice}
+                >
+                  {downloadingInvoice ? (
+                    <Loader2 className="mr-2 size-4 animate-spin" aria-hidden />
+                  ) : (
+                    <Download className="mr-2 size-4" aria-hidden />
+                  )}
+                  {downloadingInvoice ? 'Downloading…' : 'Download invoice PDF'}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void downloadShippingLabelPdf()}
+                  disabled={downloadingLabel}
+                >
+                  {downloadingLabel ? (
+                    <Loader2 className="mr-2 size-4 animate-spin" aria-hidden />
+                  ) : (
+                    <Download className="mr-2 size-4" aria-hidden />
+                  )}
+                  {downloadingLabel ? 'Downloading…' : 'Shipping label PDF'}
+                </Button>
+                {orderPerms.update ? (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => sendInvoiceMutation.mutate()}
+                    disabled={sendInvoiceMutation.isPending}
+                  >
+                    {sendInvoiceMutation.isPending ? 'Sending…' : 'Send to customer'}
+                  </Button>
+                ) : null}
+              </div>
             </div>
           </AdminPanel>
 

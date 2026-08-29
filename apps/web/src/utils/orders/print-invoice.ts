@@ -107,13 +107,10 @@ export function printInvoiceDocument(invoice: OrderInvoice): void {
       align-items: center;
       gap: 12px;
     }
-    .logo {
-      margin: 0;
-      font-family: Syne, sans-serif;
-      font-size: 34px;
-      font-weight: 800;
-      letter-spacing: -0.06em;
-      line-height: 1;
+    .logo-mark {
+      width: 48px;
+      height: 48px;
+      flex-shrink: 0;
     }
     .store-name {
       margin: 0;
@@ -291,7 +288,10 @@ export function printInvoiceDocument(invoice: OrderInvoice): void {
   <div class="sheet">
     <div class="header">
       <div class="brand">
-        <p class="logo">FE</p>
+        <svg class="logo-mark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Fashion Edge">
+          <circle cx="32" cy="32" r="32" fill="#C1F0F6"/>
+          <text x="32" y="39.5" text-anchor="middle" fill="#000B29" font-family="Figtree, Syne, system-ui, sans-serif" font-size="26" font-weight="700" letter-spacing="-0.04em">fe.</text>
+        </svg>
         <div>
           <p class="store-name">Fashion Edge</p>
           <p class="store-address">14A Kotugodella st, Kandy</p>

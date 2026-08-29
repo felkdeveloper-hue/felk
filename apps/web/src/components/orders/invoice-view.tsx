@@ -3,6 +3,7 @@ import { Download, Printer } from 'lucide-react';
 import type { OrderInvoice } from '@/services/sdk';
 import { ordersApi } from '@/services/sdk/admin';
 import { printInvoiceDocument } from '@/utils/orders/print-invoice';
+import { FeLogo } from '@/components/brand/fe-logo';
 import { Button } from '@/components/ui/button';
 
 export interface InvoiceViewProps {
@@ -74,9 +75,7 @@ export function InvoiceView({ invoice, actions }: InvoiceViewProps) {
       <div className="invoice-sheet mx-auto min-h-[1123px] w-full max-w-[794px] bg-white px-[52px] py-[48px] font-sans">
         <header className="flex items-start justify-between gap-6">
           <div className="flex items-center gap-3.5">
-            <p className="font-display text-[34px] font-extrabold uppercase leading-none tracking-[-0.06em] text-[#111]">
-              FE
-            </p>
+            <FeLogo size={48} />
             <div>
               <p className="text-[20px] font-extrabold uppercase leading-none tracking-[0.02em] text-[#111]">
                 Fashion Edge

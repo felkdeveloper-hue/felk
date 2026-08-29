@@ -1,8 +1,7 @@
 import PDFDocument from 'pdfkit';
 import type { OrderDocumentPayload } from './order-document.types.js';
 import { formatOrderDocumentAddress } from './order-document.types.js';
-
-const LIGHT_BLUE = '#D1FAE5';
+import { drawFeLogo } from './fe-logo.draw.js';
 
 export async function generateShippingLabelPdf(payload: OrderDocumentPayload): Promise<Buffer> {
   return new Promise((resolve, reject) => {
@@ -27,12 +26,7 @@ export async function generateShippingLabelPdf(payload: OrderDocumentPayload): P
     const logoX = left + 12;
     const logoY = top + 16;
 
-    doc.circle(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2).fill(LIGHT_BLUE);
-    doc
-      .font('Helvetica-Bold')
-      .fontSize(18)
-      .fillColor('#111')
-      .text('fe.', logoX + 14, logoY + 18);
+    drawFeLogo(doc, logoX, logoY, logoSize);
 
     const toX = logoX + logoSize + 18;
     const dividerX = toX - 10;
