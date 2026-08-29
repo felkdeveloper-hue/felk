@@ -4,7 +4,6 @@ import { PaymentRedirectOverlay } from '@/components/checkout/payment-redirect-o
 import { ForceLightTheme } from '@/components/common/force-light-theme';
 import { StorefrontFooter, StorefrontHeader } from '@/components/layout';
 import { FloatingSearch } from '@/components/layout/floating-search';
-import { FloatingSocialBar } from '@/components/storefront/floating-social-bar';
 import { CHECKOUT_STEPS, type CheckoutStepId } from '@/constants/checkout.constants';
 import { ROUTES } from '@/constants';
 import { useIsMobile } from '@/hooks';
@@ -67,7 +66,6 @@ export function CheckoutLayout() {
           </main>
           <StorefrontFooter />
           <FloatingSearch />
-          <FloatingSocialBar />
           <PaymentRedirectOverlay open={isRedirecting} />
         </div>
       </FlashSaleProvider>

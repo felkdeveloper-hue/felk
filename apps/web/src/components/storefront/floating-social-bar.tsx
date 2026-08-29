@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useRouterState } from '@tanstack/react-router';
 import { useSocialLinks } from '@/hooks/cms';
+import { ROUTES } from '@/constants';
 import { cn } from '@/lib/utils';
 import { X } from 'lucide-react';
 
@@ -71,6 +73,8 @@ function resolveUrl(
 
 /** Fixed social bar — desktop side rail unchanged; mobile FAB expands in place. */
 export function FloatingSocialBar({ className }: { className?: string }) {
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const hideOnCheckout = pathname.startsWith(ROUTES.checkout);
   const { data } = useSocialLinks();
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -96,6 +100,8 @@ export function FloatingSocialBar({ className }: { className?: string }) {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [mobileOpen]);
+
+  if (hideOnCheckout) return null;
 
   return (
     <>
@@ -135,15 +141,15 @@ export function FloatingSocialBar({ className }: { className?: string }) {
         </div>
       </aside>
 
-      {/* Mobile FAB — collapsed shows one circle; expand reveals all three + close */}
+      {/* Mobile FAB — smaller + lower so it clears product hearts / filter chips */}
       <aside
         aria-label="Social media"
         className={cn(
-          'pointer-events-none fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] right-3 z-[70] sm:hidden',
+          'pointer-events-none fixed bottom-[calc(5.85rem+env(safe-area-inset-bottom,0px))] right-2.5 z-[70] sm:hidden',
           className,
         )}
       >
-        <div className="pointer-events-auto flex flex-col-reverse items-center gap-2.5">
+        <div className="pointer-events-auto flex flex-col-reverse items-center gap-2">
           {primary ? (
             <button
               type="button"
@@ -151,26 +157,26 @@ export function FloatingSocialBar({ className }: { className?: string }) {
               aria-expanded={mobileOpen}
               onClick={() => setMobileOpen((open) => !open)}
               className={cn(
-                'inline-flex size-12 items-center justify-center rounded-full',
-                'shadow-[0_10px_28px_-10px_rgba(0,0,0,0.55)] ring-2 ring-white/90',
+                'inline-flex size-9 items-center justify-center rounded-full',
+                'shadow-[0_8px_22px_-10px_rgba(0,0,0,0.5)] ring-2 ring-white/90',
                 'transition-all duration-300 ease-out active:scale-95',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900/40',
                 mobileOpen ? 'bg-neutral-900 text-white' : primary.bg,
               )}
             >
               {mobileOpen ? (
-                <X className="size-5 text-white" strokeWidth={2.25} />
+                <X className="size-4 text-white" strokeWidth={2.25} />
               ) : (
-                <primary.Icon className="size-5 text-white" />
+                <primary.Icon className="size-4 text-white" />
               )}
             </button>
           ) : null}
 
           <div
             className={cn(
-              'flex flex-col-reverse items-center gap-2.5 overflow-hidden transition-all duration-300 ease-out',
+              'flex flex-col-reverse items-center gap-2 overflow-hidden transition-all duration-300 ease-out',
               mobileOpen
-                ? 'max-h-48 translate-y-0 opacity-100'
+                ? 'max-h-40 translate-y-0 opacity-100'
                 : 'pointer-events-none max-h-0 -translate-y-1 opacity-0',
             )}
             aria-hidden={!mobileOpen}
@@ -184,7 +190,7 @@ export function FloatingSocialBar({ className }: { className?: string }) {
                 aria-label={label}
                 tabIndex={mobileOpen ? 0 : -1}
                 className={cn(
-                  'inline-flex size-11 items-center justify-center rounded-full',
+                  'inline-flex size-9 items-center justify-center rounded-full',
                   'shadow-[0_8px_22px_-10px_rgba(0,0,0,0.5)] ring-2 ring-white/90',
                   'transition-all duration-300 ease-out',
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900/40',
@@ -196,7 +202,7 @@ export function FloatingSocialBar({ className }: { className?: string }) {
                 }}
                 onClick={() => setMobileOpen(false)}
               >
-                <Icon className="size-[1.1rem] text-white" />
+                <Icon className="size-3.5 text-white" />
               </a>
             ))}
           </div>

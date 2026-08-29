@@ -4,11 +4,12 @@ import { AnimatePresence } from 'framer-motion';
 import { useQueryClient } from '@tanstack/react-query';
 import { QUERY_KEYS, ROUTES } from '@/constants';
 import { useCartQuery } from '@/hooks/cart';
+import { useStartCheckoutMutation } from '@/hooks/checkout';
 import { useAuthStore, useCheckoutStore } from '@/store';
 import { AppError } from '@/lib/errors';
 import { consumePaymentFailedFlag, trackCommerceEvent } from '@/lib/analytics';
 import { formatCurrency } from '@/utils';
-import { customersApi } from '@/services/sdk';
+import { customersApi, type CustomerAddress } from '@/services/sdk';
 import { isGuestCheckoutUser } from '@/utils/auth/guest-checkout';
 import { isStaffUser } from '@/utils/auth-redirect';
 import { previewShippingAmount } from '@/constants/checkout.constants';
@@ -22,6 +23,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useFlashSale } from '@/contexts/flash-sale-context';
 import { useCategorySlugLookup } from '@/hooks/use-flash-sale-eligibility';
 import { computeFlashAdjustedSubtotal, computeFlashSaving } from '@/utils/flash-sale-eligibility';
+import { useCartStore } from '@/store/cart-store';
 
 function getIssueForItem(
   itemId: string,
@@ -52,6 +54,7 @@ export function CartPageContent() {
   const navigate = useNavigate();
   const cartQuery = useCartQuery();
   const queryClient = useQueryClient();
+  const startCheckout = useStartCheckoutMutation();
   const hasHydrated = useAuthStore((state) => state.hasHydrated);
   const authUser = useAuthStore((state) => state.user);
   const isAuthed = useAuthStore((state) => Boolean(state.accessToken && state.user));
@@ -64,6 +67,44 @@ export function CartPageContent() {
   const cart = cartQuery.data;
   const validation = cart?.validation;
   const checkoutBlocked = cart ? cartHasBlockingStockIssues(cart) : false;
+
+  /** Kick off /checkout/start while navigating so step 1 is ready faster. */
+  const goToCheckout = () => {
+    useCheckoutStore.getState().resetCheckoutUi();
+    queryClient.removeQueries({ queryKey: ['checkout'] });
+
+    const liveCart = useCartStore.getState().cart ?? cart;
+    if (isAuthed && !isGuestCheckout && liveCart?.items?.length) {
+      const cachedAddresses = queryClient.getQueryData<CustomerAddress[]>(
+        QUERY_KEYS.customers.addresses(),
+      );
+      const defaultShipping = cachedAddresses?.find((address) => address.isDefaultShipping);
+      const buyNowItems = useCheckoutStore.getState().buyNowItems;
+      const cartLineItems = liveCart.items
+        .filter((item) => Boolean(item.variantId))
+        .map((item) => ({
+          variantId: String(item.variantId),
+          quantity: item.quantity,
+        }));
+      useCheckoutStore.getState().setPrimingCheckout(true);
+      startCheckout.mutate(
+        {
+          shippingAddressId: defaultShipping?.id,
+          autoReserve: false,
+          ...(buyNowItems?.length
+            ? { items: buyNowItems }
+            : cartLineItems.length
+              ? { items: cartLineItems }
+              : {}),
+        },
+        {
+          onSettled: () => useCheckoutStore.getState().setPrimingCheckout(false),
+        },
+      );
+    }
+
+    void navigate({ to: ROUTES.checkout });
+  };
 
   useEffect(() => {
     if (!hasHydrated || !isAuthed || isGuestCheckout || checkoutBlocked) return;
@@ -141,8 +182,8 @@ export function CartPageContent() {
       : null;
 
   return (
-    <div className="mx-auto grid w-full max-w-6xl gap-5 lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-8">
-      <section aria-labelledby="cart-items-heading" className="min-w-0 space-y-4 pb-28 lg:pb-0">
+    <div className="mx-auto grid w-full max-w-6xl gap-3 pb-28 lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-8 lg:pb-0">
+      <section aria-labelledby="cart-items-heading" className="min-w-0 space-y-3">
         <h2 id="cart-items-heading" className="sr-only">
           Bag items ({cart.items.length})
         </h2>
@@ -171,7 +212,7 @@ export function CartPageContent() {
         </div>
       </section>
 
-      <div className="min-w-0 space-y-4 lg:sticky lg:top-24 lg:self-start">
+      <div className="min-w-0 space-y-3 lg:sticky lg:top-24 lg:space-y-4 lg:self-start">
         <CartOrderSummary totals={cart.totals} items={cart.items} validation={validation} />
         <div className="hidden space-y-3 lg:block">
           {!hasHydrated ? (
@@ -183,15 +224,7 @@ export function CartPageContent() {
               Remove unavailable items to checkout
             </Button>
           ) : (
-            <Button
-              className="w-full"
-              size="lg"
-              onClick={() => {
-                useCheckoutStore.getState().resetCheckoutUi();
-                queryClient.removeQueries({ queryKey: ['checkout'] });
-                void navigate({ to: ROUTES.checkout });
-              }}
-            >
+            <Button className="w-full" size="lg" onClick={goToCheckout}>
               Proceed to checkout
             </Button>
           )}
@@ -250,11 +283,7 @@ export function CartPageContent() {
             <Button
               className="h-11 w-full rounded-none text-[12px] font-bold uppercase tracking-[0.1em]"
               size="lg"
-              onClick={() => {
-                useCheckoutStore.getState().resetCheckoutUi();
-                queryClient.removeQueries({ queryKey: ['checkout'] });
-                void navigate({ to: ROUTES.checkout });
-              }}
+              onClick={goToCheckout}
             >
               Proceed to checkout
             </Button>

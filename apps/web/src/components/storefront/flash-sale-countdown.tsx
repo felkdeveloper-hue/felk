@@ -3,13 +3,15 @@ import { cn } from '@/lib/utils';
 
 interface FlashSaleCountdownProps {
   className?: string;
+  /** Tighter pill for crowded mobile headers. */
+  compact?: boolean;
 }
 
 /**
  * Flash-sale timer pill — dark red (sale red) on every surface.
  * Returns null when the countdown hits 00:00 / sale ends.
  */
-export function FlashSaleCountdown({ className }: FlashSaleCountdownProps) {
+export function FlashSaleCountdown({ className, compact = false }: FlashSaleCountdownProps) {
   const { isFlashSaleActive, formattedTime, timeRemaining } = useFlashSale();
 
   if (!isFlashSaleActive || timeRemaining <= 0) return null;
@@ -17,7 +19,10 @@ export function FlashSaleCountdown({ className }: FlashSaleCountdownProps) {
   return (
     <div
       className={cn(
-        'flash-sale-countdown inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-black uppercase tracking-wide text-white sm:gap-1.5 sm:px-2.5 sm:text-xs',
+        'flash-sale-countdown inline-flex items-center font-black uppercase tracking-wide text-white',
+        compact
+          ? 'gap-0.5 rounded px-1.5 py-0.5 text-[10px]'
+          : 'gap-1 rounded-md px-2 py-1 text-[11px] sm:gap-1.5 sm:px-2.5 sm:text-xs',
         className,
       )}
       title="Flash Sale — 20% extra off everything!"
@@ -29,7 +34,7 @@ export function FlashSaleCountdown({ className }: FlashSaleCountdownProps) {
       }}
     >
       <span
-        className="text-sm leading-none sm:text-[15px]"
+        className={cn('leading-none', compact ? 'text-[11px]' : 'text-sm sm:text-[15px]')}
         aria-hidden
         style={{
           background: 'linear-gradient(180deg, #FFE566 0%, #FF8C00 100%)',
@@ -41,9 +46,11 @@ export function FlashSaleCountdown({ className }: FlashSaleCountdownProps) {
         ⚡
       </span>
 
-      <span className="hidden sm:inline" style={{ fontSize: '10px', letterSpacing: '0.08em' }}>
-        Sale
-      </span>
+      {!compact ? (
+        <span className="hidden sm:inline" style={{ fontSize: '10px', letterSpacing: '0.08em' }}>
+          Sale
+        </span>
+      ) : null}
 
       <span
         className="tabular-nums"

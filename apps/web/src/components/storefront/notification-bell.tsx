@@ -132,7 +132,7 @@ export function NotificationBell({ lightChrome, className }: NotificationBellPro
   const hasNotification = totalBadgeCount > 0;
 
   const iconBtn = cn(
-    'relative size-11 shrink-0 [&_svg]:size-[1.15rem] [&_svg]:stroke-[1.35]',
+    'relative size-9 shrink-0 sm:size-11 [&_svg]:size-[1.15rem] [&_svg]:stroke-[1.35]',
     lightChrome
       ? 'text-white hover:bg-white/10 hover:text-white'
       : 'text-foreground hover:bg-muted/70 hover:text-foreground',

@@ -121,7 +121,7 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
       )}
     >
       <Container className="flex h-14 items-center justify-between gap-2 lg:grid lg:h-[4.75rem] lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:justify-normal lg:gap-6">
-        <div className="flex min-w-0 items-center gap-1 sm:gap-2">
+        <div className="flex min-w-0 shrink-0 items-center gap-1 sm:gap-2">
           <MobileNav
             items={navItems}
             activeHref={pathname}
@@ -133,12 +133,12 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
             to={ROUTES.home}
             preload="intent"
             className={cn(
-              'flex items-center transition-opacity hover:opacity-90',
+              'flex shrink-0 items-center transition-opacity hover:opacity-90',
               lightChrome ? 'drop-shadow-sm' : undefined,
             )}
             aria-label={storeName}
           >
-            <FeLogo size={40} inverted={lightChrome} className="lg:h-[46px] lg:w-[46px]" />
+            <FeLogo size={34} inverted={lightChrome} className="lg:h-[46px] lg:w-[46px]" />
           </Link>
         </div>
 
@@ -160,21 +160,22 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
           }}
         />
 
-        <div className="flex min-w-0 items-center justify-end gap-0.5 sm:gap-1">
+        <div className="flex min-w-0 flex-1 items-center justify-end gap-0.5 sm:gap-1 lg:flex-none">
           <HeaderSearchField
             lightChrome={lightChrome}
             className="hidden w-40 shrink-0 xl:block xl:w-48 2xl:w-56"
           />
 
-          <FlashSaleCountdown className="flex shrink-0" />
+          {/* Desktop / tablet — keep timer in the action cluster */}
+          <FlashSaleCountdown className="hidden shrink-0 sm:flex" />
 
-          <div className="flex shrink-0 items-center gap-0.5">
+          <div className="flex shrink-0 items-center gap-0">
             <Button
               variant="ghost"
               size="icon"
               aria-label="Search"
               onClick={toggleSearch}
-              className={cn('xl:hidden', iconBtn)}
+              className={cn('xl:hidden', iconBtn, 'size-9 sm:size-11')}
             >
               <Search />
             </Button>
@@ -205,7 +206,7 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
                     variant="ghost"
                     size="icon"
                     aria-label={`Account, ${accountLabel}`}
-                    className={iconBtn}
+                    className={cn(iconBtn, 'size-9 sm:size-11')}
                   >
                     <PremiumProfileIcon />
                   </Button>
@@ -236,7 +237,13 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <Button variant="ghost" size="icon" aria-label="Sign in" asChild className={iconBtn}>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Sign in"
+                asChild
+                className={cn(iconBtn, 'size-9 sm:size-11')}
+              >
                 <Link to={ROUTES.authLogin} preload="intent">
                   <PremiumProfileIcon />
                 </Link>
@@ -248,12 +255,12 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
               size="icon"
               aria-label={`Cart${cartCount ? `, ${cartCount} items` : ''}`}
               asChild
-              className={cn('relative', iconBtn)}
+              className={cn('relative', iconBtn, 'size-9 sm:size-11')}
             >
               <Link to={ROUTES.cart} preload="intent">
                 <PremiumCartIcon />
                 {cartCount > 0 ? (
-                  <span className="bg-accent text-accent-foreground absolute right-1 top-1 flex size-4 items-center justify-center rounded-full text-[9px] font-semibold tracking-tight">
+                  <span className="bg-accent text-accent-foreground absolute right-0.5 top-0.5 flex size-3.5 items-center justify-center rounded-full text-[8px] font-semibold tracking-tight sm:right-1 sm:top-1 sm:size-4 sm:text-[9px]">
                     {cartCount > 9 ? '9+' : cartCount}
                   </span>
                 ) : null}
@@ -262,6 +269,11 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
           </div>
         </div>
       </Container>
+
+      {/* Mobile-only timer strip — avoids colliding with the fe. logo */}
+      <div className="flex justify-end px-3.5 pb-1.5 sm:hidden">
+        <FlashSaleCountdown compact />
+      </div>
     </header>
   );
 }
