@@ -48,8 +48,8 @@ export const ORDER_STATUS_TRANSITIONS: Record<string, string[]> = {
   delivered: ['completed', 'returned'],
   completed: ['returned'],
   cancelled: [],
-  returned: ['refund_pending'],
-  refund_pending: ['refunded'],
+  returned: ['refund_pending', 'completed'],
+  refund_pending: ['refunded', 'completed'],
   refunded: [],
 };
 

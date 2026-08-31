@@ -237,6 +237,42 @@ export class RefundService {
     return this.toSummary(refund);
   }
 
+  /** Rejects pending refunds when a return is cancelled and the order is restored. */
+  async cancelPendingForPayment(paymentId: string, actor: ActorMeta, reason?: string) {
+    const payment = await PaymentModel.findOne({ _id: paymentId, isDeleted: false });
+    if (!payment) return 0;
+
+    const pendingStatuses = [
+      REFUND_STATUS.PENDING,
+      REFUND_STATUS.APPROVED,
+      REFUND_STATUS.PROCESSING,
+    ];
+    const pendingRefunds = await RefundModel.find({
+      paymentId: payment._id,
+      status: { $in: pendingStatuses },
+    });
+
+    const cancelNote = reason ?? 'Refund cancelled — order marked completed';
+
+    for (const refund of pendingRefunds) {
+      refund.status = REFUND_STATUS.REJECTED;
+      refund.history.push({
+        status: REFUND_STATUS.REJECTED,
+        note: cancelNote,
+        at: new Date(),
+        actorUserId: actor.userId ?? null,
+      });
+      await refund.save();
+    }
+
+    if (pendingRefunds.length > 0 && payment.status === PAYMENT_STATUS.REFUND_PENDING) {
+      payment.status = PAYMENT_STATUS.PAID;
+      await payment.save();
+    }
+
+    return pendingRefunds.length;
+  }
+
   async listForPayment(paymentId: string) {
     return RefundModel.find({ paymentId }).sort({ createdAt: -1 });
   }

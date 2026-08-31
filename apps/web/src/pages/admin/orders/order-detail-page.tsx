@@ -2,13 +2,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { Download, Mail, Loader2, Truck } from 'lucide-react';
 import { useState } from 'react';
-import { Button } from '@fe-platform/ui';
+import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { AdminErrorState, AdminPageHeader, AdminPanel, PageMotion } from '@/components/admin';
 import { FeLogo } from '@/components/brand/fe-logo';
 import { InvoiceView } from '@/components/orders';
 import { Image } from '@/components/media/image';
-import { Button as UiButton } from '@/components/ui/button';
 import { env } from '@/config/env';
 import {
   Dialog,
@@ -503,9 +502,7 @@ export function OrderDetailPage({ orderId }: { orderId: string }) {
               </div>
               <div className="flex justify-between gap-4">
                 <dt className="text-neutral-500 dark:text-neutral-400">Received</dt>
-                <dd>
-                  {receivedAt ? formatDate(receivedAt) : '—'}
-                </dd>
+                <dd>{receivedAt ? formatDate(receivedAt) : '—'}</dd>
               </div>
             </dl>
             <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -737,7 +734,7 @@ export function OrderDetailPage({ orderId }: { orderId: string }) {
               invoice={invoiceQuery.data}
               actions={
                 orderPerms.update ? (
-                  <UiButton
+                  <Button
                     variant="outline"
                     onClick={() => sendInvoiceMutation.mutate()}
                     disabled={sendInvoiceMutation.isPending}
@@ -748,7 +745,7 @@ export function OrderDetailPage({ orderId }: { orderId: string }) {
                       <Mail className="size-4" aria-hidden />
                     )}
                     {sendInvoiceMutation.isPending ? 'Sending…' : 'Send to customer'}
-                  </UiButton>
+                  </Button>
                 ) : null
               }
             />

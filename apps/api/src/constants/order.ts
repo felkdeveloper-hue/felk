@@ -19,6 +19,7 @@ export const ORDER_AUDIT = {
   CANCELLED: 'order.cancelled',
   NOTE_ADDED: 'order.note_added',
   RETURN_REQUESTED: 'order.return_requested',
+  RETURN_CANCELLED: 'order.return_cancelled',
   FED_SHIPMENT_CREATED: 'order.fed_shipment_created',
 } as const;
 

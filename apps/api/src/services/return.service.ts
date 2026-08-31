@@ -92,6 +92,51 @@ export class ReturnService {
 
     return { data, meta: buildPaginationMeta(total, page, limit) };
   }
+
+  /** Rejects open return requests when an order is restored to completed. */
+  async cancelActiveForOrder(orderId: string, actor: ActorMeta, note?: string) {
+    const activeStatuses = [
+      RETURN_STATUS.REQUESTED,
+      RETURN_STATUS.APPROVED,
+      RETURN_STATUS.PROCESSING,
+    ];
+    const returns = await ReturnRequestModel.find({
+      orderId,
+      status: { $in: activeStatuses },
+    });
+
+    const cancelNote = note ?? 'Return cancelled — order marked completed';
+
+    for (const returnRequest of returns) {
+      returnRequest.status = RETURN_STATUS.REJECTED;
+      returnRequest.history.push({
+        status: RETURN_STATUS.REJECTED,
+        note: cancelNote,
+        at: new Date(),
+      });
+      await returnRequest.save();
+
+      await writeAuditLog({
+        action: ORDER_AUDIT.RETURN_CANCELLED,
+        resourceType: 'return_requests',
+        resourceId: returnRequest._id.toString(),
+        actorUserId: actor.userId,
+        ip: actor.ip,
+        requestId: actor.requestId,
+        metadata: { orderId },
+      });
+
+      await recordOrderTimeline({
+        orderId,
+        event: 'return_cancelled',
+        note: cancelNote,
+        actorUserId: actor.userId,
+        actorType: actor.userId ? 'user' : 'system',
+      });
+    }
+
+    return returns.length;
+  }
 }
 
 export const returnService = new ReturnService();

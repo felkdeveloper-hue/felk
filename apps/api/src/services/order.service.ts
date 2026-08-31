@@ -25,6 +25,8 @@ import { writeAuditLog } from '@/services/audit.service.js';
 import { inventoryService } from '@/services/inventory.service.js';
 import { notifyOrderStatusChange } from '@/services/order-notification.service.js';
 import { emailQueueService } from '@/services/email-queue.service.js';
+import { returnService } from '@/services/return.service.js';
+import { refundService } from '@/services/refund.service.js';
 import { invoiceTemplate } from '@/services/email/templates/invoice.js';
 import type { ActorMeta } from '@/services/cms-crud.service.js';
 import { ApiError } from '@/utils/errors/api-error.js';
@@ -390,6 +392,14 @@ export class OrderService {
         { from: order.status, to: status, allowed },
         'INVALID_TRANSITION',
       );
+    }
+
+    if (
+      status === ORDER_STATUS.COMPLETED &&
+      (order.status === ORDER_STATUS.RETURNED || order.status === ORDER_STATUS.REFUND_PENDING)
+    ) {
+      await returnService.cancelActiveForOrder(order._id.toString(), actor, note);
+      await refundService.cancelPendingForPayment(order.paymentId.toString(), actor, note);
     }
 
     const before = toPlain(order);
