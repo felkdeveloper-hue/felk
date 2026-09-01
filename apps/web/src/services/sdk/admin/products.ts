@@ -12,6 +12,7 @@ export interface ProductSpecification {
 export interface AdminProduct {
   id: string;
   name: string;
+  stockControlNumber?: string | null;
   slug: string;
   sku?: string;
   status: string;
@@ -113,6 +114,8 @@ function normalizeProduct(raw: unknown): AdminProduct {
   return {
     id: normalizeId(record),
     name: String(record.name ?? ''),
+    stockControlNumber:
+      typeof record.stockControlNumber === 'string' ? record.stockControlNumber : null,
     slug: String(record.slug ?? ''),
     sku: typeof record.sku === 'string' ? record.sku : undefined,
     status: String(record.status ?? 'draft'),
@@ -219,6 +222,7 @@ export interface ProductListParams extends ListQueryParams {
 
 export interface ProductInput {
   name: string;
+  stockControlNumber?: string | null;
   slug?: string;
   sku?: string;
   status?: string;

@@ -365,9 +365,17 @@ export function OrderDetailPage({ orderId }: { orderId: string }) {
                       </div>
                     )}
                     <div className="min-w-0 flex-1">
-                      <p className="font-medium text-[var(--admin-ink)]">
-                        {String(row.name ?? row.productName ?? 'Item')}
-                      </p>
+                      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                        <p className="font-medium text-[var(--admin-ink)]">
+                          {String(row.name ?? row.productName ?? 'Item')}
+                        </p>
+                        {typeof row.stockControlNumber === 'string' &&
+                        row.stockControlNumber.trim() ? (
+                          <span className="rounded-none border border-[var(--admin-line)] bg-[var(--admin-panel-soft)] px-1.5 py-0.5 font-mono text-xs tabular-nums text-[var(--admin-ink-muted)]">
+                            {row.stockControlNumber.trim()}
+                          </span>
+                        ) : null}
+                      </div>
                       <p className="text-muted-foreground text-xs">
                         {String(row.variantTitle ?? '')} · SKU {String(row.sku ?? '—')}
                       </p>

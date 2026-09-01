@@ -850,6 +850,7 @@ export class ProductService {
 
     const doc = await ProductModel.create({
       name,
+      stockControlNumber: (payload.stockControlNumber as string | null | undefined) ?? null,
       slug,
       sku,
       shortDescription: payload.shortDescription ?? null,

@@ -43,6 +43,7 @@ import {
 
 const productSchema = z.object({
   name: z.string().min(1, 'Product name is required'),
+  stockControlNumber: z.string().optional(),
   slug: z.string().optional(),
   status: z.string().default('draft'),
   visibility: z.string().default('public'),
@@ -1418,6 +1419,7 @@ export function ProductFormPage({ productId }: { productId?: string }) {
     resolver: zodResolver(productSchema),
     defaultValues: {
       name: '',
+      stockControlNumber: '',
       slug: '',
       status: 'draft',
       visibility: 'public',
@@ -1455,6 +1457,7 @@ export function ProductFormPage({ productId }: { productId?: string }) {
     if (!product) return;
     reset({
       name: product.name,
+      stockControlNumber: product.stockControlNumber ?? '',
       slug: product.slug,
       status: product.status,
       visibility: product.visibility ?? 'public',
@@ -1511,6 +1514,7 @@ export function ProductFormPage({ productId }: { productId?: string }) {
 
   const buildPayload = (data: ProductFormValues) => ({
     name: data.name,
+    stockControlNumber: data.stockControlNumber?.trim() || null,
     slug: data.slug?.trim() || slugify(data.name),
     status: data.status,
     visibility: data.visibility,
@@ -1787,13 +1791,22 @@ export function ProductFormPage({ productId }: { productId?: string }) {
             {/* Basic info */}
             <div className={cardCls}>
               <p className={sectionTitleCls}>Product info</p>
-              <Field label="Product name *" error={errors.name?.message}>
-                <input
-                  {...register('name')}
-                  className={fieldCls}
-                  placeholder="e.g. Women's Silk Wrap Midi Dress"
-                />
-              </Field>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Product name *" error={errors.name?.message}>
+                  <input
+                    {...register('name')}
+                    className={fieldCls}
+                    placeholder="e.g. Women's Silk Wrap Midi Dress"
+                  />
+                </Field>
+                <Field label="Stock control number">
+                  <input
+                    {...register('stockControlNumber')}
+                    className={fieldCls}
+                    placeholder="Internal reference (admin only)"
+                  />
+                </Field>
+              </div>
               <Field label="Short description">
                 <textarea
                   {...register('shortDescription')}

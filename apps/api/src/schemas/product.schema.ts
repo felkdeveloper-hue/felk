@@ -66,6 +66,10 @@ export const attributeLinkSchema = z.object({
 
 export const productCreateSchema = z.object({
   name: z.string().trim().min(1).max(200),
+  stockControlNumber: z.preprocess(
+    (value) => (value === '' || value === undefined ? null : value),
+    z.string().trim().max(64).nullable().optional(),
+  ),
   slug: optionalSlug,
   sku: z.string().trim().min(1).max(64).optional(),
   shortDescription: z.string().trim().max(500).nullable().optional(),

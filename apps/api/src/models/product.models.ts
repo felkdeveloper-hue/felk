@@ -80,6 +80,8 @@ AttributeValueModel.schema.index({ attributeId: 1, value: 1 }, { unique: true })
 
 export interface ProductDocument extends Document {
   name: string;
+  /** Admin-only internal stock control reference — never exposed on the storefront. */
+  stockControlNumber?: string | null;
   slug: string;
   sku?: string | null;
   shortDescription?: string | null;
@@ -146,6 +148,7 @@ export interface ProductDocument extends Document {
 const productSchema = new Schema<ProductDocument>(
   {
     name: { type: String, required: true, trim: true },
+    stockControlNumber: { type: String, default: null, trim: true },
     slug: { type: String, required: true, trim: true },
     sku: { type: String, default: null, trim: true, uppercase: true },
     shortDescription: { type: String, default: null },

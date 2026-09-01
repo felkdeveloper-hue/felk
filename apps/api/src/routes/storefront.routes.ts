@@ -28,6 +28,10 @@ import { PRODUCT_STATUS, PRODUCT_VISIBILITY } from '@/constants/product.js';
 import { asyncHandler } from '@/utils/async-handler.js';
 import { ApiResponse } from '@/utils/response/api-response.js';
 import { ApiError } from '@/utils/errors/api-error.js';
+import {
+  stripInternalProductFields,
+  stripInternalProductFieldsList,
+} from '@/utils/product-internal-fields.util.js';
 import { getCached, setCache, storefrontProductsCacheKey } from '@/utils/simple-cache.js';
 import { stableQueryKey } from '@/utils/stable-query-key.js';
 
@@ -222,7 +226,13 @@ storefrontRouter.get(
     if (cached) {
       setPublicCache(res, 300);
       appendServerTiming(res, 'total', performance.now() - started, 'cache-hit');
-      return ApiResponse.success(res, cached.data, 'OK', 200, cached.meta as never);
+      return ApiResponse.success(
+        res,
+        stripInternalProductFieldsList(cached.data as Array<Record<string, unknown>>),
+        'OK',
+        200,
+        cached.meta as never,
+      );
     }
 
     const dbStarted = performance.now();
@@ -244,7 +254,13 @@ storefrontRouter.get(
     setCache(cacheKey, { data: result.data, meta: result.meta }, PRODUCT_LIST_CACHE_MS);
     setPublicCache(res, 300);
     appendServerTiming(res, 'total', performance.now() - started);
-    ApiResponse.success(res, result.data, 'OK', 200, result.meta);
+    ApiResponse.success(
+      res,
+      stripInternalProductFieldsList(result.data as Array<Record<string, unknown>>),
+      'OK',
+      200,
+      result.meta,
+    );
   }),
 );
 
@@ -289,7 +305,7 @@ storefrontRouter.get(
       const cached = getCached<Record<string, unknown>>(cacheKey);
       if (cached) {
         setPublicCache(res, 120);
-        return ApiResponse.success(res, cached);
+        return ApiResponse.success(res, stripInternalProductFields(cached));
       }
     }
 
@@ -309,12 +325,12 @@ storefrontRouter.get(
     }
 
     if (!skipCache) {
-      setCache(cacheKey, record, 60_000);
+      setCache(cacheKey, stripInternalProductFields(record), 60_000);
       const id = String(record.id ?? record._id ?? '');
-      if (id) setCache(`storefront:product:${id}`, record, 60_000);
+      if (id) setCache(`storefront:product:${id}`, stripInternalProductFields(record), 60_000);
     }
     setPublicCache(res, 120);
-    ApiResponse.success(res, product);
+    ApiResponse.success(res, stripInternalProductFields(record));
   }),
 );
 
@@ -391,7 +407,7 @@ storefrontRouter.get(
       const cached = getCached<Record<string, unknown>>(cacheKey);
       if (cached) {
         setPublicCache(res, 120);
-        return ApiResponse.success(res, cached);
+        return ApiResponse.success(res, stripInternalProductFields(cached));
       }
     }
 
@@ -411,10 +427,10 @@ storefrontRouter.get(
     }
 
     if (!skipCache) {
-      setCache(cacheKey, record, 60_000);
+      setCache(cacheKey, stripInternalProductFields(record), 60_000);
     }
     setPublicCache(res, 120);
-    ApiResponse.success(res, product);
+    ApiResponse.success(res, stripInternalProductFields(record));
   }),
 );
 

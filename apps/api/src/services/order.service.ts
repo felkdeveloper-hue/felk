@@ -7,6 +7,7 @@ import {
 } from '@/models/order.models.js';
 import { CustomerModel } from '@/models/customer.models.js';
 import { PaymentModel } from '@/models/payment.models.js';
+import { ProductModel } from '@/models/product.models.js';
 import { appConfig } from '@/config/app.config.js';
 import { customerService } from '@/services/customer.service.js';
 import { invoiceService } from '@/services/invoice.service.js';
@@ -95,9 +96,11 @@ export class OrderService {
 
   async getById(id: string, user: AuthenticatedUser) {
     const order = await this.findById(id);
-    await this.assertAccess(order, user);
+    const { isStaff } = await this.assertAccess(order, user);
     const [summary, source] = await Promise.all([
-      this.withReceivedAt(this.toSummary(order)),
+      this.withReceivedAt(
+        await this.withStockControlNumbers(this.toSummary(order), isStaff, order),
+      ),
       resolveOrderSource(order),
     ]);
     return { ...summary, source };
@@ -105,8 +108,10 @@ export class OrderService {
 
   async getByOrderNumber(orderNumber: string, user: AuthenticatedUser) {
     const order = await this.findByOrderNumber(orderNumber);
-    await this.assertAccess(order, user);
-    return this.withReceivedAt(this.toSummary(order));
+    const { isStaff } = await this.assertAccess(order, user);
+    return this.withReceivedAt(
+      await this.withStockControlNumbers(this.toSummary(order), isStaff, order),
+    );
   }
 
   /** Public guest lookup — order number + email, or order number + shipping phone. */
@@ -212,9 +217,14 @@ export class OrderService {
     ]);
 
     const summaries = await this.withReceivedAtMany(items.map((o) => this.toSummary(o)));
+    const summariesWithStock = await Promise.all(
+      summaries.map((summary, index) =>
+        this.withStockControlNumbers(summary, isStaff, items[index]!),
+      ),
+    );
     const sources = await resolveOrderSources(items);
     return {
-      items: summaries.map((summary, index) => ({
+      items: summariesWithStock.map((summary, index) => ({
         ...summary,
         source: sources.get(String(items[index]!._id)) ?? UNKNOWN_ORDER_SOURCE,
       })),
@@ -706,6 +716,56 @@ export class OrderService {
       metadata: order.metadata ?? {},
       createdAt: order.createdAt,
       updatedAt: order.updatedAt,
+    };
+  }
+
+  /** Staff sees stock control numbers; customers and guest tracking never do. */
+  private async withStockControlNumbers<T extends { items: Array<Record<string, unknown>> }>(
+    summary: T,
+    isStaff: boolean,
+    order?: OrderDocument,
+  ): Promise<T> {
+    if (!isStaff) return summary;
+
+    const snapshotByItemId = new Map<string, string>();
+    if (order) {
+      for (const item of order.items) {
+        const number = item.stockControlNumber?.trim();
+        if (number) snapshotByItemId.set(item._id.toString(), number);
+      }
+    }
+
+    const missingProductIds = [
+      ...new Set(
+        summary.items
+          .filter((item) => {
+            const itemId = String(item.id ?? '');
+            return !snapshotByItemId.get(itemId) && item.productId;
+          })
+          .map((item) => String(item.productId)),
+      ),
+    ];
+
+    const productNumbers = new Map<string, string>();
+    if (missingProductIds.length) {
+      const products = await ProductModel.find({ _id: { $in: missingProductIds } })
+        .select('stockControlNumber')
+        .lean();
+      for (const product of products) {
+        const number = product.stockControlNumber?.trim();
+        if (number) productNumbers.set(String(product._id), number);
+      }
+    }
+
+    return {
+      ...summary,
+      items: summary.items.map((item) => {
+        const itemId = String(item.id ?? '');
+        const snapshot = snapshotByItemId.get(itemId) ?? '';
+        const fallback = productNumbers.get(String(item.productId ?? '')) ?? '';
+        const stockControlNumber = snapshot || fallback || null;
+        return stockControlNumber ? { ...item, stockControlNumber } : item;
+      }),
     };
   }
 }

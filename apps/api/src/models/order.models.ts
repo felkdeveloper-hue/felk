@@ -26,6 +26,8 @@ export interface OrderItemSubdocument {
   productId: Types.ObjectId;
   variantId: Types.ObjectId;
   name: string;
+  /** Snapshot of admin stock control number at order time (optional). */
+  stockControlNumber?: string | null;
   variantTitle?: string | null;
   sku: string;
   barcode?: string | null;
@@ -48,6 +50,7 @@ const orderItemSchema = new Schema<OrderItemSubdocument>(
     productId: { type: Schema.Types.ObjectId, ref: 'Product', required: true },
     variantId: { type: Schema.Types.ObjectId, ref: 'ProductVariant', required: true },
     name: { type: String, required: true },
+    stockControlNumber: { type: String, default: null },
     variantTitle: { type: String, default: null },
     sku: { type: String, required: true },
     barcode: { type: String, default: null },
