@@ -27,6 +27,10 @@ export const importProductSchema = z.object({
   handle: z.string().trim().min(1).max(220),
   name: z.string().trim().min(1).max(200),
   slug: z.string().trim().min(1).max(220),
+  stockControlNumber: z.preprocess(
+    (value) => (value === '' || value === undefined ? null : value),
+    z.string().trim().max(64).nullable().optional(),
+  ),
   category: z.string().trim().min(1).max(160),
   gender: z.string().trim().max(40).default(''),
   brand: z.string().trim().max(160).default(''),

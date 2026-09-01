@@ -51,6 +51,7 @@ import { slugify } from '@/utils/slug.helper.js';
 export type ImportColumnKey =
   | 'name'
   | 'handle'
+  | 'stockControlNumber'
   | 'shortDescription'
   | 'description'
   | 'status'
@@ -114,6 +115,14 @@ export const IMPORT_COLUMNS: ColumnDef[] = [
     required: false,
     help: 'Optional URL slug / grouping key. Leave blank to derive from Product Name.',
     example: '',
+  },
+  {
+    key: 'stockControlNumber',
+    label: 'Stock Control Number',
+    aliases: ['stockcontrolnumber', 'stockcontrolno', 'stockcontrol', 'inventorycontrolnumber'],
+    required: false,
+    help: 'Internal admin-only stock reference. Not shown on the storefront. Leave blank if unused.',
+    example: 'SC-10042',
   },
   {
     key: 'shortDescription',
@@ -462,6 +471,7 @@ const FIELD_LIMITS = {
   name: 200,
   handle: 220,
   slug: 220,
+  stockControlNumber: 64,
   category: 160,
   gender: 40,
   brand: 160,
@@ -487,6 +497,7 @@ const PATH_TO_COLUMN: Record<string, string> = {
   name: 'Product Name',
   handle: 'Handle',
   slug: 'Handle',
+  stockControlNumber: 'Stock Control Number',
   category: 'Category',
   gender: 'Gender',
   brand: 'Brand',
@@ -609,6 +620,7 @@ export interface ImportProductInput {
   handle: string;
   name: string;
   slug: string;
+  stockControlNumber: string | null;
   category: string;
   gender: string;
   brand: string;
@@ -1300,6 +1312,8 @@ function buildProducts(
       const description = values.description ?? '';
       const brand = values.brand?.trim() || OFFICIAL_BRAND_NAME;
       const material = values.material ?? '';
+      const stockControlNumberRaw = values.stockControlNumber ?? '';
+      const stockControlNumber = stockControlNumberRaw.trim() || null;
       const returnsCriteria = values.returnPolicy ?? '';
       const warrantyDetails = values.warrantyDetails ?? '';
       const occasions = splitList(values.occasions ?? '');
@@ -1353,6 +1367,14 @@ function buildProducts(
           material,
           FIELD_LIMITS.material,
           'Shorten the "Material" cell in Excel.',
+        ) ||
+        pushTooLong(
+          issues,
+          row,
+          'Stock Control Number',
+          stockControlNumberRaw,
+          FIELD_LIMITS.stockControlNumber,
+          'Shorten the "Stock Control Number" cell in Excel.',
         ) ||
         pushTooLong(
           issues,
@@ -1429,6 +1451,7 @@ function buildProducts(
         handle,
         name,
         slug,
+        stockControlNumber,
         category,
         gender,
         brand,
@@ -1865,6 +1888,7 @@ export class ProductImportService {
         const created = await productService.create(
           {
             name: product.name,
+            stockControlNumber: product.stockControlNumber ?? null,
             slug,
             shortDescription: product.shortDescription || undefined,
             description: product.description || undefined,
@@ -2040,6 +2064,7 @@ export class ProductImportService {
     sheet.addRow({
       name: exampleName,
       handle: '',
+      stockControlNumber: 'SC-10042',
       shortDescription: 'Soft ruffle crop top',
       description: 'Replace these rows with your real catalogue.',
       status: 'draft',
@@ -2240,6 +2265,11 @@ export class ProductImportService {
           'Leave Images blank on same-color rows. The first image set for that color is automatically reused for every size of that color. Later rows may specify different filenames for variant-specific images.',
       },
       {
+        topic: 'Stock Control Number',
+        explanation:
+          'Optional internal admin reference (max 64 characters). Not shown on the storefront. Set on the first row of each product; leave blank if unused.',
+      },
+      {
         topic: 'SEO Title & Description',
         explanation:
           'SEO Title and SEO Description are each max 500 characters. Leave SEO Title blank to use the product name. Longer values are rejected in Preview with a clear fix tip — shorten the cell in Excel before Import.',
@@ -2315,6 +2345,7 @@ export class ProductImportService {
     const row1Values: Record<string, string | number> = {
       'Product Name': sampleName,
       Handle: '',
+      'Stock Control Number': 'SC-10042',
       'Short Description': 'Soft ruffle crop top',
       Description: 'Replace these rows with your real catalogue.',
       Status: 'draft',

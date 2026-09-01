@@ -238,6 +238,7 @@ export class ProductExportService {
         sheet.addRow({
           name: String(p.name ?? ''),
           handle: String(p.slug ?? ''),
+          stockControlNumber: isFirst ? String(p.stockControlNumber ?? '') : '',
           shortDescription: isFirst ? String(p.shortDescription ?? '') : '',
           description: isFirst ? String(p.description ?? '') : '',
           status: isFirst ? String(p.status ?? 'draft') : '',
@@ -283,6 +284,7 @@ export class ProductExportService {
         sheet.addRow({
           name: String(p.name ?? ''),
           handle: String(p.slug ?? ''),
+          stockControlNumber: String(p.stockControlNumber ?? ''),
           shortDescription: String(p.shortDescription ?? ''),
           description: String(p.description ?? ''),
           status: String(p.status ?? 'draft'),

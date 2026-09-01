@@ -81,6 +81,7 @@ async function main() {
     // Product 1 — midi dress, 2 colours × 2 sizes = 4 variants + images
     {
       name: `Sample Floral Midi Dress (${stamp})`,
+      stockControlNumber: 'SC-SAMPLE-001',
       category: dressCategory,
       color: 'Hot Pink',
       size: 'S',
