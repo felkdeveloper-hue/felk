@@ -1,3 +1,5 @@
+import type { Readable } from 'node:stream';
+
 /**
  * Object storage contract (local / S3 / R2) — interface only.
  */
@@ -16,9 +18,18 @@ export interface StorageObject {
   contentType?: string;
 }
 
+export interface StorageObjectStream {
+  body: Readable;
+  contentType?: string;
+  contentLength?: number;
+  etag?: string;
+  cacheControl?: string;
+}
+
 export interface StorageService {
   upload(input: StorageUploadInput): Promise<StorageObject>;
   delete(key: string): Promise<void>;
   getSignedUrl(key: string, expiresInSeconds?: number): Promise<string>;
   exists(key: string): Promise<boolean>;
+  getObject(key: string): Promise<StorageObjectStream | null>;
 }

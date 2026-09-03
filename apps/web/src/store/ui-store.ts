@@ -8,6 +8,8 @@ interface UiState {
   activeModal: ModalId | null;
   isGlobalLoading: boolean;
   cartAnnouncement: string | null;
+  /** Incremented to request opening the catalog filter sheet from global nav. */
+  catalogFiltersOpenTrigger: number;
 }
 
 interface UiActions {
@@ -19,6 +21,7 @@ interface UiActions {
   closeModal: () => void;
   setGlobalLoading: (loading: boolean) => void;
   setCartAnnouncement: (message: string | null) => void;
+  requestCatalogFiltersOpen: () => void;
 }
 
 export type UiStore = UiState & UiActions;
@@ -29,6 +32,7 @@ export const useUiStore = create<UiStore>((set) => ({
   activeModal: null,
   isGlobalLoading: false,
   cartAnnouncement: null,
+  catalogFiltersOpenTrigger: 0,
 
   setMobileNavOpen: (open) => set({ isMobileNavOpen: open }),
   toggleMobileNav: () => set((state) => ({ isMobileNavOpen: !state.isMobileNavOpen })),
@@ -42,4 +46,7 @@ export const useUiStore = create<UiStore>((set) => ({
   setGlobalLoading: (loading) => set({ isGlobalLoading: loading }),
 
   setCartAnnouncement: (message) => set({ cartAnnouncement: message }),
+
+  requestCatalogFiltersOpen: () =>
+    set((state) => ({ catalogFiltersOpenTrigger: state.catalogFiltersOpenTrigger + 1 })),
 }));

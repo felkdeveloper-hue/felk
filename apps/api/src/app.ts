@@ -14,6 +14,7 @@ import {
   requestIdMiddleware,
   requestLoggerMiddleware,
 } from '@/middlewares/index.js';
+import { mediaRouter } from '@/routes/media.routes.js';
 import { v1Router } from '@/routes/index.js';
 import { ApiResponse } from '@/utils/response/api-response.js';
 
@@ -26,6 +27,10 @@ export function createApp(): Application {
   app.use(requestIdMiddleware);
   app.use(helmet(helmetOptions));
   app.use(cors(corsOptions));
+  // Serve catalog images before compression / rate-limit so a grid of photos
+  // cannot get 429'd and is not re-compressed as gzip.
+  app.use('/media', mediaRouter);
+  app.use(`${appConfig.server.apiPrefix}/media`, mediaRouter);
   app.use(compression());
   const captureRawBody = (req: express.Request, _res: express.Response, buf: Buffer) => {
     req.rawBody = buf;

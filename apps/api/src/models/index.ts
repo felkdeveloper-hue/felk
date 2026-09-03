@@ -33,3 +33,7 @@ export {
   type AnalyticsEventStatus,
 } from './analytics.model.js';
 export { NotificationModel, type NotificationDocument } from './notification.model.js';
+export {
+  AnonymousFlashSaleModel,
+  type AnonymousFlashSaleDocument,
+} from './anonymous-flash-sale.model.js';

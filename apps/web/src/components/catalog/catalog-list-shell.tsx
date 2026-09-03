@@ -1,11 +1,13 @@
 import type { ReactNode } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { SlidersHorizontal } from 'lucide-react';
+import { ArrowDownWideNarrow, SlidersHorizontal } from 'lucide-react';
 import { Container } from '@/components/layout/container';
 import { useCatalogFilterFacets } from '@/hooks/catalog';
+import { useUiStore } from '@/store/ui-store';
 import { CATALOG_BATCH_SIZE, type CatalogSearchState } from '@/utils/catalog';
 import type { Product } from '@/services/sdk';
 import { CatalogFilterAndSortSheet } from './catalog-filter-sidebar';
+import { CatalogSortSheet } from './catalog-sort-sheet';
 import { AppliedFilterChips, type AppliedFilterChip } from './applied-filter-chips';
 import { ProductGrid, ProductGridError, ProductGridSkeletonWrapper } from './product-grid';
 
@@ -59,6 +61,17 @@ export function CatalogListShell({
   emptyAction,
 }: CatalogListShellProps) {
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [sortOpen, setSortOpen] = useState(false);
+  const catalogFiltersOpenTrigger = useUiStore((s) => s.catalogFiltersOpenTrigger);
+  const lastHandledFilterTrigger = useRef(catalogFiltersOpenTrigger);
+
+  // Only open when the trigger increments (Filters tap) — not on mount with a stale value.
+  useEffect(() => {
+    if (catalogFiltersOpenTrigger > lastHandledFilterTrigger.current) {
+      setFiltersOpen(true);
+      lastHandledFilterTrigger.current = catalogFiltersOpenTrigger;
+    }
+  }, [catalogFiltersOpenTrigger]);
   // Defer facet API fan-out until filters open (or chips need labels).
   // Otherwise 6–7 facet calls queue ahead of the products LIST in the browser.
   const needsFacetLabels = Boolean(
@@ -157,7 +170,7 @@ export function CatalogListShell({
   const catalogTotal = typeof total === 'number' ? total : undefined;
 
   return (
-    <div className="pb-24 sm:pb-16 lg:pb-16">
+    <div className="pb-[calc(3.5rem+env(safe-area-inset-bottom,0px))] sm:pb-16 lg:pb-16">
       <Container className="space-y-4 pt-4 sm:space-y-5 sm:pt-6">
         {banner}
 
@@ -176,28 +189,61 @@ export function CatalogListShell({
           </header>
         ) : null}
 
-        {/* Toolbar — filter trigger + applied chips (no product count) */}
-        <div className="border-border/60 flex flex-wrap items-center gap-3 border-b pb-3 sm:pb-4">
-          <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
-            <CatalogFilterAndSortSheet
-              state={state}
-              onChange={onSearchChange}
-              onClear={onClearFilters}
-              total={catalogTotal}
-              products={products}
-              facetKeys={facetKeys}
-              onSortChange={(sortBy, sortOrder) => onSearchChange({ sortBy, sortOrder, page: 1 })}
-              open={filtersOpen}
-              onOpenChange={setFiltersOpen}
-            />
-            {chips.length > 0 ? (
-              <AppliedFilterChips
-                chips={chips}
-                onRemove={(key) => onSearchChange({ [key]: undefined, page: 1 })}
-                onClearAll={onClearFilters}
-              />
-            ) : null}
+        {/* Toolbar — Filter (left) + Sort (right), chips below when applied */}
+        <div className="border-border/60 space-y-3 border-b pb-3 sm:pb-4">
+          <div className="flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={() => setFiltersOpen(true)}
+              className="text-foreground hover:text-foreground/80 inline-flex items-center gap-2 py-1 text-[13px] font-medium tracking-[-0.01em] transition-colors active:opacity-70"
+            >
+              <SlidersHorizontal className="size-3.5" strokeWidth={1.75} aria-hidden />
+              Filter
+              {chips.length > 0 ? (
+                <span className="bg-foreground text-background flex size-[18px] items-center justify-center rounded-full text-[9px] font-bold">
+                  {chips.length}
+                </span>
+              ) : null}
+            </button>
+
+            <button
+              type="button"
+              aria-label="Sort products"
+              onClick={() => setSortOpen(true)}
+              className="border-border text-foreground hover:bg-muted/50 flex size-9 shrink-0 items-center justify-center border transition-colors active:scale-[0.97]"
+            >
+              <ArrowDownWideNarrow className="size-4" strokeWidth={1.75} aria-hidden />
+            </button>
           </div>
+
+          {chips.length > 0 ? (
+            <AppliedFilterChips
+              chips={chips}
+              onRemove={(key) => onSearchChange({ [key]: undefined, page: 1 })}
+              onClearAll={onClearFilters}
+            />
+          ) : null}
+
+          <CatalogFilterAndSortSheet
+            state={state}
+            onChange={onSearchChange}
+            onClear={onClearFilters}
+            total={catalogTotal}
+            products={products}
+            facetKeys={facetKeys}
+            onSortChange={(sortBy, sortOrder) => onSearchChange({ sortBy, sortOrder, page: 1 })}
+            open={filtersOpen}
+            onOpenChange={setFiltersOpen}
+            showTrigger={false}
+          />
+
+          <CatalogSortSheet
+            state={state}
+            open={sortOpen}
+            onOpenChange={setSortOpen}
+            onSortChange={(sortBy, sortOrder) => onSearchChange({ sortBy, sortOrder, page: 1 })}
+            showTrigger={false}
+          />
         </div>
 
         {/* Product grid — never flash error while retrying or when we already have rows */}
@@ -231,35 +277,6 @@ export function CatalogListShell({
           </>
         )}
       </Container>
-
-      {/* Floating filter / sort — below sheets so quick-add covers them */}
-      {!filtersOpen ? (
-        <div
-          className="pointer-events-none fixed inset-x-0 z-40 flex justify-center gap-2 px-4 lg:hidden"
-          style={{ bottom: 'calc(3.75rem + env(safe-area-inset-bottom, 0px))' }}
-        >
-          <button
-            type="button"
-            onClick={() => setFiltersOpen(true)}
-            className="border-border/80 bg-background/95 text-foreground pointer-events-auto inline-flex h-11 min-w-[7.5rem] items-center justify-center gap-2 rounded-full border px-4 text-[11px] font-bold uppercase tracking-[0.14em] shadow-[0_8px_28px_-12px_rgba(0,0,0,0.35)] backdrop-blur-md transition-transform duration-150 active:scale-[0.97]"
-          >
-            <SlidersHorizontal className="size-3.5" aria-hidden />
-            Filter
-            {chips.length > 0 ? (
-              <span className="bg-foreground text-background flex size-4 items-center justify-center rounded-full text-[9px]">
-                {chips.length}
-              </span>
-            ) : null}
-          </button>
-          <button
-            type="button"
-            onClick={() => setFiltersOpen(true)}
-            className="border-border/80 bg-background/95 text-foreground pointer-events-auto inline-flex h-11 min-w-[7.5rem] items-center justify-center gap-2 rounded-full border px-4 text-[11px] font-bold uppercase tracking-[0.14em] shadow-[0_8px_28px_-12px_rgba(0,0,0,0.35)] backdrop-blur-md transition-transform duration-150 active:scale-[0.97]"
-          >
-            Sort
-          </button>
-        </div>
-      ) : null}
     </div>
   );
 }

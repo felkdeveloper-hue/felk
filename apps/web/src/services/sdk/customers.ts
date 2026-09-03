@@ -105,6 +105,7 @@ export interface FlashSaleStatus {
   isActive: boolean;
   expiresAt: string | null;
   apologyFlashSalePending?: boolean;
+  loginBonusApplied?: boolean;
 }
 
 export type CustomerNotificationSeverity = 'info' | 'success' | 'warning' | 'error';

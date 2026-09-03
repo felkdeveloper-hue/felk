@@ -16,6 +16,7 @@ import type { ActorMeta } from '@/services/cms-crud.service.js';
 import { ApiError } from '@/utils/errors/api-error.js';
 import { computePricing } from '@/utils/pricing.helper.js';
 import { computeAvailable, deriveStockStatus } from '@/utils/stock.helper.js';
+import { toPublicMediaUrl } from '@/utils/public-media-url.js';
 import {
   CART_AUDIT,
   CART_ITEM_LOCATION,
@@ -324,9 +325,9 @@ export class CartService {
   private mediaUrl(doc: { url?: string | null; thumbnailUrl?: string | null } | null | undefined) {
     if (!doc) return null;
     // Prefer full image so cart thumbs aren't soft/cropped CDN thumbs that fail to paint.
-    if (doc.url) return String(doc.url);
-    if (doc.thumbnailUrl) return String(doc.thumbnailUrl);
-    return null;
+    const raw = doc.url || doc.thumbnailUrl;
+    if (!raw) return null;
+    return toPublicMediaUrl(String(raw)) ?? String(raw);
   }
 
   /**
@@ -389,7 +390,9 @@ export class CartService {
       if (fromPrimary) return fromPrimary;
     }
 
-    if (variant.thumbnailUrl) return variant.thumbnailUrl;
+    if (variant.thumbnailUrl) {
+      return toPublicMediaUrl(variant.thumbnailUrl) ?? variant.thumbnailUrl;
+    }
 
     // Shared product-level images only (not another color's variant media).
     const productLevel = await ProductMediaModel.findOne({

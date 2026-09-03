@@ -17,7 +17,14 @@ import { AppError } from '@/lib/errors';
 import { cn, formatDate } from '@/lib/utils';
 import { cmsApi, type CmsResource } from '@/services/sdk/admin';
 
-type BannerTabId = 'hero' | 'split' | 'editorial' | 'before_featured';
+type BannerTabId =
+  | 'hero'
+  | 'split'
+  | 'editorial'
+  | 'after_best_sellers'
+  | 'lookbook_videos'
+  | 'before_featured'
+  | 'contact_page';
 
 const fieldClassName =
   'w-full rounded-lg border border-[var(--admin-line)] bg-[var(--admin-panel-soft)] px-3 py-2 text-sm text-[var(--admin-ink)] outline-none transition-colors focus:border-[var(--admin-accent)]/50';
@@ -30,6 +37,8 @@ const TABS: Array<{
   kind: 'hero' | 'promo';
   placement?: string;
   hint: string;
+  /** Lookbook videos — upload MP4/WebM instead of (or in addition to) images. */
+  acceptsVideo?: boolean;
 }> = [
   {
     id: 'hero',
@@ -58,6 +67,26 @@ const TABS: Array<{
     hint: 'The highest-priority active banner is shown on the storefront. You can pick the image before saving.',
   },
   {
+    id: 'after_best_sellers',
+    label: 'After Best Sellers',
+    title: 'After Best Sellers',
+    description:
+      'Full-width lifestyle banner between Best Sellers and New Arrivals on the home page.',
+    kind: 'promo',
+    placement: 'home_after_best_sellers',
+    hint: 'Create one active banner. Highest priority wins. Upload an image before saving — title and subtitle overlay the photo.',
+  },
+  {
+    id: 'lookbook_videos',
+    label: 'Lookbook videos',
+    title: 'Lookbook videos',
+    description: 'Vertical video carousel on the home page (between Dual Vision and More to love).',
+    kind: 'promo',
+    placement: 'home_lookbook_videos',
+    acceptsVideo: true,
+    hint: 'Create active videos (MP4/WebM/MOV, up to 80 MB). Highest priority shows first. Shop Now always opens Women.',
+  },
+  {
     id: 'before_featured',
     label: 'Before featured',
     title: 'Before Featured Products',
@@ -65,6 +94,15 @@ const TABS: Array<{
     kind: 'promo',
     placement: 'home_before_featured',
     hint: 'Create one active banner. Highest priority wins. Choose an image before saving.',
+  },
+  {
+    id: 'contact_page',
+    label: 'Contact page',
+    title: 'Contact Page Banner',
+    description: 'Store banner shown at the top of the mobile Contact page.',
+    kind: 'promo',
+    placement: 'contact_page',
+    hint: 'Create one active banner. Highest priority wins. Upload a wide store/lifestyle photo (recommended ~1600×900). Title is optional on storefront.',
   },
 ];
 
@@ -119,7 +157,9 @@ function BannerTabPanel({ tab }: { tab: (typeof TABS)[number] }) {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [pendingIsVideo, setPendingIsVideo] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const isVideoTab = Boolean(tab.acceptsVideo);
 
   const api = tab.kind === 'hero' ? cmsApi.heroBanners : cmsApi.promoBanners;
   const resourceKey = tab.kind === 'hero' ? 'hero-banners' : 'promo-banners';
@@ -155,35 +195,42 @@ function BannerTabPanel({ tab }: { tab: (typeof TABS)[number] }) {
         title,
         subtitle: values.subtitle.trim() || null,
         ctaLabel: values.ctaLabel.trim() || null,
-        ctaUrl: values.ctaUrl.trim() || null,
+        ctaUrl: values.ctaUrl.trim() || '/products?gender=women',
         priority: Number(values.priority) || 0,
         status: values.status,
       };
       if (tab.placement) {
         payload.placement = tab.placement;
       }
-      const images = buildImagesPayload(values.imageUrl, title);
-      if (images) payload.images = images;
+      if (!isVideoTab) {
+        const images = buildImagesPayload(values.imageUrl, title);
+        if (images) payload.images = images;
+      }
 
       let saved = existingId ? await api.update(existingId, payload) : await api.create(payload);
 
       if (pendingFile) {
-        saved = await api.uploadImage(saved.id, pendingFile, title || undefined);
+        if (isVideoTab || pendingIsVideo) {
+          saved = await api.uploadVideo(saved.id, pendingFile);
+        } else {
+          saved = await api.uploadImage(saved.id, pendingFile, title || undefined);
+        }
       }
 
       return { saved, wasCreate: !existingId };
     },
     onSuccess: () => {
       invalidate();
-      toast.success('Banner saved');
+      toast.success(isVideoTab ? 'Video saved' : 'Banner saved');
       setPendingFile(null);
+      setPendingIsVideo(false);
       setDialogOpen(false);
       setEditing(null);
       setForm(EMPTY_FORM);
       setPreviewUrl(null);
     },
     onError: (error) => {
-      toast.error(error instanceof AppError ? error.message : 'Unable to save banner');
+      toast.error(error instanceof AppError ? error.message : 'Unable to save');
     },
   });
 
@@ -191,26 +238,33 @@ function BannerTabPanel({ tab }: { tab: (typeof TABS)[number] }) {
     mutationFn: (id: string) => api.remove(id),
     onSuccess: () => {
       invalidate();
-      toast.success('Banner deleted');
+      toast.success(isVideoTab ? 'Video deleted' : 'Banner deleted');
     },
     onError: (error) => {
-      toast.error(error instanceof AppError ? error.message : 'Unable to delete banner');
+      toast.error(error instanceof AppError ? error.message : 'Unable to delete');
     },
   });
 
   const openCreate = () => {
     setEditing(null);
-    setForm(EMPTY_FORM);
+    setForm({
+      ...EMPTY_FORM,
+      ctaLabel: 'Shop Now',
+      ctaUrl: '/products?gender=women',
+    });
     setPreviewUrl(null);
     setPendingFile(null);
+    setPendingIsVideo(false);
     setDialogOpen(true);
   };
 
   const openEdit = (row: CmsResource) => {
     setEditing(row);
     setForm(formFromRow(row));
-    setPreviewUrl(row.imageUrl ?? null);
+    const videoUrl = typeof row.videoUrl === 'string' ? row.videoUrl : null;
+    setPreviewUrl(videoUrl ?? row.imageUrl ?? null);
     setPendingFile(null);
+    setPendingIsVideo(Boolean(videoUrl));
     setDialogOpen(true);
   };
 
@@ -224,6 +278,10 @@ function BannerTabPanel({ tab }: { tab: (typeof TABS)[number] }) {
       toast.error('Title is required');
       return;
     }
+    if (isVideoTab && !editing?.id && !pendingFile) {
+      toast.error('Choose a video file to upload');
+      return;
+    }
     if (form.imageUrl.trim() && !/^https?:\/\//i.test(form.imageUrl.trim())) {
       toast.error('Image URL must start with http:// or https:// (or upload a file)');
       return;
@@ -232,25 +290,34 @@ function BannerTabPanel({ tab }: { tab: (typeof TABS)[number] }) {
   };
 
   const onUpload = async (file: File) => {
-    // Prefer local preview immediately; upload on save for new banners,
-    // or upload right away when editing an existing one.
+    const isVideo = file.type.startsWith('video/') || isVideoTab;
     const objectUrl = URL.createObjectURL(file);
     setPendingFile(file);
+    setPendingIsVideo(isVideo);
     setPreviewUrl(objectUrl);
 
     if (!editing?.id) return;
 
     setUploading(true);
     try {
-      const updated = await api.uploadImage(editing.id, file, form.title.trim() || undefined);
-      setPendingFile(null);
-      setPreviewUrl(updated.imageUrl ?? objectUrl);
-      setForm((current) => ({ ...current, imageUrl: updated.imageUrl ?? current.imageUrl }));
-      setEditing(updated);
-      invalidate();
-      toast.success('Image uploaded');
+      if (isVideo) {
+        const updated = await api.uploadVideo(editing.id, file);
+        setPendingFile(null);
+        setPreviewUrl(typeof updated.videoUrl === 'string' ? updated.videoUrl : objectUrl);
+        setEditing(updated);
+        invalidate();
+        toast.success('Video uploaded');
+      } else {
+        const updated = await api.uploadImage(editing.id, file, form.title.trim() || undefined);
+        setPendingFile(null);
+        setPreviewUrl(updated.imageUrl ?? objectUrl);
+        setForm((current) => ({ ...current, imageUrl: updated.imageUrl ?? current.imageUrl }));
+        setEditing(updated);
+        invalidate();
+        toast.success('Image uploaded');
+      }
     } catch (error) {
-      toast.error(error instanceof AppError ? error.message : 'Image upload failed');
+      toast.error(error instanceof AppError ? error.message : 'Upload failed');
     } finally {
       setUploading(false);
     }
@@ -274,7 +341,7 @@ function BannerTabPanel({ tab }: { tab: (typeof TABS)[number] }) {
           <p className="mt-1 text-xs text-[var(--admin-muted)]">{tab.hint}</p>
         </div>
         <button type="button" className="admin-btn admin-btn-primary" onClick={openCreate}>
-          Add banner
+          {isVideoTab ? 'Add video' : 'Add banner'}
         </button>
       </div>
 
@@ -282,13 +349,27 @@ function BannerTabPanel({ tab }: { tab: (typeof TABS)[number] }) {
         columns={[
           {
             id: 'preview',
-            header: 'Image',
-            cell: (row) =>
-              row.imageUrl ? (
+            header: isVideoTab ? 'Video' : 'Image',
+            cell: (row) => {
+              const videoUrl = typeof row.videoUrl === 'string' ? row.videoUrl : null;
+              if (isVideoTab && videoUrl) {
+                return (
+                  <video
+                    src={videoUrl}
+                    muted
+                    playsInline
+                    className="h-14 w-10 rounded object-cover"
+                  />
+                );
+              }
+              return row.imageUrl ? (
                 <img src={row.imageUrl} alt="" className="h-14 w-24 object-cover" />
               ) : (
-                <span className="text-xs text-[var(--admin-muted)]">No image</span>
-              ),
+                <span className="text-xs text-[var(--admin-muted)]">
+                  {isVideoTab ? 'No video' : 'No image'}
+                </span>
+              );
+            },
           },
           {
             id: 'title',
@@ -438,6 +519,7 @@ function BannerTabPanel({ tab }: { tab: (typeof TABS)[number] }) {
                 value={form.imageUrl}
                 onChange={(e) => updateField('imageUrl', e.target.value)}
                 placeholder="https://…"
+                disabled={isVideoTab}
               />
             </label>
             <div className="grid grid-cols-2 gap-3">
@@ -466,12 +548,26 @@ function BannerTabPanel({ tab }: { tab: (typeof TABS)[number] }) {
             </div>
 
             <div className="rounded-lg border border-[var(--admin-line)] bg-[var(--admin-panel-soft)] p-3">
-              <p className="mb-2 text-sm font-medium text-[var(--admin-ink)]">Banner image</p>
+              <p className="mb-2 text-sm font-medium text-[var(--admin-ink)]">
+                {isVideoTab ? 'Lookbook video' : 'Banner image'}
+              </p>
               {previewUrl ? (
-                <img src={previewUrl} alt="" className="mb-3 h-36 w-full object-cover" />
+                isVideoTab || pendingIsVideo ? (
+                  <video
+                    src={previewUrl}
+                    muted
+                    playsInline
+                    controls
+                    className="mb-3 h-48 w-full object-cover"
+                  />
+                ) : (
+                  <img src={previewUrl} alt="" className="mb-3 h-36 w-full object-cover" />
+                )
               ) : (
                 <p className="mb-3 text-xs text-[var(--admin-muted)]">
-                  Choose an image file — it uploads when you save the banner.
+                  {isVideoTab
+                    ? 'Choose an MP4 / WebM / MOV file — it uploads when you save.'
+                    : 'Choose an image file — it uploads when you save the banner.'}
                 </p>
               )}
               {pendingFile ? (
@@ -483,7 +579,7 @@ function BannerTabPanel({ tab }: { tab: (typeof TABS)[number] }) {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/*"
+                accept={isVideoTab ? 'video/mp4,video/webm,video/quicktime,video/*' : 'image/*'}
                 className="hidden"
                 onChange={(event) => {
                   const file = event.target.files?.[0];
@@ -497,7 +593,7 @@ function BannerTabPanel({ tab }: { tab: (typeof TABS)[number] }) {
                 disabled={uploading || saveMutation.isPending}
                 onClick={() => fileInputRef.current?.click()}
               >
-                {uploading ? 'Uploading…' : previewUrl ? 'Change image' : 'Choose image'}
+                {uploading ? 'Uploading…' : isVideoTab ? 'Choose video' : 'Choose image'}
               </button>
             </div>
 
@@ -548,7 +644,7 @@ export function BannersPage() {
     <PageMotion>
       <AdminPageHeader
         title="Banners"
-        description="Manage home hero, split, and editorial banners shown on the storefront."
+        description="Manage home hero, split, editorial, lookbook, featured, and Contact page banners."
       />
 
       <Tabs value={activeTab} onValueChange={onTabChange} className="mt-2">

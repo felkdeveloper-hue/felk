@@ -10,6 +10,7 @@ import { recentlyViewedService, savedItemService } from '@/services/recently-vie
 import { rewardService, referralService } from '@/services/reward.service.js';
 import { customerNoteService, customerTagService } from '@/services/customer-notes-tags.service.js';
 import { notificationService } from '@/services/notification.service.js';
+import { anonymousFlashSaleService } from '@/services/anonymous-flash-sale.service.js';
 import { asyncHandler } from '@/utils/async-handler.js';
 import { ApiResponse } from '@/utils/response/api-response.js';
 import { ApiError } from '@/utils/errors/api-error.js';
@@ -353,6 +354,9 @@ customersRouter.get(
     const startTime = bonus.startTime;
     const durationMs = FLASH_SALE_DISCOUNT.DURATION_MS;
     const isActive = startTime != null && Date.now() - new Date(startTime).getTime() < durationMs;
+    if (isActive && startTime) {
+      void anonymousFlashSaleService.syncIpRecord(req, new Date(startTime));
+    }
     ApiResponse.success(res, {
       flashSaleStartTime: startTime ? new Date(startTime).toISOString() : null,
       isActive,
@@ -379,6 +383,7 @@ customersRouter.post(
         flashSaleStartTime: now,
         'metadata.apologyFlashSalePending': false,
       });
+      await anonymousFlashSaleService.syncIpRecord(req, now);
       ApiResponse.success(res, {
         flashSaleStartTime: now.toISOString(),
         isActive: true,
@@ -392,6 +397,7 @@ customersRouter.post(
     // Apply a pending one-time return bonus before returning current status.
     const bonus = await customerService.applyReturnFlashSaleBonusIfPending(customer);
     if (bonus.applied && bonus.startTime) {
+      await anonymousFlashSaleService.syncIpRecord(req, new Date(bonus.startTime));
       ApiResponse.success(res, {
         flashSaleStartTime: new Date(bonus.startTime).toISOString(),
         isActive: true,
@@ -404,6 +410,9 @@ customersRouter.post(
 
     if (customer.flashSaleStartTime) {
       const isActive = Date.now() - new Date(customer.flashSaleStartTime).getTime() < durationMs;
+      if (isActive) {
+        await anonymousFlashSaleService.syncIpRecord(req, new Date(customer.flashSaleStartTime));
+      }
       ApiResponse.success(res, {
         flashSaleStartTime: new Date(customer.flashSaleStartTime).toISOString(),
         isActive,
@@ -414,8 +423,27 @@ customersRouter.post(
       });
       return;
     }
+
+    // Transfer active anonymous IP timer to this account (preserves elapsed time).
+    const transfer = await anonymousFlashSaleService.transferToCustomer(
+      req,
+      customer._id,
+      async (startTime) => {
+        await customer.updateOne({ flashSaleStartTime: startTime });
+      },
+    );
+    if (transfer.transferred && transfer.status) {
+      ApiResponse.success(res, {
+        ...transfer.status,
+        alreadyStarted: true,
+        loginBonusApplied: transfer.status.loginBonusApplied ?? false,
+      });
+      return;
+    }
+
     const now = new Date();
     await customer.updateOne({ flashSaleStartTime: now });
+    await anonymousFlashSaleService.syncIpRecord(req, now);
     ApiResponse.success(res, {
       flashSaleStartTime: now.toISOString(),
       isActive: true,

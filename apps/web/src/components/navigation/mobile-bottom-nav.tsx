@@ -1,5 +1,5 @@
 import { Link, useRouterState } from '@tanstack/react-router';
-import { Heart, Home, Search, ShoppingBag, UserRound, LayoutGrid } from 'lucide-react';
+import { CircleUser, Heart, ShoppingCart, SlidersHorizontal, Store } from 'lucide-react';
 import { ROUTES } from '@/constants';
 import { useWishlistItemCountQuery } from '@/hooks/wishlist';
 import { useAuthStore } from '@/store';
@@ -7,89 +7,136 @@ import { selectCartItemCount, useCartStore } from '@/store/cart-store';
 import { useUiStore } from '@/store/ui-store';
 import { cn } from '@/lib/utils';
 
-const items = [
-  { id: 'home', label: 'Home', to: ROUTES.home, icon: Home },
-  { id: 'categories', label: 'Categories', to: ROUTES.categories, icon: LayoutGrid },
-  { id: 'search', label: 'Search', action: 'search' as const, icon: Search },
+/** Shared outline icon spec — one consistent Lucide family. */
+const ICON = {
+  size: 22,
+  strokeWidth: 1.5,
+} as const;
+
+type NavItemDef = {
+  id: string;
+  label: string;
+  icon: typeof Store;
+  to?: string;
+  search?: Record<string, string>;
+  action?: 'filters';
+};
+
+/** Default shop landing — women collection (not a category PLP like All Top Wear). */
+const SHOP_HREF = {
+  to: ROUTES.products,
+  search: { gender: 'women' },
+} as const;
+
+/** Home + non-catalog mobile pages — matches reference: Shop | Wishlist | Cart | My account */
+const HOME_ITEMS: NavItemDef[] = [
+  { id: 'shop', label: 'Shop', to: SHOP_HREF.to, search: SHOP_HREF.search, icon: Store },
   { id: 'wishlist', label: 'Wishlist', to: ROUTES.wishlist, icon: Heart },
-  { id: 'cart', label: 'Cart', to: ROUTES.cart, icon: ShoppingBag },
-  { id: 'profile', label: 'Profile', to: ROUTES.account, icon: UserRound },
-] as const;
+  { id: 'cart', label: 'Cart', to: ROUTES.cart, icon: ShoppingCart },
+  { id: 'account', label: 'My account', to: ROUTES.account, icon: CircleUser },
+];
+
+/** Catalog / products mobile pages — keep existing 5-item layout */
+const SHOP_ITEMS: NavItemDef[] = [
+  { id: 'shop', label: 'Shop', to: SHOP_HREF.to, search: SHOP_HREF.search, icon: Store },
+  { id: 'filters', label: 'Filters', action: 'filters', icon: SlidersHorizontal },
+  { id: 'wishlist', label: 'Wishlist', to: ROUTES.wishlist, icon: Heart },
+  { id: 'cart', label: 'Cart', to: ROUTES.cart, icon: ShoppingCart },
+  { id: 'account', label: 'My Account', to: ROUTES.account, icon: CircleUser },
+];
+
+function isShopRoute(pathname: string): boolean {
+  return (
+    pathname === ROUTES.products ||
+    pathname === ROUTES.search ||
+    pathname.startsWith('/categories/')
+  );
+}
+
+function NavBadge({ count }: { count: number }) {
+  const display = count > 9 ? '9+' : String(count);
+  return (
+    <span
+      data-radius="pill"
+      className="pointer-events-none absolute -right-1.5 -top-1 flex size-[15px] min-w-[15px] items-center justify-center rounded-full text-[8px] font-semibold leading-none text-white"
+      style={{ background: '#E53935' }}
+    >
+      {display}
+    </span>
+  );
+}
 
 /**
- * Sticky mobile tab bar — Nike / Zara / Apple Store pattern.
+ * Context-aware mobile tab bar — home layout vs shop/catalog layout.
  * Hidden from `lg` up so desktop chrome stays unchanged.
  */
 export function MobileBottomNav() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const setSearchOpen = useUiStore((s) => s.setSearchOpen);
-  const setMobileNavOpen = useUiStore((s) => s.setMobileNavOpen);
+  const requestCatalogFiltersOpen = useUiStore((s) => s.requestCatalogFiltersOpen);
   const cartCount = useCartStore(selectCartItemCount);
   const { data: wishlistCount = 0 } = useWishlistItemCountQuery();
   const isAuthed = useAuthStore((s) => Boolean(s.accessToken && s.user));
 
+  const items = isShopRoute(pathname) ? SHOP_ITEMS : HOME_ITEMS;
+
   return (
     <nav
       aria-label="Primary"
-      className="border-border/80 bg-background/95 supports-[backdrop-filter]:bg-background/90 fixed inset-x-0 bottom-0 z-[90] border-t backdrop-blur-md lg:hidden"
+      className="border-border/40 bg-background fixed inset-x-0 bottom-0 z-[90] border-t shadow-[0_-1px_12px_-4px_rgba(0,0,0,0.08)] lg:hidden"
       style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
     >
-      <ul className="mx-auto flex h-14 max-w-lg items-stretch justify-between px-1">
+      <ul className="flex h-14 w-full items-stretch">
         {items.map((item) => {
           const Icon = item.icon;
-          const isSearch = 'action' in item && item.action === 'search';
-          const href = 'to' in item ? item.to : undefined;
-          const profileHref = item.id === 'profile' && !isAuthed ? ROUTES.authLogin : href;
+          const isAction = Boolean(item.action);
+          const href = item.id === 'account' && !isAuthed ? ROUTES.authLogin : item.to;
+
           const active =
-            !isSearch &&
+            !isAction &&
             Boolean(
-              profileHref &&
-              (pathname === profileHref ||
-                (profileHref !== ROUTES.home && pathname.startsWith(profileHref))),
+              href &&
+              (pathname === href ||
+                (item.id === 'shop' &&
+                  (pathname === ROUTES.products ||
+                    pathname.startsWith('/categories/') ||
+                    pathname.startsWith(ROUTES.search))) ||
+                (href !== ROUTES.home && href !== ROUTES.products && pathname.startsWith(href))),
             );
 
           const badge =
             item.id === 'cart' && cartCount > 0
-              ? cartCount > 9
-                ? '9+'
-                : String(cartCount)
+              ? cartCount
               : item.id === 'wishlist' && wishlistCount > 0
-                ? wishlistCount > 9
-                  ? '9+'
-                  : String(wishlistCount)
-                : null;
+                ? wishlistCount
+                : 0;
 
           const className = cn(
-            'relative flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-0.5 text-[10px] font-medium tracking-wide transition-colors duration-150 active:opacity-70',
-            active ? 'text-foreground' : 'text-muted-foreground',
+            'relative flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-0.5 pt-0.5 text-[10px] transition-colors duration-150 active:opacity-70',
+            active ? 'font-semibold text-foreground' : 'font-normal text-neutral-400',
           );
 
-          if (isSearch) {
-            return (
-              <li key={item.id} className="flex flex-1">
-                <button
-                  type="button"
-                  className={className}
-                  aria-label="Search"
-                  onClick={() => setSearchOpen(true)}
-                >
-                  <Icon className="size-[1.15rem]" strokeWidth={1.5} aria-hidden />
-                  <span>{item.label}</span>
-                </button>
-              </li>
-            );
-          }
+          const iconEl = (
+            <span className="relative inline-flex items-center justify-center">
+              <Icon
+                size={ICON.size}
+                strokeWidth={active ? 2 : ICON.strokeWidth}
+                className={active ? 'text-foreground' : 'text-neutral-500'}
+                aria-hidden
+              />
+              {badge > 0 ? <NavBadge count={badge} /> : null}
+            </span>
+          );
 
-          if (item.id === 'categories') {
+          if (item.action === 'filters') {
             return (
               <li key={item.id} className="flex flex-1">
                 <button
                   type="button"
                   className={className}
-                  aria-label="Open categories"
-                  onClick={() => setMobileNavOpen(true)}
+                  aria-label="Open filters"
+                  onClick={() => requestCatalogFiltersOpen()}
                 >
-                  <Icon className="size-[1.15rem]" strokeWidth={1.5} aria-hidden />
+                  {iconEl}
                   <span>{item.label}</span>
                 </button>
               </li>
@@ -99,19 +146,13 @@ export function MobileBottomNav() {
           return (
             <li key={item.id} className="flex flex-1">
               <Link
-                to={profileHref!}
+                to={href!}
+                search={item.search}
                 preload="intent"
                 aria-current={active ? 'page' : undefined}
                 className={className}
               >
-                <span className="relative">
-                  <Icon className="size-[1.15rem]" strokeWidth={1.5} aria-hidden />
-                  {badge ? (
-                    <span className="bg-accent text-accent-foreground absolute -right-2 -top-1.5 flex size-4 items-center justify-center rounded-full text-[8px] font-semibold">
-                      {badge}
-                    </span>
-                  ) : null}
-                </span>
+                {iconEl}
                 <span>{item.label}</span>
               </Link>
             </li>

@@ -19,14 +19,13 @@ export interface CartOrderSummaryProps {
 export function CartOrderSummary({ totals, items = [], validation }: CartOrderSummaryProps) {
   const currency = totals.currency ?? 'LKR';
   const authUser = useAuthStore((state) => state.user);
-  const isAuthed = useAuthStore((state) => Boolean(state.accessToken && state.user));
   const { isFlashSaleActive } = useFlashSale();
   const slugByCategoryId = useCategorySlugLookup();
   const isStaff = isStaffUser(authUser);
   const shipping = previewShippingAmount(totals.shipping, isStaff);
   const displayTotal = totals.shipping > 0 ? totals.total : totals.total + shipping;
 
-  const flashEnabled = isAuthed && isFlashSaleActive;
+  const flashEnabled = isFlashSaleActive;
   const flashSubtotal =
     flashEnabled && items.length
       ? computeFlashAdjustedSubtotal(items, slugByCategoryId)

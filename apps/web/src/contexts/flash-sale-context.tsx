@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { QUERY_KEYS } from '@/constants/query-keys';
 import { customersApi } from '@/services/sdk';
+import { storefrontApi } from '@/services/sdk/storefront';
 import { useAuthStore } from '@/store/auth-store';
 
 const FLASH_SALE_DURATION_MS = 60 * 60 * 1000; // 1 hour
@@ -101,22 +102,35 @@ export function FlashSaleProvider({ children }: FlashSaleProviderProps) {
     };
   }, []);
 
-  // Fetch flash sale status from the server (source of truth)
-  const { data: flashSaleData, isLoading } = useQuery({
+  // Authenticated: fetch member flash sale from server
+  const { data: flashSaleData, isLoading: isLoadingAuthed } = useQuery({
     queryKey: QUERY_KEYS.customers.flashSale(),
     queryFn: () => customersApi.getFlashSale(),
     enabled: isAuthenticated,
-    staleTime: 1000 * 60, // 1 minute
+    staleTime: 1000 * 60,
     refetchOnWindowFocus: false,
   });
 
-  // Mutation to start the flash sale
+  // Anonymous: IP-persisted flash sale for unsigned visitors
+  const { data: anonymousFlashSaleData, isLoading: isLoadingAnonymous } = useQuery({
+    queryKey: QUERY_KEYS.storefront.flashSale(),
+    queryFn: () => storefrontApi.getFlashSale(),
+    enabled: !isAuthenticated,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: false,
+  });
+
+  const activeFlashSaleData = isAuthenticated ? flashSaleData : anonymousFlashSaleData;
+  const isLoading = isAuthenticated ? isLoadingAuthed : isLoadingAnonymous;
+
+  // Mutation to start the flash sale (authenticated only — transfers IP timer on login)
   const startFlashSaleMutation = useMutation({
     mutationFn: () => customersApi.startFlashSale(),
     onSuccess: (data) => {
       void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.customers.flashSale() });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.storefront.flashSale() });
       if (!data.alreadyStarted) {
-        // Fresh flash sale — show the popup (unless dismissed)
         const dismissed = sessionStorage.getItem(POPUP_DISMISSED_KEY);
         if (!dismissed) {
           setShowPopup(true);
@@ -125,10 +139,18 @@ export function FlashSaleProvider({ children }: FlashSaleProviderProps) {
     },
   });
 
-  // Start flash sale when user first logs in (no existing flashSaleStartTime)
-  // or when an apology credit is pending from the checkout bug campaign.
+  // Refetch anonymous flash sale immediately after logout
+  const wasAuthenticatedRef = useRef(isAuthenticated);
   useEffect(() => {
-    if (!isAuthenticated || isLoading) return;
+    if (wasAuthenticatedRef.current && !isAuthenticated) {
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.storefront.flashSale() });
+    }
+    wasAuthenticatedRef.current = isAuthenticated;
+  }, [isAuthenticated, queryClient]);
+
+  // Start or transfer flash sale when user logs in
+  useEffect(() => {
+    if (!isAuthenticated || isLoadingAuthed) return;
     if (flashSaleData === undefined) return;
 
     const shouldStartFresh =
@@ -137,7 +159,6 @@ export function FlashSaleProvider({ children }: FlashSaleProviderProps) {
     if (shouldStartFresh) {
       startFlashSaleMutation.mutate();
     } else if (flashSaleData.isActive) {
-      // Returning visit with active sale — show popup once per session if not dismissed
       const dismissed = sessionStorage.getItem(POPUP_DISMISSED_KEY);
       if (!dismissed) {
         setShowPopup(true);
@@ -145,12 +166,12 @@ export function FlashSaleProvider({ children }: FlashSaleProviderProps) {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated, isLoading, flashSaleData?.flashSaleStartTime, user?.id]);
+  }, [isAuthenticated, isLoadingAuthed, flashSaleData?.flashSaleStartTime, user?.id]);
 
-  // Real-time countdown
+  // Real-time countdown (works for both authenticated and anonymous)
   useEffect(() => {
-    const startTimeStr = flashSaleData?.flashSaleStartTime ?? null;
-    if (!startTimeStr || !flashSaleData?.isActive) {
+    const startTimeStr = activeFlashSaleData?.flashSaleStartTime ?? null;
+    if (!startTimeStr || !activeFlashSaleData?.isActive) {
       startTimeRef.current = null;
       setTimeRemaining(0);
       if (intervalRef.current) {
@@ -173,7 +194,11 @@ export function FlashSaleProvider({ children }: FlashSaleProviderProps) {
           clearInterval(intervalRef.current);
           intervalRef.current = null;
         }
-        void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.customers.flashSale() });
+        if (isAuthenticated) {
+          void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.customers.flashSale() });
+        } else {
+          void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.storefront.flashSale() });
+        }
       }
     };
 
@@ -186,9 +211,14 @@ export function FlashSaleProvider({ children }: FlashSaleProviderProps) {
         intervalRef.current = null;
       }
     };
-  }, [flashSaleData?.flashSaleStartTime, flashSaleData?.isActive, queryClient]);
+  }, [
+    activeFlashSaleData?.flashSaleStartTime,
+    activeFlashSaleData?.isActive,
+    isAuthenticated,
+    queryClient,
+  ]);
 
-  const isFlashSaleActive = (flashSaleData?.isActive ?? false) && timeRemaining > 0;
+  const isFlashSaleActive = (activeFlashSaleData?.isActive ?? false) && timeRemaining > 0;
 
   const dismissPopup = () => {
     setShowPopup(false);

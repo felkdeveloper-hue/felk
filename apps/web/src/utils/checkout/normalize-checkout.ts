@@ -5,6 +5,7 @@ import type {
   CheckoutTotals,
   CheckoutValidationIssue,
 } from '@/services/sdk';
+import { toStorefrontMediaUrl } from '@/utils/media-url';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -43,7 +44,10 @@ function normalizeLine(raw: unknown): CheckoutLine {
     lineSubtotal: Number(record.lineSubtotal ?? 0),
     colorName: typeof record.colorName === 'string' ? record.colorName : undefined,
     sizeName: typeof record.sizeName === 'string' ? record.sizeName : undefined,
-    thumbnailUrl: typeof record.thumbnailUrl === 'string' ? record.thumbnailUrl : undefined,
+    thumbnailUrl:
+      typeof record.thumbnailUrl === 'string'
+        ? toStorefrontMediaUrl(record.thumbnailUrl)
+        : undefined,
   };
 }
 

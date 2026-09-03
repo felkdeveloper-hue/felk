@@ -47,7 +47,17 @@ export class ProductRepository extends BaseRepository {
     super(
       ProductModel,
       ['name', 'slug', 'shortDescription', 'tags', 'searchKeywords'],
-      ['createdAt', 'updatedAt', 'name', 'publishAt', 'pricing.price', 'status', 'variantCount'],
+      [
+        'createdAt',
+        'updatedAt',
+        'name',
+        'publishAt',
+        'pricing.price',
+        'status',
+        'variantCount',
+        'averageRating',
+        'reviewCount',
+      ],
     );
   }
 

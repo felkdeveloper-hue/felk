@@ -8,6 +8,29 @@ import { VitePWA } from 'vite-plugin-pwa';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isProduction = process.env.NODE_ENV === 'production';
 
+function r2PublicOrigin(): string {
+  const cdn = process.env.VITE_CDN_URL || 'https://pub-3ea3125fe4db4405b6fce21ead15fc1f.r2.dev';
+  try {
+    const url = new URL(cdn);
+    if (url.hostname.endsWith('.r2.dev')) return url.origin;
+  } catch {
+    /* ignore */
+  }
+  return 'https://pub-3ea3125fe4db4405b6fce21ead15fc1f.r2.dev';
+}
+
+const cdnProxy = {
+  '/cdn': {
+    target: r2PublicOrigin(),
+    changeOrigin: true,
+    rewrite: (proxyPath: string) => proxyPath.replace(/^\/cdn/, ''),
+  },
+  '/api': {
+    target: 'http://127.0.0.1:4000',
+    changeOrigin: true,
+  },
+};
+
 export default defineConfig({
   plugins: [
     react(),
@@ -34,7 +57,7 @@ export default defineConfig({
             manifest: false,
             workbox: {
               navigateFallback: '/index.html',
-              navigateFallbackDenylist: [/^\/api\//],
+              navigateFallbackDenylist: [/^\/api\//, /^\/cdn\//],
               globPatterns: ['**/*.{js,css,html,ico,svg,webmanifest,woff2}'],
               runtimeCaching: [
                 {
@@ -68,12 +91,7 @@ export default defineConfig({
     host: true,
     // Allow ngrok (and similar) tunnels — free URLs change each session
     allowedHosts: ['.ngrok-free.dev', '.ngrok-free.app', '.ngrok.app', '.ngrok.io'],
-    proxy: {
-      '/api': {
-        target: 'http://127.0.0.1:4000',
-        changeOrigin: true,
-      },
-    },
+    proxy: { ...cdnProxy },
     watch: {
       ignored: [
         '**/node_modules/**',
@@ -91,10 +109,7 @@ export default defineConfig({
   preview: {
     port: 5173,
     proxy: {
-      '/api': {
-        target: 'http://127.0.0.1:4000',
-        changeOrigin: true,
-      },
+      ...cdnProxy,
     },
   },
   optimizeDeps: {

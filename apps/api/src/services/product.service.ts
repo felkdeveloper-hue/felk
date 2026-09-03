@@ -28,8 +28,9 @@ import {
 } from '@/constants/product.js';
 import { allocateUniqueParentSku, isSkuTaken } from '@/services/sku-allocation.service.js';
 import { env } from '@/config/env.js';
+import { toPublicMediaUrl } from '@/utils/public-media-url.js';
 
-/** Rewrite localhost upload URLs to the public API host (or path-only). */
+/** Rewrite localhost upload URLs and blocked `*.r2.dev` hosts to a public origin. */
 function publicMediaUrl(url?: string | null): string | undefined {
   if (!url) return undefined;
   const localMatch = url.match(/^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?(\/uploads\/.*)$/i);
@@ -42,7 +43,7 @@ function publicMediaUrl(url?: string | null): string | undefined {
     }
     return localMatch[1];
   }
-  return url;
+  return toPublicMediaUrl(url);
 }
 
 function toPlain(doc: { toObject?: () => Record<string, unknown> } | Record<string, unknown>) {
@@ -730,7 +731,11 @@ export class ProductService {
       brandName,
       inStock,
       variants: variantsWithStock,
-      media,
+      media: media.map((item) => ({
+        ...item,
+        url: publicMediaUrl(item.url) ?? item.url,
+        thumbnailUrl: publicMediaUrl(item.thumbnailUrl) ?? item.thumbnailUrl,
+      })),
       relationships,
     };
   }

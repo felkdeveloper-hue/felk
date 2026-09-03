@@ -5,6 +5,7 @@ import { productsApi } from '@/services/sdk';
 import {
   applyClientCatalogFilters,
   catalogSearchToProductParams,
+  catalogSearchToUrlParams,
   CATALOG_BATCH_SIZE,
   CATALOG_MAX_PRODUCTS,
   parseCatalogSearch,
@@ -37,8 +38,17 @@ export const productsRoute = createRoute({
   path: ROUTES.products,
   validateSearch: (search: Record<string, unknown>) => parseCatalogSearch(search),
   beforeLoad: ({ context, search }) => {
-    // Kick the first page fetch as early as the route resolves (parallel with layout paint).
     const state = parseCatalogSearch(search as Record<string, unknown>);
+    // Shop /products always opens the women collection — never a bare "All Products"
+    // page that falls back to the All Top Wear campaign banner.
+    if (!state.gender) {
+      throw redirect({
+        to: ROUTES.products,
+        search: { ...catalogSearchToUrlParams(state), gender: 'women' },
+        replace: true,
+      });
+    }
+    // Kick the first page fetch as early as the route resolves (parallel with layout paint).
     const baseParams = catalogSearchToProductParams({
       ...state,
       page: undefined,
@@ -117,6 +127,10 @@ export const wishlistRoute = createRoute({
   getParentRoute: () => publicLayoutRoute,
   path: ROUTES.wishlist,
   component: WishlistPage,
+  // Always land at the top when opening wishlist from menu / bottom nav.
+  onEnter: () => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  },
 });
 
 export const aboutRoute = createRoute({

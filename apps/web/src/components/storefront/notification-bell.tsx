@@ -2,6 +2,11 @@ import { useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bell } from 'lucide-react';
+import {
+  NavbarBellIcon,
+  NavbarIconBadge,
+  navbarActionBtnClass,
+} from '@/components/layout/navbar-action-icons';
 import { useFlashSale } from '@/contexts/flash-sale-context';
 import { useAuthStore } from '@/store/auth-store';
 import { Button } from '@/components/ui/button';
@@ -18,6 +23,8 @@ import { cn } from '@/lib/utils';
 interface NotificationBellProps {
   lightChrome?: boolean;
   className?: string;
+  /** Minimal trigger — no ghost button chrome (mobile navbar). */
+  minimal?: boolean;
 }
 
 function severityStyles(severity: CustomerNotification['severity']) {
@@ -96,7 +103,11 @@ function ServerNotificationCard({
   );
 }
 
-export function NotificationBell({ lightChrome, className }: NotificationBellProps) {
+export function NotificationBell({
+  lightChrome,
+  className,
+  minimal = false,
+}: NotificationBellProps) {
   const isAuthenticated = useAuthStore((state) => Boolean(state.accessToken && state.user));
   const { isFlashSaleActive, formattedTime, timeRemaining } = useFlashSale();
   const queryClient = useQueryClient();
@@ -131,11 +142,10 @@ export function NotificationBell({ lightChrome, className }: NotificationBellPro
   const totalBadgeCount = unreadServerCount + flashSaleUnread + guestPromo;
   const hasNotification = totalBadgeCount > 0;
 
-  const iconBtn = cn(
-    'relative size-9 shrink-0 sm:size-11 [&_svg]:size-[1.15rem] [&_svg]:stroke-[1.35]',
-    lightChrome
-      ? 'text-white hover:bg-white/10 hover:text-white'
-      : 'text-foreground hover:bg-muted/70 hover:text-foreground',
+  const iconBtn = navbarActionBtnClass(Boolean(lightChrome), className);
+  const minimalBtn = cn(
+    'relative inline-flex size-9 shrink-0 items-center justify-center transition-opacity duration-150 active:opacity-70',
+    lightChrome ? 'text-white' : 'text-foreground',
     className,
   );
 
@@ -149,26 +159,34 @@ export function NotificationBell({ lightChrome, className }: NotificationBellPro
   return (
     <DropdownMenu open={open} onOpenChange={handleOpenChange}>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label="Notifications" className={iconBtn}>
-          <Bell />
-          {hasNotification && (
-            <span
-              className="absolute right-2 top-2 size-2 rounded-full bg-red-500"
-              style={{
-                animation: 'notif-ping 1.5s cubic-bezier(0,0,0.2,1) infinite',
-                boxShadow: '0 0 0 0 rgba(239,68,68,0.7)',
-              }}
-              aria-hidden
-            />
-          )}
-          <style>{`
-            @keyframes notif-ping {
-              0%    { box-shadow: 0 0 0 0 rgba(239,68,68,0.7); }
-              70%   { box-shadow: 0 0 0 6px rgba(239,68,68,0); }
-              100%  { box-shadow: 0 0 0 0 rgba(239,68,68,0); }
+        {minimal ? (
+          <button
+            type="button"
+            aria-label={
+              hasNotification ? `Notifications, ${totalBadgeCount} unread` : 'Notifications'
             }
-          `}</style>
-        </Button>
+            className={minimalBtn}
+          >
+            <NavbarBellIcon />
+            {hasNotification ? (
+              <NavbarIconBadge count={totalBadgeCount} className="right-0 top-0" />
+            ) : null}
+          </button>
+        ) : (
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={
+              hasNotification ? `Notifications, ${totalBadgeCount} unread` : 'Notifications'
+            }
+            className={iconBtn}
+          >
+            <NavbarBellIcon />
+            {hasNotification ? (
+              <NavbarIconBadge count={totalBadgeCount} className="right-1 top-1" />
+            ) : null}
+          </Button>
+        )}
       </DropdownMenuTrigger>
 
       <DropdownMenuContent

@@ -2,6 +2,7 @@ import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { ImageOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
+import { toStorefrontMediaUrl } from '@/utils/media-url';
 
 /** Card image frame — 4:5. Typical desktop catalog card is ~315 × 394 px. */
 export const PRODUCT_CARD_IMAGE_ASPECT = 'aspect-[4/5]';
@@ -49,6 +50,7 @@ function resolveProductCardImageFit(naturalWidth: number, naturalHeight: number)
     };
   }
 
+  // Near 4:5 — fill the card (do not letterbox; avoids sampling dress/skin as pad color).
   return {
     objectFit: 'cover',
     objectPosition: 'center center',
@@ -57,38 +59,49 @@ function resolveProductCardImageFit(naturalWidth: number, naturalHeight: number)
   };
 }
 
-/** Sample edge pixels so padded cards match the uploaded photo background. */
-function sampleImageEdgeColor(image: HTMLImageElement): string | null {
+function median(values: number[]): number {
+  if (values.length === 0) return 255;
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[Math.floor(sorted.length / 2)] ?? 255;
+}
+
+/** Sample top/bottom strips at source resolution so shoe letterbox pads match the upload. */
+function sampleShortImagePadColor(image: HTMLImageElement): string | null {
   try {
-    const sample = 8;
+    const w = image.naturalWidth;
+    const h = image.naturalHeight;
+    if (w <= 0 || h <= 0) return null;
+
+    const stripPx = Math.max(2, Math.round(h * 0.03));
     const canvas = document.createElement('canvas');
-    canvas.width = sample;
-    canvas.height = sample;
+    canvas.width = Math.min(w, 240);
+    const scale = canvas.width / w;
+    const drawStripH = Math.max(1, Math.round(stripPx * scale));
+    canvas.height = drawStripH * 2;
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
     if (!ctx) return null;
-    ctx.drawImage(image, 0, 0, sample, sample);
-    const { data } = ctx.getImageData(0, 0, sample, sample);
-    const points = [
-      [0, 0],
-      [sample - 1, 0],
-      [0, sample - 1],
-      [sample - 1, sample - 1],
-      [Math.floor(sample / 2), 0],
-      [Math.floor(sample / 2), sample - 1],
-    ];
-    let r = 0;
-    let g = 0;
-    let b = 0;
-    for (const point of points) {
-      const x = point[0] ?? 0;
-      const y = point[1] ?? 0;
-      const i = (y * sample + x) * 4;
-      r += data[i] ?? 255;
-      g += data[i + 1] ?? 255;
-      b += data[i + 2] ?? 255;
+
+    ctx.drawImage(image, 0, 0, w, stripPx, 0, 0, canvas.width, drawStripH);
+    ctx.drawImage(image, 0, h - stripPx, w, stripPx, 0, drawStripH, canvas.width, drawStripH);
+
+    const { data, width: cw, height: ch } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const xStart = Math.floor(cw * 0.2);
+    const xEnd = Math.ceil(cw * 0.8);
+    const rs: number[] = [];
+    const gs: number[] = [];
+    const bs: number[] = [];
+
+    for (let y = 0; y < ch; y++) {
+      for (let x = xStart; x < xEnd; x++) {
+        const i = (y * cw + x) * 4;
+        rs.push(data[i] ?? 255);
+        gs.push(data[i + 1] ?? 255);
+        bs.push(data[i + 2] ?? 255);
+      }
     }
-    const n = points.length;
-    return `rgb(${Math.round(r / n)}, ${Math.round(g / n)}, ${Math.round(b / n)})`;
+
+    if (rs.length === 0) return null;
+    return `rgb(${median(rs)}, ${median(gs)}, ${median(bs)})`;
   } catch {
     return null;
   }
@@ -133,7 +146,7 @@ export function ProductCardImage({
     if (!node || node.naturalWidth <= 0 || node.naturalHeight <= 0) return;
     const next = resolveProductCardImageFit(node.naturalWidth, node.naturalHeight);
     if (next.shortImage) {
-      next.frameColor = sampleImageEdgeColor(node) ?? SHORT_IMAGE_FALLBACK;
+      next.frameColor = sampleShortImagePadColor(node) ?? SHORT_IMAGE_FALLBACK;
     }
     setFit(next);
   }, []);
@@ -152,6 +165,8 @@ export function ProductCardImage({
       setStatus('loaded');
     }
   }, [src, applyFit]);
+
+  const imageSrc = src ? toStorefrontMediaUrl(src) : src;
 
   const handleLoad = (event: React.SyntheticEvent<HTMLImageElement>) => {
     applyFit(event.currentTarget);
@@ -180,7 +195,7 @@ export function ProductCardImage({
       ) : (
         <img
           ref={imgRef}
-          src={src}
+          src={imageSrc}
           alt={alt}
           sizes={sizes}
           loading={loading}
@@ -195,6 +210,7 @@ export function ProductCardImage({
           style={{
             objectFit: fit.objectFit,
             objectPosition: fit.objectPosition,
+            backgroundColor: fit.shortImage ? fit.frameColor : undefined,
           }}
           onLoad={handleLoad}
           onError={() => {

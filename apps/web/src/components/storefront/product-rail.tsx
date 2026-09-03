@@ -1,5 +1,6 @@
 import { Link } from '@tanstack/react-router';
 import { ArrowRight } from 'lucide-react';
+import type { ReactNode } from 'react';
 import {
   useProductRail,
   type ProductRailKind,
@@ -48,7 +49,7 @@ const railCopy: Record<ProductRailKind, { eyebrow: string; title: string; descri
 
 export interface ProductRailSectionProps {
   kind: ProductRailKind;
-  title?: string;
+  title?: string | false;
   description?: string;
   eyebrow?: string;
   scope?: ProductRailScope;
@@ -61,6 +62,10 @@ export interface ProductRailSectionProps {
   eager?: boolean;
   spacing?: 'none' | 'sm' | 'default' | 'lg';
   titleAlign?: 'start' | 'center';
+  /** Optional custom header rendered above the rail (replaces default title). */
+  header?: React.ReactNode;
+  /** Optional custom header rendered above the rail (replaces default title). */
+  header?: ReactNode;
 }
 
 export function ProductRailSection({
@@ -73,12 +78,15 @@ export function ProductRailSection({
   eager = false,
   spacing = 'sm',
   titleAlign = 'start',
+  header,
 }: ProductRailSectionProps) {
   const copy = railCopy[kind];
   const { ref, inView } = useInView({ immediate: eager, rootMargin: '320px 0px' });
   const query = useProductRail(kind, scope, { enabled: inView });
   const isEmpty = !query.isLoading && !query.isError && !query.data?.data?.length;
   const hasProducts = Boolean(query.data?.data?.length);
+  const resolvedTitle = header ? undefined : title === false ? undefined : (title ?? copy.title);
+  const railLabel = typeof title === 'string' ? title : header ? 'Best Seller' : copy.title;
 
   // After retries fail, hide the whole rail (title included) — no red error blocks.
   if (inView && query.isError && !query.isFetching && !hasProducts) return null;
@@ -86,6 +94,7 @@ export function ProductRailSection({
 
   return (
     <div ref={ref}>
+      {header ? <div className="mb-4 sm:mb-5">{header}</div> : null}
       <Section
         spacing={spacing}
         titleAlign={titleAlign}
@@ -93,17 +102,19 @@ export function ProductRailSection({
           kind === 'trending'
             ? 'from-muted/70 via-background to-background bg-gradient-to-b'
             : kind === 'best-sellers'
-              ? 'bg-foreground/[0.025]'
+              ? 'bg-background'
               : undefined
         }
-        title={title ?? copy.title}
+        title={resolvedTitle}
         action={
-          <Button variant="ghost" asChild className="hidden sm:inline-flex">
-            <Link to={ROUTES.products}>
-              View all
-              <ArrowRight />
-            </Link>
-          </Button>
+          header ? undefined : (
+            <Button variant="ghost" asChild className="hidden sm:inline-flex">
+              <Link to={ROUTES.products}>
+                View all
+                <ArrowRight />
+              </Link>
+            </Button>
+          )
         }
       >
         {!inView || query.isLoading || (query.isFetching && !hasProducts) ? (
@@ -112,7 +123,7 @@ export function ProductRailSection({
           </div>
         ) : hasProducts ? (
           <HorizontalCarousel
-            label={title ?? copy.title}
+            label={railLabel}
             itemClassName="w-[46%] sm:w-[52%] md:w-[40%] lg:w-[31%] xl:w-[24%]"
             scrollByItem
           >

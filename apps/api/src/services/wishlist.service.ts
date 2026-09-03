@@ -6,6 +6,7 @@ import { customerService } from '@/services/customer.service.js';
 import { writeAuditLog } from '@/services/audit.service.js';
 import type { ActorMeta } from '@/services/cms-crud.service.js';
 import { ApiError } from '@/utils/errors/api-error.js';
+import { toPublicMediaUrl } from '@/utils/public-media-url.js';
 import { CUSTOMER_AUDIT, WISHLIST_VISIBILITY } from '@/constants/customer.js';
 
 type LeanWishlistItem = {
@@ -18,9 +19,9 @@ type LeanWishlistItem = {
 
 function mediaUrl(doc: { url?: string | null; thumbnailUrl?: string | null } | null | undefined) {
   if (!doc) return null;
-  if (doc.url) return String(doc.url);
-  if (doc.thumbnailUrl) return String(doc.thumbnailUrl);
-  return null;
+  const raw = doc.url || doc.thumbnailUrl;
+  if (!raw) return null;
+  return toPublicMediaUrl(String(raw)) ?? String(raw);
 }
 
 export class WishlistService {
@@ -99,7 +100,9 @@ export class WishlistService {
 
       const thumbnailUrl =
         (variantId ? mediaByVariant.get(variantId) : undefined) ??
-        (typeof variant?.thumbnailUrl === 'string' ? variant.thumbnailUrl : undefined) ??
+        (typeof variant?.thumbnailUrl === 'string'
+          ? (toPublicMediaUrl(variant.thumbnailUrl) ?? variant.thumbnailUrl)
+          : undefined) ??
         mediaByProduct.get(productId) ??
         null;
 

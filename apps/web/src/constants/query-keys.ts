@@ -39,6 +39,10 @@ export const QUERY_KEYS = {
     flashSale: () => ['customers', 'me', 'flash-sale'] as const,
     notifications: () => ['customers', 'me', 'notifications'] as const,
   },
+  storefront: {
+    bootstrap: () => ['storefront', 'bootstrap'] as const,
+    flashSale: () => ['storefront', 'flash-sale'] as const,
+  },
   cart: {
     current: () => ['cart'] as const,
   },
@@ -114,8 +118,5 @@ export const QUERY_KEYS = {
   },
   adminAudit: {
     list: (params?: unknown) => ['admin', 'audit', 'list', params] as const,
-  },
-  storefront: {
-    bootstrap: () => ['storefront', 'bootstrap'] as const,
   },
 } as const;

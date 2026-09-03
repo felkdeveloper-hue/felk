@@ -1,5 +1,6 @@
 import { http } from '@/lib/http-client';
 import type { PublicSettingRow, PublicSettings } from './cms';
+import type { FlashSaleStatus } from './customers';
 
 export interface StorefrontBootstrapPayload {
   settings: PublicSettingRow[] | PublicSettings;
@@ -24,5 +25,10 @@ export interface StorefrontBootstrapPayload {
 export const storefrontApi = {
   async getBootstrap(): Promise<StorefrontBootstrapPayload> {
     return http.get<StorefrontBootstrapPayload>('/storefront/bootstrap');
+  },
+
+  /** IP-persisted anonymous flash sale for unsigned visitors. */
+  getFlashSale(): Promise<FlashSaleStatus> {
+    return http.get<FlashSaleStatus>('/storefront/flash-sale');
   },
 };

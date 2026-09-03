@@ -3,6 +3,7 @@ import { OfflineBanner } from '@/components/feedback/offline-banner';
 import { AnnouncementBar } from '@/components/storefront/announcement-bar';
 import { FloatingSocialBar } from '@/components/storefront/floating-social-bar';
 import { FlashSalePopup } from '@/components/storefront/flash-sale-popup';
+import { MobileFloatingFlashSaleCountdown } from '@/components/storefront/mobile-floating-flash-sale-countdown';
 import { ForceLightTheme } from '@/components/common/force-light-theme';
 import { StorefrontFooter, StorefrontHeader } from '@/components/layout';
 import { FloatingSearch } from '@/components/layout/floating-search';
@@ -27,6 +28,7 @@ export function PublicLayout() {
           <OfflineBanner />
           <AnnouncementBar />
           <StorefrontHeader />
+          <MobileFloatingFlashSaleCountdown />
           <main
             id="main-content"
             className="safe-mobile-chrome flex-1 scroll-pt-20 focus:outline-none lg:scroll-pt-28 lg:pb-0"

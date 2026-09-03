@@ -10,7 +10,6 @@ import { Image } from '@/components/media/image';
 import { QuantitySelector } from '@/components/cart/quantity-selector';
 import { productMetaFrom, trackCommerceEvent } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
-import { useAuthStore } from '@/store';
 import { useFlashSale } from '@/contexts/flash-sale-context';
 import { useFlashSaleEligibilityForCategories } from '@/hooks/use-flash-sale-eligibility';
 import { applyFlashDiscount } from '@/utils/flash-sale-eligibility';
@@ -42,14 +41,13 @@ export interface CartItemRowProps {
 export function CartItemRow({ item, compact, validationMessage, className }: CartItemRowProps) {
   const updateMutation = useUpdateCartItemMutation();
   const removeMutation = useRemoveCartItemMutation();
-  const isAuthed = useAuthStore((state) => Boolean(state.accessToken && state.user));
   const { isFlashSaleActive } = useFlashSale();
   const { eligible: flashEligible } = useFlashSaleEligibilityForCategories({
     categoryId: item.categoryId,
     categoryIds: item.categoryIds,
     subcategoryId: item.subcategoryId,
   });
-  const flashEnabled = isAuthed && isFlashSaleActive && flashEligible;
+  const flashEnabled = isFlashSaleActive && flashEligible;
 
   const displayPrice = item.salePrice ?? item.unitPrice;
   const currency = item.currency ?? 'LKR';

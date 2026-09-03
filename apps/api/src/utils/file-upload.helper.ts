@@ -169,3 +169,25 @@ export const productImportZipOnlyUpload = multer({
 export function multiImageUpload(fieldName = 'files', maxCount = 10) {
   return memoryUpload.array(fieldName, maxCount);
 }
+
+const VIDEO_MIME = new Set(['video/mp4', 'video/webm', 'video/quicktime', 'video/x-m4v']);
+
+/** Memory uploader for lookbook / promo videos (separate from image MIME allow-list). */
+export const videoUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 80 * 1024 * 1024, // 80 MB
+    files: 1,
+  },
+  fileFilter(_req, file, cb) {
+    if (!VIDEO_MIME.has(file.mimetype)) {
+      cb(ApiError.badRequest('Upload an MP4, WebM, or MOV video', undefined, 'INVALID_FILE_TYPE'));
+      return;
+    }
+    cb(null, true);
+  },
+});
+
+export function singleVideoUpload(fieldName = 'file') {
+  return videoUpload.single(fieldName);
+}

@@ -1,4 +1,5 @@
 import { useCallback, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate, useParams } from '@tanstack/react-router';
 import { Seo } from '@/components/common/seo';
 import { CatalogCategoryHero, CatalogListShell } from '@/components/catalog';
@@ -7,12 +8,14 @@ import { Button } from '@/components/ui/button';
 import { Container } from '@/components/layout/container';
 import { buildAbsoluteUrl, siteConfig } from '@/config';
 import { ROUTES } from '@/constants';
+import { isHomeCategoryNavSlug, getHomeCategoryNavItem } from '@/constants/home-category-nav';
 import {
   useCatalogSearchParams,
   useCategoriesList,
   useCategoryBySlug,
   useInfiniteProducts,
 } from '@/hooks/catalog';
+import { navigationMenusApi } from '@/services/sdk/navigation-menus';
 import { catalogSearchToUrlParams, type CatalogSearchState } from '@/utils/catalog';
 
 export function CategoryDetailPage() {
@@ -30,6 +33,18 @@ export function CategoryDetailPage() {
   );
   const categoryReady = Boolean(category?.id);
   const categoryMissing = categoryQuery.isFetched && !category?.id && !categoryQuery.isError;
+
+  // Only the 8 homepage/sidebar categories keep their own banner art.
+  // Filter picks (Mini Dresses, Long sleeves, etc.) use the default shop banner.
+  const useCategoryBanner = isHomeCategoryNavSlug(slug);
+
+  const womenMenuQuery = useQuery({
+    queryKey: ['storefront', 'navigation-menus', 'women', 'hero'],
+    queryFn: () => navigationMenusApi.getByKey('women'),
+    enabled: !useCategoryBanner,
+    staleTime: 1000 * 60 * 10,
+  });
+  const defaultShopBannerUrl = womenMenuQuery.data?.heroBannerUrl?.trim() || undefined;
 
   const query = useInfiniteProducts(mergedState, {
     enabled: categoryReady,
@@ -100,6 +115,23 @@ export function CategoryDetailPage() {
 
   const heroTitle = category?.name ?? slug.replace(/-/g, ' ');
   const prettyName = category?.name ?? slug.replace(/-/g, ' ');
+  const sidebarNavItem = getHomeCategoryNavItem(slug);
+
+  const heroProps = useCategoryBanner
+    ? {
+        title: heroTitle,
+        // Prefer CMS upload, then homepage tile art, so the 8 never fall to a blank default.
+        scopeKey: slug,
+        imageUrl: category?.imageUrl?.trim() || sidebarNavItem?.imageUrl,
+        tagline: category?.description ?? '',
+      }
+    : {
+        // Other filter categories: default shop banner + bold category name on the hero.
+        title: heroTitle,
+        scopeKey: 'women' as const,
+        imageUrl: defaultShopBannerUrl,
+        tagline: '',
+      };
 
   if (categoryMissing) {
     return (
@@ -110,7 +142,7 @@ export function CategoryDetailPage() {
           url={buildAbsoluteUrl(`/categories/${slug}`)}
           noIndex
         />
-        <CatalogCategoryHero title={prettyName} scopeKey={slug} />
+        <CatalogCategoryHero {...heroProps} />
         <Container className="py-10">
           <EmptyState
             title={`Nothing here in ${prettyName}`}
@@ -133,16 +165,11 @@ export function CategoryDetailPage() {
         description={
           category?.description ?? `Shop ${category?.name ?? 'category'} at ${siteConfig.name}.`
         }
-        image={category?.imageUrl}
+        image={useCategoryBanner ? category?.imageUrl : defaultShopBannerUrl}
         url={buildAbsoluteUrl(`/categories/${slug}`)}
       />
 
-      <CatalogCategoryHero
-        title={heroTitle}
-        scopeKey={slug}
-        imageUrl={category?.imageUrl}
-        tagline={category?.description ?? undefined}
-      />
+      <CatalogCategoryHero {...heroProps} />
 
       <CatalogListShell
         state={mergedState}

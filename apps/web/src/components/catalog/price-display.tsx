@@ -88,19 +88,29 @@ export function PriceDisplay({
   const priceSize = size === 'md' ? 'text-base sm:text-lg' : 'text-[15px] sm:text-sm';
 
   return (
-    <div className="space-y-0.5">
-      <div className={cn('flex flex-wrap items-baseline gap-x-2 gap-y-0.5', className)}>
-        {/* Original price (struck through) always first */}
+    <div className="space-y-0 max-lg:space-y-0 lg:space-y-0.5">
+      <div
+        className={cn(
+          'flex flex-wrap items-baseline gap-x-2 gap-y-0.5 max-lg:gap-x-1.5',
+          className,
+        )}
+      >
         {onSale ? (
-          <span className={cn('text-muted-foreground line-through', priceSize)}>
+          <span
+            className={cn(
+              'text-muted-foreground line-through max-lg:text-[11px] max-lg:text-neutral-400',
+              priceSize,
+            )}
+          >
             {formatCurrency(original!.amount, original!.currency)}
           </span>
         ) : null}
-        {/* Current / sale price — red when on sale */}
         <span
           className={cn(
-            'font-semibold tracking-tight',
-            onSale ? 'text-red-600 dark:text-red-500' : 'text-foreground',
+            'font-semibold tracking-tight max-lg:text-[14px] max-lg:font-semibold',
+            onSale
+              ? 'text-red-600 max-lg:text-[#b91c1c] dark:text-red-500 max-lg:dark:text-[#dc2626]'
+              : 'text-foreground max-lg:font-medium',
             priceSize,
           )}
         >

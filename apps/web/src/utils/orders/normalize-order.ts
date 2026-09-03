@@ -8,6 +8,7 @@ import type {
   OrderTotals,
   OrderTrackingInfo,
 } from '@/services/sdk';
+import { toStorefrontMediaUrl } from '@/utils/media-url';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -32,7 +33,9 @@ function normalizeAddress(raw: unknown): OrderAddressSnapshot | null {
 
 function normalizeLineItem(raw: unknown): OrderLineItem {
   const record = asRecord(raw);
-  const images = Array.isArray(record.images) ? record.images.map((image) => String(image)) : [];
+  const images = Array.isArray(record.images)
+    ? record.images.map((image) => toStorefrontMediaUrl(String(image)))
+    : [];
   return {
     id: String(record.id ?? record._id ?? ''),
     productId: String(record.productId ?? ''),

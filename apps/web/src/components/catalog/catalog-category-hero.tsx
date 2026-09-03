@@ -7,6 +7,8 @@ import corsetBannerMobile from '@/assets/images/Categories/corset-banner-mobile.
 import jeansBanner from '@/assets/images/Categories/jeans-banner.webp';
 import jeansBannerMobile from '@/assets/images/Categories/jeans-banner-mobile.webp';
 import oversizedBanner from '@/assets/images/Categories/oversized-banner.webp';
+import shopForLookImage from '@/assets/images/Crousel Image/shop-for-look.webp';
+import shopForLookImageMobile from '@/assets/images/Crousel Image/shop-for-look-mobile.webp';
 import { BlurredBannerImage } from '@/components/media/blurred-banner-image';
 import { cn } from '@/lib/utils';
 
@@ -21,9 +23,10 @@ type HeroArt = {
 /** Curated campaign art keyed by gender or category slug. */
 const HERO_FALLBACKS: Record<string, HeroArt> = {
   women: {
-    desktop: allTopwearBanner,
-    bakedCopy: true,
-    objectClass: 'object-[70%_center]',
+    desktop: shopForLookImage,
+    mobile: shopForLookImageMobile,
+    bakedCopy: false,
+    objectClass: 'object-[55%_center] md:object-center',
   },
   men: { desktop: '/catalog/women/women-14.jpg' },
   accessories: { desktop: '/catalog/categories/bags.png' },
@@ -126,7 +129,13 @@ export function CatalogCategoryHero({
 }: CatalogCategoryHeroProps) {
   const art = resolveHeroArt(scopeKey, imageUrl);
   const showCopy = !art.bakedCopy;
-  const resolvedTagline = tagline ?? (scopeKey && showCopy ? TAGLINES[scopeKey] : undefined);
+  // Explicit tagline (including '') wins — empty string hides auto women taglines.
+  const resolvedTagline =
+    tagline !== undefined && tagline !== null
+      ? tagline || undefined
+      : scopeKey && showCopy
+        ? TAGLINES[scopeKey]
+        : undefined;
 
   const [loaded, setLoaded] = useState(false);
   const [visible, setVisible] = useState(false);

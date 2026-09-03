@@ -38,13 +38,16 @@ import { pageService } from '@/services/page.service.js';
 import { blogService } from '@/services/blog.service.js';
 import { settingsService } from '@/services/settings.service.js';
 import { actorFromRequest } from '@/services/cms-crud.service.js';
-import { uploadBannerDesktopImage } from '@/services/banner-image.service.js';
+import {
+  uploadBannerDesktopImage,
+  uploadPromoBannerVideo,
+} from '@/services/banner-image.service.js';
 import { storageService } from '@/services/storage.factory.js';
 import { authenticate, authorizeAny, validate } from '@/middlewares/index.js';
 import { asyncHandler } from '@/utils/async-handler.js';
 import { ApiResponse } from '@/utils/response/api-response.js';
 import { storeSettingUpsertSchema } from '@/schemas/cms.schema.js';
-import { singleImageUpload } from '@/utils/file-upload.helper.js';
+import { singleImageUpload, singleVideoUpload } from '@/utils/file-upload.helper.js';
 import { processImage } from '@/utils/image.helper.js';
 import { clearCacheByPrefix } from '@/utils/simple-cache.js';
 import { z } from 'zod';
@@ -300,6 +303,25 @@ cmsRouter.post(
       typeof req.body.alt === 'string' ? req.body.alt : undefined,
     );
     ApiResponse.success(res, banner, 'Promo banner image updated');
+  }),
+);
+
+cmsRouter.post(
+  '/promo-banners/:id/video',
+  authenticate,
+  authorizeAny(P.BANNERS_MANAGE, P.MARKETING_MANAGE, P.CMS_MANAGE),
+  validate({ params: bannerIdParams }),
+  singleVideoUpload('file'),
+  asyncHandler(async (req, res) => {
+    if (!req.file) {
+      return ApiResponse.error(res, 'File is required', 400, 'FILE_REQUIRED');
+    }
+    const banner = await uploadPromoBannerVideo(
+      PromoBannerModel as never,
+      String(req.params.id),
+      req.file,
+    );
+    ApiResponse.success(res, banner, 'Promo banner video updated');
   }),
 );
 

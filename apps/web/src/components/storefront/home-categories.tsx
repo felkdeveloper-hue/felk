@@ -1,12 +1,10 @@
-import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { Link } from '@tanstack/react-router';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Section } from '@/components/common/section';
 import { Image } from '@/components/media/image';
-import { DEFAULT_HOME_CATEGORIES } from '@/constants/mega-menu-defaults';
+import { HOME_CATEGORY_NAV_ITEMS } from '@/constants/home-category-nav';
 import { cn } from '@/lib/utils';
-import { navigationMenusApi } from '@/services/sdk/navigation-menus';
 import { MotionItem, MotionReveal } from './motion-reveal';
 
 type HomeCategoryTile = {
@@ -17,27 +15,22 @@ type HomeCategoryTile = {
   objectClass?: string;
 };
 
+/**
+ * Homepage Categories — same 8 labels + slugs as the mobile drawer CATEGORIES tab.
+ * Local bundled images so tiles render on localhost without CMS/R2.
+ */
 export function HomeCategoriesSection() {
   const reduceMotion = useReducedMotion();
-  const menuQuery = useQuery({
-    queryKey: ['storefront', 'navigation-menus', 'women', 'home-categories'],
-    queryFn: () => navigationMenusApi.getByKey('women'),
-    staleTime: 1000 * 60 * 10,
-  });
 
   const tiles = useMemo((): HomeCategoryTile[] => {
-    const fromCms = menuQuery.data?.homeCategories?.filter(
-      (tile) => tile.label.trim() && tile.slug.trim(),
-    );
-    const source = fromCms?.length ? fromCms : DEFAULT_HOME_CATEGORIES;
-    return source.map((tile) => ({
+    return HOME_CATEGORY_NAV_ITEMS.map((tile) => ({
       id: tile.slug,
       slug: tile.slug,
       name: tile.label,
       imageUrl: tile.imageUrl,
-      objectClass: tile.imageClassName ?? undefined,
+      objectClass: tile.imageClassName,
     }));
-  }, [menuQuery.data?.homeCategories]);
+  }, []);
 
   if (!tiles.length) return null;
 
@@ -64,6 +57,7 @@ export function HomeCategoriesSection() {
                 params={{ slug: category.slug }}
                 preload="intent"
                 className="group relative block overflow-hidden rounded-2xl"
+                data-radius="lookbook"
                 aria-label={`Shop ${category.name}`}
               >
                 {category.imageUrl ? (

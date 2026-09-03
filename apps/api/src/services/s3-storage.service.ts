@@ -6,10 +6,12 @@ import {
   S3Client,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { Readable } from 'node:stream';
 import { appConfig } from '@/config/app.config.js';
 import { ApiError } from '@/utils/errors/api-error.js';
 import type {
   StorageObject,
+  StorageObjectStream,
   StorageService,
   StorageUploadInput,
 } from '@/services/interfaces/storage.service.js';
@@ -113,6 +115,39 @@ export class S3StorageService implements StorageService {
       return true;
     } catch {
       return false;
+    }
+  }
+
+  async getObject(key: string): Promise<StorageObjectStream | null> {
+    try {
+      const out = await this.client.send(
+        new GetObjectCommand({
+          Bucket: this.bucket,
+          Key: normalizeKey(key),
+        }),
+      );
+      if (!out.Body) return null;
+      const body =
+        out.Body instanceof Readable
+          ? out.Body
+          : Readable.from(out.Body as AsyncIterable<Uint8Array>);
+      return {
+        body,
+        contentType: out.ContentType,
+        contentLength: out.ContentLength,
+        etag: out.ETag,
+        cacheControl: out.CacheControl,
+      };
+    } catch (error: unknown) {
+      const err = error as { name?: string; $metadata?: { httpStatusCode?: number } };
+      if (
+        err.name === 'NoSuchKey' ||
+        err.name === 'NotFound' ||
+        err.$metadata?.httpStatusCode === 404
+      ) {
+        return null;
+      }
+      throw error;
     }
   }
 }

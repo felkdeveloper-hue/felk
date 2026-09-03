@@ -310,6 +310,13 @@
     border-radius: 2px !important;
   }
 
+  /* Lookbook video cards — mobile coverflow (IMAGE 2 rounded portrait) */
+  [data-radius='lookbook'],
+  [data-radius='lookbook']::before,
+  [data-radius='lookbook']::after {
+    border-radius: 1.75rem !important;
+  }
+
   html {
     @apply scroll-smooth;
   }

@@ -42,6 +42,8 @@ export const PromoBannerModel = model(
     {
       ...bannerBase,
       placement: { type: String, default: 'home' },
+      /** Optional lookbook / reel video URL (Admin → Banners → Lookbook videos). */
+      videoUrl: { type: String, default: null },
     },
     { timestamps: true, collection: 'promo_banners' },
   ),

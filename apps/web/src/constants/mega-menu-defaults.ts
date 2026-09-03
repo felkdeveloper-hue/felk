@@ -12,6 +12,8 @@ import scarvesImage from '@/assets/images/Categories/Scarves.jpg';
 import shoesImage from '@/assets/images/Categories/Shoes.png';
 import sunglassesImage from '@/assets/images/Categories/Sunglasses.jpg';
 import jacketImage from '@/assets/images/Categories/WomenJacket.png';
+import shopForLookImage from '@/assets/images/Crousel Image/shop-for-look.webp';
+import { HOME_CATEGORY_NAV_ITEMS } from '@/constants/home-category-nav';
 
 /** Storefront mega-menu keys managed in admin. */
 export type NavigationMenuKey = 'women' | 'men' | 'accessories';
@@ -49,32 +51,10 @@ export type GenderMegaMenuConfig = {
   homeCategories?: MegaMenuTile[];
 };
 
-/** Default homepage Categories section tiles. */
-export const DEFAULT_HOME_CATEGORIES: MegaMenuTile[] = [
-  { label: 'New Arrival', slug: 'new-arrivals', imageUrl: newArrivalImage },
-  {
-    label: 'Jeans',
-    slug: 'jeans-denim',
-    imageUrl: jeansBanner,
-    imageClassName: 'object-[center_18%]',
-  },
-  {
-    label: 'Oversized',
-    slug: 'oversized',
-    imageUrl: oversizedBanner,
-    imageClassName: 'object-[78%_center]',
-  },
-  {
-    label: 'Corset',
-    slug: 'corset-tops',
-    imageUrl: corsetBanner,
-    imageClassName: 'object-[center_22%]',
-  },
-  { label: 'Hoodies', slug: 'hoodies', imageUrl: hoodieImage },
-  { label: 'Jackets', slug: 'jackets', imageUrl: jacketImage },
-  { label: 'Bags', slug: 'bags', imageUrl: bagsImage },
-  { label: 'Shoes', slug: 'shoes', imageUrl: shoesImage },
-];
+/** Default homepage Categories section tiles — matches mobile CATEGORIES tab. */
+export const DEFAULT_HOME_CATEGORIES: MegaMenuTile[] = HOME_CATEGORY_NAV_ITEMS.map((tile) => ({
+  ...tile,
+}));
 
 const SHARED_TOPWEAR: MegaMenuLink[] = [
   { label: 'Oversized', slug: 'oversized' },
@@ -207,7 +187,7 @@ export const DEFAULT_MEGA_MENUS: Record<NavigationMenuKey, GenderMegaMenuConfig>
     key: 'women',
     label: 'Women',
     gender: 'women',
-    heroBannerUrl: allTopwearBanner,
+    heroBannerUrl: shopForLookImage,
     homeCategories: DEFAULT_HOME_CATEGORIES.map((tile) => ({ ...tile })),
     columns: WOMEN_CATEGORY_COLUMNS,
     specials: [

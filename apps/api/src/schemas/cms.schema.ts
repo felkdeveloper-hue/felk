@@ -178,6 +178,7 @@ export const heroBannerUpdateSchema = heroBannerCreateSchema.partial();
 
 export const promoBannerCreateSchema = bannerCreate.extend({
   placement: z.string().optional(),
+  videoUrl: z.string().trim().max(2000).nullable().optional(),
 });
 export const promoBannerUpdateSchema = promoBannerCreateSchema.partial();
 

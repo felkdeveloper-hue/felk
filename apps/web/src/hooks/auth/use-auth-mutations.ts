@@ -100,8 +100,10 @@ export function useLogoutMutation() {
     mutationFn: () => authApi.logout(),
     onSettled: () => {
       clearSession();
-      queryClient.clear();
-      navigate({ to: ROUTES.authLogin });
+      queryClient.removeQueries({ queryKey: QUERY_KEYS.customers.flashSale() });
+      queryClient.removeQueries({ queryKey: QUERY_KEYS.auth.me() });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.storefront.flashSale() });
+      navigate({ to: ROUTES.home });
     },
   });
 }
@@ -115,8 +117,10 @@ export function useLogoutAllMutation() {
     mutationFn: () => authApi.logoutAll(),
     onSettled: () => {
       clearSession();
-      queryClient.clear();
-      navigate({ to: ROUTES.authLogin });
+      queryClient.removeQueries({ queryKey: QUERY_KEYS.customers.flashSale() });
+      queryClient.removeQueries({ queryKey: QUERY_KEYS.auth.me() });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.storefront.flashSale() });
+      navigate({ to: ROUTES.home });
     },
   });
 }

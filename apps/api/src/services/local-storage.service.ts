@@ -1,11 +1,22 @@
-import { promises as fs } from 'node:fs';
+import { createReadStream, promises as fs } from 'node:fs';
 import path from 'node:path';
 import { env } from '@/config/env.js';
 import type {
   StorageObject,
+  StorageObjectStream,
   StorageService,
   StorageUploadInput,
 } from '@/services/interfaces/storage.service.js';
+
+const LOCAL_MIME: Record<string, string> = {
+  '.avif': 'image/avif',
+  '.gif': 'image/gif',
+  '.jpeg': 'image/jpeg',
+  '.jpg': 'image/jpeg',
+  '.png': 'image/png',
+  '.svg': 'image/svg+xml',
+  '.webp': 'image/webp',
+};
 
 const UPLOAD_ROOT = path.resolve(process.cwd(), 'uploads');
 
@@ -62,6 +73,26 @@ export class LocalStorageService implements StorageService {
       return true;
     } catch {
       return false;
+    }
+  }
+
+  async getObject(key: string): Promise<StorageObjectStream | null> {
+    const root = path.resolve(UPLOAD_ROOT) + path.sep;
+    const fullPath = path.resolve(UPLOAD_ROOT, ...key.split('/').filter(Boolean));
+    if (fullPath !== path.resolve(UPLOAD_ROOT) && !fullPath.startsWith(root)) {
+      return null;
+    }
+    try {
+      const stat = await fs.stat(fullPath);
+      if (!stat.isFile()) return null;
+      const ext = path.extname(fullPath).toLowerCase();
+      return {
+        body: createReadStream(fullPath),
+        contentType: LOCAL_MIME[ext] ?? 'application/octet-stream',
+        contentLength: stat.size,
+      };
+    } catch {
+      return null;
     }
   }
 }

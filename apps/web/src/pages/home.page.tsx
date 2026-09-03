@@ -6,9 +6,13 @@ import { buildOrganizationJsonLd, buildStoreJsonLd, buildWebsiteJsonLd } from '@
 import { getSetting } from '@/utils/cms';
 import {
   HeroBannerSection,
+  HomeAfterBestSellersBannerSection,
   HomeBeforeFeaturedBannerSection,
   HomeCategoriesSection,
+  HomeDualVisionSection,
   HomeEditorialBannerSection,
+  HomeLookbookVideosSection,
+  HomeRailHeading,
   HomeSectionRenderer,
   HomeSplitBannersSection,
   ProductGridSection,
@@ -27,7 +31,8 @@ export function HomePage() {
     getSetting<string>(settings, 'store.description') ??
     siteConfig.defaultDescription;
   const origin = buildAbsoluteUrl('/');
-  const logoUrl = getSetting<string>(settings, 'store.logo') ?? buildAbsoluteUrl(siteConfig.logoPath);
+  const logoUrl =
+    getSetting<string>(settings, 'store.logo') ?? buildAbsoluteUrl(siteConfig.logoPath);
   const ogImageUrl = buildAbsoluteUrl(siteConfig.defaultOgImagePath);
   const sameAs = [
     siteConfig.social.facebook,
@@ -94,16 +99,45 @@ export function HomePage() {
       {/* Section 1 — full-bleed hero (existing images kept) */}
       <HeroBannerSection />
 
-      {/* Section 2 — zero-gap dual women’s banners */}
-      <HomeSplitBannersSection />
+      {/* Section 2 — zero-gap dual women’s banners (desktop only) */}
+      <div className="hidden lg:block">
+        <HomeSplitBannersSection />
+      </div>
 
-      {/* Section 3 — full-viewport women’s editorial */}
-      <HomeEditorialBannerSection />
+      {/* Section 3 — full-viewport women’s editorial (desktop only) */}
+      <div className="hidden lg:block">
+        <HomeEditorialBannerSection />
+      </div>
 
-      <div className="flex flex-col gap-8 pt-10 sm:gap-10 sm:pt-12">
-        <ProductRailSection kind="best-sellers" eager spacing="none" title="Best Sellers" />
+      <div className="flex flex-col gap-8 pt-6 sm:gap-10 sm:pt-12 lg:pt-10">
+        <ProductRailSection
+          kind="best-sellers"
+          eager
+          spacing="none"
+          title={false}
+          header={<HomeRailHeading subtitle="Most wanted pieces right now." title="Best Seller" />}
+        />
+
+        {/* Mid-home promo — Admin → Banners → After Best Sellers */}
+        <HomeAfterBestSellersBannerSection />
+
+        <ProductRailSection
+          kind="new-arrivals"
+          eager={false}
+          spacing="none"
+          title={false}
+          // Show newest uploads even when nothing is flagged isNewArrival in admin.
+          scope={{ newestUploads: true }}
+          header={<HomeRailHeading subtitle="Fresh drops. Just landed." title="New Arrivals" />}
+        />
+
         <HomeCategoriesSection />
-        <div className="pt-2 sm:pt-3">
+
+        <HomeDualVisionSection />
+        <HomeLookbookVideosSection />
+
+        {/* More to love — desktop only */}
+        <div className="hidden pt-2 sm:pt-3 lg:block">
           <ProductRailSection
             kind="more-to-love"
             eager={false}
@@ -113,10 +147,13 @@ export function HomePage() {
         </div>
       </div>
 
-      {/* Full-viewport banner before Featured Products — admin: home_before_featured */}
-      <HomeBeforeFeaturedBannerSection />
+      {/* Full-viewport banner before Featured Products — desktop only */}
+      <div className="hidden lg:block">
+        <HomeBeforeFeaturedBannerSection />
+      </div>
 
-      <div className="pt-8 sm:pt-10">
+      {/* Featured products under that banner — desktop only */}
+      <div className="hidden pt-8 sm:pt-10 lg:block">
         <ProductGridSection spacing="none" />
       </div>
 

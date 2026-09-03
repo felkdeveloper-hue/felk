@@ -14,6 +14,7 @@ import type {
 } from '@/services/sdk/cms';
 import { env } from '@/config/env';
 import { resolveBrandSiteName } from '@/config/site';
+import { toStorefrontMediaUrl } from '@/utils/media-url';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -45,17 +46,17 @@ export function resolveMediaUrl(value: unknown): string | undefined {
   // Rewrite dev-only localhost upload URLs to the real API origin for production.
   const localMatch = url.match(/^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?(\/uploads\/.*)$/i);
   if (localMatch && env.apiOrigin) {
-    return `${env.apiOrigin.replace(/\/$/, '')}${localMatch[1]}`;
+    return toStorefrontMediaUrl(`${env.apiOrigin.replace(/\/$/, '')}${localMatch[1]}`);
   }
-  if (/^(https?:|data:|blob:)/i.test(url)) return url;
+  if (/^(https?:|data:|blob:)/i.test(url)) return toStorefrontMediaUrl(url);
   // Uploaded objects may be stored under /uploads/; R2 public URLs are already absolute.
   // Local uploads are served by the API host, so resolve them against the API origin
   // when no CDN is configured (otherwise they 404 against the web/Vercel domain).
   if (url.startsWith('/uploads/')) {
     const base = env.cdnUrl || env.apiOrigin;
-    if (base) return `${base.replace(/\/$/, '')}${url}`;
+    if (base) return toStorefrontMediaUrl(`${base.replace(/\/$/, '')}${url}`);
   }
-  return url;
+  return toStorefrontMediaUrl(url);
 }
 
 export function resolveResponsiveImageUrl(images: unknown): string | undefined {
@@ -115,6 +116,7 @@ export function normalizePromoBanner(raw: unknown): PromoBanner {
     subtitle: asString(record.subtitle) || undefined,
     placement: asString(record.placement) || undefined,
     imageUrl: resolveResponsiveImageUrl(record.images),
+    videoUrl: asString(record.videoUrl) || undefined,
     linkUrl: asString(record.ctaUrl ?? record.linkUrl) || undefined,
     ctaLabel: asString(record.ctaLabel ?? record.buttonText) || undefined,
     priority: asNumber(record.priority),

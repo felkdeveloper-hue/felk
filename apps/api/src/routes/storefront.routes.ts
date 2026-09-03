@@ -34,6 +34,7 @@ import {
 } from '@/utils/product-internal-fields.util.js';
 import { getCached, setCache, storefrontProductsCacheKey } from '@/utils/simple-cache.js';
 import { stableQueryKey } from '@/utils/stable-query-key.js';
+import { anonymousFlashSaleService } from '@/services/anonymous-flash-sale.service.js';
 
 export const storefrontRouter = Router();
 
@@ -505,5 +506,15 @@ storefrontRouter.get(
       homeCategories: doc.homeCategories ?? [],
       status: doc.status,
     });
+  }),
+);
+
+/** Anonymous flash sale — IP-persisted 60-min window for unsigned visitors. */
+storefrontRouter.get(
+  '/flash-sale',
+  asyncHandler(async (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    const status = await anonymousFlashSaleService.getOrCreateForRequest(req);
+    ApiResponse.success(res, status);
   }),
 );

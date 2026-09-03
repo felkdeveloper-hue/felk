@@ -59,7 +59,7 @@ export function CartPageContent() {
   const slugByCategoryId = useCategorySlugLookup();
   const isGuestCheckout = isGuestCheckoutUser(authUser);
   const isStaff = isStaffUser(authUser);
-  const flashEnabled = isAuthed && isFlashSaleActive;
+  const flashEnabled = isFlashSaleActive;
 
   const cart = cartQuery.data;
   const validation = cart?.validation;

@@ -28,42 +28,19 @@ import { GenderMegaMenu } from '@/components/navigation/gender-mega-menu';
 import { MegaMenuPlaceholder } from '@/components/navigation/mega-menu-placeholder';
 import { NotificationBell } from '@/components/storefront/notification-bell';
 import { FlashSaleCountdown } from '@/components/storefront/flash-sale-countdown';
+import {
+  NavbarBagIcon,
+  NavbarIconBadge,
+  NavbarProfileIcon,
+  navbarActionBtnClass,
+  navbarLucideIconProps,
+} from '@/components/layout/navbar-action-icons';
 
 const DEFAULT_NAV: NavItem[] = [
   { label: 'Women', href: ROUTES.products, gender: 'women' },
   { label: 'Browse', href: ROUTES.categories },
   { label: 'Contact', href: ROUTES.contact },
 ];
-
-const iconStroke = '[&_svg]:size-[1.15rem] [&_svg]:stroke-[1.35]';
-
-/** Minimal bob-style profile silhouette (img-2 reference). */
-function PremiumProfileIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden>
-      <path d="M12 3.25c-2.95 0-5.35 2.35-5.35 5.25 0 1.55.68 2.95 1.75 3.85-1.35.85-2.9 2.45-2.9 4.65V19h12.5v-2c0-2.2-1.55-3.8-2.9-4.65 1.07-.9 1.75-2.3 1.75-3.85 0-2.9-2.4-5.25-5.35-5.25zm0 1.75c1.55 0 2.8 1.15 2.8 2.55 0 1.4-1.25 2.55-2.8 2.55s-2.8-1.15-2.8-2.55c0-1.4 1.25-2.55 2.8-2.55z" />
-    </svg>
-  );
-}
-
-/** Minimal shopping bag icon (img-3 reference). */
-function PremiumCartIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      className={className}
-      stroke="currentColor"
-      strokeWidth="1.65"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <path d="M8.25 9V7.75a3.75 3.75 0 1 1 7.5 0V9" />
-      <path d="M6.75 9h10.5l-.85 10.25H7.6L6.75 9Z" />
-    </svg>
-  );
-}
 
 export interface StorefrontHeaderProps {
   navItems?: NavItem[];
@@ -74,8 +51,8 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
   const isCheckout = pathname.startsWith(ROUTES.checkout);
   const { isScrolled, isHidden } = useScrollHeader({
     threshold: 36,
-    // Auto-hide on checkout clips titles under the bar — keep it pinned there.
-    hideOnScrollDown: !isCheckout,
+    // Keep mobile navbar visible while scrolling (no auto-hide).
+    hideOnScrollDown: false,
   });
   const isHome = pathname === ROUTES.home;
   const transparent = isHome && !isScrolled;
@@ -98,19 +75,15 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
   const logoutMutation = useLogoutMutation();
   const { data: wishlistCount = 0 } = useWishlistItemCountQuery();
   const accountLabel = user?.firstName ?? user?.email?.split('@')[0] ?? 'Account';
-  const iconBtn = cn(
-    'size-11 shrink-0',
-    iconStroke,
-    lightChrome
-      ? 'text-white hover:bg-white/10 hover:text-white'
-      : 'text-foreground hover:bg-muted/70 hover:text-foreground',
-  );
+  const actionBtn = navbarActionBtnClass(lightChrome);
+  const lucideIcon = navbarLucideIconProps();
 
   return (
     <header
       data-slot="storefront-header"
       className={cn(
         'sticky top-0 z-[100] transition-[background-color,box-shadow,border-color,backdrop-filter,color,transform] duration-200 ease-out lg:duration-500 lg:ease-[cubic-bezier(0.22,1,0.36,1)]',
+        'max-lg:pt-[env(safe-area-inset-top,0px)]',
         // Auto-hide on scroll down — mobile only; desktop never translates.
         isHidden && '-translate-y-full lg:translate-y-0',
         transparent
@@ -120,15 +93,51 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
             : 'bg-background text-foreground border-border/70 border-b shadow-[0_8px_28px_-20px_rgba(0,0,0,0.28)]',
       )}
     >
-      <Container className="flex h-14 items-center justify-between gap-2 lg:grid lg:h-[4.75rem] lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:justify-normal lg:gap-6">
-        <div className="flex min-w-0 shrink-0 items-center gap-1 sm:gap-2">
-          <MobileNav
-            items={navItems}
-            activeHref={pathname}
-            transparent={lightChrome}
-            open={mobileNavOpen}
-            onOpenChange={setMobileNavOpen}
-          />
+      <Container className="relative lg:grid lg:h-[4.75rem] lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:items-center lg:justify-normal lg:gap-6">
+        {/* ── Mobile navbar: ☰  FASHION EDGE  🔍 🔔 ── */}
+        <div className="grid h-14 w-full grid-cols-[auto_1fr_auto] items-center lg:hidden">
+          <div className="z-10 flex shrink-0 items-center">
+            <MobileNav
+              items={navItems}
+              activeHref={pathname}
+              transparent={lightChrome}
+              open={mobileNavOpen}
+              onOpenChange={setMobileNavOpen}
+            />
+          </div>
+
+          <div className="z-20 flex min-w-0 items-center justify-center px-1">
+            <Link
+              to={ROUTES.home}
+              preload="intent"
+              className={cn(
+                'max-w-[min(58vw,12.5rem)] truncate whitespace-nowrap font-serif text-[clamp(0.9375rem,3.9vw,1.125rem)] font-normal uppercase leading-none tracking-[0.14em] transition-opacity hover:opacity-80 active:opacity-70',
+                lightChrome ? 'text-white drop-shadow-sm' : 'text-foreground',
+              )}
+              aria-label={`${storeName}, go to home`}
+            >
+              Fashion Edge
+            </Link>
+          </div>
+
+          <div className="z-10 flex shrink-0 items-center justify-end">
+            <button
+              type="button"
+              aria-label="Search"
+              onClick={toggleSearch}
+              className={cn(
+                'inline-flex size-9 shrink-0 items-center justify-center transition-opacity duration-150 active:opacity-70',
+                lightChrome ? 'text-white' : 'text-foreground',
+              )}
+            >
+              <Search {...lucideIcon} />
+            </button>
+            <NotificationBell lightChrome={lightChrome} minimal />
+          </div>
+        </div>
+
+        {/* ── Desktop navbar (unchanged) ── */}
+        <div className="hidden min-w-0 shrink-0 items-center gap-1 sm:gap-2 lg:flex">
           <Link
             to={ROUTES.home}
             preload="intent"
@@ -160,14 +169,14 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
           }}
         />
 
-        <div className="flex min-w-0 flex-1 items-center justify-end gap-0.5 sm:gap-1 lg:flex-none">
+        <div className="hidden min-w-0 flex-1 items-center justify-end gap-0.5 sm:gap-1 lg:flex lg:flex-none">
           <HeaderSearchField
             lightChrome={lightChrome}
             className="hidden w-40 shrink-0 xl:block xl:w-48 2xl:w-56"
           />
 
           {/* Desktop / tablet — keep timer in the action cluster */}
-          <FlashSaleCountdown className="hidden shrink-0 sm:flex" />
+          {!isCheckout ? <FlashSaleCountdown className="hidden shrink-0 sm:flex" /> : null}
 
           <div className="flex shrink-0 items-center gap-0">
             <Button
@@ -175,23 +184,21 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
               size="icon"
               aria-label="Search"
               onClick={toggleSearch}
-              className={cn('xl:hidden', iconBtn, 'size-9 sm:size-11')}
+              className={cn('xl:hidden', actionBtn)}
             >
-              <Search />
+              <Search {...lucideIcon} />
             </Button>
             <Button
               variant="ghost"
               size="icon"
               aria-label={`Wishlist${wishlistCount ? `, ${wishlistCount} items` : ''}`}
               asChild
-              className={cn('relative hidden sm:inline-flex', iconBtn)}
+              className={cn('relative hidden sm:inline-flex', actionBtn)}
             >
               <Link to={ROUTES.wishlist} preload="intent">
-                <Heart />
+                <Heart {...lucideIcon} />
                 {wishlistCount > 0 ? (
-                  <span className="bg-accent text-accent-foreground absolute right-1 top-1 flex size-4 items-center justify-center rounded-full text-[9px] font-semibold tracking-tight">
-                    {wishlistCount > 9 ? '9+' : wishlistCount}
-                  </span>
+                  <NavbarIconBadge count={wishlistCount} className="right-1 top-1" />
                 ) : null}
               </Link>
             </Button>
@@ -206,9 +213,9 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
                     variant="ghost"
                     size="icon"
                     aria-label={`Account, ${accountLabel}`}
-                    className={cn(iconBtn, 'size-9 sm:size-11')}
+                    className={actionBtn}
                   >
-                    <PremiumProfileIcon />
+                    <NavbarProfileIcon />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="min-w-44 rounded-none">
@@ -242,10 +249,10 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
                 size="icon"
                 aria-label="Sign in"
                 asChild
-                className={cn(iconBtn, 'size-9 sm:size-11')}
+                className={actionBtn}
               >
                 <Link to={ROUTES.authLogin} preload="intent">
-                  <PremiumProfileIcon />
+                  <NavbarProfileIcon />
                 </Link>
               </Button>
             )}
@@ -255,25 +262,18 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
               size="icon"
               aria-label={`Cart${cartCount ? `, ${cartCount} items` : ''}`}
               asChild
-              className={cn('relative', iconBtn, 'size-9 sm:size-11')}
+              className={cn('relative', actionBtn)}
             >
               <Link to={ROUTES.cart} preload="intent">
-                <PremiumCartIcon />
+                <NavbarBagIcon />
                 {cartCount > 0 ? (
-                  <span className="bg-accent text-accent-foreground absolute right-0.5 top-0.5 flex size-3.5 items-center justify-center rounded-full text-[8px] font-semibold tracking-tight sm:right-1 sm:top-1 sm:size-4 sm:text-[9px]">
-                    {cartCount > 9 ? '9+' : cartCount}
-                  </span>
+                  <NavbarIconBadge count={cartCount} className="right-1 top-1" />
                 ) : null}
               </Link>
             </Button>
           </div>
         </div>
       </Container>
-
-      {/* Mobile-only timer strip — avoids colliding with the fe. logo */}
-      <div className="flex justify-end px-3.5 pb-1.5 sm:hidden">
-        <FlashSaleCountdown compact />
-      </div>
     </header>
   );
 }

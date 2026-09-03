@@ -43,3 +43,27 @@ export async function uploadBannerDesktopImage(
   await doc.save();
   return doc.toObject();
 }
+
+export async function uploadPromoBannerVideo(
+  model: Model<any>,
+  id: string,
+  file: Express.Multer.File,
+) {
+  const doc = await model.findOne({ _id: id, isDeleted: false });
+  if (!doc) {
+    throw ApiError.notFound('Banner not found');
+  }
+
+  const ext =
+    file.mimetype === 'video/webm' ? 'webm' : file.mimetype === 'video/quicktime' ? 'mov' : 'mp4';
+  const key = `promo-banners/${id}/videos/${randomUUID()}.${ext}`;
+  const stored = await storageService.upload({
+    key,
+    body: file.buffer,
+    contentType: file.mimetype,
+  });
+
+  doc.set('videoUrl', stored.url);
+  await doc.save();
+  return doc.toObject();
+}

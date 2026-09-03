@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { SlidersHorizontal } from 'lucide-react';
+import { SlidersHorizontal, X } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { PriceRangeSlider } from '@/components/ui/price-range-slider';
 import {
@@ -239,6 +239,8 @@ export interface CatalogFilterAndSortSheetProps extends CatalogFilterSidebarProp
   total?: number;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  /** When false, parent owns the open trigger (e.g. toolbar Filter button). */
+  showTrigger?: boolean;
 }
 
 type SectionKey = CatalogFacetKey;
@@ -270,6 +272,7 @@ export function CatalogFilterAndSortSheet({
   products = [],
   open,
   onOpenChange,
+  showTrigger = true,
 }: CatalogFilterAndSortSheetProps) {
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
   const sheetOpen = open ?? uncontrolledOpen;
@@ -370,20 +373,22 @@ export function CatalogFilterAndSortSheet({
 
   return (
     <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-      <SheetTrigger asChild>
-        <button
-          type="button"
-          className="border-foreground hover:bg-foreground hover:text-background hidden h-10 items-center gap-2.5 border px-4 text-xs font-bold uppercase tracking-[0.14em] transition-colors lg:inline-flex"
-        >
-          <SlidersHorizontal className="size-3.5" />
-          Filter and Sort
-          {activeCount > 0 ? (
-            <span className="size-4.5 bg-foreground text-background ml-0.5 flex items-center justify-center rounded-full text-[10px] font-bold">
-              {activeCount}
-            </span>
-          ) : null}
-        </button>
-      </SheetTrigger>
+      {showTrigger ? (
+        <SheetTrigger asChild>
+          <button
+            type="button"
+            className="border-foreground hover:bg-foreground hover:text-background hidden h-10 items-center gap-2.5 border px-4 text-xs font-bold uppercase tracking-[0.14em] transition-colors lg:inline-flex"
+          >
+            <SlidersHorizontal className="size-3.5" />
+            Filter and Sort
+            {activeCount > 0 ? (
+              <span className="bg-foreground text-background ml-0.5 flex size-[18px] items-center justify-center rounded-full text-[10px] font-bold">
+                {activeCount}
+              </span>
+            ) : null}
+          </button>
+        </SheetTrigger>
+      ) : null}
 
       <SheetContent
         side={isMobile ? 'bottom' : 'left'}
@@ -396,13 +401,24 @@ export function CatalogFilterAndSortSheet({
             : 'max-w-130 lg:top-19 top-16 h-[calc(100%-4rem)] lg:h-[calc(100%-4.75rem)]',
         )}
       >
-        <SheetHeader className="border-border flex-row items-baseline gap-3 border-b px-6 py-4">
-          <SheetTitle className="text-xs font-bold uppercase tracking-[0.16em]">
-            Filter and Sort
-          </SheetTitle>
-          {total != null ? (
-            <span className="text-muted-foreground text-xs">{total} products</span>
-          ) : null}
+        <SheetHeader className="border-border flex-row items-center justify-between gap-3 border-b px-6 py-4">
+          <div className="flex min-w-0 flex-1 items-baseline gap-3">
+            <SheetTitle className="text-xs font-bold uppercase tracking-[0.16em]">
+              Filter and Sort
+            </SheetTitle>
+            {total != null ? (
+              <span className="text-muted-foreground text-xs">{total} products</span>
+            ) : null}
+          </div>
+          <SheetClose asChild>
+            <button
+              type="button"
+              aria-label="Close"
+              className="text-muted-foreground hover:text-foreground -mr-1 flex size-9 shrink-0 items-center justify-center transition-colors"
+            >
+              <X className="size-5" strokeWidth={2} aria-hidden />
+            </button>
+          </SheetClose>
           <SheetDescription className="sr-only">Filter and sort products</SheetDescription>
         </SheetHeader>
 
@@ -632,6 +648,14 @@ export function CatalogFilterAndSortSheet({
           </div>
 
           <div className="flex items-center gap-3">
+            <SheetClose asChild>
+              <button
+                type="button"
+                className="border-border hover:border-foreground h-12 min-h-11 flex-1 border text-xs font-bold uppercase tracking-widest transition-colors active:opacity-80 lg:h-11"
+              >
+                Close
+              </button>
+            </SheetClose>
             <button
               type="button"
               onClick={onClear}

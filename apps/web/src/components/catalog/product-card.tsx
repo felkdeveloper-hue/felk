@@ -7,6 +7,10 @@ import { productsApi } from '@/services/sdk';
 import { useFlashSale } from '@/contexts/flash-sale-context';
 import { useFlashSaleEligibility } from '@/hooks/use-flash-sale-eligibility';
 import { ProductCardImage } from '@/components/catalog/product-card-image';
+import {
+  ProductFlashSaleBadge,
+  ProductFlashSaleMobile,
+} from '@/components/catalog/product-flash-sale-badge';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -29,6 +33,10 @@ import { formatCurrency } from '@/utils';
 import { BnplInstallmentHint } from './bnpl-installment-hint';
 import { QuickViewModal } from './quick-view-modal';
 import { isProductLowStock, isProductSoldOut } from '@/utils/catalog/stock';
+
+/** Shared compact sale badge styling for product cards. */
+export const SALE_BADGE_CLASS =
+  'inline-flex w-fit items-center rounded-[4px] bg-[#b91c1c] px-1.5 py-[3px] text-[9px] font-bold uppercase leading-none tracking-[0.06em] text-white shadow-[0_1px_3px_rgba(185,28,28,0.25)] sm:rounded-none sm:px-2 sm:text-[10px] sm:shadow-none lg:rounded-none';
 
 export interface ProductCardProps {
   product: Product;
@@ -107,7 +115,8 @@ function ProductCardComponent({
   const isAuthed = useAuthStore((state) => Boolean(state.accessToken && state.user));
   const { isFlashSaleActive, formattedTime } = useFlashSale();
   const { eligible: flashEligible } = useFlashSaleEligibility(product);
-  const showFlashSale = isAuthed && isFlashSaleActive && flashEligible;
+  // Guest + logged-in: IP/device 1-hour flash sale applies to everyone (no auth gate).
+  const showFlashSale = isFlashSaleActive && flashEligible;
   const resolvedVariantId = resolveVariantId(undefined, product);
   const isInWishlist = useIsInWishlist(product.id, resolvedVariantId);
   const wishlistQuery = useDefaultWishlistQuery();
@@ -280,8 +289,7 @@ function ProductCardComponent({
     <>
       <article
         className={cn(
-          'group relative',
-          // Desktop hover lift only
+          'group relative transition-transform duration-150 ease-out active:scale-[0.985] lg:active:scale-100',
           !isList && 'lg:transition-transform lg:duration-300 lg:ease-out lg:hover:-translate-y-1',
           isList && 'flex gap-3 sm:gap-4',
           className,
@@ -298,7 +306,7 @@ function ProductCardComponent({
       >
         <div
           className={cn(
-            'relative overflow-hidden',
+            'relative overflow-hidden rounded-[10px] lg:rounded-none',
             isList ? 'w-28 shrink-0 sm:w-40 sm:rounded-xl lg:w-48' : 'w-full',
           )}
         >
@@ -332,6 +340,7 @@ function ProductCardComponent({
               sizes={sizes}
               loading={priority ? 'eager' : 'lazy'}
               fetchPriority={priority ? 'high' : 'auto'}
+              containerClassName="rounded-[10px] lg:rounded-none"
               className={cn(hoverImage && hoverReady ? 'lg:group-hover:opacity-0' : undefined)}
               onError={() => setPrimaryBroken(true)}
             />
@@ -374,30 +383,12 @@ function ProductCardComponent({
             </span>
           </Link>
 
-          <div className="absolute left-2 top-2 flex flex-col gap-1">
-            {discountPct ? (
-              <Badge className="rounded-none bg-red-600 px-1.5 text-[9px] font-bold uppercase tracking-wide text-white sm:px-2 sm:text-[10px]">
-                Save {discountPct}%
-              </Badge>
-            ) : null}
-            {showFlashSale ? (
-              <Badge
-                className="rounded-none px-1.5 text-[9px] font-bold uppercase tracking-wide text-white sm:px-2 sm:text-[10px]"
-                style={{
-                  background: 'linear-gradient(90deg, #ff4500, #ff8c00)',
-                  boxShadow: '0 0 8px rgba(255,80,0,0.5)',
-                  animation: 'flash-badge-pulse 2s ease-in-out infinite',
-                }}
-              >
-                ⚡ +20% OFF · {formattedTime}
-                <style>{`
-                  @keyframes flash-badge-pulse {
-                    0%, 100% { box-shadow: 0 0 8px rgba(255,80,0,0.5); }
-                    50%       { box-shadow: 0 0 16px rgba(255,80,0,0.9); }
-                  }
-                `}</style>
-              </Badge>
-            ) : null}
+          {showFlashSale ? <ProductFlashSaleMobile formattedTime={formattedTime} /> : null}
+
+          {/* Desktop status badges */}
+          <div className="absolute left-3 top-3 z-[2] hidden w-auto flex-col items-start gap-1.5 sm:flex">
+            {showFlashSale ? <ProductFlashSaleBadge formattedTime={formattedTime} /> : null}
+            {discountPct ? <span className={SALE_BADGE_CLASS}>Save {discountPct}%</span> : null}
             {isSoldOut ? (
               <Badge
                 variant="outline"
@@ -406,25 +397,33 @@ function ProductCardComponent({
                 Sold out
               </Badge>
             ) : isLowStock ? (
-              <Badge className="rounded-none bg-red-600/95 px-1.5 text-[9px] font-bold uppercase tracking-wide text-white sm:px-2 sm:text-[10px]">
-                Low in Stock
-              </Badge>
+              <span className={SALE_BADGE_CLASS}>Low in Stock</span>
             ) : null}
           </div>
 
-          {/* Mobile wishlist — icon only, no box */}
-          <div className="absolute right-1 top-1 z-[2] lg:hidden">
-            <WishlistButton
-              product={product}
-              variant="ghost"
-              className={cn(
-                'size-10 rounded-none border-0 bg-transparent shadow-none hover:bg-transparent [&_svg]:size-[1.15rem] [&_svg]:drop-shadow-[0_1px_3px_rgba(0,0,0,0.65)]',
-                'aria-pressed:fill-red-500 aria-pressed:text-red-500',
-                isInWishlist || heartBurst
-                  ? 'text-red-500 hover:text-red-500'
-                  : 'text-white hover:text-white',
-              )}
-            />
+          {/* Mobile status badges (non-flash) */}
+          <div className="absolute left-2 top-2 z-[2] flex w-auto flex-col items-start gap-1 sm:hidden">
+            {discountPct ? (
+              <span className={cn(SALE_BADGE_CLASS, showFlashSale && 'mt-[2.125rem]')}>
+                Save {discountPct}%
+              </span>
+            ) : null}
+            {isSoldOut ? (
+              <span
+                className={cn(
+                  'inline-flex w-fit items-center rounded-[4px] border border-neutral-200/80 bg-white/95 px-1.5 py-[3px] text-[9px] font-semibold uppercase leading-none tracking-wide text-neutral-700 backdrop-blur-sm',
+                  showFlashSale && !discountPct && 'mt-[2.125rem]',
+                )}
+              >
+                Sold out
+              </span>
+            ) : isLowStock ? (
+              <span
+                className={cn(SALE_BADGE_CLASS, showFlashSale && !discountPct && 'mt-[2.125rem]')}
+              >
+                Low in Stock
+              </span>
+            ) : null}
           </div>
 
           {/* Desktop quick view — hover only */}
@@ -443,11 +442,11 @@ function ProductCardComponent({
 
           {averageRating != null ? (
             <div
-              className="bg-white/92 absolute bottom-2 left-2 flex items-center gap-0.5 rounded-full border border-white/70 px-2 py-0.5 shadow-[0_2px_14px_-4px_rgba(0,0,0,0.28)] backdrop-blur-[2px] transition-opacity lg:group-hover:opacity-0"
+              className="bg-white/92 absolute bottom-2 left-2 flex items-center gap-0.5 rounded-full border border-white/60 px-1.5 py-0.5 shadow-[0_1px_8px_-2px_rgba(0,0,0,0.2)] backdrop-blur-[2px] transition-opacity lg:group-hover:opacity-0"
               aria-label={`Rated ${averageRating} out of 5`}
             >
-              <span className="text-[9.5px] leading-none text-amber-400">★</span>
-              <span className="text-[10.5px] font-bold tabular-nums leading-none tracking-tight text-neutral-800">
+              <span className="text-[9px] leading-none text-amber-500">★</span>
+              <span className="text-[10px] font-semibold tabular-nums leading-none text-neutral-800">
                 {averageRating.toFixed(1)}
               </span>
             </div>
@@ -486,21 +485,21 @@ function ProductCardComponent({
               type="button"
               aria-label={`Quick add ${product.name}`}
               onClick={openQuickAdd}
-              className="absolute bottom-1.5 right-1 z-[3] flex size-10 items-center justify-center bg-transparent text-white transition-transform duration-150 active:scale-90 lg:hidden"
+              className="bg-white/92 absolute bottom-2 right-2 z-[3] flex size-8 items-center justify-center rounded-full border border-white/70 text-neutral-800 shadow-[0_2px_10px_-3px_rgba(0,0,0,0.25)] backdrop-blur-sm transition-transform duration-150 active:scale-90 lg:hidden"
             >
-              <Plus className="size-5 drop-shadow-[0_1px_3px_rgba(0,0,0,0.65)]" strokeWidth={2} />
+              <Plus className="size-3.5" strokeWidth={2} />
             </button>
           ) : null}
         </div>
 
         <div
           className={cn(
-            'space-y-1 pt-2 lg:space-y-0 lg:pt-2.5',
+            'flex flex-col pt-2 max-lg:gap-0 lg:space-y-0 lg:pt-2.5',
             isList && 'flex flex-1 flex-col justify-center py-0.5',
           )}
         >
-          <div className="flex items-start justify-between gap-1">
-            <h3 className="text-foreground line-clamp-2 text-[13px] font-medium leading-snug tracking-wide lg:line-clamp-1 lg:text-sm">
+          <div className="flex items-start justify-between gap-1.5">
+            <h3 className="text-foreground line-clamp-2 text-[13px] font-medium leading-[1.35] tracking-normal lg:line-clamp-1 lg:text-sm lg:tracking-wide">
               <Link {...productHref} preload="intent" className="lg:hover:underline">
                 {title}
               </Link>
@@ -509,60 +508,51 @@ function ProductCardComponent({
               product={product}
               variant="ghost"
               className={cn(
-                '-mr-1.5 -mt-0.5 inline-flex size-8 shrink-0 rounded-full lg:size-7',
+                'inline-flex size-7 shrink-0 rounded-full transition-transform duration-150 active:scale-90 lg:-mr-1.5 lg:-mt-0.5 lg:size-7',
                 isInWishlist || heartBurst
                   ? 'text-red-500 hover:text-red-600'
-                  : 'text-muted-foreground hover:text-foreground',
+                  : 'text-neutral-400 hover:text-neutral-700 max-lg:[&_svg]:stroke-[1.5]',
               )}
             />
           </div>
 
-          {flashPrice && displayPrice && showFlashSale ? (
-            /* Logged-in users: show struck-through price + orange 20%-off flash price */
-            <div className="space-y-0.5">
-              <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
-                {/* Case 2: product already has a sale — show ~~original~~ ~~red sale~~ orange final */}
-                {liveSale && originalPrice && originalPrice.amount > displayPrice.amount ? (
-                  <>
-                    <span className="text-muted-foreground text-[12px] line-through lg:text-[13px]">
-                      {formatCurrency(
-                        originalPrice.amount,
-                        originalPrice.currency ?? displayPrice.currency,
-                      )}
-                    </span>
-                    <span
-                      className="text-[12px] line-through lg:text-[13px]"
-                      style={{ color: '#ef4444' }}
-                    >
+          <div className="mt-1 max-lg:mt-1 lg:mt-0">
+            {flashPrice && displayPrice && showFlashSale ? (
+              <div className="space-y-0.5 max-lg:space-y-1">
+                <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
+                  {liveSale && originalPrice && originalPrice.amount > displayPrice.amount ? (
+                    <>
+                      <span className="text-muted-foreground text-[11px] text-neutral-400 line-through lg:text-[13px]">
+                        {formatCurrency(
+                          originalPrice.amount,
+                          originalPrice.currency ?? displayPrice.currency,
+                        )}
+                      </span>
+                      <span className="text-[11px] text-[#ef4444] line-through lg:text-[13px]">
+                        {formatCurrency(displayPrice.amount, displayPrice.currency)}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-muted-foreground text-[11px] text-neutral-400 line-through lg:text-[13px]">
                       {formatCurrency(displayPrice.amount, displayPrice.currency)}
                     </span>
-                  </>
-                ) : (
-                  /* Case 1: no existing sale — show ~~base price~~ then orange flash price */
-                  <span className="text-muted-foreground text-[12px] line-through lg:text-[13px]">
-                    {formatCurrency(displayPrice.amount, displayPrice.currency)}
+                  )}
+                  <span className="text-[14px] font-semibold tracking-tight text-[#ea580c] lg:text-sm lg:font-bold">
+                    {formatCurrency(flashPrice.amount, flashPrice.currency)}
                   </span>
-                )}
-                <span
-                  className="text-[13px] font-bold tracking-tight lg:text-sm"
-                  style={{ color: '#f97316' }}
-                >
-                  {formatCurrency(flashPrice.amount, flashPrice.currency)}
-                </span>
+                </div>
+                <BnplInstallmentHint amount={flashPrice.amount} currency={flashPrice.currency} />
               </div>
-              <BnplInstallmentHint amount={flashPrice.amount} currency={flashPrice.currency} />
-            </div>
-          ) : (
-            /* Guests: regular price with installment lines */
-            <PriceDisplay
-              price={product.price}
-              salePrice={liveSale}
-              compareAtPrice={product.compareAtPrice}
-              discountPercent={product.isOnSale ? product.discountPercent : undefined}
-              className="[&_*]:text-[13px] lg:[&_*]:text-sm"
-              showInstallments={true}
-            />
-          )}
+            ) : (
+              <PriceDisplay
+                price={product.price}
+                salePrice={liveSale}
+                compareAtPrice={product.compareAtPrice}
+                discountPercent={product.isOnSale ? product.discountPercent : undefined}
+                showInstallments={true}
+              />
+            )}
+          </div>
         </div>
       </article>
 

@@ -22,6 +22,40 @@ export const CATALOG_SORT_OPTIONS = [
   },
 ] as const;
 
+/** Storefront PLP sort sheet — labels match shopper-facing copy. */
+export const CATALOG_PLP_SORT_OPTIONS = [
+  {
+    value: 'reviewCount:desc',
+    label: 'Sort by popularity',
+    sortBy: 'reviewCount',
+    sortOrder: 'desc' as const,
+  },
+  {
+    value: 'averageRating:desc',
+    label: 'Sort by average rating',
+    sortBy: 'averageRating',
+    sortOrder: 'desc' as const,
+  },
+  {
+    value: 'createdAt:desc',
+    label: 'Sort by latest',
+    sortBy: 'createdAt',
+    sortOrder: 'desc' as const,
+  },
+  {
+    value: 'pricing.price:asc',
+    label: 'Sort by price: low to high',
+    sortBy: 'pricing.price',
+    sortOrder: 'asc' as const,
+  },
+  {
+    value: 'pricing.price:desc',
+    label: 'Sort by price: high to low',
+    sortBy: 'pricing.price',
+    sortOrder: 'desc' as const,
+  },
+] as const;
+
 export const POPULAR_SEARCHES = [
   'jeans',
   'denim',

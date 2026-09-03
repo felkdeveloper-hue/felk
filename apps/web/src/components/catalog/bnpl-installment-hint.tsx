@@ -39,13 +39,13 @@ export function BnplInstallmentHint({
   return (
     <div
       className={cn(
-        'flex flex-col gap-[2px] overflow-visible pb-1 pt-1 font-medium uppercase tracking-[0.03em]',
+        'flex flex-col gap-[2px] overflow-visible pt-0.5 font-medium uppercase tracking-[0.03em]',
         isMd
           ? 'text-[11px] sm:text-xs'
-          : 'text-[9px] leading-[1.3] sm:text-[10.5px] sm:leading-[1.35]',
+          : 'text-[8px] leading-[1.45] sm:text-[10.5px] sm:leading-[1.35]',
+        'max-lg:font-normal max-lg:tracking-[0.02em] max-lg:text-neutral-400',
         className,
       )}
-      style={{ color: '#8a8a8a' }}
       aria-label={`Or ${INSTALLMENT_COUNT} payments of ${installmentLabel} with Mintpay, KOKO, or PayHere`}
     >
       <p className="flex flex-wrap items-center gap-x-[4px] gap-y-0.5">
@@ -60,8 +60,8 @@ export function BnplInstallmentHint({
             width={68}
             height={17}
             className={cn(
-              'inline-block w-auto shrink-0 object-contain object-left align-middle',
-              isMd ? 'h-[15px]' : 'h-[12px] sm:h-[13px]',
+              'inline-block w-auto shrink-0 object-contain object-left align-middle opacity-80 max-lg:opacity-70',
+              isMd ? 'h-[15px]' : 'h-[11px] sm:h-[13px]',
             )}
             loading="lazy"
             decoding="async"
@@ -80,8 +80,8 @@ export function BnplInstallmentHint({
             width={126}
             height={53}
             className={cn(
-              'block w-auto max-w-none object-contain object-left',
-              isMd ? 'h-[20px]' : 'h-[16px] sm:h-[18px]',
+              'block w-auto max-w-none object-contain object-left opacity-80 max-lg:opacity-70',
+              isMd ? 'h-[20px]' : 'h-[14px] sm:h-[18px]',
             )}
             loading="lazy"
             decoding="async"
@@ -95,8 +95,8 @@ export function BnplInstallmentHint({
           width={72}
           height={18}
           className={cn(
-            'inline-block w-auto shrink-0 object-contain object-left align-middle',
-            isMd ? 'h-[14px]' : 'h-[12px] sm:h-[13px]',
+            'inline-block w-auto shrink-0 object-contain object-left align-middle opacity-80 max-lg:opacity-70',
+            isMd ? 'h-[14px]' : 'h-[10px] sm:h-[13px]',
           )}
           loading="lazy"
           decoding="async"

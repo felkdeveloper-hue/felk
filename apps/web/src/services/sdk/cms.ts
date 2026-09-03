@@ -68,6 +68,7 @@ export interface PromoBanner {
   subtitle?: string;
   placement?: string;
   imageUrl?: string;
+  videoUrl?: string;
   linkUrl?: string;
   ctaLabel?: string;
   priority?: number;

@@ -4,7 +4,11 @@ import { AUTH_LIMITS } from '@/constants/auth.js';
 import { ERROR_MESSAGES } from '@/constants/error-messages.js';
 import { HTTP_STATUS } from '@/constants/http.js';
 
-const skipLocalNoise = () => appConfig.app.isTest || appConfig.app.isDev;
+const skipLocalNoise = (req?: { originalUrl?: string; path?: string }) => {
+  if (appConfig.app.isTest || appConfig.app.isDev) return true;
+  const url = `${req?.originalUrl ?? ''} ${req?.path ?? ''}`;
+  return url.includes('/media/');
+};
 
 /**
  * Global API rate limiter (in-memory). Skipped in development/test.

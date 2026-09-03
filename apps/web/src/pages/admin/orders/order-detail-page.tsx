@@ -9,6 +9,7 @@ import { FeLogo } from '@/components/brand/fe-logo';
 import { InvoiceView } from '@/components/orders';
 import { Image } from '@/components/media/image';
 import { env } from '@/config/env';
+import { toStorefrontMediaUrl } from '@/utils/media-url';
 import {
   Dialog,
   DialogContent,
@@ -34,14 +35,16 @@ function readRecord(value: unknown): Record<string, unknown> {
 
 function resolveOrderItemImage(value: unknown): string | undefined {
   if (typeof value !== 'string' || !value) return undefined;
-  if (/^https?:\/\//i.test(value)) return value;
+  if (/^https?:\/\//i.test(value) || value.startsWith('/cdn/')) {
+    return toStorefrontMediaUrl(value);
+  }
   if (value.startsWith('/uploads/') && env.apiOrigin) {
-    return `${env.apiOrigin.replace(/\/$/, '')}${value}`;
+    return toStorefrontMediaUrl(`${env.apiOrigin.replace(/\/$/, '')}${value}`);
   }
   if (value.startsWith('/uploads/') && env.cdnUrl) {
-    return `${env.cdnUrl.replace(/\/$/, '')}${value}`;
+    return toStorefrontMediaUrl(`${env.cdnUrl.replace(/\/$/, '')}${value}`);
   }
-  return value;
+  return toStorefrontMediaUrl(value);
 }
 
 function readItemImage(row: Record<string, unknown>): string | undefined {

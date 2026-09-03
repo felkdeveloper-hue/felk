@@ -1,5 +1,6 @@
 import type { Wishlist, WishlistItem } from '@/services/sdk';
 import type { ProductMoney } from '@/services/sdk';
+import { toStorefrontMediaUrl } from '@/utils/media-url';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -108,14 +109,17 @@ export function normalizeWishlistItem(raw: unknown): EnrichedWishlistItem {
         : typeof variant.title === 'string'
           ? variant.title
           : undefined,
-    thumbnailUrl:
-      typeof record.thumbnailUrl === 'string'
-        ? record.thumbnailUrl
-        : typeof product.thumbnailUrl === 'string'
-          ? product.thumbnailUrl
-          : typeof variant.thumbnailUrl === 'string'
-            ? variant.thumbnailUrl
-            : undefined,
+    thumbnailUrl: (() => {
+      const raw =
+        typeof record.thumbnailUrl === 'string'
+          ? record.thumbnailUrl
+          : typeof product.thumbnailUrl === 'string'
+            ? product.thumbnailUrl
+            : typeof variant.thumbnailUrl === 'string'
+              ? variant.thumbnailUrl
+              : undefined;
+      return raw ? toStorefrontMediaUrl(raw) : undefined;
+    })(),
     price,
   };
 }

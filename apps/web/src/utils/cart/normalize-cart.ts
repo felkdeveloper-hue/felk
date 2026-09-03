@@ -1,4 +1,5 @@
 import type { CartLineItem, CartTotals, CartValidationResult, CartView } from '@/services/sdk';
+import { toStorefrontMediaUrl } from '@/utils/media-url';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -30,9 +31,9 @@ export function normalizeCartLineItem(raw: unknown): CartLineItem {
     ),
     imageUrl:
       typeof record.thumbnailUrl === 'string'
-        ? record.thumbnailUrl
+        ? toStorefrontMediaUrl(record.thumbnailUrl)
         : typeof record.imageUrl === 'string'
-          ? record.imageUrl
+          ? toStorefrontMediaUrl(record.imageUrl)
           : undefined,
     colorName: typeof record.colorName === 'string' ? record.colorName : undefined,
     sizeName: typeof record.sizeName === 'string' ? record.sizeName : undefined,

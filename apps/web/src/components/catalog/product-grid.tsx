@@ -21,8 +21,8 @@ export interface ProductGridProps {
 function gridClassName(view: 'grid' | 'list', filtersOpen: boolean) {
   if (view === 'list') return 'flex flex-col gap-3 sm:gap-4';
   return filtersOpen
-    ? 'grid grid-cols-2 gap-2.5 sm:gap-6 md:grid-cols-3 xl:grid-cols-4'
-    : 'grid grid-cols-2 gap-2.5 sm:gap-7 md:grid-cols-3 xl:grid-cols-4';
+    ? 'grid grid-cols-2 gap-x-3 gap-y-5 sm:gap-6 md:grid-cols-3 xl:grid-cols-4'
+    : 'grid grid-cols-2 gap-x-3 gap-y-5 sm:gap-7 md:grid-cols-3 xl:grid-cols-4';
 }
 
 export function ProductGrid({

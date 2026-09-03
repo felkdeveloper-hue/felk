@@ -8,6 +8,7 @@ import type {
 import type { Category } from '@/services/sdk/categories';
 import { env } from '@/config/env';
 import { getSeededReviewSummary } from '@/lib/seeded-reviews';
+import { toStorefrontMediaUrl } from '@/utils/media-url';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -47,16 +48,16 @@ function resolveMediaUrl(value: unknown): string | undefined {
   // Rewrite dev-only localhost upload URLs to the real API origin for production.
   const localMatch = url.match(/^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?(\/uploads\/.*)$/i);
   if (localMatch && env.apiOrigin) {
-    return `${env.apiOrigin.replace(/\/$/, '')}${localMatch[1]}`;
+    return toStorefrontMediaUrl(`${env.apiOrigin.replace(/\/$/, '')}${localMatch[1]}`);
   }
-  if (/^(https?:|data:|blob:)/i.test(url)) return url;
+  if (/^(https?:|data:|blob:)/i.test(url)) return toStorefrontMediaUrl(url);
   // Locally-uploaded media (`/uploads/...`) is served by the API, not the web host,
   // so on production (empty CDN) resolve it against the API origin instead of Vercel.
   if (url.startsWith('/uploads/')) {
     const base = env.cdnUrl || env.apiOrigin;
-    if (base) return `${base.replace(/\/$/, '')}${url}`;
+    if (base) return toStorefrontMediaUrl(`${base.replace(/\/$/, '')}${url}`);
   }
-  return url;
+  return toStorefrontMediaUrl(url);
 }
 
 export function normalizeProductMedia(raw: unknown): ProductMedia {

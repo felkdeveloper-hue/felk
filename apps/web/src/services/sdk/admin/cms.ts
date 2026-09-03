@@ -42,6 +42,7 @@ function normalizeCmsResource(raw: unknown): CmsResource {
       resolveImageUrl(record.image) ??
       resolveImageUrl(record.logo) ??
       resolveResponsiveImageUrl(record.images),
+    videoUrl: typeof record.videoUrl === 'string' ? record.videoUrl : undefined,
     updatedAt: typeof record.updatedAt === 'string' ? record.updatedAt : undefined,
   };
 }
@@ -80,6 +81,11 @@ function createBannerApi(basePath: string) {
       form.append('file', file);
       if (alt) form.append('alt', alt);
       return normalizeCmsResource(await http.post<unknown>(`${basePath}/${id}/image`, form));
+    },
+    async uploadVideo(id: string, file: File): Promise<CmsResource> {
+      const form = new FormData();
+      form.append('file', file);
+      return normalizeCmsResource(await http.post<unknown>(`${basePath}/${id}/video`, form));
     },
   };
 }

@@ -147,7 +147,14 @@ async function runPrefetch(queryClient: QueryClient): Promise<void> {
           updatedAt: now,
         },
       );
-      for (const placement of ['home_split', 'home_editorial', 'home_before_featured'] as const) {
+      for (const placement of [
+        'home_split',
+        'home_editorial',
+        'home_after_best_sellers',
+        'home_lookbook_videos',
+        'home_before_featured',
+        'contact_page',
+      ] as const) {
         queryClient.setQueryData(
           QUERY_KEYS.cms.promoBanners({ placement }),
           { data: allPromos.filter((banner) => banner.placement === placement) },

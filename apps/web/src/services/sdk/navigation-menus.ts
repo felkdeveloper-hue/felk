@@ -11,6 +11,7 @@ import {
   ensureWomenCoordsExtras,
   isLegacyWomenMegaMenuColumns,
 } from '@/constants/mega-menu-defaults';
+import { toStorefrontMediaUrl } from '@/utils/media-url';
 
 /**
  * Mega-menu tiles saved from local Vite admin often persist `/src/assets/...`
@@ -36,7 +37,7 @@ function asTiles(raw: unknown): MegaMenuTile[] {
     return {
       label: String(record.label ?? ''),
       slug: String(record.slug ?? ''),
-      imageUrl: String(record.imageUrl ?? ''),
+      imageUrl: toStorefrontMediaUrl(String(record.imageUrl ?? '')),
       imageClassName: typeof record.imageClassName === 'string' ? record.imageClassName : null,
     };
   });
@@ -49,7 +50,7 @@ function asColumns(raw: unknown): MegaMenuColumn[] {
     const links = Array.isArray(record.links)
       ? record.links.map((link) => {
           const row = link as Record<string, unknown>;
-          const bannerUrl = String(row.bannerUrl ?? '').trim();
+          const bannerUrl = toStorefrontMediaUrl(String(row.bannerUrl ?? '').trim());
           return {
             label: String(row.label ?? ''),
             slug: String(row.slug ?? ''),
@@ -75,7 +76,7 @@ function mergeTilesWithFallback(
     const byIndex = fallback[index];
     const fallbackTile = bySlug ?? byIndex;
     const imageUrl = isUsableStorefrontImageUrl(tile.imageUrl)
-      ? tile.imageUrl.trim()
+      ? toStorefrontMediaUrl(tile.imageUrl.trim())
       : (fallbackTile?.imageUrl ?? '');
 
     return {

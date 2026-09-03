@@ -2,6 +2,7 @@ import * as React from 'react';
 import { ImageOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
+import { toStorefrontMediaUrl } from '@/utils/media-url';
 
 export interface ImageSource {
   srcSet: string;
@@ -69,6 +70,8 @@ export const Image = React.forwardRef<HTMLImageElement, ImageProps>(
       [ref],
     );
 
+    const imageSrc = typeof src === 'string' && src ? toStorefrontMediaUrl(src) : src;
+
     return (
       <div
         data-slot="image"
@@ -86,7 +89,7 @@ export const Image = React.forwardRef<HTMLImageElement, ImageProps>(
             const img = (
               <img
                 ref={setRefs}
-                src={src}
+                src={imageSrc}
                 alt={alt}
                 loading={loading}
                 decoding={decoding}
@@ -119,7 +122,7 @@ export const Image = React.forwardRef<HTMLImageElement, ImageProps>(
                 {sources.map((source) => (
                   <source
                     key={source.srcSet}
-                    srcSet={source.srcSet}
+                    srcSet={toStorefrontMediaUrl(source.srcSet)}
                     media={source.media}
                     type={source.type}
                   />
