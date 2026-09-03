@@ -8,7 +8,7 @@
   ],
   "headers": [
     {
-      "source": "/cdn/(.*)",
+      "source": "/cdn/(.*)\\.(webp|avif|jpe?g|png|gif|svg|ico)",
       "headers": [
         {
           "key": "Cache-Control",

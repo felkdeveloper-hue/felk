@@ -16,6 +16,10 @@ const LOCAL_MIME: Record<string, string> = {
   '.png': 'image/png',
   '.svg': 'image/svg+xml',
   '.webp': 'image/webp',
+  '.mp4': 'video/mp4',
+  '.webm': 'video/webm',
+  '.mov': 'video/quicktime',
+  '.m4v': 'video/mp4',
 };
 
 const UPLOAD_ROOT = path.resolve(process.cwd(), 'uploads');

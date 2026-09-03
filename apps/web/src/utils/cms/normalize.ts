@@ -116,7 +116,7 @@ export function normalizePromoBanner(raw: unknown): PromoBanner {
     subtitle: asString(record.subtitle) || undefined,
     placement: asString(record.placement) || undefined,
     imageUrl: resolveResponsiveImageUrl(record.images),
-    videoUrl: asString(record.videoUrl) || undefined,
+    videoUrl: resolveMediaUrl(record.videoUrl),
     linkUrl: asString(record.ctaUrl ?? record.linkUrl) || undefined,
     ctaLabel: asString(record.ctaLabel ?? record.buttonText) || undefined,
     priority: asNumber(record.priority),

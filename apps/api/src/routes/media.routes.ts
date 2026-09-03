@@ -31,6 +31,7 @@ async function sendStoredObject(req: Request, res: Response, next: NextFunction)
     res.setHeader('Cache-Control', object.cacheControl ?? 'public, max-age=31536000, immutable');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.setHeader('Accept-Ranges', 'bytes');
     if (object.contentLength != null) {
       res.setHeader('Content-Length', String(object.contentLength));
     }
@@ -44,6 +45,8 @@ async function sendStoredObject(req: Request, res: Response, next: NextFunction)
       return;
     }
 
+    // Full-body stream only — Range slicing needs storage-level support.
+    // Do not set long edge caches in front of this route for video (Range).
     object.body.pipe(res);
   } catch (error) {
     next(error);
