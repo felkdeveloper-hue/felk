@@ -396,25 +396,6 @@ export const authService = {
       throw ApiError.internal('Unable to create verification code', 'EMAIL_SEND_FAILED');
     }
 
-    // Track registration analytics (fire-and-forget)
-    const { trackCompleteRegistrationSafely } =
-      await import('@/services/analytics/complete-registration.tracking.js');
-    trackCompleteRegistrationSafely({
-      user: {
-        id: user._id.toString(),
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        phone: user.phone,
-      },
-      customerId: customer._id.toString(),
-      meta,
-      fbp: input.fbp,
-      fbc: input.fbc,
-      fbclid: input.fbclid,
-      eventSourcePath: '/auth/register',
-    });
-
     await writeAuditLog({
       action: AUDIT_ACTIONS.USER_REGISTERED,
       resourceType: 'user',
@@ -919,9 +900,31 @@ export const authService = {
     return { message: 'Password changed successfully' };
   },
 
-  async verifyEmail(emailRaw: string, code: string, meta: AuthRequestMeta) {
+  async verifyEmail(
+    emailRaw: string,
+    code: string,
+    meta: AuthRequestMeta,
+    attribution?: {
+      visitorId?: string | null;
+      utmSource?: string | null;
+      utmMedium?: string | null;
+      utmCampaign?: string | null;
+      utmTerm?: string | null;
+      utmContent?: string | null;
+      referrer?: string | null;
+      fbclid?: string | null;
+      fbp?: string | null;
+      fbc?: string | null;
+      gclid?: string | null;
+      ttclid?: string | null;
+      msclkid?: string | null;
+      igshid?: string | null;
+      inAppSource?: string | null;
+      landingPath?: string | null;
+    } | null,
+  ) {
     const { otpService } = await import('@/services/otp.service.js');
-    const result = await otpService.verifyOtp(emailRaw, code, meta);
+    const result = await otpService.verifyOtp(emailRaw, code, meta, attribution);
     return {
       message: result.message,
       user: result.user,

@@ -128,7 +128,12 @@ export const checkoutAuthService = {
     );
   },
 
-  async verifyOtp(emailRaw: string, otp: string) {
+  async verifyOtp(
+    emailRaw: string,
+    otp: string,
+    meta: AuthRequestMeta = {},
+    click?: { fbp?: string | null; fbc?: string | null; fbclid?: string | null },
+  ) {
     const email = normalizeEmail(emailRaw);
     const invalid = () =>
       ApiError.badRequest('Invalid or expired verification code', undefined, 'INVALID_VERIFY_CODE');
@@ -139,7 +144,7 @@ export const checkoutAuthService = {
       const { otpService } = await import('@/services/otp.service.js');
       return {
         mode: 'login' as const,
-        ...(await otpService.verifyOtp(email, otp, {})),
+        ...(await otpService.verifyOtp(email, otp, meta, click)),
       };
     }
 

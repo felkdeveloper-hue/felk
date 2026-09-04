@@ -71,6 +71,9 @@ export const verifyEmailSchema = z.object({
     .email()
     .transform((v) => v.trim().toLowerCase()),
   code: z.string().regex(REGEX.OTP, 'Enter the 6-digit code'),
+  fbp: z.string().max(200).optional().nullable(),
+  fbc: z.string().max(200).optional().nullable(),
+  fbclid: z.string().max(500).optional().nullable(),
 });
 
 export const resendVerificationSchema = z.object({
@@ -90,6 +93,8 @@ export const attributionFieldsSchema = z.object({
   utmContent: z.string().trim().max(200).optional().nullable(),
   referrer: z.string().trim().max(2000).optional().nullable(),
   fbclid: z.string().trim().max(500).optional().nullable(),
+  fbp: z.string().max(200).optional().nullable(),
+  fbc: z.string().max(200).optional().nullable(),
   gclid: z.string().trim().max(500).optional().nullable(),
   ttclid: z.string().trim().max(500).optional().nullable(),
   msclkid: z.string().trim().max(500).optional().nullable(),

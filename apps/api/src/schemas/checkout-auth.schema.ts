@@ -11,6 +11,9 @@ export const checkoutSendOtpSchema = z.object({
 export const checkoutVerifyOtpSchema = z.object({
   email: z.string().trim().email().max(255),
   otp: z.string().trim().min(4).max(12),
+  fbp: z.string().max(200).optional().nullable(),
+  fbc: z.string().max(200).optional().nullable(),
+  fbclid: z.string().max(500).optional().nullable(),
 });
 
 export const checkoutCompleteSignupSchema = z.object({

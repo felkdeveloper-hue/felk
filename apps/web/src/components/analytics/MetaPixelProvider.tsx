@@ -1,20 +1,21 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { initMetaPixel, isMetaPixelConfigured, metaPixelTrack } from '@/lib/analytics/meta-pixel';
 import { collectMetaBrowserParams } from '@/lib/analytics/meta-param-builder';
 import { router } from '@/routes/router';
 
+/** Survives React Strict Mode remounts so the same path is not sent twice. */
+let lastPageViewPath: string | null = null;
+
 /** Loads the Meta Pixel once and sends one PageView per SPA route (browser only). */
 export function MetaPixelProvider({ children }: { children: React.ReactNode }) {
-  const lastPathRef = useRef<string | null>(null);
-
   useEffect(() => {
     void collectMetaBrowserParams();
 
     if (!isMetaPixelConfigured()) return;
 
     const sendPageView = (path: string) => {
-      if (lastPathRef.current === path) return;
-      lastPathRef.current = path;
+      if (lastPageViewPath === path) return;
+      lastPageViewPath = path;
       void metaPixelTrack('PageView');
     };
 

@@ -133,7 +133,12 @@ export const authController = {
   }),
 
   verifyEmail: asyncHandler(async (req, res) => {
-    const result = await authService.verifyEmail(req.body.email, req.body.code, meta(req));
+    const result = await authService.verifyEmail(
+      req.body.email,
+      req.body.code,
+      meta(req),
+      req.body,
+    );
     setAuthCookies(res, {
       accessToken: result.accessToken,
       refreshToken: result.refreshToken,
@@ -174,7 +179,11 @@ export const authController = {
   }),
 
   checkoutVerifyOtp: asyncHandler(async (req, res) => {
-    const result = await checkoutAuthService.verifyOtp(req.body.email, req.body.otp);
+    const result = await checkoutAuthService.verifyOtp(req.body.email, req.body.otp, meta(req), {
+      fbp: req.body.fbp,
+      fbc: req.body.fbc,
+      fbclid: req.body.fbclid,
+    });
     if (result.mode === 'login') {
       setAuthCookies(res, {
         accessToken: result.accessToken,

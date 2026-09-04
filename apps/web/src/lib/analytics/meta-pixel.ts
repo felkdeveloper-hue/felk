@@ -22,6 +22,8 @@ type FbqFunction = {
   loaded?: boolean;
   version?: string;
   push?: FbqFunction;
+  /** Prevents fbevents.js from auto-sending PageView on history.pushState. */
+  disablePushState?: boolean;
 };
 
 export const META_PIXEL_ID = import.meta.env.VITE_META_PIXEL_ID ?? '1485989443213075';
@@ -31,6 +33,7 @@ const TEST_CODE_PATTERN = /^TEST\d{3,12}$/i;
 
 let scriptPromise: Promise<void> | null = null;
 let pixelInitialized = false;
+let initPromise: Promise<void> | null = null;
 
 function loadScript(): Promise<void> {
   if (typeof window === 'undefined') return Promise.resolve();
@@ -103,13 +106,24 @@ export function getMetaTestEventCode(): string | null {
 export async function initMetaPixel(): Promise<void> {
   if (!META_PIXEL_ID || typeof window === 'undefined') return;
   captureMetaTestEventCode();
-  await loadScript();
-  if (pixelInitialized || !window.fbq) return;
+  if (pixelInitialized) return;
+  if (initPromise) {
+    await initPromise;
+    return;
+  }
 
-  // Meta docs: disable automatic button/microdata events BEFORE init.
-  window.fbq('set', 'autoConfig', false, META_PIXEL_ID);
-  window.fbq('init', META_PIXEL_ID);
-  pixelInitialized = true;
+  initPromise = (async () => {
+    await loadScript();
+    if (pixelInitialized || !window.fbq) return;
+
+    // Meta docs: disable automatic button/microdata events BEFORE init.
+    window.fbq.disablePushState = true;
+    window.fbq('set', 'autoConfig', false, META_PIXEL_ID);
+    window.fbq('init', META_PIXEL_ID);
+    pixelInitialized = true;
+  })();
+
+  await initPromise;
 }
 
 export async function metaPixelTrack(

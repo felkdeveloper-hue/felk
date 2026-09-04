@@ -68,12 +68,14 @@ export const authApi = {
     return http.post<MessageResult>('/auth/change-password', payload);
   },
 
-  verifyEmail(email: string, code: string): Promise<AuthSession> {
+  async verifyEmail(email: string, code: string): Promise<AuthSession> {
+    await collectMetaBrowserParams();
     return http
       .post<unknown>('/auth/verify-otp', {
         email,
         otp: code,
         ...getAttributionPayloadForAuth(),
+        ...getMetaClickPayload(),
       })
       .then(normalizeAuthSession);
   },
@@ -86,12 +88,14 @@ export const authApi = {
     return http.post<MessageResult>('/auth/send-otp', { email });
   },
 
-  verifyOtp(email: string, otp: string): Promise<AuthSession> {
+  async verifyOtp(email: string, otp: string): Promise<AuthSession> {
+    await collectMetaBrowserParams();
     return http
       .post<unknown>('/auth/verify-otp', {
         email,
         otp,
         ...getAttributionPayloadForAuth(),
+        ...getMetaClickPayload(),
       })
       .then(normalizeAuthSession);
   },
@@ -129,6 +133,7 @@ export const authApi = {
     | (AuthSession & { mode: 'login' })
     | { mode: 'signup'; signupToken: string; email: string; expiresIn: number; message: string }
   > {
+    await collectMetaBrowserParams();
     const raw = await http.post<{
       mode?: string;
       signupToken?: string;
@@ -138,7 +143,11 @@ export const authApi = {
       accessToken?: string;
       refreshToken?: string;
       user?: unknown;
-    }>('/auth/checkout/verify-otp', { email, otp }, { skipAuthRefresh: true, timeout: 15_000 });
+    }>(
+      '/auth/checkout/verify-otp',
+      { email, otp, ...getMetaClickPayload() },
+      { skipAuthRefresh: true, timeout: 15_000 },
+    );
 
     if (raw.mode === 'signup' && raw.signupToken) {
       return {

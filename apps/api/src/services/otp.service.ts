@@ -102,6 +102,8 @@ export const otpService = {
       utmContent?: string | null;
       referrer?: string | null;
       fbclid?: string | null;
+      fbp?: string | null;
+      fbc?: string | null;
       gclid?: string | null;
       ttclid?: string | null;
       msclkid?: string | null;
@@ -182,6 +184,44 @@ export const otpService = {
     void emailService
       .sendWelcomeEmail({ email: user.email, firstName: user.firstName })
       .catch((err) => logger.warn({ err, email }, 'Welcome email failed after verification'));
+
+    try {
+      const { customerService } = await import('@/services/customer.service.js');
+      const customer = await customerService.ensureForUser(
+        {
+          id: user._id.toString(),
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          phone: user.phone,
+        },
+        {
+          userId: user._id.toString(),
+          ip: meta.ip,
+          userAgent: meta.userAgent,
+          requestId: meta.requestId,
+        },
+      );
+      const { trackCompleteRegistrationSafely } =
+        await import('@/services/analytics/complete-registration.tracking.js');
+      trackCompleteRegistrationSafely({
+        user: {
+          id: user._id.toString(),
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          phone: user.phone,
+        },
+        customerId: customer._id.toString(),
+        meta,
+        fbp: attribution?.fbp,
+        fbc: attribution?.fbc,
+        fbclid: attribution?.fbclid,
+        eventSourcePath: '/auth/register',
+      });
+    } catch {
+      /* tracking must never block verification */
+    }
 
     return {
       ...tokens,

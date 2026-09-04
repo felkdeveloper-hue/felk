@@ -114,15 +114,8 @@ function singleItemPayload(
 
 export const trackingApi = {
   async track(payload: TrackEventPayload): Promise<void> {
-    await collectMetaBrowserParams();
     const eventId = payload.eventId ?? generateEventId();
     const url = payload.url ?? (typeof window !== 'undefined' ? window.location.href : undefined);
-    const userData = {
-      ...(payload.userData ?? {}),
-      fbp: payload.userData?.fbp ?? getFbp(),
-      fbc: payload.userData?.fbc ?? getFbc(),
-      ttclid: payload.userData?.ttclid ?? getTtclid(),
-    };
 
     void metaPixelTrack(payload.eventName, payload.customData, eventId);
 
@@ -130,6 +123,13 @@ export const trackingApi = {
     if (!sendToCapi) return;
 
     try {
+      await collectMetaBrowserParams();
+      const userData = {
+        ...(payload.userData ?? {}),
+        fbp: payload.userData?.fbp ?? getFbp(),
+        fbc: payload.userData?.fbc ?? getFbc(),
+        ttclid: payload.userData?.ttclid ?? getTtclid(),
+      };
       await http.post('/tracking/event', {
         ...payload,
         eventId,
