@@ -1,11 +1,21 @@
-import { describe, it, expect } from 'vitest';
+import { beforeAll, afterAll, describe, it, expect } from 'vitest';
 import request from 'supertest';
+import type { Application } from 'express';
 import { createApp } from '@/app.js';
 import { appConfig } from '@/config/app.config.js';
+import { setupTestDatabase, teardownTestDatabase } from '@/test/helpers/db.js';
 
 describe('Tracking endpoint', () => {
-  const app = createApp();
+  let app: Application;
   const prefix = appConfig.server.apiPrefix;
+
+  beforeAll(async () => {
+    await setupTestDatabase();
+    app = createApp();
+  });
+  afterAll(async () => {
+    await teardownTestDatabase();
+  });
 
   it('POST /tracking/event accepts a valid PageView payload', async () => {
     const res = await request(app)

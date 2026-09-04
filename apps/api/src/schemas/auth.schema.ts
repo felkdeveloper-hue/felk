@@ -22,6 +22,9 @@ export const registerSchema = z.object({
   // Optional — single-name signups leave this empty (not a copy of firstName).
   lastName: z.string().trim().max(100).optional().default(''),
   phone: z.string().regex(REGEX.E164_PHONE).optional(),
+  fbp: z.string().max(200).optional().nullable(),
+  fbc: z.string().max(200).optional().nullable(),
+  fbclid: z.string().max(500).optional().nullable(),
 });
 
 export const loginSchema = z.object({

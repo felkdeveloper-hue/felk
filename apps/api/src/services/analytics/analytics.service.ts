@@ -12,6 +12,10 @@ export interface TrackingUserData {
   firstName?: string | null;
   lastName?: string | null;
   city?: string | null;
+  state?: string | null;
+  zip?: string | null;
+  dateOfBirth?: Date | string | null;
+  gender?: string | null;
   country?: string | null;
   ipAddress?: string | null;
   userAgent?: string | null;
@@ -30,6 +34,10 @@ function toMetaUserData(ud?: TrackingUserData | null): MetaUserData | undefined 
     firstName: ud.firstName,
     lastName: ud.lastName,
     city: ud.city,
+    state: ud.state,
+    zip: ud.zip,
+    dateOfBirth: ud.dateOfBirth,
+    gender: ud.gender,
     country: ud.country,
     ipAddress: ud.ipAddress,
     userAgent: ud.userAgent,
@@ -55,6 +63,7 @@ function toTikTokUserData(ud?: TrackingUserData | null): TikTokUserData | undefi
 export interface TrackEventInput {
   eventName: string;
   url?: string;
+  referrerUrl?: string;
   userData?: TrackingUserData | null;
   customData?: MetaCustomData;
   tiktokProperties?: TikTokProperties;
@@ -78,6 +87,7 @@ export class AnalyticsService {
         eventName: input.eventName,
         eventId,
         eventSourceUrl: input.url,
+        referrerUrl: input.referrerUrl,
         userData: metaUserData,
         customData: input.customData,
         testEventCode: input.testEventCode,
@@ -247,10 +257,14 @@ export class AnalyticsService {
     await metaCapiService.trackLead(toMetaUserData(userData), eid);
   }
 
-  async trackCompleteRegistration(userData?: TrackingUserData | null, eventId?: string) {
+  async trackCompleteRegistration(
+    userData?: TrackingUserData | null,
+    eventId?: string,
+    eventSourceUrl?: string,
+  ) {
     const eid = eventId ?? randomUUID();
     await Promise.allSettled([
-      metaCapiService.trackCompleteRegistration(toMetaUserData(userData), eid),
+      metaCapiService.trackCompleteRegistration(toMetaUserData(userData), eid, eventSourceUrl),
       tikTokEventsService.trackRegistration(toTikTokUserData(userData), eid),
     ]);
   }

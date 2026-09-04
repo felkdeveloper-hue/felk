@@ -2,8 +2,13 @@ import { randomUUID } from 'node:crypto';
 import { appConfig } from '@/config/app.config.js';
 import { logger } from '@/config/logger.js';
 import { fetchWithRetry } from '@/utils/http-retry.js';
-import { hashPii, hashPhone } from '@/utils/pii-hash.js';
 import { AnalyticsEventLogModel } from '@/models/analytics.model.js';
+import {
+  formatMetaDateOfBirth,
+  hashMetaPii,
+  sanitizeMetaClickId,
+  sanitizeMetaClientIp,
+} from '@/services/analytics/meta-param-builder.js';
 
 const GRAPH_API_VERSION = 'v19.0';
 
@@ -44,6 +49,10 @@ export interface MetaUserData {
   firstName?: string | null;
   lastName?: string | null;
   city?: string | null;
+  state?: string | null;
+  zip?: string | null;
+  dateOfBirth?: Date | string | null;
+  gender?: string | null;
   country?: string | null;
   ipAddress?: string | null;
   userAgent?: string | null;
@@ -82,6 +91,7 @@ export interface MetaEventInput {
   eventName: string;
   eventId?: string;
   eventSourceUrl?: string;
+  referrerUrl?: string;
   userData?: MetaUserData;
   customData?: MetaCustomData;
   testEventCode?: string;
@@ -123,18 +133,38 @@ function isDuplicateKeyError(error: unknown): boolean {
 }
 
 function buildUserData(ud: MetaUserData) {
+  const em = hashMetaPii(ud.email, 'email');
+  const ph = hashMetaPii(ud.phone, 'phone');
+  const fn = hashMetaPii(ud.firstName, 'first_name');
+  const ln = hashMetaPii(ud.lastName, 'last_name');
+  const ct = hashMetaPii(ud.city, 'city');
+  const st = hashMetaPii(ud.state, 'state');
+  const zp = hashMetaPii(ud.zip, 'zip_code');
+  const db = hashMetaPii(formatMetaDateOfBirth(ud.dateOfBirth), 'date_of_birth');
+  const ge = hashMetaPii(ud.gender, 'gender');
+  const country = hashMetaPii(ud.country, 'country');
+  const externalId = hashMetaPii(ud.externalId, 'external_id');
+  const ip = sanitizeMetaClientIp(ud.ipAddress);
+  const userAgent = ud.userAgent?.trim();
+  const fbp = sanitizeMetaClickId(ud.fbp);
+  const fbc = sanitizeMetaClickId(ud.fbc);
+
   return {
-    ...(ud.email && { em: hashPii(ud.email) }),
-    ...(ud.phone && { ph: hashPhone(ud.phone) }),
-    ...(ud.firstName && { fn: hashPii(ud.firstName) }),
-    ...(ud.lastName && { ln: hashPii(ud.lastName) }),
-    ...(ud.city && { ct: hashPii(ud.city) }),
-    ...(ud.country && { country: hashPii(ud.country) }),
-    ...(ud.ipAddress && { client_ip_address: ud.ipAddress }),
-    ...(ud.userAgent && { client_user_agent: ud.userAgent }),
-    ...(ud.fbp && { fbp: ud.fbp }),
-    ...(ud.fbc && { fbc: ud.fbc }),
-    ...(ud.externalId && { external_id: hashPii(ud.externalId) }),
+    ...(em && { em }),
+    ...(ph && { ph }),
+    ...(fn && { fn }),
+    ...(ln && { ln }),
+    ...(ct && { ct }),
+    ...(st && { st }),
+    ...(zp && { zp }),
+    ...(db && { db }),
+    ...(ge && { ge }),
+    ...(country && { country }),
+    ...(ip && { client_ip_address: ip }),
+    ...(userAgent && { client_user_agent: userAgent }),
+    ...(fbp && { fbp }),
+    ...(fbc && { fbc }),
+    ...(externalId && { external_id: externalId }),
   };
 }
 
@@ -158,6 +188,7 @@ export class MetaCapiService {
     const eventTime = Math.floor(Date.now() / 1000);
 
     const customData = normalizeCustomData(input.customData);
+    const userData = input.userData ? buildUserData(input.userData) : undefined;
 
     const payload: Record<string, unknown> = {
       data: [
@@ -166,8 +197,9 @@ export class MetaCapiService {
           event_time: eventTime,
           event_id: eventId,
           ...(input.eventSourceUrl && { event_source_url: input.eventSourceUrl }),
+          ...(input.referrerUrl && { referrer_url: input.referrerUrl }),
           action_source: 'website',
-          ...(input.userData && { user_data: buildUserData(input.userData) }),
+          ...(userData && Object.keys(userData).length > 0 && { user_data: userData }),
           ...(customData && Object.keys(customData).length > 0 && { custom_data: customData }),
         },
       ],
@@ -425,8 +457,13 @@ export class MetaCapiService {
     return this.sendEvent({ eventName: 'Lead', userData, eventId });
   }
 
-  trackCompleteRegistration(userData?: MetaUserData, eventId?: string) {
-    return this.sendEvent({ eventName: 'CompleteRegistration', userData, eventId });
+  trackCompleteRegistration(userData?: MetaUserData, eventId?: string, eventSourceUrl?: string) {
+    return this.sendEvent({
+      eventName: 'CompleteRegistration',
+      userData,
+      eventId,
+      eventSourceUrl,
+    });
   }
 }
 

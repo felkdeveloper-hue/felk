@@ -296,6 +296,9 @@ export const authService = {
       firstName: string;
       lastName: string;
       phone?: string;
+      fbp?: string | null;
+      fbc?: string | null;
+      fbclid?: string | null;
     },
     meta: AuthRequestMeta,
   ) {
@@ -368,7 +371,7 @@ export const authService = {
     }
 
     const { customerService } = await import('@/services/customer.service.js');
-    await customerService.ensureForUser(
+    const customer = await customerService.ensureForUser(
       {
         id: user._id.toString(),
         email: user.email,
@@ -394,16 +397,23 @@ export const authService = {
     }
 
     // Track registration analytics (fire-and-forget)
-    void import('@/services/analytics/analytics.service.js')
-      .then(({ analyticsService }) => {
-        return analyticsService
-          .trackCompleteRegistration({
-            email: user.email,
-            ipAddress: meta.ip,
-          })
-          .catch(() => {});
-      })
-      .catch(() => {});
+    const { trackCompleteRegistrationSafely } =
+      await import('@/services/analytics/complete-registration.tracking.js');
+    trackCompleteRegistrationSafely({
+      user: {
+        id: user._id.toString(),
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        phone: user.phone,
+      },
+      customerId: customer._id.toString(),
+      meta,
+      fbp: input.fbp,
+      fbc: input.fbc,
+      fbclid: input.fbclid,
+      eventSourcePath: '/auth/register',
+    });
 
     await writeAuditLog({
       action: AUDIT_ACTIONS.USER_REGISTERED,

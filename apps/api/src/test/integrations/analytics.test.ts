@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { hashPii, hashPhone } from '@/utils/pii-hash.js';
+import { hashMetaPii } from '@/services/analytics/meta-param-builder.js';
 
 vi.mock('@/config/app.config', () => ({
   appConfig: {
@@ -7,6 +8,8 @@ vi.mock('@/config/app.config', () => ({
       meta: { token: 'meta-test-token', pixelId: 'pixel-123', configured: true },
       tiktok: { pixelId: 'tiktok-pix', accessToken: 'tt-token', configured: true },
     },
+    cors: { origins: ['http://localhost:5173'] },
+    email: { shopUrl: 'http://localhost:5173' },
   },
 }));
 
@@ -76,7 +79,51 @@ describe('MetaCapiService', () => {
     ];
     expect(url).toContain('graph.facebook.com');
     const body = JSON.parse(init.body) as { data: Array<{ user_data?: { em?: string } }> };
-    expect(body.data[0].user_data?.em).toBe(hashPii('buyer@example.com'));
+    expect(body.data[0].user_data?.em).toBe(hashMetaPii('buyer@example.com', 'email'));
+    expect(String(body.data[0].user_data?.em)).toMatch(/^[a-f0-9]{64}(\.[A-Za-z0-9]+)?$/);
+  });
+
+  it('sends CompleteRegistration with hashed PII and unhashed fbc/fbp', async () => {
+    const { MetaCapiService } = await import('@/services/analytics/meta-capi.service.js');
+    const { fetchWithRetry } = await import('@/utils/http-retry.js');
+    const service = new MetaCapiService();
+
+    await service.trackCompleteRegistration({
+      email: 'new@example.com',
+      firstName: 'Ada',
+      lastName: 'Lovelace',
+      fbc: 'fb.1.1554763741205.AbCdEf',
+      fbp: 'fb.1.1554763741205.1234567890',
+      userAgent: 'Mozilla/5.0',
+      ipAddress: '203.0.113.10',
+      externalId: 'cust_123',
+      city: '',
+      zip: null,
+    });
+
+    const [, init] = (fetchWithRetry as ReturnType<typeof vi.fn>).mock.calls[0] as [
+      string,
+      { body: string },
+    ];
+    const body = JSON.parse(init.body) as {
+      data: Array<{
+        event_name: string;
+        user_data?: Record<string, unknown>;
+      }>;
+    };
+    const userData = body.data[0]?.user_data ?? {};
+    expect(body.data[0]?.event_name).toBe('CompleteRegistration');
+    expect(userData.em).toBe(hashMetaPii('new@example.com', 'email'));
+    expect(userData.fn).toBe(hashMetaPii('Ada', 'first_name'));
+    expect(userData.ln).toBe(hashMetaPii('Lovelace', 'last_name'));
+    expect(userData.fbc).toBe('fb.1.1554763741205.AbCdEf');
+    expect(userData.fbp).toBe('fb.1.1554763741205.1234567890');
+    expect(userData.client_user_agent).toBe('Mozilla/5.0');
+    expect(userData.client_ip_address).toBe('203.0.113.10');
+    expect(userData.ct).toBeUndefined();
+    expect(userData.zp).toBeUndefined();
+    expect(userData.db).toBeUndefined();
+    expect(userData.st).toBeUndefined();
   });
 
   it('sends a Search event', async () => {

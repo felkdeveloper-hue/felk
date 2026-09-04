@@ -151,6 +151,15 @@ export async function trackMetaPurchaseForOrder(
     const shipping = (checkout?.shippingAddress ?? {}) as Record<string, unknown>;
     const click = readMetaClick(checkout);
     const eventSourceUrl = `${appConfig.email.shopUrl.replace(/\/$/, '')}/checkout/success?checkoutToken=${encodeURIComponent(payment.checkoutToken)}`;
+    const customerRecord = customer as {
+      email?: string;
+      phone?: string | null;
+      firstName?: string | null;
+      lastName?: string | null;
+      country?: string | null;
+      dateOfBirth?: Date | null;
+      gender?: string | null;
+    } | null;
 
     const metaResponse = await metaCapiService.trackPurchase({
       orderId: order.orderNumber,
@@ -162,17 +171,20 @@ export async function trackMetaPurchaseForOrder(
       eventId,
       eventSourceUrl,
       userData: {
-        email: (customer as { email?: string } | null)?.email ?? null,
+        email: customerRecord?.email ?? null,
         phone:
-          (customer as { phone?: string | null } | null)?.phone ??
-          (typeof shipping.phone === 'string' ? shipping.phone : null),
-        firstName: (customer as { firstName?: string | null } | null)?.firstName ?? null,
-        lastName: (customer as { lastName?: string | null } | null)?.lastName ?? null,
+          customerRecord?.phone ?? (typeof shipping.phone === 'string' ? shipping.phone : null),
+        firstName: customerRecord?.firstName ?? null,
+        lastName: customerRecord?.lastName ?? null,
         city: typeof shipping.city === 'string' ? shipping.city : null,
+        state: typeof shipping.state === 'string' ? shipping.state : null,
+        zip: typeof shipping.postalCode === 'string' ? shipping.postalCode : null,
+        dateOfBirth: customerRecord?.dateOfBirth ?? null,
+        gender: customerRecord?.gender ?? null,
         country:
           typeof shipping.country === 'string'
             ? shipping.country
-            : ((customer as { country?: string | null } | null)?.country ?? null),
+            : (customerRecord?.country ?? null),
         externalId: payment.customerId.toString(),
         fbp: click.fbp ?? null,
         fbc: click.fbc ?? null,

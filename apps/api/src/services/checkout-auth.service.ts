@@ -184,6 +184,9 @@ export const checkoutAuthService = {
       firstName: string;
       lastName: string;
       phone?: string;
+      fbp?: string | null;
+      fbc?: string | null;
+      fbclid?: string | null;
     },
     meta: AuthRequestMeta,
   ): Promise<AuthTokensResult & { rememberMe: boolean; message: string }> {
@@ -242,7 +245,7 @@ export const checkoutAuthService = {
     }
 
     const { customerService } = await import('@/services/customer.service.js');
-    await customerService.ensureForUser(
+    const customer = await customerService.ensureForUser(
       {
         id: user._id.toString(),
         email: user.email,
@@ -268,6 +271,24 @@ export const checkoutAuthService = {
       resourceId: user._id.toString(),
       actorUserId: user._id.toString(),
       metadata: { source: 'checkout_signup', ip: meta.ip },
+    });
+
+    const { trackCompleteRegistrationSafely } =
+      await import('@/services/analytics/complete-registration.tracking.js');
+    trackCompleteRegistrationSafely({
+      user: {
+        id: user._id.toString(),
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        phone: user.phone,
+      },
+      customerId: customer._id.toString(),
+      meta,
+      fbp: input.fbp,
+      fbc: input.fbc,
+      fbclid: input.fbclid,
+      eventSourcePath: '/checkout/information',
     });
 
     return {

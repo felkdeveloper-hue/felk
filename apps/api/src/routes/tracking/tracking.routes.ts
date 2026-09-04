@@ -4,6 +4,7 @@ import { appConfig } from '@/config/app.config.js';
 import { validate } from '@/middlewares/validate.middleware.js';
 import { trackEventBodySchema } from '@/schemas/tracking.schema.js';
 import { analyticsService } from '@/services/analytics/analytics.service.js';
+import { extractMetaClickParams } from '@/services/analytics/meta-param-builder.js';
 import {
   captureMetaClickContext,
   getMetaPurchaseStatus,
@@ -33,19 +34,24 @@ trackingRouter.post(
     const { eventName, url, eventId, userData, customData, tiktokProperties, testEventCode } =
       req.body as ReturnType<typeof trackEventBodySchema.parse>;
 
-    const enrichedUserData = userData
-      ? {
-          ...userData,
-          ipAddress: req.ip,
-          userAgent: req.headers['user-agent'] ?? null,
-        }
-      : { ipAddress: req.ip, userAgent: req.headers['user-agent'] ?? null };
+    const click = extractMetaClickParams(req, {
+      fbp: userData?.fbp,
+      fbc: userData?.fbc,
+    });
+
+    const enrichedUserData = {
+      ...(userData ?? {}),
+      fbp: click.fbp ?? userData?.fbp ?? null,
+      fbc: click.fbc ?? userData?.fbc ?? null,
+      ipAddress: click.clientIp ?? req.ip,
+      userAgent: req.headers['user-agent'] ?? null,
+    };
 
     void captureMetaClickContext({
       eventId,
       url,
-      fbp: userData?.fbp ?? null,
-      fbc: userData?.fbc ?? null,
+      fbp: enrichedUserData.fbp,
+      fbc: enrichedUserData.fbc,
       ipAddress: enrichedUserData.ipAddress,
       userAgent: enrichedUserData.userAgent,
     });

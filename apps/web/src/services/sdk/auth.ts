@@ -1,5 +1,6 @@
 import { http } from '@/lib/http-client';
 import { getAttributionPayloadForAuth } from '@/lib/analytics/auth-attribution';
+import { collectMetaBrowserParams, getMetaClickPayload } from '@/lib/analytics/meta-param-builder';
 import { normalizeAuthSession, normalizeAuthUser } from '@/utils/auth';
 import type {
   AuthSession,
@@ -17,11 +18,16 @@ import type {
  */
 export const authApi = {
   async register(payload: RegisterPayload): Promise<RegisterResult> {
+    await collectMetaBrowserParams();
     const raw = await http.post<{
       user: unknown;
       message: string;
       devVerificationCode?: string;
-    }>('/auth/register', { ...payload, ...getAttributionPayloadForAuth() });
+    }>('/auth/register', {
+      ...payload,
+      ...getAttributionPayloadForAuth(),
+      ...getMetaClickPayload(),
+    });
     return {
       user: normalizeAuthUser(raw.user),
       message: raw.message,
@@ -154,10 +160,15 @@ export const authApi = {
     lastName: string;
     phone?: string;
   }): Promise<AuthSession> {
-    const raw = await http.post<unknown>('/auth/checkout/complete-signup', payload, {
-      skipAuthRefresh: true,
-      timeout: 20_000,
-    });
+    await collectMetaBrowserParams();
+    const raw = await http.post<unknown>(
+      '/auth/checkout/complete-signup',
+      { ...payload, ...getMetaClickPayload(), ...getAttributionPayloadForAuth() },
+      {
+        skipAuthRefresh: true,
+        timeout: 20_000,
+      },
+    );
     return normalizeAuthSession(raw);
   },
 

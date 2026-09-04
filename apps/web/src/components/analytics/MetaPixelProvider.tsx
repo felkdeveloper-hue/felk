@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { initMetaPixel, isMetaPixelConfigured, metaPixelTrack } from '@/lib/analytics/meta-pixel';
+import { collectMetaBrowserParams } from '@/lib/analytics/meta-param-builder';
 import { router } from '@/routes/router';
 
 /** Loads the Meta Pixel once and sends one PageView per SPA route (browser only). */
@@ -7,6 +8,8 @@ export function MetaPixelProvider({ children }: { children: React.ReactNode }) {
   const lastPathRef = useRef<string | null>(null);
 
   useEffect(() => {
+    void collectMetaBrowserParams();
+
     if (!isMetaPixelConfigured()) return;
 
     const sendPageView = (path: string) => {

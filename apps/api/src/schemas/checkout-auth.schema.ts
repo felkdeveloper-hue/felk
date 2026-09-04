@@ -19,6 +19,9 @@ export const checkoutCompleteSignupSchema = z.object({
   firstName: z.string().trim().min(1).max(80),
   lastName: z.string().trim().min(1).max(80),
   phone: z.string().trim().min(7).max(32).optional(),
+  fbp: z.string().max(200).optional().nullable(),
+  fbc: z.string().max(200).optional().nullable(),
+  fbclid: z.string().max(500).optional().nullable(),
 });
 
 export const checkoutCompleteGuestSchema = z.object({

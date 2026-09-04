@@ -1,5 +1,10 @@
 import { http } from '@/lib/http-client';
 import { getMetaTestEventCode, metaPixelTrack } from '@/lib/analytics/meta-pixel';
+import {
+  collectMetaBrowserParams,
+  getMetaFbc,
+  getMetaFbp,
+} from '@/lib/analytics/meta-param-builder';
 
 export interface MetaContentItem {
   id: string;
@@ -60,15 +65,11 @@ export function checkoutEventId(checkoutToken: string): string {
 }
 
 function getFbp(): string | null {
-  if (typeof document === 'undefined') return null;
-  const match = document.cookie.match(/_fbp=([^;]+)/);
-  return match ? (match[1] ?? null) : null;
+  return getMetaFbp();
 }
 
 function getFbc(): string | null {
-  if (typeof document === 'undefined') return null;
-  const match = document.cookie.match(/_fbc=([^;]+)/);
-  return match ? (match[1] ?? null) : null;
+  return getMetaFbc();
 }
 
 function getTtclid(): string | null {
@@ -113,6 +114,7 @@ function singleItemPayload(
 
 export const trackingApi = {
   async track(payload: TrackEventPayload): Promise<void> {
+    await collectMetaBrowserParams();
     const eventId = payload.eventId ?? generateEventId();
     const url = payload.url ?? (typeof window !== 'undefined' ? window.location.href : undefined);
     const userData = {

@@ -28,11 +28,49 @@ Both variables must be set for the service to become active. If either is absent
 
 ## PII Hashing
 
-All customer PII (email, phone, first name, last name, city, country, external ID) is **SHA-256 hashed** before sending. The raw value never leaves the server. See `apps/api/src/utils/pii-hash.ts`.
+Customer PII is normalized and SHA-256 hashed **once** with Meta's official
+`capi-param-builder-nodejs` Parameter Builder before it is sent. Do not pre-hash
+values in callers. `fbc`, `fbp`, IP addresses, and user agents are never hashed.
+
+Missing, empty, or invalid fields are omitted from `user_data`.
+
+## Browser identifiers (`_fbp` / `_fbc`)
+
+The storefront uses `meta-capi-param-builder-clientjs` to capture and preserve
+first-party `_fbp` / `_fbc` cookies (including `fbclid` → `fbc`). Those values
+are sent in JSON on CAPI-bound events and on registration. The API prefers the
+browser-sent values and will only construct `fbc` from `fbclid` when `_fbc` is
+absent.
 
 ## Deduplication
 
-Each event is issued with a `event_id` (UUID). The same `event_id` is passed to the storefront tracking SDK so that if a browser pixel is later added, Meta's dedup engine will deduplicate matching server+browser events.
+Commerce events that fire in both the Pixel and CAPI share the same identifier:
+
+- Browser: `fbq(..., { eventID })`
+- Server: `event_id`
+
+| Event                  | `event_id`               | Pixel + CAPI                       |
+| ---------------------- | ------------------------ | ---------------------------------- |
+| ViewContent, AddToCart | random UUID              | Yes                                |
+| InitiateCheckout       | `checkout-{token}`       | Yes                                |
+| Purchase               | `purchase-{orderNumber}` | Yes                                |
+| PageView               | random UUID              | Pixel only                         |
+| CompleteRegistration   | random UUID              | **CAPI only** (no Pixel duplicate) |
+
+## CompleteRegistration
+
+Fired after a user is created in `AuthService.register` and checkout
+`completeSignup`. Payload includes available match keys only:
+
+- `em`, `fn`, `ln`, `ph` (when collected)
+- `external_id` (stable customer id)
+- `client_ip_address`, `client_user_agent`
+- `fbp` / `fbc` when the browser sent them
+- `country` only when a CDN country header exists
+
+`ct`, `st`, `zp`, and `db` are **not** sent at registration because those fields
+are not collected on the signup form. Purchase events send city/state/zip from
+the shipping address, and dob/gender from the customer profile, **when present**.
 
 ## Retry Queue
 
@@ -44,7 +82,7 @@ The following events fire automatically without storefront involvement:
 
 - **InitiateCheckout** + **AddPaymentInfo** — when a gateway session is created (`PaymentService.createAttempt`)
 - **Purchase** — on a verified `PAID` webhook
-- **CompleteRegistration** — on user registration (`AuthService.register`)
+- **CompleteRegistration** — on user registration (`AuthService.register`) and checkout account creation (`checkoutAuthService.completeSignup`)
 
 ## Storefront Tracking Endpoint
 
@@ -58,7 +96,7 @@ Content-Type: application/json
   "eventName": "AddToCart",
   "url": "https://yoursite.com/product/red-dress",
   "customData": { "content_ids": ["variant-123"], "currency": "LKR", "value": 2500 },
-  "userData": { "fbp": "_fbp.1.1234.abc", "fbc": "_fbc.1.1234.xyz" }
+  "userData": { "fbp": "fb.1.1234.abc", "fbc": "fb.1.1234.xyz" }
 }
 ```
 
