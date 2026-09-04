@@ -63,8 +63,6 @@ export interface ProductRailSectionProps {
   spacing?: 'none' | 'sm' | 'default' | 'lg';
   titleAlign?: 'start' | 'center';
   /** Optional custom header rendered above the rail (replaces default title). */
-  header?: React.ReactNode;
-  /** Optional custom header rendered above the rail (replaces default title). */
   header?: ReactNode;
 }
 

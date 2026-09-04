@@ -44,4 +44,6 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 
 Button.displayName = 'Button';
 
+// Shared by consumers that compose button styles without remounting <Button />.
+// eslint-disable-next-line react-refresh/only-export-components -- variant helper, not a component
 export { buttonVariants };
