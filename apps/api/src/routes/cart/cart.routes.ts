@@ -69,9 +69,25 @@ cartRouter.post(
       }
     }
     const body = S.cartAddItemSchema.parse(req.body);
+    const { eventId, fbp, fbc, fbclid, ...item } = body;
     const owner = await cartService.resolveOwner(req);
-    const view = await cartService.addItem(owner, body, actorFromRequest(req));
+    const view = await cartService.addItem(owner, item, actorFromRequest(req));
     if (owner.guestToken) setGuestCartCookie(res, owner.guestToken);
+    const line =
+      view.items.find((entry) => String(entry.variantId ?? '') === item.variantId) ?? null;
+    const { trackAddToCartAfterCartAdd } =
+      await import('@/services/analytics/add-to-cart.tracking.js');
+    trackAddToCartAfterCartAdd({
+      req,
+      variantId: item.variantId,
+      quantity: item.quantity ?? 1,
+      eventId,
+      fbp,
+      fbc,
+      fbclid,
+      line,
+      customerId: owner.customerId ?? null,
+    });
     ApiResponse.created(res, view);
   }),
 );

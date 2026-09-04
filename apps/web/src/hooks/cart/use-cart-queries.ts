@@ -10,8 +10,8 @@ import {
 } from '@/services/sdk';
 import { useAuthStore } from '@/store';
 import { useCartStore } from '@/store/cart-store';
-import { trackingApi } from '@/services/sdk/tracking';
 import { trackCommerceEvent } from '@/lib/analytics';
+import { fireAddToCartPixel, prepareCartAddMeta } from '@/lib/analytics/add-to-cart-meta';
 
 function syncCartToStore(cart: CartView | null) {
   useCartStore.getState().setCart(cart);
@@ -110,16 +110,22 @@ export function useAddToCartMutation() {
 
   return useMutation({
     mutationFn: async ({ optimistic, ...payload }: CartAddItemInput) => {
-      const cart = await cartApi.addItem(payload);
-      // Must run here — not in the button onSuccess. The PDP swaps AddToCartButton
-      // for "Go to bag" on the optimistic cart write, which unmounts mutate callbacks.
-      void trackingApi.addToCart(
-        payload.variantId,
-        optimistic?.name ?? 'Product',
-        'LKR',
-        optimistic?.unitPrice ?? 0,
-        payload.quantity ?? 1,
-      );
+      const meta = await prepareCartAddMeta();
+      const cart = await cartApi.addItem({
+        variantId: payload.variantId,
+        quantity: payload.quantity,
+        warehouseId: payload.warehouseId,
+        eventId: meta.eventId,
+        ...(meta.fbp ? { fbp: meta.fbp } : {}),
+        ...(meta.fbc ? { fbc: meta.fbc } : {}),
+      });
+      await fireAddToCartPixel({
+        eventId: meta.eventId,
+        variantId: payload.variantId,
+        contentName: optimistic?.name ?? 'Product',
+        unitPrice: optimistic?.unitPrice ?? 0,
+        quantity: payload.quantity ?? 1,
+      });
       trackCommerceEvent('add_to_cart', {
         productId: optimistic?.productId ?? null,
         productName: optimistic?.name ?? null,

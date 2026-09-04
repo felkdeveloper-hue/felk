@@ -5,6 +5,10 @@ export const cartAddItemSchema = z.object({
   variantId: objectIdSchema,
   quantity: z.number().int().min(1).max(99).optional(),
   warehouseId: objectIdSchema.optional(),
+  eventId: z.string().min(1).max(200).optional(),
+  fbp: z.string().max(200).optional().nullable(),
+  fbc: z.string().max(200).optional().nullable(),
+  fbclid: z.string().max(500).optional().nullable(),
 });
 
 export const cartUpdateItemSchema = z.object({

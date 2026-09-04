@@ -58,6 +58,10 @@ export interface CartAddItemPayload {
   variantId: string;
   quantity?: number;
   warehouseId?: string;
+  eventId?: string;
+  fbp?: string;
+  fbc?: string;
+  fbclid?: string;
 }
 
 export interface CartUpdateItemPayload {
