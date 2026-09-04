@@ -7,6 +7,7 @@ import {
   sanitizeMetaClickId,
   sanitizeMetaClientIp,
 } from '@/services/analytics/meta-param-builder.js';
+import { completeRegistrationEventId } from '@/services/analytics/complete-registration.tracking.js';
 
 describe('Meta Parameter Builder wrappers', () => {
   it('preserves fbc casing and rejects empty values', () => {
@@ -52,6 +53,12 @@ describe('Meta Parameter Builder wrappers', () => {
     expect(hashMetaPii(null, 'email')).toBeUndefined();
   });
 
+  it('does not re-hash an already hashed SHA-256 value', () => {
+    const alreadyHashed = createHash('sha256').update('test@example.com').digest('hex');
+    expect(hashMetaPii(alreadyHashed, 'email')).toBe(alreadyHashed);
+    expect(hashMetaPii(alreadyHashed.toUpperCase(), 'email')).toBe(alreadyHashed);
+  });
+
   it('omits empty last names', () => {
     expect(hashMetaPii('', 'last_name')).toBeUndefined();
     expect(hashMetaPii('   ', 'last_name')).toBeUndefined();
@@ -60,6 +67,11 @@ describe('Meta Parameter Builder wrappers', () => {
   it('formats date of birth as YYYYMMDD', () => {
     expect(formatMetaDateOfBirth(new Date(Date.UTC(1994, 2, 15)))).toBe('19940315');
     expect(formatMetaDateOfBirth(null)).toBeUndefined();
+  });
+
+  it('uses a stable CompleteRegistration event_id per user', () => {
+    expect(completeRegistrationEventId('user-1')).toBe('complete-registration-user-1');
+    expect(completeRegistrationEventId('user-1')).toBe(completeRegistrationEventId('user-1'));
   });
 
   it('strips Parameter Builder appendix from IP addresses', () => {

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { getMetaClickPayload, getMetaFbc, getMetaFbp } from './meta-param-builder';
+import { normalizeMetaPageViewPath } from './meta-pixel';
 
 vi.mock('./consent', () => ({
   hasMarketingConsent: () => true,
@@ -29,5 +30,15 @@ describe('Meta browser click IDs', () => {
     expect(getMetaFbp()).toBeNull();
     expect(getMetaFbc()).toBeNull();
     expect(getMetaClickPayload()).toEqual({});
+  });
+});
+
+describe('Meta PageView path', () => {
+  it('treats trailing slashes and query strings as the same page', () => {
+    expect(normalizeMetaPageViewPath('/products/dress')).toBe('/products/dress');
+    expect(normalizeMetaPageViewPath('/products/dress/')).toBe('/products/dress');
+    expect(normalizeMetaPageViewPath('/products/dress?color=1')).toBe('/products/dress');
+    expect(normalizeMetaPageViewPath('/')).toBe('/');
+    expect(normalizeMetaPageViewPath('')).toBe('/');
   });
 });

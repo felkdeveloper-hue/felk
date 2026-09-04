@@ -10,6 +10,8 @@ import {
 } from '@/services/sdk';
 import { useAuthStore } from '@/store';
 import { useCartStore } from '@/store/cart-store';
+import { trackingApi } from '@/services/sdk/tracking';
+import { trackCommerceEvent } from '@/lib/analytics';
 
 function syncCartToStore(cart: CartView | null) {
   useCartStore.getState().setCart(cart);
@@ -107,8 +109,30 @@ export function useAddToCartMutation() {
   const setSyncing = useCartStore((state) => state.setSyncing);
 
   return useMutation({
-    mutationFn: ({ optimistic: _optimistic, ...payload }: CartAddItemInput) =>
-      cartApi.addItem(payload),
+    mutationFn: async ({ optimistic, ...payload }: CartAddItemInput) => {
+      const cart = await cartApi.addItem(payload);
+      // Must run here — not in the button onSuccess. The PDP swaps AddToCartButton
+      // for "Go to bag" on the optimistic cart write, which unmounts mutate callbacks.
+      void trackingApi.addToCart(
+        payload.variantId,
+        optimistic?.name ?? 'Product',
+        'LKR',
+        optimistic?.unitPrice ?? 0,
+        payload.quantity ?? 1,
+      );
+      trackCommerceEvent('add_to_cart', {
+        productId: optimistic?.productId ?? null,
+        productName: optimistic?.name ?? null,
+        sku: null,
+        category: null,
+        variantId: payload.variantId,
+        variantLabel: optimistic?.sizeName ?? optimistic?.colorName ?? null,
+        price: optimistic?.unitPrice ?? null,
+        quantity: payload.quantity ?? 1,
+        currency: 'LKR',
+      });
+      return cart;
+    },
     onMutate: async (payload) => {
       setSyncing(true);
       await queryClient.cancelQueries({ queryKey: QUERY_KEYS.cart.current() });

@@ -130,12 +130,13 @@ export const trackingApi = {
         fbc: payload.userData?.fbc ?? getFbc(),
         ttclid: payload.userData?.ttclid ?? getTtclid(),
       };
+      const testEventCode = getMetaTestEventCode();
       await http.post('/tracking/event', {
         ...payload,
         eventId,
         url,
         userData,
-        testEventCode: getMetaTestEventCode(),
+        ...(testEventCode ? { testEventCode } : {}),
       });
     } catch {
       // Tracking failures must never surface to the user

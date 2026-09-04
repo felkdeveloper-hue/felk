@@ -119,6 +119,8 @@ export function hashMetaPii(
 ): string | undefined {
   const trimmed = asTrimmed(value);
   if (!trimmed) return undefined;
+  // Official hasher output is SHA-256 hex. Never hash that payload again.
+  if (/^[a-f0-9]{64}$/i.test(trimmed)) return trimmed.toLowerCase();
   const hashed = hasher.getNormalizedAndHashedPII(trimmed, dataType);
   if (typeof hashed !== 'string') return undefined;
   const result = hashed.trim();

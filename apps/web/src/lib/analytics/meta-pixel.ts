@@ -26,6 +26,13 @@ type FbqFunction = {
   disablePushState?: boolean;
 };
 
+/** One PageView key per route — trailing slashes and query/hash do not count as new pages. */
+export function normalizeMetaPageViewPath(path: string): string {
+  const raw = (path.split('?')[0] ?? '').split('#')[0] ?? '';
+  if (!raw || raw === '/') return '/';
+  return raw.endsWith('/') ? raw.slice(0, -1) : raw;
+}
+
 export const META_PIXEL_ID = import.meta.env.VITE_META_PIXEL_ID ?? '1485989443213075';
 
 const TEST_CODE_STORAGE_KEY = 'meta_test_event_code';
@@ -57,6 +64,8 @@ function loadScript(): Promise<void> {
     fbq.queue = [];
     fbq.loaded = true;
     fbq.version = '2.0';
+    // Must be set on the stub BEFORE fbevents.js loads — it patches history at evaluate time.
+    fbq.disablePushState = true;
     window.fbq = fbq;
     if (!window._fbq) window._fbq = fbq;
 
