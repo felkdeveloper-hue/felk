@@ -4,6 +4,7 @@ import {
   createAddToCartEventId,
   fireAddToCartPixel,
   prepareCartAddMeta,
+  resetAddToCartPixelDedupe,
 } from './add-to-cart-meta';
 
 const metaPixelTrack = vi.fn();
@@ -21,6 +22,7 @@ vi.mock('@/lib/analytics/meta-param-builder', () => ({
 
 describe('AddToCart Meta helpers', () => {
   beforeEach(() => {
+    resetAddToCartPixelDedupe();
     metaPixelTrack.mockReset();
     collectMetaBrowserParams.mockReset().mockResolvedValue(undefined);
     getMetaClickPayload.mockReset().mockReturnValue({
@@ -72,6 +74,19 @@ describe('AddToCart Meta helpers', () => {
       expect.objectContaining({ content_ids: ['var_1'], value: 2500 }),
       'evt-shared',
     );
+  });
+
+  it('does not fire Pixel twice for the same event_id', async () => {
+    const input = {
+      eventId: 'evt-once',
+      variantId: 'var_1',
+      contentName: 'Silk Dress',
+      unitPrice: 2500,
+      quantity: 1,
+    };
+    await fireAddToCartPixel(input);
+    await fireAddToCartPixel(input);
+    expect(metaPixelTrack).toHaveBeenCalledOnce();
   });
 
   it('does not fire Pixel if the cart add fails first', async () => {

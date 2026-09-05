@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useRouter, useSearch } from '@tanstack/react-router';
 import { ArrowLeft } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -140,33 +140,24 @@ export function ProductDetailPage() {
     trackCommerceEvent('product_detail_opened', productMetaFrom(product));
   }, [product?.id]);
 
-  const selectedVariantForTracking = useMemo(
-    () =>
-      product?.variants?.find((v: ProductVariant) => v.id === selectedVariantId) ??
-      product?.variants?.[0],
-    [product?.variants, selectedVariantId],
-  );
+  const viewContentProductId = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!product?.id || !selectedVariantForTracking?.id) return;
+    if (!product?.id) return;
+    if (viewContentProductId.current === product.id) return;
+    viewContentProductId.current = product.id;
     const price =
-      selectedVariantForTracking.salePrice?.amount ??
-      selectedVariantForTracking.price?.amount ??
       product.salePrice?.amount ??
       product.price?.amount ??
       (typeof product.price === 'number' ? product.price : 0);
-    const currency =
-      selectedVariantForTracking.price?.currency ??
-      product.salePrice?.currency ??
-      product.price?.currency ??
-      'LKR';
+    const currency = product.salePrice?.currency ?? product.price?.currency ?? 'LKR';
     void trackingApi.viewContent(
-      selectedVariantForTracking.id,
+      product.id,
       product.name,
       currency,
       typeof price === 'number' ? price : 0,
     );
-  }, [product?.id, product?.name, selectedVariantForTracking?.id]);
+  }, [product?.id, product?.name, product?.salePrice, product?.price]);
 
   useEffect(() => {
     if (!product?.variants?.length) return;

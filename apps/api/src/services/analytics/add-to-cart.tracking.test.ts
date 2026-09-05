@@ -37,6 +37,24 @@ describe('AddToCart CAPI payload from cart add', () => {
     expect(payload.userData.ipAddress).toBe('203.0.113.10');
   });
 
+  it('skips CAPI when no shared event_id is provided', async () => {
+    const { trackAddToCartAfterCartAdd } =
+      await import('@/services/analytics/add-to-cart.tracking.js');
+    const req = {
+      headers: {},
+      ip: '127.0.0.1',
+      get: () => 'Mozilla/5.0',
+      user: undefined,
+    };
+    expect(() =>
+      trackAddToCartAfterCartAdd({
+        req: req as never,
+        variantId: '507f1f77bcf86cd799439011',
+        quantity: 1,
+      }),
+    ).not.toThrow();
+  });
+
   it('does not invent fbc', () => {
     const payload = buildAddToCartCapiInput({
       variantId: '507f1f77bcf86cd799439011',

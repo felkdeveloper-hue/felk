@@ -97,10 +97,13 @@ export function trackAddToCartAfterCartAdd(input: {
   customerId?: string | null;
 }): void {
   try {
+    const sharedEventId = input.eventId?.trim();
+    if (!sharedEventId) return;
+
     const payload = buildAddToCartCapiInput({
       variantId: input.variantId,
       quantity: input.quantity,
-      eventId: input.eventId,
+      eventId: sharedEventId,
       fbp: input.fbp,
       fbc: input.fbc,
       fbclid: input.fbclid,

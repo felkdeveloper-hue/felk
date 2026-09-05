@@ -40,6 +40,12 @@ export async function prepareCartAddMeta(): Promise<{
   };
 }
 
+const sentAddToCartEventIds = new Set<string>();
+
+export function resetAddToCartPixelDedupe(): void {
+  sentAddToCartEventIds.clear();
+}
+
 /** Browser Pixel only. CAPI is sent by POST /cart/items after the add succeeds. */
 export async function fireAddToCartPixel(input: {
   eventId: string;
@@ -48,5 +54,7 @@ export async function fireAddToCartPixel(input: {
   unitPrice: number;
   quantity: number;
 }): Promise<void> {
+  if (!input.eventId || sentAddToCartEventIds.has(input.eventId)) return;
+  sentAddToCartEventIds.add(input.eventId);
   await metaPixelTrack('AddToCart', buildAddToCartPixelParams(input), input.eventId);
 }

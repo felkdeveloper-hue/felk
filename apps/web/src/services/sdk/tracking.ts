@@ -39,7 +39,7 @@ export interface TrackEventPayload {
   browserOnly?: boolean;
 }
 
-const CAPI_EVENTS = new Set(['ViewContent', 'AddToCart', 'InitiateCheckout', 'AddPaymentInfo']);
+const CAPI_EVENTS = new Set(['AddToCart', 'InitiateCheckout', 'AddPaymentInfo']);
 
 const sentPurchaseEventIds = new Set<string>();
 
@@ -151,6 +151,7 @@ export const trackingApi = {
       eventName: 'ViewContent',
       customData: buildProductCustomData(data),
       tiktokProperties: { contentId, contentName, currency, value: price },
+      browserOnly: true,
     });
   },
 

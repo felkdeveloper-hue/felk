@@ -33,7 +33,9 @@ export function normalizeMetaPageViewPath(path: string): string {
   return raw.endsWith('/') ? raw.slice(0, -1) : raw;
 }
 
-export const META_PIXEL_ID = import.meta.env.VITE_META_PIXEL_ID ?? '1485989443213075';
+const envPixelId = import.meta.env.VITE_META_PIXEL_ID;
+export const META_PIXEL_ID =
+  typeof envPixelId === 'string' && envPixelId.trim() ? envPixelId.trim() : '1485989443213075';
 
 const TEST_CODE_STORAGE_KEY = 'meta_test_event_code';
 const TEST_CODE_PATTERN = /^TEST\d{3,12}$/i;
@@ -68,6 +70,8 @@ function loadScript(): Promise<void> {
     fbq.disablePushState = true;
     window.fbq = fbq;
     if (!window._fbq) window._fbq = fbq;
+    // Queue before fbevents.js evaluates so it does not auto-bind button events.
+    window.fbq('set', 'autoConfig', false, META_PIXEL_ID);
 
     const script = document.createElement('script');
     script.async = true;
@@ -145,6 +149,12 @@ export async function metaPixelTrack(
   if (!window.fbq) return;
 
   const data = params ?? {};
+  // Standard PageView must use track(), not trackSingle — Events Manager
+  // otherwise may never show the built-in PageView event.
+  if (eventName === 'PageView') {
+    window.fbq('track', 'PageView');
+    return;
+  }
   if (eventId) {
     window.fbq('trackSingle', META_PIXEL_ID, eventName, data, { eventID: eventId });
   } else {
