@@ -4,8 +4,8 @@ import { useRevenueDashboard } from '@/hooks/admin';
 import { formatCurrency } from '@/lib/utils';
 
 const PERIODS = [
-  { key: 'today', label: 'Today', hint: 'Since midnight' },
-  { key: 'yesterday', label: 'Yesterday', hint: 'Full day' },
+  { key: 'today', label: 'Today', hint: 'Since midnight SL' },
+  { key: 'yesterday', label: 'Yesterday', hint: 'Full SL day' },
   { key: 'week', label: 'This week', hint: 'Last 7 days' },
   { key: 'month', label: 'This month', hint: 'Calendar month' },
   { key: 'year', label: 'This year', hint: 'Calendar year' },

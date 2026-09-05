@@ -10,7 +10,7 @@ export const ANALYTICS_TIMEZONE = 'Asia/Colombo';
 const COLOMBO_OFFSET = '+05:30';
 
 /** Calendar YYYY-MM-DD in the analytics timezone. */
-function calendarDateInTz(date: Date, timeZone = ANALYTICS_TIMEZONE): string {
+export function calendarDateInTz(date: Date, timeZone = ANALYTICS_TIMEZONE): string {
   return new Intl.DateTimeFormat('en-CA', {
     timeZone,
     year: 'numeric',
@@ -22,6 +22,19 @@ function calendarDateInTz(date: Date, timeZone = ANALYTICS_TIMEZONE): string {
 /** Midnight (start of calendar day) in Asia/Colombo, as a UTC Date. */
 function startOfZonedDay(ymd: string): Date {
   return new Date(`${ymd}T00:00:00${COLOMBO_OFFSET}`);
+}
+
+/** Colombo calendar midnight for the given instant (late-night SL orders stay on “today”). */
+export function startOfAnalyticsDay(date: Date = new Date()): Date {
+  return startOfZonedDay(calendarDateInTz(date));
+}
+
+export function startOfAnalyticsMonth(date: Date = new Date()): Date {
+  return startOfZonedDay(`${calendarDateInTz(date).slice(0, 7)}-01`);
+}
+
+export function startOfAnalyticsYear(date: Date = new Date()): Date {
+  return startOfZonedDay(`${calendarDateInTz(date).slice(0, 4)}-01-01`);
 }
 
 function addCalendarDays(ymd: string, days: number): string {

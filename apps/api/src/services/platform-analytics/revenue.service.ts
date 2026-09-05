@@ -5,6 +5,12 @@ import { ORDER_STATUS } from '@/constants/order-status.js';
 import type { AnalyticsFilter } from '@/schemas/analytics/index.js';
 import { orderReceivedAt, paymentReceivedAt } from '@/utils/order-received-at.js';
 import { buildOrderMatch, resolveDateRange } from './analytics-query.builder.js';
+import {
+  calendarDateInTz,
+  startOfAnalyticsDay,
+  startOfAnalyticsMonth,
+  startOfAnalyticsYear,
+} from './date-range.util.js';
 
 const PAID_STATUSES = [
   ORDER_STATUS.PENDING,
@@ -25,10 +31,6 @@ type LeanOrder = {
   totals?: { grandTotal?: number };
   items?: Array<Record<string, unknown>>;
 };
-
-function startOfDay(d: Date) {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
-}
 
 function sumOrders(orders: Array<{ totals?: { grandTotal?: number } }>) {
   return orders.reduce((s, o) => s + Number(o.totals?.grandTotal ?? 0), 0);
@@ -66,14 +68,15 @@ async function receivedAtByPaymentId(orders: LeanOrder[]): Promise<Map<string, D
 
 export async function getRevenueDashboard(filter: AnalyticsFilter) {
   const now = new Date();
-  const todayStart = startOfDay(now);
-  const yesterdayStart = new Date(todayStart);
-  yesterdayStart.setDate(yesterdayStart.getDate() - 1);
-  const yesterdayEnd = new Date(todayStart.getTime() - 1);
-  const weekStart = new Date(todayStart);
-  weekStart.setDate(weekStart.getDate() - 6);
-  const monthStart = new Date(todayStart.getFullYear(), todayStart.getMonth(), 1);
-  const yearStart = new Date(todayStart.getFullYear(), 0, 1);
+  // Always Asia/Colombo — production hosts run UTC, which used to dump
+  // late-night Sri Lanka orders (after 00:00 SL / before 00:00 UTC) into Yesterday.
+  const todayStart = startOfAnalyticsDay(now);
+  const yesterday = resolveDateRange({ period: 'yesterday' });
+  const yesterdayStart = yesterday.from;
+  const yesterdayEnd = yesterday.to;
+  const weekStart = resolveDateRange({ period: '7d' }).from;
+  const monthStart = startOfAnalyticsMonth(now);
+  const yearStart = startOfAnalyticsYear(now);
 
   const range = resolveDateRange({ ...filter, period: filter.period ?? '30d' });
   const fetchFrom = new Date(Math.min(yearStart.getTime(), range.from.getTime()));
@@ -109,7 +112,7 @@ export async function getRevenueDashboard(filter: AnalyticsFilter) {
   for (const o of periodOrders) {
     const received = receivedOf(o);
     if (!received) continue;
-    const day = startOfDay(received).toISOString().slice(0, 10);
+    const day = calendarDateInTz(received);
     trendMap.set(day, (trendMap.get(day) ?? 0) + Number(o.totals?.grandTotal ?? 0));
   }
   const trend = [...trendMap.entries()]
