@@ -42,6 +42,8 @@ export const QUERY_KEYS = {
   storefront: {
     bootstrap: () => ['storefront', 'bootstrap'] as const,
     flashSale: () => ['storefront', 'flash-sale'] as const,
+    navigationMenus: () => ['storefront', 'navigation-menus'] as const,
+    navigationMenu: (key: string) => ['storefront', 'navigation-menus', key] as const,
   },
   cart: {
     current: () => ['cart'] as const,

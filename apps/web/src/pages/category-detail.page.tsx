@@ -1,5 +1,4 @@
 import { useCallback, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate, useParams } from '@tanstack/react-router';
 import { Seo } from '@/components/common/seo';
 import { CatalogCategoryHero, CatalogListShell } from '@/components/catalog';
@@ -15,7 +14,7 @@ import {
   useCategoryBySlug,
   useInfiniteProducts,
 } from '@/hooks/catalog';
-import { navigationMenusApi } from '@/services/sdk/navigation-menus';
+import { useNavigationMenu } from '@/hooks/storefront';
 import { catalogSearchToUrlParams, type CatalogSearchState } from '@/utils/catalog';
 
 export function CategoryDetailPage() {
@@ -34,16 +33,11 @@ export function CategoryDetailPage() {
   const categoryReady = Boolean(category?.id);
   const categoryMissing = categoryQuery.isFetched && !category?.id && !categoryQuery.isError;
 
-  // Only the 8 homepage/sidebar categories keep their own banner art.
+  const womenMenuQuery = useNavigationMenu('women');
+  const homeCategorySlugs = womenMenuQuery.data?.homeCategories?.map((tile) => tile.slug) ?? [];
+  // Homepage / admin tiles keep their own banner art.
   // Filter picks (Mini Dresses, Long sleeves, etc.) use the default shop banner.
-  const useCategoryBanner = isHomeCategoryNavSlug(slug);
-
-  const womenMenuQuery = useQuery({
-    queryKey: ['storefront', 'navigation-menus', 'women', 'hero'],
-    queryFn: () => navigationMenusApi.getByKey('women'),
-    enabled: !useCategoryBanner,
-    staleTime: 1000 * 60 * 10,
-  });
+  const useCategoryBanner = isHomeCategoryNavSlug(slug, homeCategorySlugs);
   const defaultShopBannerUrl = womenMenuQuery.data?.heroBannerUrl?.trim() || undefined;
 
   const query = useInfiniteProducts(mergedState, {
@@ -115,7 +109,7 @@ export function CategoryDetailPage() {
 
   const heroTitle = category?.name ?? slug.replace(/-/g, ' ');
   const prettyName = category?.name ?? slug.replace(/-/g, ' ');
-  const sidebarNavItem = getHomeCategoryNavItem(slug);
+  const sidebarNavItem = getHomeCategoryNavItem(slug, womenMenuQuery.data?.homeCategories);
 
   const heroProps = useCategoryBanner
     ? {

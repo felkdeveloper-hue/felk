@@ -1,12 +1,11 @@
 import { useCallback, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { Seo } from '@/components/common/seo';
 import { CatalogCategoryHero, CatalogListShell } from '@/components/catalog';
 import { buildAbsoluteUrl, siteConfig } from '@/config';
 import type { MegaMenuGender } from '@/constants/mega-menu-defaults';
 import { getHomeCategoryNavItem, isHomeCategoryNavSlug } from '@/constants/home-category-nav';
 import { useCatalogSearchParams, useCategoriesList, useInfiniteProducts } from '@/hooks/catalog';
-import { navigationMenusApi } from '@/services/sdk/navigation-menus';
+import { useNavigationMenu } from '@/hooks/storefront';
 
 const GENDER_META: Record<
   string,
@@ -46,11 +45,7 @@ export function ProductsPage() {
   const meta = gender ? GENDER_META[gender] : undefined;
   const menuKey = meta?.scopeKey ?? 'women';
 
-  const menuQuery = useQuery({
-    queryKey: ['storefront', 'navigation-menus', menuKey, 'hero'],
-    queryFn: () => navigationMenusApi.getByKey(menuKey),
-    staleTime: 1000 * 60 * 10,
-  });
+  const menuQuery = useNavigationMenu(menuKey);
 
   const filteredCategory = useMemo(() => {
     if (!state.categoryId) return undefined;
@@ -58,8 +53,9 @@ export function ProductsPage() {
   }, [categoriesQuery.data?.data, state.categoryId]);
 
   const filteredSlug = filteredCategory?.slug;
-  const isSidebarCategory = isHomeCategoryNavSlug(filteredSlug);
-  const sidebarNavItem = getHomeCategoryNavItem(filteredSlug);
+  const homeCategorySlugs = menuQuery.data?.homeCategories?.map((tile) => tile.slug) ?? [];
+  const isSidebarCategory = isHomeCategoryNavSlug(filteredSlug, homeCategorySlugs);
+  const sidebarNavItem = getHomeCategoryNavItem(filteredSlug, menuQuery.data?.homeCategories);
   const defaultShopBannerUrl = menuQuery.data?.heroBannerUrl?.trim() || undefined;
 
   // Banner rules:

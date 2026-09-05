@@ -11,6 +11,7 @@ import {
   ensureWomenCoordsExtras,
   isLegacyWomenMegaMenuColumns,
 } from '@/constants/mega-menu-defaults';
+import { isLegacyHomeCategoryList } from '@/constants/home-category-nav';
 import { toStorefrontMediaUrl } from '@/utils/media-url';
 
 /**
@@ -139,7 +140,7 @@ export const navigationMenusApi = {
         specials: mergeTilesWithFallback(specials, fallback.specials),
         featured: mergeTilesWithFallback(featured, fallback.featured),
         homeCategories: mergeTilesWithFallback(
-          homeCategories,
+          isLegacyHomeCategoryList(homeCategories) ? [] : homeCategories,
           fallback.homeCategories?.length
             ? fallback.homeCategories
             : key === 'women'

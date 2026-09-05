@@ -484,7 +484,9 @@ publicList('/pages', 'pages', CmsPageModel as Model<any>, 'published');
 storefrontRouter.get(
   '/navigation-menus/:key',
   asyncHandler(async (req, res) => {
-    setPublicCache(res);
+    // Admin can replace homepage tiles at any time — do not let CDN/browser
+    // keep a stale mega-menu (labels + uploaded images) for 5 minutes.
+    res.set('Cache-Control', 'no-store');
     const key = String(req.params.key).trim().toLowerCase();
     const doc = await NavigationMenuModel.findOne({
       key,

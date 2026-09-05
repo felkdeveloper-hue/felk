@@ -1,12 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { ChevronRight, Heart, Menu, Search, User, X } from 'lucide-react';
 import { ROUTES } from '@/constants';
-import { HOME_CATEGORY_NAV_ITEMS } from '@/constants/home-category-nav';
+import { resolveHomeCategoryTiles } from '@/constants/home-category-nav';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 import type { NavItem } from '@/components/navigation/main-nav';
+import { useNavigationMenu } from '@/hooks/storefront';
 import { useAuthStore } from '@/store';
 import { useUiStore } from '@/store/ui-store';
 
@@ -20,9 +21,6 @@ export interface MobileNavProps {
 
 type MobileTab = 'menu' | 'categories';
 
-/** CATEGORIES tab — same labels/slugs as homepage Categories grid. */
-const CATEGORY_ITEMS = HOME_CATEGORY_NAV_ITEMS.map(({ label, slug }) => ({ label, slug }));
-
 const rowClass =
   'text-foreground flex min-h-[3.25rem] w-full items-center border-b border-border/70 px-4 text-[13px] font-medium uppercase tracking-[0.08em] transition-opacity duration-150 active:opacity-60';
 
@@ -34,6 +32,11 @@ export function MobileNav({ items: _items, transparent, open, onOpenChange }: Mo
   const [tab, setTab] = useState<MobileTab>('menu');
   const isAuthed = useAuthStore((state) => Boolean(state.accessToken && state.user));
   const setSearchOpen = useUiStore((state) => state.setSearchOpen);
+  const menuQuery = useNavigationMenu('women');
+  const categoryItems = useMemo(
+    () => resolveHomeCategoryTiles(menuQuery.data?.homeCategories).map(({ label, slug }) => ({ label, slug })),
+    [menuQuery.data?.homeCategories],
+  );
 
   // Reset to MENU whenever the drawer is reopened.
   useEffect(() => {
@@ -205,7 +208,7 @@ export function MobileNav({ items: _items, transparent, open, onOpenChange }: Mo
             </ul>
           ) : (
             <ul>
-              {CATEGORY_ITEMS.map((item) => (
+              {categoryItems.map((item) => (
                 <li key={item.slug}>
                   <Link
                     to="/categories/$slug"

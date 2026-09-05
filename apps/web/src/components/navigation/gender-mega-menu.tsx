@@ -175,7 +175,7 @@ export function GenderMegaMenu({
 }: GenderMegaMenuProps) {
   const menuKey = menuKeyProp ?? gender ?? 'women';
   const menuQuery = useQuery({
-    queryKey: ['storefront', 'navigation-menus', menuKey],
+    queryKey: QUERY_KEYS.storefront.navigationMenu(menuKey),
     queryFn: () => navigationMenusApi.getByKey(menuKey),
     // A hardcoded fallback renders instantly, so this never needs to refetch on
     // every mount — that only added header requests during the first load.

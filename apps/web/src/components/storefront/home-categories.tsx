@@ -3,7 +3,8 @@ import { Link } from '@tanstack/react-router';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Section } from '@/components/common/section';
 import { Image } from '@/components/media/image';
-import { HOME_CATEGORY_NAV_ITEMS } from '@/constants/home-category-nav';
+import { resolveHomeCategoryTiles } from '@/constants/home-category-nav';
+import { useNavigationMenu } from '@/hooks/storefront';
 import { cn } from '@/lib/utils';
 import { MotionItem, MotionReveal } from './motion-reveal';
 
@@ -16,21 +17,22 @@ type HomeCategoryTile = {
 };
 
 /**
- * Homepage Categories — same 8 labels + slugs as the mobile drawer CATEGORIES tab.
- * Local bundled images so tiles render on localhost without CMS/R2.
+ * Homepage Categories — labels, slugs, and images come from admin
+ * Mega menu → Homepage Categories tiles. Bundled art is only a fallback.
  */
 export function HomeCategoriesSection() {
   const reduceMotion = useReducedMotion();
+  const menuQuery = useNavigationMenu('women');
 
   const tiles = useMemo((): HomeCategoryTile[] => {
-    return HOME_CATEGORY_NAV_ITEMS.map((tile) => ({
+    return resolveHomeCategoryTiles(menuQuery.data?.homeCategories).map((tile) => ({
       id: tile.slug,
       slug: tile.slug,
       name: tile.label,
       imageUrl: tile.imageUrl,
-      objectClass: tile.imageClassName,
+      objectClass: tile.imageClassName ?? undefined,
     }));
-  }, []);
+  }, [menuQuery.data?.homeCategories]);
 
   if (!tiles.length) return null;
 

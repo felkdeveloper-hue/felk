@@ -15,8 +15,10 @@ import {
   type MegaMenuLink,
   type MegaMenuTile,
 } from '@/constants/mega-menu-defaults';
+import { isLegacyHomeCategoryList } from '@/constants/home-category-nav';
 import { AppError } from '@/lib/errors';
 import { cn } from '@/lib/utils';
+import { QUERY_KEYS } from '@/constants/query-keys';
 import { cmsApi } from '@/services/sdk/admin';
 import { megaMenuHrefPreview } from '@/utils/mega-menu-links';
 
@@ -70,7 +72,9 @@ function normalizeConfig(
   const columns = key === 'women' ? ensureWomenCoordsExtras(baseColumns) : baseColumns;
 
   const mapTiles = (tiles: unknown, fallbackTiles: MegaMenuTile[]): MegaMenuTile[] => {
-    if (!Array.isArray(tiles)) return fallbackTiles;
+    if (!Array.isArray(tiles) || tiles.length === 0) {
+      return fallbackTiles.map((tile) => ({ ...tile }));
+    }
     return (tiles as MegaMenuTile[]).map((tile, index) => {
       const rawUrl = String(tile.imageUrl ?? '').trim();
       // Vite `/src/...` paths only work in local `vite` — never persist/show them in admin.
@@ -109,7 +113,58 @@ function normalizeConfig(
     columns: columns.length ? columns : fallback.columns,
     specials: mapTiles(raw.specials, fallback.specials),
     featured: mapTiles(raw.featured, fallback.featured),
-    homeCategories: mapTiles(raw.homeCategories, homeFallback),
+    homeCategories: mapTiles(
+      isLegacyHomeCategoryList(Array.isArray(raw.homeCategories) ? raw.homeCategories : [])
+        ? []
+        : raw.homeCategories,
+      homeFallback,
+    ),
+  };
+}
+
+function buildMenuPayload(menuKey: MegaMenuGender, config: GenderMegaMenuConfig) {
+  return {
+    label: config.label.trim() || DEFAULT_MEGA_MENUS[menuKey].label,
+    gender: menuKey,
+    heroBannerUrl: config.heroBannerUrl?.trim() || '',
+    columns: config.columns
+      .map((col) => ({
+        title: col.title.trim(),
+        links: col.links
+          .map((link) => ({
+            label: link.label.trim(),
+            slug: link.slug.trim(),
+            ...(link.heading ? { heading: true as const } : {}),
+            bannerUrl: link.bannerUrl?.trim() || '',
+          }))
+          .filter((link) => link.label && (link.heading || link.slug)),
+      }))
+      .filter((col) => col.title),
+    specials: config.specials
+      .map((tile) => ({
+        label: tile.label.trim(),
+        slug: tile.slug.trim(),
+        imageUrl: tile.imageUrl.trim(),
+        imageClassName: tile.imageClassName ?? null,
+      }))
+      .filter((tile) => tile.label && tile.slug),
+    featured: config.featured
+      .map((tile) => ({
+        label: tile.label.trim(),
+        slug: tile.slug.trim(),
+        imageUrl: tile.imageUrl.trim(),
+        imageClassName: tile.imageClassName ?? null,
+      }))
+      .filter((tile) => tile.label && tile.slug),
+    homeCategories: (config.homeCategories ?? [])
+      .map((tile) => ({
+        label: tile.label.trim(),
+        slug: tile.slug.trim(),
+        imageUrl: tile.imageUrl.trim(),
+        imageClassName: tile.imageClassName ?? null,
+      }))
+      .filter((tile) => tile.label && tile.slug),
+    status: 'active',
   };
 }
 
@@ -136,54 +191,16 @@ function MegaMenuEditor({ menuKey }: { menuKey: MegaMenuGender }) {
     setConfig(normalizeConfig(menuKey, query.data as Record<string, unknown> | null));
   }, [menuKey, query.data]);
 
+  const invalidatePublishedMenus = () => {
+    void queryClient.invalidateQueries({ queryKey: ['cms', 'navigation-menus', menuKey] });
+    void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.storefront.navigationMenus() });
+    void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.categories.all() });
+  };
+
   const saveMutation = useMutation({
-    mutationFn: () =>
-      cmsApi.navigationMenus.upsert(menuKey, {
-        label: config.label.trim() || DEFAULT_MEGA_MENUS[menuKey].label,
-        gender: menuKey,
-        heroBannerUrl: config.heroBannerUrl?.trim() || '',
-        columns: config.columns
-          .map((col) => ({
-            title: col.title.trim(),
-            links: col.links
-              .map((link) => ({
-                label: link.label.trim(),
-                slug: link.slug.trim(),
-                ...(link.heading ? { heading: true as const } : {}),
-                bannerUrl: link.bannerUrl?.trim() || '',
-              }))
-              .filter((link) => link.label && (link.heading || link.slug)),
-          }))
-          .filter((col) => col.title),
-        specials: config.specials
-          .map((tile) => ({
-            label: tile.label.trim(),
-            slug: tile.slug.trim(),
-            imageUrl: tile.imageUrl.trim(),
-            imageClassName: tile.imageClassName ?? null,
-          }))
-          .filter((tile) => tile.label && tile.slug),
-        featured: config.featured
-          .map((tile) => ({
-            label: tile.label.trim(),
-            slug: tile.slug.trim(),
-            imageUrl: tile.imageUrl.trim(),
-            imageClassName: tile.imageClassName ?? null,
-          }))
-          .filter((tile) => tile.label && tile.slug),
-        homeCategories: (config.homeCategories ?? [])
-          .map((tile) => ({
-            label: tile.label.trim(),
-            slug: tile.slug.trim(),
-            imageUrl: tile.imageUrl.trim(),
-            imageClassName: tile.imageClassName ?? null,
-          }))
-          .filter((tile) => tile.label && tile.slug),
-        status: 'active',
-      }),
+    mutationFn: () => cmsApi.navigationMenus.upsert(menuKey, buildMenuPayload(menuKey, config)),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['cms', 'navigation-menus', menuKey] });
-      void queryClient.invalidateQueries({ queryKey: ['storefront', 'navigation-menus'] });
+      invalidatePublishedMenus();
       toast.success(`${config.label || menuKey} mega menu saved`);
     },
     onError: (error) => {
@@ -197,18 +214,22 @@ function MegaMenuEditor({ menuKey }: { menuKey: MegaMenuGender }) {
     index: number,
   ) => {
     try {
-      const uploaded = await cmsApi.navigationMenus.uploadMedia(file, {
-        kind: kind === 'homeCategories' ? 'tile' : 'tile',
-      });
-      setConfig((prev) => {
-        const next = structuredClone(prev);
-        const list = next[kind] ?? [];
-        const current = list[index] ?? emptyTile();
-        list[index] = { ...current, imageUrl: uploaded.url };
-        next[kind] = list;
-        return next;
-      });
-      toast.success('Image uploaded');
+      const uploaded = await cmsApi.navigationMenus.uploadMedia(file, { kind: 'tile' });
+      const next = structuredClone(config);
+      const list = next[kind] ?? [];
+      const current = list[index] ?? emptyTile();
+      list[index] = { ...current, imageUrl: uploaded.url };
+      next[kind] = list;
+      setConfig(next);
+
+      if (kind === 'homeCategories') {
+        await cmsApi.navigationMenus.upsert(menuKey, buildMenuPayload(menuKey, next));
+        invalidatePublishedMenus();
+        toast.success('Image published to homepage Categories');
+        return;
+      }
+
+      toast.success('Image uploaded — click Save mega menu to publish');
     } catch (error) {
       toast.error(error instanceof AppError ? error.message : 'Upload failed');
     }
@@ -514,8 +535,9 @@ function MegaMenuEditor({ menuKey }: { menuKey: MegaMenuGender }) {
       {menuKey === 'women' ? (
         <AdminPanel title="Homepage Categories tiles">
           <p className="mb-4 text-xs text-neutral-500">
-            These images appear in the homepage Categories grid (New Arrival, Jeans, Oversized,
-            etc.). Change each picture individually, then save.
+            These tiles match the shop homepage Categories grid (TOPS, PANTS, DRESSES, SKIRTS,
+            etc.). Replace a picture to publish it on the shop immediately. Label or route edits
+            still need Save mega menu.
           </p>
           <div className="space-y-3">
             {homeCategories.map((tile, index) => (
