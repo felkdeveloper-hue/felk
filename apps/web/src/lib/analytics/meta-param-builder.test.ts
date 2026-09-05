@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { getMetaClickPayload, getMetaFbc, getMetaFbp } from './meta-param-builder';
-import { normalizeMetaPageViewPath } from './meta-pixel';
+import { normalizeMetaPageViewPath, shouldSendMetaPageView } from './meta-pixel';
 
 vi.mock('./consent', () => ({
   hasMarketingConsent: () => true,
@@ -40,5 +40,15 @@ describe('Meta PageView path', () => {
     expect(normalizeMetaPageViewPath('/products/dress?color=1')).toBe('/products/dress');
     expect(normalizeMetaPageViewPath('/')).toBe('/');
     expect(normalizeMetaPageViewPath('')).toBe('/');
+  });
+
+  it('sends PageView on a new pathname but not on the same navigation', () => {
+    expect(shouldSendMetaPageView(null, '/')).toBe(true);
+    expect(shouldSendMetaPageView('/', '/')).toBe(false);
+    expect(shouldSendMetaPageView('/', '/shop')).toBe(true);
+    expect(shouldSendMetaPageView('/shop', '/products/abc')).toBe(true);
+    expect(shouldSendMetaPageView('/products/abc', '/cart')).toBe(true);
+    expect(shouldSendMetaPageView('/cart', '/shop')).toBe(true);
+    expect(shouldSendMetaPageView('/shop', '/shop?sort=new')).toBe(false);
   });
 });

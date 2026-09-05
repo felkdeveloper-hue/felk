@@ -1,5 +1,10 @@
 import { Outlet } from '@tanstack/react-router';
+import { MetaPixelProvider } from '@/components/analytics/MetaPixelProvider';
 
 export function RootComponent() {
-  return <Outlet />;
+  return (
+    <MetaPixelProvider>
+      <Outlet />
+    </MetaPixelProvider>
+  );
 }

@@ -24,6 +24,12 @@ type FbqFunction = {
   push?: FbqFunction;
   /** Prevents fbevents.js from auto-sending PageView on history.pushState. */
   disablePushState?: boolean;
+  /**
+   * fbevents drops every PageView after the first unless this is true or the
+   * history listener is on. We keep the listener off (no auto events) and
+   * allow explicit SPA PageViews instead.
+   */
+  allowDuplicatePageViews?: boolean;
 };
 
 /** One PageView key per route — trailing slashes and query/hash do not count as new pages. */
@@ -31,6 +37,11 @@ export function normalizeMetaPageViewPath(path: string): string {
   const raw = (path.split('?')[0] ?? '').split('#')[0] ?? '';
   if (!raw || raw === '/') return '/';
   return raw.endsWith('/') ? raw.slice(0, -1) : raw;
+}
+
+/** Consecutive-path guard only. Revisiting a earlier route must still send. */
+export function shouldSendMetaPageView(previousPath: string | null, nextPath: string): boolean {
+  return previousPath !== normalizeMetaPageViewPath(nextPath);
 }
 
 const envPixelId = import.meta.env.VITE_META_PIXEL_ID;
@@ -68,6 +79,7 @@ function loadScript(): Promise<void> {
     fbq.version = '2.0';
     // Must be set on the stub BEFORE fbevents.js loads — it patches history at evaluate time.
     fbq.disablePushState = true;
+    fbq.allowDuplicatePageViews = true;
     window.fbq = fbq;
     if (!window._fbq) window._fbq = fbq;
     // Queue before fbevents.js evaluates so it does not auto-bind button events.
@@ -131,6 +143,7 @@ export async function initMetaPixel(): Promise<void> {
 
     // Meta docs: disable automatic button/microdata events BEFORE init.
     window.fbq.disablePushState = true;
+    window.fbq.allowDuplicatePageViews = true;
     window.fbq('set', 'autoConfig', false, META_PIXEL_ID);
     window.fbq('init', META_PIXEL_ID);
     pixelInitialized = true;
@@ -152,6 +165,7 @@ export async function metaPixelTrack(
   // Standard PageView must use track(), not trackSingle — Events Manager
   // otherwise may never show the built-in PageView event.
   if (eventName === 'PageView') {
+    window.fbq.allowDuplicatePageViews = true;
     window.fbq('track', 'PageView');
     return;
   }
