@@ -90,11 +90,27 @@ export interface MetaCustomData {
 export interface MetaEventInput {
   eventName: string;
   eventId?: string;
+  /** Unix seconds. When omitted, send-time is used. */
+  eventTime?: number;
   eventSourceUrl?: string;
   referrerUrl?: string;
   userData?: MetaUserData;
   customData?: MetaCustomData;
   testEventCode?: string;
+}
+
+function toUnixSeconds(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+    return Math.floor(value > 1e12 ? value / 1000 : value);
+  }
+  return undefined;
+}
+
+function storedEventTime(payload: unknown): number | undefined {
+  if (!payload || typeof payload !== 'object') return undefined;
+  const data = (payload as { data?: unknown }).data;
+  if (!Array.isArray(data) || !data[0] || typeof data[0] !== 'object') return undefined;
+  return toUnixSeconds((data[0] as { event_time?: unknown }).event_time);
 }
 
 function normalizeCustomData(raw?: MetaCustomData): Record<string, unknown> | undefined {
@@ -185,7 +201,7 @@ export class MetaCapiService {
     }
 
     const eventId = input.eventId ?? randomUUID();
-    const eventTime = Math.floor(Date.now() / 1000);
+    const eventTime = toUnixSeconds(input.eventTime) ?? Math.floor(Date.now() / 1000);
 
     const customData = normalizeCustomData(input.customData);
     const userData = input.userData ? buildUserData(input.userData) : undefined;
@@ -236,6 +252,14 @@ export class MetaCapiService {
       if (!existing) throw err;
       logDoc = existing;
       logDoc.eventName = input.eventName;
+      const reusedTime = storedEventTime(existing.payload);
+      const firstEvent =
+        Array.isArray(payload.data) && payload.data[0] && typeof payload.data[0] === 'object'
+          ? (payload.data[0] as { event_time: number })
+          : null;
+      if (reusedTime && firstEvent) {
+        firstEvent.event_time = reusedTime;
+      }
       logDoc.payload = payload;
       logDoc.status = 'pending';
     }
@@ -434,6 +458,7 @@ export class MetaCapiService {
     numItems?: number;
     userData?: MetaUserData;
     eventId?: string;
+    eventTime?: number;
     eventSourceUrl?: string;
   }) {
     return this.sendEvent({
@@ -441,6 +466,7 @@ export class MetaCapiService {
       eventSourceUrl: data.eventSourceUrl,
       userData: data.userData,
       eventId: data.eventId,
+      eventTime: data.eventTime,
       customData: {
         order_id: data.orderId,
         currency: data.currency,

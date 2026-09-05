@@ -81,19 +81,22 @@ export class AnalyticsService {
     const eventId = input.eventId ?? randomUUID();
     const metaUserData = toMetaUserData(input.userData);
     const tiktokUserData = toTikTokUserData(input.userData);
+    const isPurchase = input.eventName === 'Purchase';
 
     await Promise.allSettled([
-      metaCapiService.sendEvent({
-        eventName: input.eventName,
-        eventId,
-        eventSourceUrl: input.url,
-        referrerUrl: input.referrerUrl,
-        userData: metaUserData,
-        customData: input.customData,
-        testEventCode: input.testEventCode,
-      }),
+      isPurchase
+        ? Promise.resolve()
+        : metaCapiService.sendEvent({
+            eventName: input.eventName,
+            eventId,
+            eventSourceUrl: input.url,
+            referrerUrl: input.referrerUrl,
+            userData: metaUserData,
+            customData: input.customData,
+            testEventCode: input.testEventCode,
+          }),
       tikTokEventsService.sendEvent({
-        eventName: input.eventName,
+        eventName: isPurchase ? 'CompletePayment' : input.eventName,
         eventId,
         pageUrl: input.url,
         userData: tiktokUserData,

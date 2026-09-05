@@ -39,13 +39,7 @@ export interface TrackEventPayload {
   browserOnly?: boolean;
 }
 
-const CAPI_EVENTS = new Set([
-  'ViewContent',
-  'AddToCart',
-  'InitiateCheckout',
-  'AddPaymentInfo',
-  'Purchase',
-]);
+const CAPI_EVENTS = new Set(['ViewContent', 'AddToCart', 'InitiateCheckout', 'AddPaymentInfo']);
 
 const sentPurchaseEventIds = new Set<string>();
 
@@ -119,8 +113,11 @@ export const trackingApi = {
 
     void metaPixelTrack(payload.eventName, payload.customData, eventId);
 
-    const sendToCapi = !payload.browserOnly && CAPI_EVENTS.has(payload.eventName);
-    if (!sendToCapi) return;
+    const sendMetaCapi = !payload.browserOnly && CAPI_EVENTS.has(payload.eventName);
+    // Purchase stays out of CAPI_EVENTS (backend owns Meta CAPI). Still POST so
+    // the API can send TikTok CompletePayment without a Meta Purchase event.
+    const sendTikTokPurchase = payload.eventName === 'Purchase';
+    if (!sendMetaCapi && !sendTikTokPurchase) return;
 
     try {
       await collectMetaBrowserParams();
@@ -248,7 +245,7 @@ export const trackingApi = {
       eventId,
       customData,
       userData,
-      browserOnly: options?.browserOnly,
+      browserOnly: options?.browserOnly ?? true,
       tiktokProperties: {
         currency: data.currency,
         value: data.value,

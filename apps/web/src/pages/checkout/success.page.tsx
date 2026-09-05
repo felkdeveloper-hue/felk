@@ -72,10 +72,15 @@ export function CheckoutSuccessPage() {
           value: statusQuery.data.amount ?? 0,
         };
 
-    void trackingApi.purchase(purchaseOrderNumber, payload, {
-      email: userEmail,
-      phone: userPhone,
-    });
+    void trackingApi.purchase(
+      purchaseOrderNumber,
+      payload,
+      {
+        email: userEmail,
+        phone: userPhone,
+      },
+      { browserOnly: true },
+    );
   }, [orderNumber, statusQuery.data]);
 
   useEffect(() => {

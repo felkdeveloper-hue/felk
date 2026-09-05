@@ -125,10 +125,34 @@ export async function captureMetaClickContext(input: {
   }
 }
 
+function toUnixSeconds(value: unknown): number | undefined {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return Math.floor(value.getTime() / 1000);
+  }
+  if (typeof value === 'string' && value) {
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) return Math.floor(parsed.getTime() / 1000);
+  }
+  return undefined;
+}
+
+function resolvePurchaseEventTime(
+  payment: Pick<PaymentDocument, 'paidAt'>,
+  order: Pick<OrderDocument, 'paidAt' | 'placedAt' | 'createdAt'>,
+): number {
+  return (
+    toUnixSeconds(payment.paidAt) ??
+    toUnixSeconds(order.paidAt) ??
+    toUnixSeconds(order.placedAt) ??
+    toUnixSeconds(order.createdAt) ??
+    Math.floor(Date.now() / 1000)
+  );
+}
+
 /** Send Meta Purchase after an order is successfully created. Returns true when Meta accepted the event. */
 export async function trackMetaPurchaseForOrder(
   payment: PaymentDocument,
-  order: Pick<OrderDocument, 'orderNumber' | 'items'>,
+  order: Pick<OrderDocument, 'orderNumber' | 'items' | 'paidAt' | 'placedAt' | 'createdAt'>,
   checkout?: Pick<CheckoutSessionDocument, 'shippingAddress' | 'metadata'> | null,
 ): Promise<boolean> {
   const eventId = purchaseEventId(order.orderNumber);
@@ -169,6 +193,7 @@ export async function trackMetaPurchaseForOrder(
       contents,
       numItems,
       eventId,
+      eventTime: resolvePurchaseEventTime(payment, order),
       eventSourceUrl,
       userData: {
         email: customerRecord?.email ?? null,
