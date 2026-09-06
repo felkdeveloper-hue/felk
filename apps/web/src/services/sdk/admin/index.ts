@@ -77,6 +77,7 @@ export type {
   MetaAdsPerformanceData,
   AdsReconciliationData,
   EventBreakdownRow,
+  SizeCount,
   ProductCountRow,
   ProductConversionRow,
   ProductAnalyticsData,

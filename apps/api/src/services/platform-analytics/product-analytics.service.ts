@@ -1,6 +1,7 @@
 import { EventModel } from '@/models/analytics/index.js';
 import type { AnalyticsFilter } from '@/schemas/analytics/index.js';
 import { buildEventMatch, mergeMatch } from './analytics-query.builder.js';
+import { pickSizeLabel, sizeNameByVariantId, toSizeCounts } from './size-breakdown.util.js';
 
 const VIEW_NAMES = ['product_viewed', 'product_detail_opened'];
 const CLICK_NAMES = ['product_card_clicked', 'product_image_clicked', 'product_quick_view'];
@@ -12,12 +13,13 @@ interface ProductAggRow {
   productId: string;
   productName: string;
   count: number;
+  sizes?: Array<{ size: string; count: number }>;
 }
 
 async function topByNames(
   filter: AnalyticsFilter,
   names: string[],
-  limit = 20,
+  limit = 200,
 ): Promise<ProductAggRow[]> {
   const base = await buildEventMatch(filter);
   delete base['name'];
@@ -50,11 +52,81 @@ async function topByNames(
   }));
 }
 
+async function topCartWithSizes(filter: AnalyticsFilter, limit = 200): Promise<ProductAggRow[]> {
+  const base = await buildEventMatch(filter);
+  delete base['name'];
+  const rows = await EventModel.aggregate<{
+    _id: { productId: string; variantId: string; sizeName: string };
+    productName: string;
+    variantLabel: string;
+    count: number;
+  }>([
+    {
+      $match: mergeMatch(base, {
+        name: { $in: CART_NAMES },
+        'properties.productId': { $exists: true, $nin: [null, ''] },
+      }),
+    },
+    {
+      $group: {
+        _id: {
+          productId: '$properties.productId',
+          variantId: { $ifNull: ['$properties.variantId', ''] },
+          sizeName: { $ifNull: ['$properties.sizeName', ''] },
+        },
+        productName: { $last: '$properties.productName' },
+        variantLabel: { $last: '$properties.variantLabel' },
+        count: {
+          $sum: {
+            $cond: [{ $gt: ['$properties.quantity', 0] }, '$properties.quantity', 1],
+          },
+        },
+      },
+    },
+  ]);
+
+  const sizeByVariant = await sizeNameByVariantId(rows.map((row) => String(row._id.variantId ?? '')));
+  const products = new Map<
+    string,
+    { productId: string; productName: string; count: number; sizes: Map<string, number> }
+  >();
+
+  for (const row of rows) {
+    const productId = String(row._id.productId);
+    const size = pickSizeLabel({
+      sizeName: row._id.sizeName,
+      variantId: row._id.variantId,
+      variantLabel: row.variantLabel,
+      sizeByVariant,
+    });
+    const current = products.get(productId) ?? {
+      productId,
+      productName: row.productName || productId,
+      count: 0,
+      sizes: new Map<string, number>(),
+    };
+    current.productName = row.productName || current.productName;
+    current.count += row.count;
+    current.sizes.set(size, (current.sizes.get(size) ?? 0) + row.count);
+    products.set(productId, current);
+  }
+
+  return [...products.values()]
+    .map((product) => ({
+      productId: product.productId,
+      productName: product.productName,
+      count: product.count,
+      sizes: toSizeCounts(product.sizes),
+    }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, limit);
+}
+
 export async function getProductAnalytics(filter: AnalyticsFilter) {
   const [mostViewed, mostClicked, mostAddedToCart, mostWishlisted, conversion] = await Promise.all([
     topByNames(filter, VIEW_NAMES),
     topByNames(filter, CLICK_NAMES),
-    topByNames(filter, CART_NAMES),
+    topCartWithSizes(filter),
     topByNames(filter, WISHLIST_NAMES),
     getConversionProducts(filter),
   ]);
@@ -62,7 +134,7 @@ export async function getProductAnalytics(filter: AnalyticsFilter) {
   return { mostViewed, mostClicked, mostAddedToCart, mostWishlisted, conversion };
 }
 
-async function getConversionProducts(filter: AnalyticsFilter, limit = 20) {
+async function getConversionProducts(filter: AnalyticsFilter, limit = 200) {
   const base = await buildEventMatch(filter);
   delete base['name'];
   const rows = await EventModel.aggregate<{

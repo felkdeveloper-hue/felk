@@ -6,6 +6,7 @@ import { AdminErrorState, AdminPageHeader, PageMotion } from '@/components/admin
 import { ChartSkeleton } from '@/components/admin/analytics';
 import { DashboardCustomizeBar } from './DashboardCustomizeBar';
 import { DashboardRevenueHero } from './DashboardRevenueHero';
+import { DashboardTopProducts } from './DashboardTopProducts';
 import { DashboardWidgetRenderer } from './widgets';
 import {
   useDashboardCatalogQuery,
@@ -100,7 +101,7 @@ export function PersonalizedDashboard() {
   );
 
   const visibleWidgets = useMemo(
-    () => widgets.filter((w) => !w.hidden && w.widgetId !== 'revenue'),
+    () => widgets.filter((w) => !w.hidden && w.widgetId !== 'revenue' && w.widgetId !== 'top_products'),
     [widgets],
   );
   const hiddenCount = widgets.filter((w) => w.hidden).length;
@@ -258,6 +259,7 @@ export function PersonalizedDashboard() {
       />
 
       <DashboardRevenueHero />
+      <DashboardTopProducts />
 
       {customizing ? (
         <div className="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-900">

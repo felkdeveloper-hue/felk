@@ -19,6 +19,7 @@ import {
   KpiCardWithDelta,
   Drillable,
   AnalyticsExportButton,
+  SizeBreakdown,
 } from '@/components/admin/analytics';
 import { useRevenueDashboard, useAnalyticsFilters, useAnalyticsDrillDown } from '@/hooks/admin';
 import { adminChartColor } from '@/lib/admin-chart-colors';
@@ -268,6 +269,11 @@ export function AnalyticsRevenuePage() {
                     ),
                   },
                   { id: 'qty', header: 'Qty', cell: (r) => r.qty },
+                  {
+                    id: 'sizes',
+                    header: 'Sizes sold',
+                    cell: (r) => <SizeBreakdown sizes={r.sizes} />,
+                  },
                   {
                     id: 'revenue',
                     header: 'Revenue',

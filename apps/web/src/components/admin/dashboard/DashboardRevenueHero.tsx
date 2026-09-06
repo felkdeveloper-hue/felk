@@ -1,5 +1,6 @@
 import { Link } from '@tanstack/react-router';
 import { ADMIN_ROUTES } from '@/constants';
+import { SizeBreakdown } from '@/components/admin/analytics';
 import { useRevenueDashboard } from '@/hooks/admin';
 import { formatCurrency } from '@/lib/utils';
 
@@ -84,6 +85,46 @@ export function DashboardRevenueHero() {
           })}
         </div>
       )}
+
+      {data?.yearProducts?.length || data?.topProducts?.length ? (
+        <div className="border-t border-[var(--admin-line)] px-5 py-4">
+          <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--admin-accent)]">
+                What sold
+              </p>
+              <p className="text-muted-foreground mt-0.5 text-xs">
+                {(data.yearProducts ?? data.topProducts).length} products this year
+              </p>
+            </div>
+            <Link
+              to={ADMIN_ROUTES.analyticsProducts}
+              search={{ period: '90d' } as never}
+              className="text-xs font-medium text-teal-800 underline-offset-2 hover:underline"
+            >
+              See all
+            </Link>
+          </div>
+          <ul className="divide-border max-h-72 divide-y overflow-auto pr-1">
+            {(data.yearProducts ?? data.topProducts).map((product) => (
+              <li
+                key={product.productId}
+                className="flex items-center justify-between gap-4 py-2"
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-[var(--admin-ink)]">
+                    {product.productName}
+                  </p>
+                  <SizeBreakdown sizes={product.sizes} empty="Size not recorded" />
+                </div>
+                <p className="text-muted-foreground shrink-0 text-xs tabular-nums">
+                  {product.qty} sold
+                </p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
     </section>
   );
 }

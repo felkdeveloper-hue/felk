@@ -404,6 +404,22 @@ const reports: ExportReportDefinition[] = [
         fetch: async (ctx) => asRows((await getProductAnalytics(ctx.filter)).mostClicked),
       },
       {
+        name: 'Most Added To Cart',
+        columns: cols([
+          ['productId', 'Product ID'],
+          ['productName', 'Product'],
+          ['count', 'Adds'],
+          ['sizes', 'Sizes'],
+        ]),
+        fetch: async (ctx) =>
+          asRows(
+            (await getProductAnalytics(ctx.filter)).mostAddedToCart.map((row) => ({
+              ...row,
+              sizes: (row.sizes ?? []).map((s) => `${s.size} ${s.count}`).join(' · '),
+            })),
+          ),
+      },
+      {
         name: 'Conversion',
         columns: cols([
           ['productId', 'Product ID'],
@@ -624,9 +640,16 @@ const reports: ExportReportDefinition[] = [
           ['productId', 'Product ID'],
           ['productName', 'Product'],
           ['qty', 'Qty'],
+          ['sizes', 'Sizes'],
           ['revenue', 'Revenue'],
         ]),
-        fetch: async (ctx) => asRows((await getRevenueDashboard(ctx.filter)).topProducts),
+        fetch: async (ctx) =>
+          asRows(
+            (await getRevenueDashboard(ctx.filter)).topProducts.map((row) => ({
+              ...row,
+              sizes: (row.sizes ?? []).map((s) => `${s.size} ${s.count}`).join(' · '),
+            })),
+          ),
       },
       {
         name: 'Countries',

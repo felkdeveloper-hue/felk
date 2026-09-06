@@ -29,10 +29,15 @@ import {
   useWishlistAnalytics,
   useDashboardStatsQuery,
 } from '@/hooks/admin';
-import { AnalyticsEmpty, KpiCardWithDelta, formatDuration } from '@/components/admin/analytics';
+import {
+  AnalyticsEmpty,
+  KpiCardWithDelta,
+  formatDuration,
+} from '@/components/admin/analytics';
 import { AdminStatCard } from '@/components/admin';
 import { formatCurrency } from '@/lib/utils';
 import type { AnalyticsFilter, DashboardWidgetPlacement } from '@/services/sdk/admin';
+import { TopProductsTable } from './DashboardTopProducts';
 import { formatAnalyticsPeriodLabel, withPeriodHint } from '@/lib/analytics-period-label';
 import { ADMIN_CHART_COLORS, adminChartColor } from '@/lib/admin-chart-colors';
 
@@ -264,41 +269,16 @@ const TopProductsWidget = memo(function TopProductsWidget({
 }: {
   placement: DashboardWidgetPlacement;
 }) {
-  const q = useProductAnalytics(periodFilter(placement.settings));
-  if (q.isLoading) return <LoadingBlock />;
-  const rows = q.data?.conversion?.slice(0, 8) ?? [];
   return (
     <WidgetFrame
       title="Top Products"
       href={ADMIN_ROUTES.analyticsProducts}
       collapsed={placement.collapsed}
     >
-      {!rows.length ? (
-        <AnalyticsEmpty />
-      ) : (
-        <div className="overflow-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="text-muted-foreground">
-              <tr>
-                <th className="pb-1 font-medium">Product</th>
-                <th className="pb-1 font-medium">Views</th>
-                <th className="pb-1 font-medium">Carts</th>
-                <th className="pb-1 font-medium">Buys</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.productId} className="border-border/60 border-t">
-                  <td className="max-w-[10rem] truncate py-1">{r.productName}</td>
-                  <td className="py-1 tabular-nums">{r.views}</td>
-                  <td className="py-1 tabular-nums">{r.carts}</td>
-                  <td className="py-1 tabular-nums">{r.purchases}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <TopProductsTable
+        filter={{ period: (placement.settings?.period as AnalyticsFilter['period']) || '30d' }}
+        limit={8}
+      />
     </WidgetFrame>
   );
 });

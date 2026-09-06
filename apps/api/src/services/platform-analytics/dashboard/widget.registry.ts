@@ -52,7 +52,7 @@ const widgets: WidgetDefinitionMeta[] = [
   {
     id: 'top_products',
     name: 'Top Products',
-    description: 'Most viewed and purchased products',
+    description: 'Most viewed products, with cart and sales counts by size',
     category: 'commerce',
     defaultSize: { w: 6, h: 5, minW: 4, minH: 3 },
     permissions: ['analytics.view'],

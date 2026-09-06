@@ -12,10 +12,25 @@ import { AppError } from '@/lib/errors';
 import { toast } from 'sonner';
 import { QUERY_KEYS } from '@/constants';
 
+function sizeNameFromProduct(product: Product, variantId?: string): string | undefined {
+  const variant = product.variants?.find((item) => item.id === variantId);
+  if (!variant) return undefined;
+  const fromOption = variant.optionValues?.size?.trim();
+  if (fromOption) return fromOption;
+  const title = variant.title?.trim();
+  if (!title) return undefined;
+  const parts = title
+    .split(/\s*\/\s*/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  return parts.length >= 2 ? parts[parts.length - 1] : title;
+}
+
 export interface AddToCartButtonProps extends Omit<ButtonProps, 'onClick'> {
   product: Product;
   variantId?: string;
   quantity?: number;
+  sizeName?: string;
   label?: string;
   /** Called after a successful add (e.g. close an options sheet). */
   onAdded?: () => void;
@@ -43,6 +58,7 @@ export function AddToCartButton({
   product,
   variantId,
   quantity = 1,
+  sizeName,
   label = 'Add to cart',
   disabled,
   loading,
@@ -101,6 +117,7 @@ export function AddToCartButton({
           unitPrice,
           imageUrl: product.thumbnailUrl ?? product.hoverImageUrl,
           productSlug: product.slug,
+          sizeName: sizeName ?? sizeNameFromProduct(product, resolvedVariantId),
         },
       },
       {

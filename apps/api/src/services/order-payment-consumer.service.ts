@@ -118,6 +118,7 @@ async function buildOrderItems(checkout: CheckoutSessionDocument): Promise<Order
       name: product?.name ?? line.title,
       stockControlNumber: product?.stockControlNumber ?? null,
       variantTitle: variant?.title ?? line.title,
+      sizeName: line.sizeName ?? null,
       sku: line.sku,
       barcode: variant?.barcode ?? null,
       images: [...new Set(images)],

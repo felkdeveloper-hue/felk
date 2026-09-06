@@ -549,10 +549,16 @@ export interface AnalyticsExportJob {
   downloadAvailable: boolean;
 }
 
+export interface SizeCount {
+  size: string;
+  count: number;
+}
+
 export interface ProductCountRow {
   productId: string;
   productName: string;
   count: number;
+  sizes?: SizeCount[];
 }
 
 export interface ProductConversionRow {
@@ -732,7 +738,20 @@ export interface RevenueDashboardData {
   aov: number;
   orderCount: number;
   trend: Array<{ date: string; revenue: number }>;
-  topProducts: Array<{ productId: string; productName: string; revenue: number; qty: number }>;
+  topProducts: Array<{
+    productId: string;
+    productName: string;
+    revenue: number;
+    qty: number;
+    sizes?: SizeCount[];
+  }>;
+  yearProducts?: Array<{
+    productId: string;
+    productName: string;
+    revenue: number;
+    qty: number;
+    sizes?: SizeCount[];
+  }>;
   byTrafficSource: Array<{
     source: string;
     visitors: number;

@@ -133,6 +133,7 @@ export function useAddToCartMutation() {
         category: null,
         variantId: payload.variantId,
         variantLabel: optimistic?.sizeName ?? optimistic?.colorName ?? null,
+        sizeName: optimistic?.sizeName ?? null,
         price: optimistic?.unitPrice ?? null,
         quantity: payload.quantity ?? 1,
         currency: 'LKR',

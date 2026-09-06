@@ -543,6 +543,7 @@ export function ProductPurchasePanel({
               product={product}
               variantId={cartVariantId}
               quantity={quantity}
+              sizeName={effectiveSizeId ? sizeLabels[effectiveSizeId] : undefined}
               size="lg"
               variant="outline"
               skipOptionGate

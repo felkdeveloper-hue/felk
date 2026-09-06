@@ -80,6 +80,7 @@ export interface CommerceProductMeta {
   category?: string | null;
   variantId?: string | null;
   variantLabel?: string | null;
+  sizeName?: string | null;
   price?: number | null;
   quantity?: number | null;
   currency?: string | null;
@@ -124,6 +125,7 @@ export function trackCommerceEvent(
             category: product.category ?? null,
             variantId: product.variantId ?? null,
             variantLabel: product.variantLabel ?? null,
+            sizeName: product.sizeName ?? null,
             price: product.price ?? null,
             quantity: product.quantity ?? null,
             currency: product.currency ?? null,

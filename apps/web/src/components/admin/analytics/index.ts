@@ -9,3 +9,4 @@ export { AnalyticsBreadcrumbs } from './AnalyticsBreadcrumbs';
 export type { AnalyticsBreadcrumbItem } from './AnalyticsBreadcrumbs';
 export { AnalyticsExportButton } from './AnalyticsExportButton';
 export type { AnalyticsExportButtonProps } from './AnalyticsExportButton';
+export { SizeBreakdown, formatSizeBreakdown } from './SizeBreakdown';

@@ -443,6 +443,7 @@ export function SelectOptionsSheet({ product, open, onOpenChange }: SelectOption
                       product={detail}
                       variantId={cartVariantId}
                       quantity={quantity}
+                      sizeName={effectiveSizeId ? sizeLabels[effectiveSizeId] : undefined}
                       size="lg"
                       variant="outline"
                       className="border-foreground text-foreground hover:bg-foreground hover:text-background h-12 min-w-0 flex-1 rounded-none border bg-transparent font-bold uppercase tracking-[0.12em]"

@@ -11,6 +11,7 @@ import {
   startOfAnalyticsMonth,
   startOfAnalyticsYear,
 } from './date-range.util.js';
+import { pickSizeLabel, sizeNameByVariantId, toSizeCounts } from './size-breakdown.util.js';
 
 const PAID_STATUSES = [
   ORDER_STATUS.PENDING,
@@ -40,6 +41,57 @@ function inRange(at: Date | undefined, from: Date, to: Date) {
   if (!at) return false;
   const time = at.getTime();
   return time >= from.getTime() && time <= to.getTime();
+}
+
+function soldProductsFromOrders(
+  orders: LeanOrder[],
+  sizeByVariant: Map<string, string>,
+) {
+  const productMap = new Map<
+    string,
+    {
+      productId: string;
+      productName: string;
+      revenue: number;
+      qty: number;
+      sizes: Map<string, number>;
+    }
+  >();
+  for (const order of orders) {
+    for (const item of order.items ?? []) {
+      const productId = String(item.productId ?? '');
+      if (!productId) continue;
+      const name = String(item.name ?? item.productName ?? productId);
+      const qty = Number(item.quantity ?? 1);
+      const lineTotal = Number(item.lineTotal ?? item.unitPrice ?? item.price ?? 0);
+      const size = pickSizeLabel({
+        sizeName: item.sizeName ? String(item.sizeName) : '',
+        variantId: item.variantId ? String(item.variantId) : '',
+        variantTitle: item.variantTitle ? String(item.variantTitle) : '',
+        sizeByVariant,
+      });
+      const current = productMap.get(productId) ?? {
+        productId,
+        productName: name,
+        revenue: 0,
+        qty: 0,
+        sizes: new Map<string, number>(),
+      };
+      current.revenue += Number.isFinite(lineTotal) && lineTotal > 0 ? lineTotal : 0;
+      current.qty += qty;
+      current.sizes.set(size, (current.sizes.get(size) ?? 0) + qty);
+      productMap.set(productId, current);
+    }
+  }
+  return [...productMap.values()]
+    .map((product) => ({
+      productId: product.productId,
+      productName: product.productName,
+      revenue: Math.round(product.revenue * 100) / 100,
+      qty: product.qty,
+      sizes: toSizeCounts(product.sizes),
+    }))
+    .sort((a, b) => b.qty - a.qty || b.revenue - a.revenue);
 }
 
 async function receivedAtByPaymentId(orders: LeanOrder[]): Promise<Map<string, Date | undefined>> {
@@ -119,27 +171,16 @@ export async function getRevenueDashboard(filter: AnalyticsFilter) {
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([date, revenue]) => ({ date, revenue: Math.round(revenue * 100) / 100 }));
 
-  const productMap = new Map<
-    string,
-    { productId: string; productName: string; revenue: number; qty: number }
-  >();
-  for (const o of periodOrders) {
-    for (const item of o.items ?? []) {
-      const pid = String(item.productId ?? '');
-      if (!pid) continue;
-      const name = String(item.name ?? item.productName ?? pid);
-      const qty = Number(item.quantity ?? 1);
-      const lineTotal = Number(item.lineTotal ?? item.unitPrice ?? item.price ?? 0);
-      const cur = productMap.get(pid) ?? { productId: pid, productName: name, revenue: 0, qty: 0 };
-      cur.revenue += Number.isFinite(lineTotal) && lineTotal > 0 ? lineTotal : 0;
-      cur.qty += qty;
-      productMap.set(pid, cur);
-    }
-  }
-  const topProducts = [...productMap.values()]
-    .map((p) => ({ ...p, revenue: Math.round(p.revenue * 100) / 100 }))
-    .sort((a, b) => b.revenue - a.revenue)
-    .slice(0, 15);
+  const saleVariantIds = [
+    ...new Set(
+      allOrders.flatMap((order) =>
+        (order.items ?? []).map((item) => String(item.variantId ?? '')).filter(Boolean),
+      ),
+    ),
+  ];
+  const sizeByVariant = await sizeNameByVariantId(saleVariantIds);
+  const topProducts = soldProductsFromOrders(periodOrders, sizeByVariant);
+  const yearProducts = soldProductsFromOrders(yearOrders, sizeByVariant);
 
   const userIds = [
     ...new Set(periodOrders.map((o) => (o.userId ? String(o.userId) : null)).filter(Boolean)),
@@ -218,6 +259,7 @@ export async function getRevenueDashboard(filter: AnalyticsFilter) {
     orderCount: periodOrders.length,
     trend,
     topProducts,
+    yearProducts,
     byTrafficSource: [...bySource.entries()].map(([source, v]) => ({
       source,
       visitors: v.visitors.size,

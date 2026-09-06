@@ -29,6 +29,7 @@ export interface OrderItemSubdocument {
   /** Snapshot of admin stock control number at order time (optional). */
   stockControlNumber?: string | null;
   variantTitle?: string | null;
+  sizeName?: string | null;
   sku: string;
   barcode?: string | null;
   images: string[];
@@ -52,6 +53,7 @@ const orderItemSchema = new Schema<OrderItemSubdocument>(
     name: { type: String, required: true },
     stockControlNumber: { type: String, default: null },
     variantTitle: { type: String, default: null },
+    sizeName: { type: String, default: null },
     sku: { type: String, required: true },
     barcode: { type: String, default: null },
     images: { type: [String], default: [] },

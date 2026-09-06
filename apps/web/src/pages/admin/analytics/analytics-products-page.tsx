@@ -8,6 +8,7 @@ import {
   AnalyticsChartCard,
   Drillable,
   AnalyticsExportButton,
+  SizeBreakdown,
 } from '@/components/admin/analytics';
 import {
   useProductAnalytics,
@@ -20,6 +21,7 @@ import type { DataTableColumn } from '@/components/admin';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { DRILL_TOOLTIP } from '@/lib/analytics/drill-down';
+import { TopProductsTable } from '@/components/admin/dashboard/DashboardTopProducts';
 
 export function AnalyticsProductsPage() {
   const { filter, setFilter, clearFilters } = useAnalyticsFilters({ defaults: { period: '7d' } });
@@ -179,6 +181,13 @@ export function AnalyticsProductsPage() {
         <AnalyticsEmpty />
       ) : (
         <div className="mt-4 space-y-6">
+          <AnalyticsChartCard
+            title="Top Products"
+            description="Updates with the date range above. Views, cart adds, and sales include size counts."
+          >
+            <TopProductsTable filter={filter} />
+          </AnalyticsChartCard>
+
           <div className="grid gap-4 xl:grid-cols-2">
             <AnalyticsChartCard title="Most Viewed Products">
               <DataTable
@@ -194,11 +203,21 @@ export function AnalyticsProductsPage() {
                 columns={productColumns('Clicks')}
               />
             </AnalyticsChartCard>
-            <AnalyticsChartCard title="Most Added To Cart">
+            <AnalyticsChartCard
+              title="Most Added To Cart"
+              description="Total adds, plus how many of each size."
+            >
               <DataTable
                 data={data.mostAddedToCart}
                 getRowId={(r) => r.productId}
-                columns={productColumns('Count')}
+                columns={[
+                  ...productColumns('Count'),
+                  {
+                    id: 'sizes',
+                    header: 'Sizes added',
+                    cell: (row) => <SizeBreakdown sizes={row.sizes} />,
+                  },
+                ]}
               />
             </AnalyticsChartCard>
             <AnalyticsChartCard title="Most Wishlisted">
