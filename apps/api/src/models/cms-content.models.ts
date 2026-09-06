@@ -233,8 +233,10 @@ const megaMenuLinkSchema = new Schema(
     // Empty for non-clickable column subheadings (e.g. Pants under Bottoms).
     slug: { type: String, default: '', trim: true },
     heading: { type: Boolean, default: false },
-    /** Optional category PLP hero banner for this link. */
+    /** Optional category PLP hero banner for this link (desktop / both). */
     bannerUrl: { type: String, default: '', trim: true },
+    bannerMobileUrl: { type: String, default: '', trim: true },
+    bannerDevice: { type: String, enum: ['desktop', 'mobile', 'both'], default: 'both' },
   },
   { _id: false },
 );

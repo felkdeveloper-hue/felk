@@ -7,8 +7,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   DEFAULT_HOME_CATEGORIES,
   DEFAULT_MEGA_MENUS,
+  ensureWomenCategoryBannerSlots,
   ensureWomenCoordsExtras,
   isLegacyWomenMegaMenuColumns,
+  type BannerDevice,
   type GenderMegaMenuConfig,
   type MegaMenuColumn,
   type MegaMenuGender,
@@ -20,13 +22,19 @@ import { AppError } from '@/lib/errors';
 import { cn } from '@/lib/utils';
 import { QUERY_KEYS } from '@/constants/query-keys';
 import { cmsApi } from '@/services/sdk/admin';
-import { megaMenuHrefPreview } from '@/utils/mega-menu-links';
+import { megaMenuHrefPreview, normalizeBannerDevice } from '@/utils/mega-menu-links';
+
+const BANNER_DEVICES: Array<{ value: BannerDevice; label: string }> = [
+  { value: 'desktop', label: 'Desktop' },
+  { value: 'mobile', label: 'Mobile' },
+  { value: 'both', label: 'Both' },
+];
 
 const fieldClassName =
   'w-full rounded-lg border border-[var(--admin-line)] bg-[var(--admin-panel-soft)] px-3 py-2 text-sm text-[var(--admin-ink)] outline-none transition-colors focus:border-[var(--admin-accent)]/50';
 
 function emptyLink(): MegaMenuLink {
-  return { label: '', slug: '', bannerUrl: '' };
+  return { label: '', slug: '', bannerUrl: '', bannerMobileUrl: '', bannerDevice: 'both' };
 }
 
 function emptyHeading(): MegaMenuLink {
@@ -57,6 +65,8 @@ function normalizeConfig(
               slug: String(link.slug ?? ''),
               ...(link.heading ? { heading: true as const } : {}),
               bannerUrl: String(link.bannerUrl ?? ''),
+              bannerMobileUrl: String(link.bannerMobileUrl ?? ''),
+              bannerDevice: normalizeBannerDevice(link.bannerDevice),
             }))
           : [],
       }))
@@ -69,7 +79,8 @@ function normalizeConfig(
         ? parsedColumns
         : fallback.columns;
 
-  const columns = key === 'women' ? ensureWomenCoordsExtras(baseColumns) : baseColumns;
+  const columns =
+    key === 'women' ? ensureWomenCategoryBannerSlots(ensureWomenCoordsExtras(baseColumns)) : baseColumns;
 
   const mapTiles = (tiles: unknown, fallbackTiles: MegaMenuTile[]): MegaMenuTile[] => {
     if (!Array.isArray(tiles) || tiles.length === 0) {
@@ -136,6 +147,8 @@ function buildMenuPayload(menuKey: MegaMenuGender, config: GenderMegaMenuConfig)
             slug: link.slug.trim(),
             ...(link.heading ? { heading: true as const } : {}),
             bannerUrl: link.bannerUrl?.trim() || '',
+            bannerMobileUrl: link.bannerMobileUrl?.trim() || '',
+            bannerDevice: normalizeBannerDevice(link.bannerDevice),
           }))
           .filter((link) => link.label && (link.heading || link.slug)),
       }))
@@ -173,7 +186,7 @@ function MegaMenuEditor({ menuKey }: { menuKey: MegaMenuGender }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pendingUpload, setPendingUpload] = useState<
     | { kind: 'specials' | 'featured' | 'homeCategories'; index: number }
-    | { kind: 'linkBanner'; columnIndex: number; linkIndex: number }
+    | { kind: 'linkBanner'; columnIndex: number; linkIndex: number; slot: 'desktop' | 'mobile' }
     | { kind: 'heroBanner' }
     | null
   >(null);
@@ -235,17 +248,26 @@ function MegaMenuEditor({ menuKey }: { menuKey: MegaMenuGender }) {
     }
   };
 
-  const uploadLinkBanner = async (file: File, columnIndex: number, linkIndex: number) => {
+  const uploadLinkBanner = async (
+    file: File,
+    columnIndex: number,
+    linkIndex: number,
+    slot: 'desktop' | 'mobile',
+  ) => {
     try {
       const uploaded = await cmsApi.navigationMenus.uploadMedia(file, { kind: 'banner' });
-      setConfig((prev) => {
-        const next = structuredClone(prev);
-        const row = next.columns[columnIndex]?.links[linkIndex];
-        if (!row) return prev;
-        row.bannerUrl = uploaded.url;
-        return next;
-      });
-      toast.success('Section banner uploaded');
+      const next = structuredClone(config);
+      const row = next.columns[columnIndex]?.links[linkIndex];
+      if (!row) return;
+      if (slot === 'mobile') row.bannerMobileUrl = uploaded.url;
+      else row.bannerUrl = uploaded.url;
+      if (!row.bannerDevice) row.bannerDevice = 'both';
+      setConfig(next);
+      await cmsApi.navigationMenus.upsert(menuKey, buildMenuPayload(menuKey, next));
+      invalidatePublishedMenus();
+      toast.success(
+        slot === 'mobile' ? 'Mobile banner published to the category page' : 'Desktop banner published to the category page',
+      );
     } catch (error) {
       toast.error(error instanceof AppError ? error.message : 'Upload failed');
     }
@@ -325,8 +347,9 @@ function MegaMenuEditor({ menuKey }: { menuKey: MegaMenuGender }) {
         <p className="mb-4 text-xs text-neutral-500">
           Use <strong>Bold subheading</strong> for section labels inside a column (e.g. Pants,
           Skirts, Footwear) — they appear as bold uppercase text with no link. Regular links need a
-          route slug. Upload a page banner for each linked section; it appears on that category page
-          after you save.
+          route slug. The banners below are the category page hero (the wide image on Pants, All
+          Bottoms, etc.) — not the homepage category cards. Choose Desktop, Mobile, or Both, then
+          upload. Replacing a banner publishes it immediately.
         </p>
         <div className="space-y-4">
           {config.columns.map((column, columnIndex) => (
@@ -383,6 +406,7 @@ function MegaMenuEditor({ menuKey }: { menuKey: MegaMenuGender }) {
                             row.heading = true;
                             row.slug = '';
                             row.bannerUrl = '';
+                            row.bannerMobileUrl = '';
                           } else {
                             delete row.heading;
                           }
@@ -449,46 +473,105 @@ function MegaMenuEditor({ menuKey }: { menuKey: MegaMenuGender }) {
                       </button>
                     </div>
                     {!link.heading ? (
-                      <div className="mt-3 flex flex-wrap items-center gap-3">
-                        <div className="relative h-14 w-28 overflow-hidden rounded-md border border-[var(--admin-line)] bg-[var(--admin-panel-soft)]">
-                          {link.bannerUrl ? (
-                            <img
-                              src={link.bannerUrl}
-                              alt=""
-                              className="h-full w-full object-cover"
-                            />
-                          ) : (
-                            <div className="flex h-full items-center justify-center text-[10px] text-neutral-500">
-                              No banner
-                            </div>
-                          )}
+                      <div className="mt-3 space-y-3 rounded-lg border border-[var(--admin-line)] p-3">
+                        <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-neutral-500">
+                          Category page banner
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {BANNER_DEVICES.map((option) => {
+                            const selected =
+                              normalizeBannerDevice(link.bannerDevice) === option.value;
+                            return (
+                              <button
+                                key={option.value}
+                                type="button"
+                                disabled={!link.slug.trim()}
+                                className={cn(
+                                  'admin-btn px-3 py-1 text-xs',
+                                  selected &&
+                                    'border-[var(--admin-accent)] bg-[var(--admin-accent)]/10 font-semibold',
+                                )}
+                                onClick={() => {
+                                  const next = structuredClone(config);
+                                  const row = next.columns[columnIndex]?.links[linkIndex];
+                                  if (!row) return;
+                                  row.bannerDevice = option.value;
+                                  setConfig(next);
+                                }}
+                              >
+                                {option.label}
+                              </button>
+                            );
+                          })}
                         </div>
-                        <button
-                          type="button"
-                          className="admin-btn"
-                          disabled={!link.slug.trim()}
-                          onClick={() => {
-                            setPendingUpload({ kind: 'linkBanner', columnIndex, linkIndex });
-                            fileInputRef.current?.click();
-                          }}
-                        >
-                          {link.bannerUrl ? 'Replace banner' : 'Upload banner'}
-                        </button>
-                        {link.bannerUrl ? (
-                          <button
-                            type="button"
-                            className="admin-btn text-red-600"
-                            onClick={() => {
-                              const next = structuredClone(config);
-                              const row = next.columns[columnIndex]?.links[linkIndex];
-                              if (!row) return;
-                              row.bannerUrl = '';
-                              setConfig(next);
-                            }}
-                          >
-                            Clear banner
-                          </button>
-                        ) : null}
+                        <p className="text-[10px] text-neutral-500">
+                          {normalizeBannerDevice(link.bannerDevice) === 'desktop'
+                            ? 'Shown on desktop only. Mobile keeps the default category art.'
+                            : normalizeBannerDevice(link.bannerDevice) === 'mobile'
+                              ? 'Shown on mobile only. Desktop keeps the default category art.'
+                              : 'Desktop image on large screens, mobile image on phones. One image is used on both if the other is empty.'}
+                        </p>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          {(
+                            [
+                              ['desktop', 'Desktop', link.bannerUrl],
+                              ['mobile', 'Mobile', link.bannerMobileUrl],
+                            ] as const
+                          ).map(([slot, slotLabel, slotUrl]) => (
+                            <div key={slot} className="space-y-2">
+                              <p className="text-[11px] font-medium text-[var(--admin-ink)]">
+                                {slotLabel}
+                              </p>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <div className="relative h-14 w-28 overflow-hidden rounded-md border border-[var(--admin-line)] bg-[var(--admin-panel-soft)]">
+                                  {slotUrl ? (
+                                    <img
+                                      src={slotUrl}
+                                      alt=""
+                                      className="h-full w-full object-cover"
+                                    />
+                                  ) : (
+                                    <div className="flex h-full items-center justify-center text-[10px] text-neutral-500">
+                                      No banner
+                                    </div>
+                                  )}
+                                </div>
+                                <button
+                                  type="button"
+                                  className="admin-btn"
+                                  disabled={!link.slug.trim()}
+                                  onClick={() => {
+                                    setPendingUpload({
+                                      kind: 'linkBanner',
+                                      columnIndex,
+                                      linkIndex,
+                                      slot,
+                                    });
+                                    fileInputRef.current?.click();
+                                  }}
+                                >
+                                  {slotUrl ? 'Replace' : 'Upload'}
+                                </button>
+                                {slotUrl ? (
+                                  <button
+                                    type="button"
+                                    className="admin-btn text-red-600"
+                                    onClick={() => {
+                                      const next = structuredClone(config);
+                                      const row = next.columns[columnIndex]?.links[linkIndex];
+                                      if (!row) return;
+                                      if (slot === 'mobile') row.bannerMobileUrl = '';
+                                      else row.bannerUrl = '';
+                                      setConfig(next);
+                                    }}
+                                  >
+                                    Clear
+                                  </button>
+                                ) : null}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     ) : null}
                   </div>
@@ -734,7 +817,12 @@ function MegaMenuEditor({ menuKey }: { menuKey: MegaMenuGender }) {
             if (pendingUpload.kind === 'heroBanner') {
               void uploadHeroBanner(file);
             } else if (pendingUpload.kind === 'linkBanner') {
-              void uploadLinkBanner(file, pendingUpload.columnIndex, pendingUpload.linkIndex);
+              void uploadLinkBanner(
+                file,
+                pendingUpload.columnIndex,
+                pendingUpload.linkIndex,
+                pendingUpload.slot,
+              );
             } else {
               void uploadTileImage(file, pendingUpload.kind, pendingUpload.index);
             }

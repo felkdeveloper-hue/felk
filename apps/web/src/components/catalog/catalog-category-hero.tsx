@@ -10,7 +10,9 @@ import oversizedBanner from '@/assets/images/Categories/oversized-banner.webp';
 import shopForLookImage from '@/assets/images/Crousel Image/shop-for-look.webp';
 import shopForLookImageMobile from '@/assets/images/Crousel Image/shop-for-look-mobile.webp';
 import { BlurredBannerImage } from '@/components/media/blurred-banner-image';
+import type { BannerDevice } from '@/constants/mega-menu-defaults';
 import { cn } from '@/lib/utils';
+import { normalizeBannerDevice } from '@/utils/mega-menu-links';
 
 type HeroArt = {
   desktop: string;
@@ -66,6 +68,11 @@ const HERO_FALLBACKS: Record<string, HeroArt> = {
   },
 };
 
+HERO_FALLBACKS['all-tops'] = HERO_FALLBACKS['all-topwear']!;
+HERO_FALLBACKS.pants = HERO_FALLBACKS['all-bottomwear']!;
+HERO_FALLBACKS.skirts = HERO_FALLBACKS['all-bottomwear']!;
+HERO_FALLBACKS['all-dresses'] = HERO_FALLBACKS.women!;
+
 /** Soft gradient backdrop when a category has no uploaded / curated banner. */
 const DEFAULT_HERO: HeroArt = {
   desktop:
@@ -104,30 +111,54 @@ export interface CatalogCategoryHeroProps {
   title: string;
   /** Slug or gender key used to pick the curated fallback. */
   scopeKey?: string;
-  /** CMS-supplied image URL — only used when no curated campaign art exists. */
+  /** Mega-menu desktop (or both) banner. Never the homepage category card. */
   imageUrl?: string | null;
+  /** Mega-menu mobile banner. */
+  mobileImageUrl?: string | null;
+  /** Where the uploaded banner should appear. */
+  bannerDevice?: BannerDevice | string | null;
   /** Short tagline. Auto-resolved from scopeKey when omitted. */
   tagline?: string;
   className?: string;
 }
 
-function resolveHeroArt(scopeKey?: string, imageUrl?: string | null): HeroArt {
-  // Prefer admin-uploaded category / mega-menu banners over baked campaign art.
-  const uploaded = imageUrl?.trim();
-  if (uploaded) return { desktop: uploaded, bakedCopy: false };
-  const curated = scopeKey ? HERO_FALLBACKS[scopeKey] : undefined;
-  if (curated) return curated;
-  return DEFAULT_HERO;
+function resolveHeroArt(
+  scopeKey?: string,
+  imageUrl?: string | null,
+  mobileImageUrl?: string | null,
+  bannerDevice?: BannerDevice | string | null,
+): HeroArt {
+  const curated = (scopeKey ? HERO_FALLBACKS[scopeKey] : undefined) ?? DEFAULT_HERO;
+  const desktopUpload = imageUrl?.trim() || '';
+  const mobileUpload = mobileImageUrl?.trim() || '';
+  const device = normalizeBannerDevice(bannerDevice);
+  const hasUpload = Boolean(desktopUpload || mobileUpload);
+
+  if (!hasUpload) return curated;
+
+  const showDesktop = device === 'both' || device === 'desktop';
+  const showMobile = device === 'both' || device === 'mobile';
+
+  return {
+    desktop: showDesktop ? desktopUpload || mobileUpload || curated.desktop : curated.desktop,
+    mobile: showMobile
+      ? mobileUpload || desktopUpload || curated.mobile || curated.desktop
+      : (curated.mobile ?? curated.desktop),
+    bakedCopy: false,
+    objectClass: curated.objectClass,
+  };
 }
 
 export function CatalogCategoryHero({
   title,
   scopeKey,
   imageUrl,
+  mobileImageUrl,
+  bannerDevice,
   tagline,
   className,
 }: CatalogCategoryHeroProps) {
-  const art = resolveHeroArt(scopeKey, imageUrl);
+  const art = resolveHeroArt(scopeKey, imageUrl, mobileImageUrl, bannerDevice);
   const showCopy = !art.bakedCopy;
   // Explicit tagline (including '') wins — empty string hides auto women taglines.
   const resolvedTagline =

@@ -21,13 +21,19 @@ export type NavigationMenuKey = 'women' | 'men' | 'accessories';
 /** @deprecated Use NavigationMenuKey */
 export type MegaMenuGender = NavigationMenuKey;
 
+export type BannerDevice = 'desktop' | 'mobile' | 'both';
+
 export type MegaMenuLink = {
   label: string;
   slug: string;
   /** Non-clickable subheading inside a column (e.g. Pants under Bottoms). */
   heading?: boolean;
-  /** Optional category page hero banner for this link. */
+  /** Category page hero — desktop / both. Not the homepage tile image. */
   bannerUrl?: string;
+  /** Category page hero — mobile. */
+  bannerMobileUrl?: string;
+  /** Where the uploaded hero appears. Defaults to both. */
+  bannerDevice?: BannerDevice;
 };
 export type MegaMenuColumn = { title: string; links: MegaMenuLink[] };
 export type MegaMenuTile = {
@@ -101,11 +107,13 @@ export const WOMEN_CATEGORY_COLUMNS: MegaMenuColumn[] = [
     links: [
       { label: 'All Bottoms', slug: 'all-bottoms' },
       { label: 'Pants', slug: '', heading: true },
+      { label: 'All pants', slug: 'pants' },
       { label: 'Jeans - Denim', slug: 'jeans-denim' },
       { label: 'Leather pants', slug: 'leather-pants' },
       { label: 'Casual pants', slug: 'casual-pants' },
       { label: 'Office pants', slug: 'office-pants' },
       { label: 'Skirts', slug: '', heading: true },
+      { label: 'All skirts', slug: 'skirts' },
       { label: 'Mini Skirts', slug: 'mini-skirts' },
       { label: 'Midi Skirts', slug: 'midi-skirts' },
       { label: 'Maxi Skirts', slug: 'maxi-skirts' },
@@ -165,6 +173,30 @@ export function ensureWomenCoordsExtras(columns: MegaMenuColumn[]): MegaMenuColu
       links = [...links, ...COORDS_FOOTWEAR_LINKS.map((link) => ({ ...link }))];
     }
 
+    return { ...column, links };
+  });
+}
+
+function insertLinkAfterHeading(
+  links: MegaMenuLink[],
+  headingLabel: string,
+  insert: MegaMenuLink,
+): MegaMenuLink[] {
+  if (links.some((link) => link.slug === insert.slug)) return links;
+  const headingIdx = links.findIndex(
+    (link) => link.heading && link.label.trim().toLowerCase() === headingLabel,
+  );
+  const next = [...links];
+  next.splice(headingIdx >= 0 ? headingIdx + 1 : next.length, 0, insert);
+  return next;
+}
+
+/** Homepage tile slugs (pants / skirts) need a mega-menu row so their page banner can be uploaded. */
+export function ensureWomenCategoryBannerSlots(columns: MegaMenuColumn[]): MegaMenuColumn[] {
+  return columns.map((column) => {
+    if (column.title.trim().toLowerCase() !== 'bottoms') return column;
+    let links = insertLinkAfterHeading(column.links, 'pants', { label: 'All pants', slug: 'pants' });
+    links = insertLinkAfterHeading(links, 'skirts', { label: 'All skirts', slug: 'skirts' });
     return { ...column, links };
   });
 }

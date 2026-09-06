@@ -1,5 +1,54 @@
 import { ROUTES } from '@/constants';
-import type { NavigationMenuKey } from '@/constants/mega-menu-defaults';
+import type {
+  BannerDevice,
+  MegaMenuColumn,
+  NavigationMenuKey,
+} from '@/constants/mega-menu-defaults';
+
+export function normalizeBannerDevice(value?: string | null): BannerDevice {
+  if (value === 'desktop' || value === 'mobile') return value;
+  return 'both';
+}
+
+export type CategoryPageBanner = {
+  desktop?: string;
+  mobile?: string;
+  device: BannerDevice;
+};
+
+function linkSlug(slug: string): string {
+  return slug
+    .trim()
+    .toLowerCase()
+    .replace(/^\/?categories\//, '')
+    .split('?')[0] ?? '';
+}
+
+/** Category PLP hero from mega-menu link banners — never homepage tile photos. */
+export function findMegaMenuPageBanner(
+  menus: Array<{ columns?: MegaMenuColumn[] } | null | undefined>,
+  slug?: string | null,
+): CategoryPageBanner | undefined {
+  const normalized = slug ? linkSlug(slug) : '';
+  if (!normalized) return undefined;
+
+  for (const menu of menus) {
+    for (const column of menu?.columns ?? []) {
+      for (const link of column.links) {
+        if (link.heading || linkSlug(link.slug) !== normalized) continue;
+        const desktop = link.bannerUrl?.trim() || undefined;
+        const mobile = link.bannerMobileUrl?.trim() || undefined;
+        if (!desktop && !mobile) return undefined;
+        return {
+          desktop,
+          mobile,
+          device: normalizeBannerDevice(link.bannerDevice),
+        };
+      }
+    }
+  }
+  return undefined;
+}
 
 export type MegaMenuLinkTarget =
   | { kind: 'products'; search: Record<string, string> }

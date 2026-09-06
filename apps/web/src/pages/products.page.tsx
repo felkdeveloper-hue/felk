@@ -3,9 +3,9 @@ import { Seo } from '@/components/common/seo';
 import { CatalogCategoryHero, CatalogListShell } from '@/components/catalog';
 import { buildAbsoluteUrl, siteConfig } from '@/config';
 import type { MegaMenuGender } from '@/constants/mega-menu-defaults';
-import { getHomeCategoryNavItem, isHomeCategoryNavSlug } from '@/constants/home-category-nav';
 import { useCatalogSearchParams, useCategoriesList, useInfiniteProducts } from '@/hooks/catalog';
 import { useNavigationMenu } from '@/hooks/storefront';
+import { findMegaMenuPageBanner } from '@/utils/mega-menu-links';
 
 const GENDER_META: Record<
   string,
@@ -53,20 +53,12 @@ export function ProductsPage() {
   }, [categoriesQuery.data?.data, state.categoryId]);
 
   const filteredSlug = filteredCategory?.slug;
-  const homeCategorySlugs = menuQuery.data?.homeCategories?.map((tile) => tile.slug) ?? [];
-  const isSidebarCategory = isHomeCategoryNavSlug(filteredSlug, homeCategorySlugs);
-  const sidebarNavItem = getHomeCategoryNavItem(filteredSlug, menuQuery.data?.homeCategories);
   const defaultShopBannerUrl = menuQuery.data?.heroBannerUrl?.trim() || undefined;
+  const pageBanner = findMegaMenuPageBanner([menuQuery.data], filteredSlug);
 
-  // Banner rules:
-  // - No category filter → shop/gender default banner + Women/All Products title
-  // - One of the 8 sidebar categories → that category’s banner + its name
-  // - Any other category filter → default shop banner + bold category name (e.g. Midi Dresses)
   const heroTitle = filteredCategory?.name ?? meta?.title ?? 'All Products';
-  const heroScopeKey = isSidebarCategory ? (filteredSlug ?? 'women') : (meta?.scopeKey ?? 'women');
-  const heroBannerUrl = isSidebarCategory
-    ? filteredCategory?.imageUrl?.trim() || sidebarNavItem?.imageUrl || defaultShopBannerUrl
-    : defaultShopBannerUrl;
+  const heroScopeKey = filteredSlug ?? meta?.scopeKey ?? 'women';
+  const heroBannerUrl = pageBanner?.desktop ?? (filteredSlug ? undefined : defaultShopBannerUrl);
 
   return (
     <>
@@ -80,7 +72,9 @@ export function ProductsPage() {
         title={heroTitle}
         scopeKey={heroScopeKey}
         imageUrl={heroBannerUrl}
-        tagline={isSidebarCategory ? (filteredCategory?.description ?? '') : ''}
+        mobileImageUrl={pageBanner?.mobile}
+        bannerDevice={pageBanner?.device}
+        tagline={filteredSlug ? (filteredCategory?.description ?? '') : ''}
       />
 
       <CatalogListShell

@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Container } from '@/components/layout/container';
 import { buildAbsoluteUrl, siteConfig } from '@/config';
 import { ROUTES } from '@/constants';
-import { isHomeCategoryNavSlug, getHomeCategoryNavItem } from '@/constants/home-category-nav';
 import {
   useCatalogSearchParams,
   useCategoriesList,
@@ -16,6 +15,7 @@ import {
 } from '@/hooks/catalog';
 import { useNavigationMenu } from '@/hooks/storefront';
 import { catalogSearchToUrlParams, type CatalogSearchState } from '@/utils/catalog';
+import { findMegaMenuPageBanner } from '@/utils/mega-menu-links';
 
 export function CategoryDetailPage() {
   const navigate = useNavigate();
@@ -34,10 +34,11 @@ export function CategoryDetailPage() {
   const categoryMissing = categoryQuery.isFetched && !category?.id && !categoryQuery.isError;
 
   const womenMenuQuery = useNavigationMenu('women');
-  const homeCategorySlugs = womenMenuQuery.data?.homeCategories?.map((tile) => tile.slug) ?? [];
-  // Homepage / admin tiles keep their own banner art.
-  // Filter picks (Mini Dresses, Long sleeves, etc.) use the default shop banner.
-  const useCategoryBanner = isHomeCategoryNavSlug(slug, homeCategorySlugs);
+  const menMenuQuery = useNavigationMenu('men');
+  const pageBanner = findMegaMenuPageBanner(
+    [womenMenuQuery.data, menMenuQuery.data],
+    slug,
+  );
   const defaultShopBannerUrl = womenMenuQuery.data?.heroBannerUrl?.trim() || undefined;
 
   const query = useInfiniteProducts(mergedState, {
@@ -109,23 +110,15 @@ export function CategoryDetailPage() {
 
   const heroTitle = category?.name ?? slug.replace(/-/g, ' ');
   const prettyName = category?.name ?? slug.replace(/-/g, ' ');
-  const sidebarNavItem = getHomeCategoryNavItem(slug, womenMenuQuery.data?.homeCategories);
 
-  const heroProps = useCategoryBanner
-    ? {
-        title: heroTitle,
-        // Prefer CMS upload, then homepage tile art, so the 8 never fall to a blank default.
-        scopeKey: slug,
-        imageUrl: category?.imageUrl?.trim() || sidebarNavItem?.imageUrl,
-        tagline: category?.description ?? '',
-      }
-    : {
-        // Other filter categories: default shop banner + bold category name on the hero.
-        title: heroTitle,
-        scopeKey: 'women' as const,
-        imageUrl: defaultShopBannerUrl,
-        tagline: '',
-      };
+  const heroProps = {
+    title: heroTitle,
+    scopeKey: slug,
+    imageUrl: pageBanner?.desktop,
+    mobileImageUrl: pageBanner?.mobile,
+    bannerDevice: pageBanner?.device,
+    tagline: category?.description ?? '',
+  };
 
   if (categoryMissing) {
     return (
@@ -159,7 +152,7 @@ export function CategoryDetailPage() {
         description={
           category?.description ?? `Shop ${category?.name ?? 'category'} at ${siteConfig.name}.`
         }
-        image={useCategoryBanner ? category?.imageUrl : defaultShopBannerUrl}
+        image={pageBanner?.desktop ?? defaultShopBannerUrl}
         url={buildAbsoluteUrl(`/categories/${slug}`)}
       />
 

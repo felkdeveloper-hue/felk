@@ -435,10 +435,16 @@ cmsRouter.put(
       { upsert: true, new: true, setDefaultsOnInsert: true },
     ).lean();
 
-    // Sync link / homepage-tile images onto matching category pages.
+    // Homepage tile photos stay on the homepage grid only.
+    // Category PLP heroes come from mega-menu link banners.
     const bannerLinks = (body.columns ?? []).flatMap((column) =>
       (column.links ?? [])
-        .filter((link) => !link.heading && link.slug?.trim() && link.bannerUrl?.trim())
+        .filter(
+          (link) =>
+            !link.heading &&
+            link.slug?.trim() &&
+            (link.bannerUrl?.trim() || link.bannerMobileUrl?.trim()),
+        )
         .map((link) => ({
           slug: (
             link.slug
@@ -448,17 +454,11 @@ cmsRouter.put(
           )
             .trim()
             .toLowerCase(),
-          bannerUrl: String(link.bannerUrl ?? '').trim(),
+          bannerUrl: String(link.bannerUrl || link.bannerMobileUrl || '').trim(),
         })),
     );
-    const homeTileImages = (body.homeCategories ?? [])
-      .filter((tile) => tile.slug?.trim() && tile.imageUrl?.trim())
-      .map((tile) => ({
-        slug: tile.slug.trim().toLowerCase(),
-        bannerUrl: tile.imageUrl.trim(),
-      }));
     await Promise.all(
-      [...bannerLinks, ...homeTileImages]
+      bannerLinks
         .filter((link) => link.slug && !link.slug.includes('/'))
         .map(async (link) => {
           await CategoryModel.updateOne(

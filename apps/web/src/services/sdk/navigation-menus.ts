@@ -8,9 +8,11 @@ import type {
 import {
   DEFAULT_HOME_CATEGORIES,
   DEFAULT_MEGA_MENUS,
+  ensureWomenCategoryBannerSlots,
   ensureWomenCoordsExtras,
   isLegacyWomenMegaMenuColumns,
 } from '@/constants/mega-menu-defaults';
+import { normalizeBannerDevice } from '@/utils/mega-menu-links';
 import { isLegacyHomeCategoryList } from '@/constants/home-category-nav';
 import { toStorefrontMediaUrl } from '@/utils/media-url';
 
@@ -53,11 +55,14 @@ function asColumns(raw: unknown): MegaMenuColumn[] {
       ? record.links.map((link) => {
           const row = link as Record<string, unknown>;
           const bannerUrl = toStorefrontMediaUrl(String(row.bannerUrl ?? '').trim());
+          const bannerMobileUrl = toStorefrontMediaUrl(String(row.bannerMobileUrl ?? '').trim());
           return {
             label: String(row.label ?? ''),
             slug: String(row.slug ?? ''),
             ...(row.heading ? { heading: true as const } : {}),
             ...(bannerUrl ? { bannerUrl } : {}),
+            ...(bannerMobileUrl ? { bannerMobileUrl } : {}),
+            bannerDevice: normalizeBannerDevice(String(row.bannerDevice ?? '')),
           };
         })
       : [];
@@ -125,7 +130,10 @@ export const navigationMenusApi = {
           : columns.length
             ? columns
             : fallback.columns;
-      const resolvedColumns = key === 'women' ? ensureWomenCoordsExtras(baseColumns) : baseColumns;
+      const resolvedColumns =
+        key === 'women'
+          ? ensureWomenCategoryBannerSlots(ensureWomenCoordsExtras(baseColumns))
+          : baseColumns;
 
       const rawHero = String(raw.heroBannerUrl ?? '').trim();
       const heroBannerUrl = isUsableStorefrontImageUrl(rawHero)
