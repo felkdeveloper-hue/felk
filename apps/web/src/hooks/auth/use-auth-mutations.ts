@@ -18,12 +18,15 @@ export interface LoginMutationInput extends LoginPayload {
 
 export function useLoginMutation() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const setSession = useAuthStore((state) => state.setSession);
 
   return useMutation({
     mutationFn: ({ redirect: _redirect, ...payload }: LoginMutationInput) => authApi.login(payload),
     onSuccess: (session, variables) => {
       setSession(session);
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.customers.flashSale() });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.storefront.flashSale() });
       navigate({ to: getPostLoginDestination(session.user, variables.redirect) });
     },
   });
@@ -67,6 +70,7 @@ export function useResetPasswordMutation() {
 
 export function useVerifyEmailMutation() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const setSession = useAuthStore((state) => state.setSession);
 
   return useMutation({
@@ -74,6 +78,8 @@ export function useVerifyEmailMutation() {
       authApi.verifyEmail(email, code),
     onSuccess: (session) => {
       setSession(session);
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.customers.flashSale() });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.storefront.flashSale() });
       navigate({ to: getPostLoginDestination(session.user) });
     },
   });

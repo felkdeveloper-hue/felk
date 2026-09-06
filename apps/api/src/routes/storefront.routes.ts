@@ -35,6 +35,7 @@ import {
 import { getCached, setCache, storefrontProductsCacheKey } from '@/utils/simple-cache.js';
 import { stableQueryKey } from '@/utils/stable-query-key.js';
 import { anonymousFlashSaleService } from '@/services/anonymous-flash-sale.service.js';
+import { applyFlashSaleCookie } from '@/utils/flash-sale-cookie.util.js';
 
 export const storefrontRouter = Router();
 
@@ -517,6 +518,7 @@ storefrontRouter.get(
   asyncHandler(async (req, res) => {
     res.set('Cache-Control', 'no-store');
     const status = await anonymousFlashSaleService.getOrCreateForRequest(req);
+    applyFlashSaleCookie(res, status);
     ApiResponse.success(res, status);
   }),
 );

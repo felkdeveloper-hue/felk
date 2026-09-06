@@ -49,6 +49,7 @@ checkoutRouter.post(
         shippingMethod: req.body.shippingMethod as ShippingMethod | undefined,
       },
       actorFromRequest(req),
+      req,
     );
     void emitBusinessEvent({
       eventId: randomUUID(),
@@ -122,6 +123,7 @@ checkoutRouter.post(
           shippingMethod: req.body.shippingMethod as ShippingMethod | undefined,
         },
         actorFromRequest(req),
+        req,
       ),
       'Refreshed',
     );

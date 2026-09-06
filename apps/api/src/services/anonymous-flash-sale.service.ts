@@ -2,7 +2,9 @@ import type { Request } from 'express';
 import type { Types } from 'mongoose';
 import { FLASH_SALE_DISCOUNT } from '@/constants/checkout.js';
 import { AnonymousFlashSaleModel } from '@/models/anonymous-flash-sale.model.js';
+import { CustomerModel } from '@/models/customer.models.js';
 import { hashIpFromRequest } from '@/utils/ip-hash.util.js';
+import { readFlashSaleCookie } from '@/utils/flash-sale-cookie.util.js';
 
 const LOGIN_BONUS_THRESHOLD_MS = 5 * 60 * 1000;
 const LOGIN_BONUS_MS = 15 * 60 * 1000;
@@ -19,10 +21,29 @@ function remainingMs(startTime: Date): number {
   return Math.max(0, FLASH_SALE_DISCOUNT.DURATION_MS - elapsed);
 }
 
+function toDate(value: Date | string | null | undefined): Date | null {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isFinite(date.getTime()) ? date : null;
+}
+
+function isActiveWindow(startTime: Date | string | null | undefined): startTime is Date | string {
+  const date = toDate(startTime ?? null);
+  return Boolean(date && remainingMs(date) > 0);
+}
+
 function buildStatus(
-  startTime: Date,
+  startTime: Date | null,
   extras?: { loginBonusApplied?: boolean },
 ): FlashSaleStatusPayload {
+  if (!startTime) {
+    return {
+      flashSaleStartTime: null,
+      isActive: false,
+      expiresAt: null,
+      ...extras,
+    };
+  }
   const remaining = remainingMs(startTime);
   const isActive = remaining > 0;
   return {
@@ -43,10 +64,23 @@ function applyLoginBonusIfLowTime(startTime: Date): {
   if (remaining <= 0 || remaining >= LOGIN_BONUS_THRESHOLD_MS) {
     return { startTime, loginBonusApplied: false };
   }
+  // Move start forward so expiresAt (start + 1h) is later — never past a full hour.
+  const extendedStartMs = Math.min(Date.now(), startTime.getTime() + LOGIN_BONUS_MS);
   return {
-    startTime: new Date(startTime.getTime() - LOGIN_BONUS_MS),
+    startTime: new Date(extendedStartMs),
     loginBonusApplied: true,
   };
+}
+
+/** Prefer the earliest still-active start so login never resets the clock. */
+function earliestActiveStart(candidates: Array<Date | null | undefined>): Date | null {
+  const active = candidates
+    .map((value) => toDate(value ?? null))
+    .filter((value): value is Date => Boolean(value && remainingMs(value) > 0));
+  if (!active.length) return null;
+  return active.reduce((earliest, next) =>
+    next.getTime() < earliest.getTime() ? next : earliest,
+  );
 }
 
 class AnonymousFlashSaleService {
@@ -66,31 +100,31 @@ class AnonymousFlashSaleService {
     );
   }
 
-  /** Get or create a 60-minute anonymous flash sale keyed by request IP. */
+  /** Get or create a 60-minute anonymous flash sale keyed by request IP (+ cookie fallback). */
   async getOrCreateForRequest(req: Request): Promise<FlashSaleStatusPayload> {
     const ipHash = hashIpFromRequest(req);
+    const cookieStart = readFlashSaleCookie(req);
     let record = await AnonymousFlashSaleModel.findOne({ ipHash });
 
     if (!record) {
-      const now = new Date();
+      const startTime = cookieStart && remainingMs(cookieStart) > 0 ? cookieStart : new Date();
       try {
         record = await AnonymousFlashSaleModel.create({
           ipHash,
-          flashSaleStartTime: now,
+          flashSaleStartTime: startTime,
         });
       } catch {
         record = await AnonymousFlashSaleModel.findOne({ ipHash });
         if (!record) {
-          return {
-            flashSaleStartTime: null,
-            isActive: false,
-            expiresAt: null,
-          };
+          return buildStatus(cookieStart && remainingMs(cookieStart) > 0 ? cookieStart : null);
         }
       }
     } else if (remainingMs(record.flashSaleStartTime) <= 0) {
-      const now = new Date();
-      record.flashSaleStartTime = now;
+      if (cookieStart && remainingMs(cookieStart) > 0) {
+        record.flashSaleStartTime = cookieStart;
+      } else {
+        record.flashSaleStartTime = new Date();
+      }
       record.transferredAt = null;
       record.transferredToCustomerId = null;
       await record.save();
@@ -103,8 +137,43 @@ class AnonymousFlashSaleService {
   async getForRequest(req: Request): Promise<FlashSaleStatusPayload | null> {
     const ipHash = hashIpFromRequest(req);
     const record = await AnonymousFlashSaleModel.findOne({ ipHash });
-    if (!record) return null;
-    return buildStatus(record.flashSaleStartTime);
+    const ipStart = record?.flashSaleStartTime ?? null;
+    const cookieStart = readFlashSaleCookie(req);
+    const startTime = earliestActiveStart([ipStart, cookieStart]);
+    return startTime ? buildStatus(startTime) : record ? buildStatus(record.flashSaleStartTime) : null;
+  }
+
+  /**
+   * Attach an active guest timer (IP or signed cookie) to a customer account.
+   * Never overwrites an already-active customer window and never restarts the clock.
+   */
+  async adoptActiveWindow(
+    req: Request,
+    customerId: Types.ObjectId | string,
+    currentStartTime?: Date | string | null,
+  ): Promise<FlashSaleStatusPayload> {
+    const current = toDate(currentStartTime ?? null);
+    if (current && remainingMs(current) > 0) {
+      await this.syncIpRecord(req, current);
+      return buildStatus(current);
+    }
+
+    const ipRecord = await AnonymousFlashSaleModel.findOne({ ipHash: hashIpFromRequest(req) });
+    const guestStart = earliestActiveStart([
+      ipRecord?.flashSaleStartTime,
+      readFlashSaleCookie(req),
+    ]);
+    if (!guestStart) {
+      return buildStatus(current);
+    }
+
+    const { startTime, loginBonusApplied } = applyLoginBonusIfLowTime(guestStart);
+    await CustomerModel.updateOne(
+      { _id: customerId, isDeleted: false },
+      { $set: { flashSaleStartTime: startTime } },
+    );
+    await this.syncIpRecord(req, startTime);
+    return buildStatus(startTime, { loginBonusApplied });
   }
 
   /**
@@ -117,28 +186,22 @@ class AnonymousFlashSaleService {
     customerId: Types.ObjectId | string,
     updateCustomer: (startTime: Date) => Promise<void>,
   ): Promise<{ transferred: boolean; status: FlashSaleStatusPayload | null }> {
-    const ipHash = hashIpFromRequest(req);
-    const record = await AnonymousFlashSaleModel.findOne({ ipHash });
-    if (!record) {
+    const status = await this.adoptActiveWindow(req, customerId, null);
+    if (!status.isActive || !status.flashSaleStartTime) {
       return { transferred: false, status: null };
     }
-
-    const remaining = remainingMs(record.flashSaleStartTime);
-    if (remaining <= 0) {
-      return { transferred: false, status: null };
-    }
-
-    const { startTime, loginBonusApplied } = applyLoginBonusIfLowTime(record.flashSaleStartTime);
-    await updateCustomer(startTime);
-    await this.syncIpRecord(req, startTime);
-
-    return {
-      transferred: true,
-      status: buildStatus(startTime, { loginBonusApplied }),
-    };
+    await updateCustomer(new Date(status.flashSaleStartTime));
+    return { transferred: true, status };
   }
 }
 
 export const anonymousFlashSaleService = new AnonymousFlashSaleService();
 
-export { LOGIN_BONUS_THRESHOLD_MS, LOGIN_BONUS_MS, applyLoginBonusIfLowTime, remainingMs };
+export {
+  LOGIN_BONUS_THRESHOLD_MS,
+  LOGIN_BONUS_MS,
+  applyLoginBonusIfLowTime,
+  remainingMs,
+  isActiveWindow,
+  earliestActiveStart,
+};

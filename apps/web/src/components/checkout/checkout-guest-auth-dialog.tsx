@@ -62,7 +62,19 @@ export function CheckoutGuestAuthDialog({ open, onAuthenticated }: CheckoutGuest
   const [guestPending, setGuestPending] = useState(false);
   const [error, setError] = useState<unknown>(null);
 
+  const persistFlashSale = async () => {
+    try {
+      const status = await customersApi.startFlashSale();
+      queryClient.setQueryData(QUERY_KEYS.customers.flashSale(), status);
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.customers.flashSale() });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.storefront.flashSale() });
+    } catch {
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.customers.flashSale() });
+    }
+  };
+
   const afterAuth = async () => {
+    await persistFlashSale();
     const guestCartToken = useCartStore.getState().guestCartToken;
     if (guestCartToken) {
       try {
@@ -113,6 +125,7 @@ export function CheckoutGuestAuthDialog({ open, onAuthenticated }: CheckoutGuest
         ...getAttributionPayloadForAuth(),
       });
       setSession(session);
+      await persistFlashSale();
       queryClient.setQueryData(QUERY_KEYS.customers.addresses(), []);
       onAuthenticated();
     } catch (err) {

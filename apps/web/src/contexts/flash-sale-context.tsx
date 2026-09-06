@@ -1,11 +1,12 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { QUERY_KEYS } from '@/constants/query-keys';
-import { customersApi } from '@/services/sdk';
+import { customersApi, type FlashSaleStatus } from '@/services/sdk';
 import { storefrontApi } from '@/services/sdk/storefront';
 import { useAuthStore } from '@/store/auth-store';
 
 const FLASH_SALE_DURATION_MS = 60 * 60 * 1000; // 1 hour
+const FLASH_SALE_START_STORAGE_KEY = 'fe_flash_sale_start';
 
 export interface FlashSaleContextValue {
   /** Whether the flash sale is currently active for this user */
@@ -67,6 +68,39 @@ function formatTime(ms: number): string {
   return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 }
 
+function remainingFromStart(startTimeStr: string | null | undefined): number {
+  if (!startTimeStr) return 0;
+  const startTs = new Date(startTimeStr).getTime();
+  if (!Number.isFinite(startTs)) return 0;
+  return Math.max(0, FLASH_SALE_DURATION_MS - (Date.now() - startTs));
+}
+
+function readStoredStartTime(): string | null {
+  try {
+    const raw = localStorage.getItem(FLASH_SALE_START_STORAGE_KEY);
+    if (!raw) return null;
+    if (remainingFromStart(raw) <= 0) {
+      localStorage.removeItem(FLASH_SALE_START_STORAGE_KEY);
+      return null;
+    }
+    return raw;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredStartTime(startTime: string | null): void {
+  try {
+    if (!startTime || remainingFromStart(startTime) <= 0) {
+      localStorage.removeItem(FLASH_SALE_START_STORAGE_KEY);
+      return;
+    }
+    localStorage.setItem(FLASH_SALE_START_STORAGE_KEY, startTime);
+  } catch {
+    /* private mode / blocked storage */
+  }
+}
+
 const POPUP_DISMISSED_KEY = 'flash_sale_popup_dismissed';
 
 interface FlashSaleProviderProps {
@@ -78,11 +112,12 @@ export function FlashSaleProvider({ children }: FlashSaleProviderProps) {
   const user = useAuthStore((state) => state.user);
   const queryClient = useQueryClient();
 
-  const [timeRemaining, setTimeRemaining] = useState(0);
+  const [timeRemaining, setTimeRemaining] = useState(() => remainingFromStart(readStoredStartTime()));
   const [showPopup, setShowPopup] = useState(false);
   const [showUniversalPopup, setShowUniversalPopup] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef<number | null>(null);
+  const ensureAttemptedForUserRef = useRef<string | null>(null);
 
   // Universal popup — fires for ALL visitors on every page load, no storage gate.
   useEffect(() => {
@@ -107,8 +142,9 @@ export function FlashSaleProvider({ children }: FlashSaleProviderProps) {
     queryKey: QUERY_KEYS.customers.flashSale(),
     queryFn: () => customersApi.getFlashSale(),
     enabled: isAuthenticated,
-    staleTime: 1000 * 60,
+    staleTime: 15 * 1000,
     refetchOnWindowFocus: false,
+    placeholderData: () => queryClient.getQueryData<FlashSaleStatus>(QUERY_KEYS.storefront.flashSale()),
   });
 
   // Anonymous: IP-persisted flash sale for unsigned visitors
@@ -121,15 +157,32 @@ export function FlashSaleProvider({ children }: FlashSaleProviderProps) {
     refetchOnWindowFocus: false,
   });
 
-  const activeFlashSaleData = isAuthenticated ? flashSaleData : anonymousFlashSaleData;
+  const guestFallback = anonymousFlashSaleData ?? queryClient.getQueryData<FlashSaleStatus>(QUERY_KEYS.storefront.flashSale());
+  const storedStart = readStoredStartTime();
+  const storedFallback: FlashSaleStatus | undefined = storedStart
+    ? {
+        flashSaleStartTime: storedStart,
+        isActive: remainingFromStart(storedStart) > 0,
+        expiresAt: new Date(new Date(storedStart).getTime() + FLASH_SALE_DURATION_MS).toISOString(),
+      }
+    : undefined;
+
+  // Keep the guest timer visible until the member record is actually loaded.
+  const activeFlashSaleData = isAuthenticated
+    ? (flashSaleData ?? (isLoadingAuthed ? (guestFallback ?? storedFallback) : flashSaleData))
+    : (anonymousFlashSaleData ?? storedFallback);
   const isLoading = isAuthenticated ? isLoadingAuthed : isLoadingAnonymous;
 
   // Mutation to start the flash sale (authenticated only — transfers IP timer on login)
   const startFlashSaleMutation = useMutation({
     mutationFn: () => customersApi.startFlashSale(),
     onSuccess: (data) => {
+      queryClient.setQueryData(QUERY_KEYS.customers.flashSale(), data);
       void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.customers.flashSale() });
       void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.storefront.flashSale() });
+      if (data.flashSaleStartTime && data.isActive) {
+        writeStoredStartTime(data.flashSaleStartTime);
+      }
       if (!data.alreadyStarted) {
         const dismissed = sessionStorage.getItem(POPUP_DISMISSED_KEY);
         if (!dismissed) {
@@ -143,35 +196,60 @@ export function FlashSaleProvider({ children }: FlashSaleProviderProps) {
   const wasAuthenticatedRef = useRef(isAuthenticated);
   useEffect(() => {
     if (wasAuthenticatedRef.current && !isAuthenticated) {
+      ensureAttemptedForUserRef.current = null;
       void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.storefront.flashSale() });
     }
     wasAuthenticatedRef.current = isAuthenticated;
   }, [isAuthenticated, queryClient]);
 
-  // Start or transfer flash sale when user logs in
+  useEffect(() => {
+    if (activeFlashSaleData?.isActive && activeFlashSaleData.flashSaleStartTime) {
+      writeStoredStartTime(activeFlashSaleData.flashSaleStartTime);
+    } else if (isAuthenticated && flashSaleData && !flashSaleData.isActive && !isLoadingAuthed) {
+      writeStoredStartTime(null);
+    }
+  }, [
+    activeFlashSaleData?.flashSaleStartTime,
+    activeFlashSaleData?.isActive,
+    flashSaleData,
+    isAuthenticated,
+    isLoadingAuthed,
+  ]);
+
+  // Start or transfer flash sale when user logs in — never drop an active guest window.
   useEffect(() => {
     if (!isAuthenticated || isLoadingAuthed) return;
     if (flashSaleData === undefined) return;
 
-    const shouldStartFresh =
-      !flashSaleData.flashSaleStartTime || flashSaleData.apologyFlashSalePending === true;
-
-    if (shouldStartFresh) {
+    if (flashSaleData.apologyFlashSalePending === true) {
       startFlashSaleMutation.mutate();
-    } else if (flashSaleData.isActive) {
+      return;
+    }
+
+    if (flashSaleData.isActive) {
       const dismissed = sessionStorage.getItem(POPUP_DISMISSED_KEY);
       if (!dismissed) {
         setShowPopup(true);
         sessionStorage.setItem(POPUP_DISMISSED_KEY, '1');
       }
+      return;
     }
+
+    const userKey = user?.id ?? 'authed';
+    if (ensureAttemptedForUserRef.current === userKey) return;
+    ensureAttemptedForUserRef.current = userKey;
+    startFlashSaleMutation.mutate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated, isLoadingAuthed, flashSaleData?.flashSaleStartTime, user?.id]);
+  }, [isAuthenticated, isLoadingAuthed, flashSaleData?.flashSaleStartTime, flashSaleData?.isActive, user?.id]);
 
   // Real-time countdown (works for both authenticated and anonymous)
   useEffect(() => {
     const startTimeStr = activeFlashSaleData?.flashSaleStartTime ?? null;
     if (!startTimeStr || !activeFlashSaleData?.isActive) {
+      // During the login handoff, keep the last known timer instead of flashing to 00:00.
+      if (isAuthenticated && isLoadingAuthed && startTimeRef.current) {
+        return;
+      }
       startTimeRef.current = null;
       setTimeRemaining(0);
       if (intervalRef.current) {
@@ -194,6 +272,7 @@ export function FlashSaleProvider({ children }: FlashSaleProviderProps) {
           clearInterval(intervalRef.current);
           intervalRef.current = null;
         }
+        writeStoredStartTime(null);
         if (isAuthenticated) {
           void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.customers.flashSale() });
         } else {
@@ -215,6 +294,7 @@ export function FlashSaleProvider({ children }: FlashSaleProviderProps) {
     activeFlashSaleData?.flashSaleStartTime,
     activeFlashSaleData?.isActive,
     isAuthenticated,
+    isLoadingAuthed,
     queryClient,
   ]);
 

@@ -15,6 +15,7 @@ import { asyncHandler } from '@/utils/async-handler.js';
 import { ApiResponse } from '@/utils/response/api-response.js';
 import { HTTP_STATUS } from '@/constants/http.js';
 import { emitBusinessEvent } from '@/services/platform-analytics/index.js';
+import { persistGuestFlashSaleOnAuth } from '@/services/flash-sale-persist.service.js';
 
 function meta(req: Request): AuthRequestMeta {
   return authMetaFromRequest(req);
@@ -45,6 +46,7 @@ export const authController = {
       userId: result.user?.id ?? null,
       properties: { portal: (req.body as { portal?: string }).portal ?? 'customer' },
     });
+    await persistGuestFlashSaleOnAuth(req, res, result.user?.id);
     ApiResponse.success(
       res,
       {
@@ -144,6 +146,7 @@ export const authController = {
       refreshToken: result.refreshToken,
       rememberMe: false,
     });
+    await persistGuestFlashSaleOnAuth(req, res, result.user?.id);
     ApiResponse.success(
       res,
       {
@@ -190,6 +193,7 @@ export const authController = {
         refreshToken: result.refreshToken,
         rememberMe: result.rememberMe,
       });
+      await persistGuestFlashSaleOnAuth(req, res, result.user?.id);
       ApiResponse.success(
         res,
         {
@@ -220,6 +224,7 @@ export const authController = {
       userId: result.user?.id ?? null,
       properties: { portal: 'customer', source: 'checkout' },
     });
+    await persistGuestFlashSaleOnAuth(req, res, result.user?.id);
     ApiResponse.created(
       res,
       {
@@ -246,6 +251,7 @@ export const authController = {
       userId: result.user?.id ?? null,
       properties: { portal: 'customer', source: 'checkout_guest' },
     });
+    await persistGuestFlashSaleOnAuth(req, res, result.user?.id);
     ApiResponse.created(
       res,
       {
@@ -272,6 +278,7 @@ export const authController = {
       userId: result.user?.id ?? null,
       properties: { portal: 'customer', source: 'checkout_continue_as_guest' },
     });
+    await persistGuestFlashSaleOnAuth(req, res, result.user?.id);
     ApiResponse.created(
       res,
       {

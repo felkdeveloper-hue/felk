@@ -15,7 +15,6 @@ import { productMetaFrom, trackCommerceEvent } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
 import { useFlashSale } from '@/contexts/flash-sale-context';
 import { useFlashSaleEligibility } from '@/hooks/use-flash-sale-eligibility';
-import { useAuthStore } from '@/store';
 import { PriceDisplay } from './price-display';
 import { BnplInstallmentHint } from './bnpl-installment-hint';
 import { ProductColorSelector } from './product-color-selector';
@@ -128,10 +127,9 @@ export function ProductPurchasePanel({
   const [sizeError, setSizeError] = useState(false);
   const variants = product.variants ?? [];
 
-  const isAuthed = useAuthStore((state) => Boolean(state.accessToken && state.user));
   const { isFlashSaleActive, formattedTime } = useFlashSale();
   const { eligible: flashEligible } = useFlashSaleEligibility(product);
-  const showFlashSale = isAuthed && isFlashSaleActive && flashEligible;
+  const showFlashSale = isFlashSaleActive && flashEligible;
 
   const selectedVariant = useMemo(
     () => variants.find((v) => v.id === selectedVariantId) ?? variants[0],
@@ -339,7 +337,7 @@ export function ProductPurchasePanel({
 
         <div className="space-y-1">
           {flashPrice && flashBasePrice ? (
-            /* Logged-in users with active flash sale: 20% off */
+            /* Active flash sale: 20% off (guest + logged-in) */
             <div className="space-y-1">
               <div className="mb-1">
                 <span

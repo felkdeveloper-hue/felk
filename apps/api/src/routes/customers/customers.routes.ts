@@ -11,6 +11,7 @@ import { rewardService, referralService } from '@/services/reward.service.js';
 import { customerNoteService, customerTagService } from '@/services/customer-notes-tags.service.js';
 import { notificationService } from '@/services/notification.service.js';
 import { anonymousFlashSaleService } from '@/services/anonymous-flash-sale.service.js';
+import { applyFlashSaleCookie } from '@/utils/flash-sale-cookie.util.js';
 import { asyncHandler } from '@/utils/async-handler.js';
 import { ApiResponse } from '@/utils/response/api-response.js';
 import { ApiError } from '@/utils/errors/api-error.js';
@@ -351,18 +352,14 @@ customersRouter.get(
   asyncHandler(async (req, res) => {
     const customer = await resolveMeCustomer(req);
     const bonus = await customerService.applyReturnFlashSaleBonusIfPending(customer);
-    const startTime = bonus.startTime;
-    const durationMs = FLASH_SALE_DISCOUNT.DURATION_MS;
-    const isActive = startTime != null && Date.now() - new Date(startTime).getTime() < durationMs;
-    if (isActive && startTime) {
-      void anonymousFlashSaleService.syncIpRecord(req, new Date(startTime));
-    }
+    const status = await anonymousFlashSaleService.adoptActiveWindow(
+      req,
+      customer._id,
+      bonus.startTime,
+    );
+    applyFlashSaleCookie(res, status);
     ApiResponse.success(res, {
-      flashSaleStartTime: startTime ? new Date(startTime).toISOString() : null,
-      isActive,
-      expiresAt: startTime
-        ? new Date(new Date(startTime).getTime() + durationMs).toISOString()
-        : null,
+      ...status,
       apologyFlashSalePending: customer.metadata?.apologyFlashSalePending === true,
       returnBonusApplied: bonus.applied,
     });
@@ -384,13 +381,15 @@ customersRouter.post(
         'metadata.apologyFlashSalePending': false,
       });
       await anonymousFlashSaleService.syncIpRecord(req, now);
-      ApiResponse.success(res, {
+      const status = {
         flashSaleStartTime: now.toISOString(),
         isActive: true,
         expiresAt: new Date(now.getTime() + durationMs).toISOString(),
         alreadyStarted: false,
         apologyRedeemed: true,
-      });
+      };
+      applyFlashSaleCookie(res, status);
+      ApiResponse.success(res, status);
       return;
     }
 
@@ -398,45 +397,38 @@ customersRouter.post(
     const bonus = await customerService.applyReturnFlashSaleBonusIfPending(customer);
     if (bonus.applied && bonus.startTime) {
       await anonymousFlashSaleService.syncIpRecord(req, new Date(bonus.startTime));
-      ApiResponse.success(res, {
+      const status = {
         flashSaleStartTime: new Date(bonus.startTime).toISOString(),
         isActive: true,
         expiresAt: new Date(bonus.startTime.getTime() + durationMs).toISOString(),
         alreadyStarted: true,
         returnBonusApplied: true,
-      });
+      };
+      applyFlashSaleCookie(res, status);
+      ApiResponse.success(res, status);
       return;
     }
 
-    if (customer.flashSaleStartTime) {
-      const isActive = Date.now() - new Date(customer.flashSaleStartTime).getTime() < durationMs;
-      if (isActive) {
-        await anonymousFlashSaleService.syncIpRecord(req, new Date(customer.flashSaleStartTime));
-      }
-      ApiResponse.success(res, {
-        flashSaleStartTime: new Date(customer.flashSaleStartTime).toISOString(),
-        isActive,
-        expiresAt: new Date(
-          new Date(customer.flashSaleStartTime).getTime() + durationMs,
-        ).toISOString(),
-        alreadyStarted: true,
-      });
-      return;
-    }
-
-    // Transfer active anonymous IP timer to this account (preserves elapsed time).
-    const transfer = await anonymousFlashSaleService.transferToCustomer(
+    const adopted = await anonymousFlashSaleService.adoptActiveWindow(
       req,
       customer._id,
-      async (startTime) => {
-        await customer.updateOne({ flashSaleStartTime: startTime });
-      },
+      bonus.startTime ?? customer.flashSaleStartTime,
     );
-    if (transfer.transferred && transfer.status) {
+    if (adopted.isActive) {
+      applyFlashSaleCookie(res, adopted);
       ApiResponse.success(res, {
-        ...transfer.status,
+        ...adopted,
         alreadyStarted: true,
-        loginBonusApplied: transfer.status.loginBonusApplied ?? false,
+      });
+      return;
+    }
+
+    // Expired personal window and no live guest timer — do not restart the clock.
+    if (customer.flashSaleStartTime) {
+      applyFlashSaleCookie(res, adopted);
+      ApiResponse.success(res, {
+        ...adopted,
+        alreadyStarted: true,
       });
       return;
     }
@@ -444,12 +436,14 @@ customersRouter.post(
     const now = new Date();
     await customer.updateOne({ flashSaleStartTime: now });
     await anonymousFlashSaleService.syncIpRecord(req, now);
-    ApiResponse.success(res, {
+    const started = {
       flashSaleStartTime: now.toISOString(),
       isActive: true,
       expiresAt: new Date(now.getTime() + durationMs).toISOString(),
       alreadyStarted: false,
-    });
+    };
+    applyFlashSaleCookie(res, started);
+    ApiResponse.success(res, started);
   }),
 );
 

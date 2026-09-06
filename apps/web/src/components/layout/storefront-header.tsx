@@ -48,7 +48,6 @@ export interface StorefrontHeaderProps {
 
 export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderProps) {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
-  const isCheckout = pathname.startsWith(ROUTES.checkout);
   const { isScrolled, isHidden } = useScrollHeader({
     threshold: 36,
     // Keep mobile navbar visible while scrolling (no auto-hide).
@@ -176,7 +175,7 @@ export function StorefrontHeader({ navItems = DEFAULT_NAV }: StorefrontHeaderPro
           />
 
           {/* Desktop / tablet — keep timer in the action cluster */}
-          {!isCheckout ? <FlashSaleCountdown className="hidden shrink-0 sm:flex" /> : null}
+          <FlashSaleCountdown className="hidden shrink-0 sm:flex" />
 
           <div className="flex shrink-0 items-center gap-0">
             <Button

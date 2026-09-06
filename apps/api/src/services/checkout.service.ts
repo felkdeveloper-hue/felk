@@ -1,3 +1,4 @@
+import type { Request } from 'express';
 import { randomBytes } from 'node:crypto';
 import { Types } from 'mongoose';
 import { CheckoutSessionModel, type CheckoutSessionDocument } from '@/models/checkout.models.js';
@@ -9,6 +10,7 @@ import { CategoryModel } from '@/models/master-data.models.js';
 import { cartService } from '@/services/cart.service.js';
 import { reservationService } from '@/services/reservation.service.js';
 import { customerService } from '@/services/customer.service.js';
+import { anonymousFlashSaleService } from '@/services/anonymous-flash-sale.service.js';
 import {
   applyCouponPlaceholder,
   applyFirstOrderDiscount,
@@ -38,6 +40,15 @@ import type { AuthenticatedUser } from '@/types/index.js';
 
 function isStaffCheckout(roleKey?: string | null) {
   return Boolean(roleKey && (STAFF_ROLES as readonly string[]).includes(roleKey));
+}
+
+async function adoptFlashSaleForCheckout(req: Request | undefined, customerId: Types.ObjectId | string) {
+  if (!req) return;
+  const customer = await CustomerModel.findById(customerId)
+    .select('flashSaleStartTime')
+    .lean();
+  if (!customer) return;
+  await anonymousFlashSaleService.adoptActiveWindow(req, customer._id, customer.flashSaleStartTime);
 }
 
 function toPlain(doc: { toObject: () => Record<string, unknown> }) {
@@ -263,7 +274,7 @@ export class CheckoutService {
 
   private async recalculate(
     session: CheckoutSessionDocument,
-    opts?: { couponCode?: string | null; giftCardCode?: string | null },
+    opts?: { couponCode?: string | null; giftCardCode?: string | null; req?: Request },
   ) {
     const subtotal = Number(session.lines.reduce((s, l) => s + l.lineSubtotal, 0).toFixed(2));
     const totalWeightGrams = session.lines.reduce(
@@ -320,6 +331,9 @@ export class CheckoutService {
     // (flash sale window = 60 minutes from flashSaleStartTime).
     let customerHasActiveFlashSale = false;
     if (session.customerId) {
+      if (opts?.req) {
+        await adoptFlashSaleForCheckout(opts.req, session.customerId);
+      }
       const customer = await CustomerModel.findById(session.customerId)
         .select('flashSaleStartTime')
         .lean();
@@ -433,8 +447,10 @@ export class CheckoutService {
       items?: Array<{ variantId: string; quantity: number }>;
     },
     actor: ActorMeta,
+    req?: Request,
   ) {
     const customer = await customerService.ensureForUser(user, actor);
+    await adoptFlashSaleForCheckout(req, customer._id);
     const buyNowVariantIds = payload.items?.map((item) => item.variantId) ?? [];
 
     const existing = await CheckoutSessionModel.findOne({
@@ -467,6 +483,7 @@ export class CheckoutService {
             giftCardCode: payload.giftCardCode,
           },
           actor,
+          req,
         );
         if (payload.autoReserve === true) {
           return this.reserve(existing._id.toString(), user, actor, { skipRebuild: true });
@@ -576,6 +593,7 @@ export class CheckoutService {
     session = (await this.recalculate(session, {
       couponCode: payload.couponCode,
       giftCardCode: payload.giftCardCode,
+      req,
     })) as typeof session;
     await session.save();
 
@@ -892,6 +910,7 @@ export class CheckoutService {
       extendReservation?: boolean;
     },
     actor: ActorMeta,
+    req?: Request,
   ) {
     const session = await this.getByIdOrToken(idOrToken);
     await this.assertOwner(session, user);
@@ -934,6 +953,7 @@ export class CheckoutService {
     await this.recalculate(session, {
       couponCode: payload.couponCode,
       giftCardCode: payload.giftCardCode,
+      req,
     });
 
     // Promote to READY without holding stock once the customer has an address + lines.

@@ -10,6 +10,7 @@ import { useIsMobile } from '@/hooks';
 import { useCheckoutStore } from '@/store';
 import { AnalyticsProvider } from '@/components/analytics/AnalyticsProvider';
 import { FlashSaleProvider } from '@/contexts/flash-sale-context';
+import { MobileFloatingFlashSaleCountdown } from '@/components/storefront/mobile-floating-flash-sale-countdown';
 
 function resolveStepId(pathname: string): CheckoutStepId | null {
   if (pathname === ROUTES.checkout || pathname === `${ROUTES.checkout}/`) return 'information';
@@ -41,6 +42,7 @@ export function CheckoutLayout() {
         <div className="bg-background flex min-h-screen flex-col overflow-x-clip">
           <ForceLightTheme />
           <StorefrontHeader />
+          <MobileFloatingFlashSaleCountdown />
           {/* Compact mobile chrome; desktop keeps larger title spacing */}
           <main className="mx-auto w-full max-w-7xl flex-1 px-3.5 pb-8 pt-6 sm:px-6 sm:pb-10 sm:pt-12 lg:px-10 lg:pt-14 xl:max-w-none xl:px-14 2xl:px-20">
             {!isTerminal && stepId ? (

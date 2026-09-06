@@ -42,7 +42,7 @@ export const FIRST_ORDER_DISCOUNT = {
   LABEL: '5% off your first order',
 } as const;
 
-/** Member flash sale — 20% off eligible items for 60 minutes after login/grant. */
+/** Personal flash sale — 20% off eligible items for 60 minutes (guest IP/cookie + member). */
 export const FLASH_SALE_DISCOUNT = {
   CODE: 'FLASH20',
   PERCENT: 20,
