@@ -458,7 +458,7 @@ export function CheckoutInformationPage() {
           </p>
 
           {!bootstrapError || session ? (
-            <div className="mt-4 space-y-5 sm:mt-6 sm:space-y-8">
+            <div className="mt-3 space-y-3 sm:mt-6 sm:space-y-8">
               {session ? (
                 <>
                   <CheckoutExpiryBanner

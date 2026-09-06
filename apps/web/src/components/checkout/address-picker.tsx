@@ -78,9 +78,9 @@ export function AddressPicker({
 
   if (showInlineCreate) {
     return (
-      <div className="space-y-4">
-        <Label className="text-base font-medium">{label}</Label>
-        <p className="text-muted-foreground text-sm">
+      <div className="space-y-2 sm:space-y-3">
+        <Label className="text-sm font-medium sm:text-base">{label}</Label>
+        <p className="text-muted-foreground hidden text-sm sm:block">
           Enter your delivery details to continue — no account required.
         </p>
         <AddressForm compact onSubmit={handleCreate} isSubmitting={createMutation.isPending} />
