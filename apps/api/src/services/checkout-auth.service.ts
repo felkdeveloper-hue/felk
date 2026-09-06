@@ -18,7 +18,7 @@ import { findRoleByKey } from '@/services/rbac.service.js';
 import { attachDevVerificationCode } from '@/utils/dev-verification.helper.js';
 import { addMinutes } from '@/utils/date.helper.js';
 import { normalizeEmail } from '@/utils/email.helper.js';
-import { generateEmailOtp, hashEmailOtp, verifyEmailOtp } from '@/utils/email-otp.helper.js';
+import { generateEmailOtp, hashEmailOtp } from '@/utils/email-otp.helper.js';
 import { ApiError } from '@/utils/errors/api-error.js';
 import { assertRegisterPassword, hashPassword } from '@/utils/password.helper.js';
 
@@ -94,7 +94,11 @@ export const checkoutAuthService = {
       return otpService.sendOtp(email, meta);
     }
 
-    await EmailOtpModel.deleteMany({ email, verified: false, purpose: CHECKOUT_SIGNUP_PURPOSE });
+    await EmailOtpModel.deleteMany({
+      email,
+      purpose: CHECKOUT_SIGNUP_PURPOSE,
+      $or: [{ verified: true }, { expiresAt: { $lte: new Date() } }],
+    });
 
     const otp = generateEmailOtp();
     const otpHash = await hashEmailOtp(otp);
@@ -148,24 +152,9 @@ export const checkoutAuthService = {
       };
     }
 
-    const record = await EmailOtpModel.findOne({
-      email,
-      verified: false,
-      purpose: CHECKOUT_SIGNUP_PURPOSE,
-    }).sort({ createdAt: -1 });
-
-    if (!record || record.expiresAt.getTime() <= Date.now()) {
-      throw invalid();
-    }
-
-    if (record.attempts >= AUTH_LIMITS.OTP_MAX_ATTEMPTS) {
-      throw ApiError.badRequest('Too many invalid attempts', undefined, 'OTP_LOCKED');
-    }
-
-    const ok = await verifyEmailOtp(otp, record.otpHash);
-    if (!ok) {
-      record.attempts += 1;
-      await record.save();
+    const { findValidOtpRecord } = await import('@/services/otp.service.js');
+    const record = await findValidOtpRecord(email, otp);
+    if (!record) {
       throw invalid();
     }
 

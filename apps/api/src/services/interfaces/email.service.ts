@@ -16,6 +16,7 @@ export interface SendEmailInput {
   bcc?: string | string[];
   replyTo?: string;
   attachments?: EmailAttachment[];
+  priority?: 'high' | 'normal';
 }
 
 export interface EmailService {

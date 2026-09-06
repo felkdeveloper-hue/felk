@@ -58,7 +58,7 @@ export class WishlistService {
 
     const [products, variants, mediaRows] = await Promise.all([
       ProductModel.find({ _id: { $in: productIds }, isDeleted: false })
-        .select('name slug status pricing')
+        .select('name slug status pricing categoryId categoryIds subcategoryId')
         .lean(),
       variantIds.length
         ? ProductVariantModel.find({ _id: { $in: variantIds }, isDeleted: false })
@@ -135,6 +135,11 @@ export class WishlistService {
         thumbnailUrl,
         price: priceAmount ? { amount: priceAmount, currency } : null,
         // Keep nested shapes for older clients / FE normalize fallback.
+        categoryId: product?.categoryId ? String(product.categoryId) : null,
+        categoryIds: Array.isArray(product?.categoryIds)
+          ? product.categoryIds.map((id) => String(id))
+          : [],
+        subcategoryId: product?.subcategoryId ? String(product.subcategoryId) : null,
         product: product
           ? {
               id: productId,
@@ -143,6 +148,9 @@ export class WishlistService {
               slug: product.slug,
               status: product.status,
               pricing: product.pricing,
+              categoryId: product.categoryId,
+              categoryIds: product.categoryIds,
+              subcategoryId: product.subcategoryId,
               thumbnailUrl,
             }
           : undefined,

@@ -68,6 +68,12 @@ export class CentralizedEmailService implements EmailService {
         bcc: input.bcc,
         replyTo: input.replyTo,
         attachments: input.attachments,
+        ...(input.priority === 'high'
+          ? {
+              priority: 'high' as const,
+              headers: { 'X-Priority': '1', Importance: 'high' },
+            }
+          : {}),
       });
 
       const messageId = String(info.messageId);
@@ -88,7 +94,7 @@ export class CentralizedEmailService implements EmailService {
   private async sendTemplate(
     to: string,
     template: { subject: string; html: string; text: string },
-    options?: { maxAttempts?: number },
+    options?: { maxAttempts?: number; priority?: 'high' | 'normal' },
   ) {
     return this.send(
       {
@@ -96,6 +102,7 @@ export class CentralizedEmailService implements EmailService {
         subject: template.subject,
         html: template.html,
         text: template.text,
+        priority: options?.priority,
       },
       options,
     );
@@ -108,7 +115,7 @@ export class CentralizedEmailService implements EmailService {
   ): Promise<{ messageId: string }> {
     const name = options?.name ?? 'there';
     const template = verificationTemplate(name, otp, options?.expiryMinutes ?? 10);
-    return this.sendTemplate(email, template, { maxAttempts: 2 });
+    return this.sendTemplate(email, template, { maxAttempts: 2, priority: 'high' });
   }
 
   /**
@@ -120,6 +127,7 @@ export class CentralizedEmailService implements EmailService {
     otp: string,
     options?: { name?: string; expiryMinutes?: number },
   ): void {
+    getEmailTransporter();
     void this.sendVerificationOTP(email, otp, options)
       .then((result) => {
         logger.info({ email, messageId: result.messageId }, 'OTP email queued/sent');

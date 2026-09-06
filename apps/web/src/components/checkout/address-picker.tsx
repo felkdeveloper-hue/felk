@@ -83,7 +83,7 @@ export function AddressPicker({
         <p className="text-muted-foreground text-sm">
           Enter your delivery details to continue — no account required.
         </p>
-        <AddressForm onSubmit={handleCreate} isSubmitting={createMutation.isPending} />
+        <AddressForm compact onSubmit={handleCreate} isSubmitting={createMutation.isPending} />
       </div>
     );
   }
@@ -139,14 +139,15 @@ export function AddressPicker({
       )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
-          <DialogHeader>
+        <DialogContent className="max-h-[90vh] gap-3 overflow-y-auto p-4 sm:max-w-lg sm:p-6">
+          <DialogHeader className="space-y-1">
             <DialogTitle>Add address</DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-xs sm:text-sm">
               Save a shipping or billing address to your account.
             </DialogDescription>
           </DialogHeader>
           <AddressForm
+            compact
             onSubmit={handleCreate}
             onCancel={() => setDialogOpen(false)}
             isSubmitting={createMutation.isPending}

@@ -52,9 +52,17 @@ export interface AddressFormProps {
   onSubmit: (values: CustomerAddressInput) => void;
   onCancel?: () => void;
   isSubmitting?: boolean;
+  /** Tighter mobile layout for checkout / dialogs. */
+  compact?: boolean;
 }
 
-export function AddressForm({ address, onSubmit, onCancel, isSubmitting }: AddressFormProps) {
+export function AddressForm({
+  address,
+  onSubmit,
+  onCancel,
+  isSubmitting,
+  compact = false,
+}: AddressFormProps) {
   const form = useForm<AddressFormValues>({
     resolver: zodResolver(addressSchema),
     defaultValues: {
@@ -102,17 +110,21 @@ export function AddressForm({ address, onSubmit, onCancel, isSubmitting }: Addre
             state: values.state || undefined,
           }),
         )}
-        className="space-y-4"
+        className={compact ? 'space-y-2.5 sm:space-y-4' : 'space-y-4'}
         noValidate
       >
         <FormField
           control={form.control}
           name="fullName"
           render={({ field }) => (
-            <FormItem>
-              <FormLabel>Full name</FormLabel>
+            <FormItem className={compact ? 'gap-1' : undefined}>
+              <FormLabel className={compact ? 'text-xs' : undefined}>Full name</FormLabel>
               <FormControl>
-                <Input autoComplete="name" {...field} />
+                <Input
+                  autoComplete="name"
+                  className={compact ? 'h-9 md:h-9' : undefined}
+                  {...field}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -123,10 +135,15 @@ export function AddressForm({ address, onSubmit, onCancel, isSubmitting }: Addre
           control={form.control}
           name="phone"
           render={({ field }) => (
-            <FormItem>
-              <FormLabel>Phone</FormLabel>
+            <FormItem className={compact ? 'gap-1' : undefined}>
+              <FormLabel className={compact ? 'text-xs' : undefined}>Phone</FormLabel>
               <FormControl>
-                <Input type="tel" autoComplete="tel" {...field} />
+                <Input
+                  type="tel"
+                  autoComplete="tel"
+                  className={compact ? 'h-9 md:h-9' : undefined}
+                  {...field}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -137,10 +154,14 @@ export function AddressForm({ address, onSubmit, onCancel, isSubmitting }: Addre
           control={form.control}
           name="line1"
           render={({ field }) => (
-            <FormItem>
-              <FormLabel>Address line 1</FormLabel>
+            <FormItem className={compact ? 'gap-1' : undefined}>
+              <FormLabel className={compact ? 'text-xs' : undefined}>Address line 1</FormLabel>
               <FormControl>
-                <Input autoComplete="address-line1" {...field} />
+                <Input
+                  autoComplete="address-line1"
+                  className={compact ? 'h-9 md:h-9' : undefined}
+                  {...field}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -151,25 +172,35 @@ export function AddressForm({ address, onSubmit, onCancel, isSubmitting }: Addre
           control={form.control}
           name="line2"
           render={({ field }) => (
-            <FormItem>
-              <FormLabel>Address line 2 (optional)</FormLabel>
+            <FormItem className={compact ? 'gap-1' : undefined}>
+              <FormLabel className={compact ? 'text-xs' : undefined}>
+                Address line 2 (optional)
+              </FormLabel>
               <FormControl>
-                <Input autoComplete="address-line2" {...field} />
+                <Input
+                  autoComplete="address-line2"
+                  className={compact ? 'h-9 md:h-9' : undefined}
+                  {...field}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className={compact ? 'grid grid-cols-2 gap-2.5 sm:gap-4' : 'grid gap-4 sm:grid-cols-2'}>
           <FormField
             control={form.control}
             name="city"
             render={({ field }) => (
-              <FormItem>
-                <FormLabel>City</FormLabel>
+              <FormItem className={compact ? 'gap-1' : undefined}>
+                <FormLabel className={compact ? 'text-xs' : undefined}>City</FormLabel>
                 <FormControl>
-                  <Input autoComplete="address-level2" {...field} />
+                  <Input
+                    autoComplete="address-level2"
+                    className={compact ? 'h-9 md:h-9' : undefined}
+                    {...field}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -179,10 +210,14 @@ export function AddressForm({ address, onSubmit, onCancel, isSubmitting }: Addre
             control={form.control}
             name="state"
             render={({ field }) => (
-              <FormItem>
-                <FormLabel>State / region</FormLabel>
+              <FormItem className={compact ? 'gap-1' : undefined}>
+                <FormLabel className={compact ? 'text-xs' : undefined}>State / region</FormLabel>
                 <FormControl>
-                  <Input autoComplete="address-level1" {...field} />
+                  <Input
+                    autoComplete="address-level1"
+                    className={compact ? 'h-9 md:h-9' : undefined}
+                    {...field}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -190,15 +225,19 @@ export function AddressForm({ address, onSubmit, onCancel, isSubmitting }: Addre
           />
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className={compact ? 'grid grid-cols-2 gap-2.5 sm:gap-4' : 'grid gap-4 sm:grid-cols-2'}>
           <FormField
             control={form.control}
             name="postalCode"
             render={({ field }) => (
-              <FormItem>
-                <FormLabel>Postal code</FormLabel>
+              <FormItem className={compact ? 'gap-1' : undefined}>
+                <FormLabel className={compact ? 'text-xs' : undefined}>Postal code</FormLabel>
                 <FormControl>
-                  <Input autoComplete="postal-code" {...field} />
+                  <Input
+                    autoComplete="postal-code"
+                    className={compact ? 'h-9 md:h-9' : undefined}
+                    {...field}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -208,11 +247,11 @@ export function AddressForm({ address, onSubmit, onCancel, isSubmitting }: Addre
             control={form.control}
             name="country"
             render={({ field }) => (
-              <FormItem>
-                <FormLabel>Country</FormLabel>
+              <FormItem className={compact ? 'gap-1' : undefined}>
+                <FormLabel className={compact ? 'text-xs' : undefined}>Country</FormLabel>
                 <Select onValueChange={field.onChange} value={field.value}>
                   <FormControl>
-                    <SelectTrigger aria-label="Country">
+                    <SelectTrigger aria-label="Country" className={compact ? 'h-9' : undefined}>
                       <SelectValue placeholder="Select country" />
                     </SelectTrigger>
                   </FormControl>
@@ -250,7 +289,7 @@ export function AddressForm({ address, onSubmit, onCancel, isSubmitting }: Addre
           control={form.control}
           name="label"
           render={({ field }) => (
-            <FormItem>
+            <FormItem className={compact ? 'hidden sm:grid' : undefined}>
               <FormLabel>Label</FormLabel>
               <Select onValueChange={field.onChange} value={field.value}>
                 <FormControl>
@@ -269,7 +308,7 @@ export function AddressForm({ address, onSubmit, onCancel, isSubmitting }: Addre
           )}
         />
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:gap-6">
+        <div className={compact ? 'flex flex-row flex-wrap gap-x-4 gap-y-2' : 'flex flex-col gap-3 sm:flex-row sm:gap-6'}>
           <FormField
             control={form.control}
             name="isDefaultShipping"
@@ -296,7 +335,7 @@ export function AddressForm({ address, onSubmit, onCancel, isSubmitting }: Addre
           />
         </div>
 
-        <div className="flex justify-end gap-2 pt-2">
+        <div className={compact ? 'flex justify-end gap-2 pt-1' : 'flex justify-end gap-2 pt-2'}>
           {onCancel ? (
             <Button type="button" variant="outline" onClick={onCancel}>
               Cancel

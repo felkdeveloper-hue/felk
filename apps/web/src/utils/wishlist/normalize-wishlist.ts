@@ -17,6 +17,9 @@ export interface EnrichedWishlistItem extends WishlistItem {
   thumbnailUrl?: string;
   price?: ProductMoney;
   salePrice?: ProductMoney;
+  categoryId?: string;
+  categoryIds?: string[];
+  subcategoryId?: string;
 }
 
 function readMoney(value: unknown, fallbackCurrency: string): ProductMoney | undefined {
@@ -109,6 +112,27 @@ export function normalizeWishlistItem(raw: unknown): EnrichedWishlistItem {
         : typeof variant.title === 'string'
           ? variant.title
           : undefined,
+    categoryId:
+      typeof record.categoryId === 'string'
+        ? record.categoryId
+        : typeof product.categoryId === 'string'
+          ? product.categoryId
+          : product.categoryId != null
+            ? String(product.categoryId)
+            : undefined,
+    categoryIds: Array.isArray(record.categoryIds)
+      ? record.categoryIds.map(String)
+      : Array.isArray(product.categoryIds)
+        ? product.categoryIds.map(String)
+        : undefined,
+    subcategoryId:
+      typeof record.subcategoryId === 'string'
+        ? record.subcategoryId
+        : typeof product.subcategoryId === 'string'
+          ? product.subcategoryId
+          : product.subcategoryId != null
+            ? String(product.subcategoryId)
+            : undefined,
     thumbnailUrl: (() => {
       const raw =
         typeof record.thumbnailUrl === 'string'

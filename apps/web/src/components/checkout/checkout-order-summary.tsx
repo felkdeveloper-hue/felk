@@ -1,4 +1,3 @@
-import { useNavigate } from '@tanstack/react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { Trash2, Zap } from 'lucide-react';
@@ -11,7 +10,7 @@ import { QuantitySelector } from '@/components/cart/quantity-selector';
 import { useRemoveCartItemMutation, useUpdateCartItemMutation } from '@/hooks/cart';
 import { useCancelCheckoutMutation, useRefreshCheckoutMutation } from '@/hooks/checkout';
 import { useCheckoutStore } from '@/store';
-import { QUERY_KEYS, ROUTES } from '@/constants';
+import { QUERY_KEYS } from '@/constants';
 import { trackCommerceEvent } from '@/lib/analytics';
 import { useFlashSale } from '@/contexts/flash-sale-context';
 import { useCategorySlugLookup } from '@/hooks/use-flash-sale-eligibility';
@@ -24,7 +23,6 @@ export interface CheckoutOrderSummaryProps {
 }
 
 export function CheckoutOrderSummary({ session, editable = false }: CheckoutOrderSummaryProps) {
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { isFlashSaleActive } = useFlashSale();
   const slugByCategoryId = useCategorySlugLookup();
@@ -80,7 +78,7 @@ export function CheckoutOrderSummary({ session, editable = false }: CheckoutOrde
   const flashSubtotal = serverFlashApplied
     ? Math.round(displayTotals.subtotal - displayTotals.discount)
     : clientFlashSubtotal;
-  const hasFlashDiscount = flashSaving > 0;
+  const hasFlashDiscount = flashSaving > 0 && lines.length > 0 && displayTotals.subtotal > 0;
   const showFlashUi = (serverFlashApplied || flashEnabled) && hasFlashDiscount;
   const payableTotal = serverFlashApplied
     ? displayTotals.grandTotal
@@ -124,7 +122,6 @@ export function CheckoutOrderSummary({ session, editable = false }: CheckoutOrde
       cancelCheckout.mutate(token, {
         onSettled: () => {
           useCheckoutStore.getState().resetCheckoutUi();
-          void navigate({ to: ROUTES.cart });
         },
       });
       return;

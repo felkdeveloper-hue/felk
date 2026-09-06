@@ -13,5 +13,10 @@ export async function hashEmailOtp(otp: string): Promise<string> {
 }
 
 export async function verifyEmailOtp(otp: string, otpHash: string): Promise<boolean> {
-  return bcrypt.compare(otp, otpHash);
+  return bcrypt.compare(normalizeOtpInput(otp), otpHash);
+}
+
+/** Strip spaces / dashes so "825 499" still matches 825499. */
+export function normalizeOtpInput(otp: string): string {
+  return otp.replace(/\D/g, '');
 }

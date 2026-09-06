@@ -15,6 +15,7 @@ import { previewShippingAmount } from '@/constants/checkout.constants';
 import { Zap, AlertTriangle } from 'lucide-react';
 import { CartItemRow } from '@/components/cart/cart-item-row';
 import { CartOrderSummary } from '@/components/cart/cart-order-summary';
+import { EmptyBagState } from '@/components/cart/empty-bag-state';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { ErrorState } from '@/components/ui/error-state';
@@ -114,17 +115,7 @@ export function CartPageContent() {
   }
 
   if (!cart || cart.items.length === 0) {
-    return (
-      <div className="border-border/80 bg-muted/40 mx-auto max-w-6xl rounded-[2rem] border border-dashed px-6 py-20 text-center">
-        <h2 className="font-display text-3xl font-bold uppercase">Your bag is empty</h2>
-        <p className="text-muted-foreground mt-2 text-sm">
-          Browse the catalog and add pieces you love.
-        </p>
-        <Button asChild className="mt-6">
-          <Link to={ROUTES.products}>Continue shopping</Link>
-        </Button>
-      </div>
-    );
+    return <EmptyBagState />;
   }
 
   const flashSubtotal =

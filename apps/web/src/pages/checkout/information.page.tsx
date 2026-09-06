@@ -10,7 +10,7 @@ import {
   CheckoutOrderSummary,
   CheckoutValidationAlert,
 } from '@/components/checkout';
-import { CartItemRow, CartOrderSummary } from '@/components/cart';
+import { CartItemRow, CartOrderSummary, EmptyBagState } from '@/components/cart';
 import { AuthErrorAlert } from '@/components/auth/auth-error-alert';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -21,6 +21,7 @@ import { ROUTES } from '@/constants';
 import { useAddressesQuery } from '@/hooks/account';
 import {
   isCheckoutClosedError,
+  useCancelCheckoutMutation,
   useCheckoutSessionQuery,
   useRefreshCheckoutMutation,
   useStartCheckoutMutation,
@@ -64,6 +65,7 @@ export function CheckoutInformationPage() {
 
   const startCheckout = useStartCheckoutMutation();
   const refreshCheckout = useRefreshCheckoutMutation();
+  const cancelCheckout = useCancelCheckoutMutation();
   const sessionQuery = useCheckoutSessionQuery();
   const session = sessionQuery.data ?? startCheckout.data;
   const addressesQuery = useAddressesQuery(isAuthed);
@@ -294,6 +296,26 @@ export function CheckoutInformationPage() {
       !bootstrapError &&
       (startCheckout.isPending || sessionQuery.isLoading || !checkoutToken));
   const sessionReady = Boolean(session?.checkoutToken);
+  const [bagCleared, setBagCleared] = useState(false);
+  const hadItemsRef = useRef(false);
+
+  useEffect(() => {
+    const count = session?.lines.length ?? guestCart?.items.length ?? 0;
+    if (count > 0) hadItemsRef.current = true;
+    if (hadItemsRef.current && count === 0) setBagCleared(true);
+  }, [session?.lines.length, guestCart?.items.length]);
+
+  useEffect(() => {
+    if (!bagCleared) return;
+    const token = useCheckoutStore.getState().checkoutToken ?? session?.checkoutToken;
+    if (!token) return;
+    cancelCheckout.mutate(token, {
+      onSettled: () => {
+        useCheckoutStore.getState().resetCheckoutUi();
+      },
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bagCleared]);
 
   const handleContinue = () => {
     if (!session?.checkoutToken || !shippingAddressId) return;
@@ -329,6 +351,15 @@ export function CheckoutInformationPage() {
     void navigate({ to: ROUTES.checkout, replace: true });
     window.location.reload();
   };
+
+  if (hasHydrated && bagCleared) {
+    return (
+      <>
+        <Seo title="Checkout" description="Your bag is empty." noIndex />
+        <EmptyBagState description="Add pieces you love, then come back to checkout." />
+      </>
+    );
+  }
 
   if (hasHydrated && guestBridgeOpen) {
     return (

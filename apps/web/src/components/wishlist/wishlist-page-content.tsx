@@ -12,6 +12,10 @@ import type { EnrichedWishlistItem } from '@/utils/wishlist';
 import { Button } from '@/components/ui/button';
 import { Image } from '@/components/media/image';
 import { PriceDisplay } from '@/components/catalog/price-display';
+import { useFlashSale } from '@/contexts/flash-sale-context';
+import { useFlashSaleEligibilityForCategories } from '@/hooks/use-flash-sale-eligibility';
+import { applyFlashDiscount } from '@/utils/flash-sale-eligibility';
+import { formatCurrency } from '@/utils/format';
 import { useUiStore } from '@/store/ui-store';
 import { AppError } from '@/lib/errors';
 import { cn } from '@/lib/utils';
@@ -27,6 +31,16 @@ export function WishlistItemCard({ wishlistId, item }: WishlistItemCardProps) {
   const setCartAnnouncement = useUiStore((state) => state.setCartAnnouncement);
   const title = item.productName ?? 'Product';
   const slug = item.productSlug ?? item.productId;
+  const { isFlashSaleActive } = useFlashSale();
+  const { eligible: flashEligible } = useFlashSaleEligibilityForCategories(item);
+  const showFlashSale = isFlashSaleActive && flashEligible && Boolean(item.price);
+  const flashPrice =
+    showFlashSale && item.price
+      ? {
+          ...item.price,
+          amount: applyFlashDiscount(item.salePrice?.amount ?? item.price.amount, true),
+        }
+      : undefined;
 
   const moveToCart = () => {
     moveMutation.mutate(
@@ -129,7 +143,21 @@ export function WishlistItemCard({ wishlistId, item }: WishlistItemCardProps) {
             </p>
           ) : null}
 
-          {item.price ? (
+          {flashPrice && item.price ? (
+            <div className="space-y-0.5">
+              <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
+                <span className="text-muted-foreground text-[11px] line-through sm:text-xs">
+                  {formatCurrency(item.salePrice?.amount ?? item.price.amount, item.price.currency)}
+                </span>
+                <span className="text-[13px] font-semibold tracking-tight text-[#ea580c] sm:text-sm">
+                  {formatCurrency(flashPrice.amount, flashPrice.currency)}
+                </span>
+              </div>
+              <span className="inline-flex w-fit items-center rounded-none bg-[#ea580c] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white">
+                20% off
+              </span>
+            </div>
+          ) : item.price ? (
             <>
               <div className="sm:hidden">
                 <PriceDisplay

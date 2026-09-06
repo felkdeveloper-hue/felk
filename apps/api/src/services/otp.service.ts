@@ -7,7 +7,12 @@ import type { AuthRequestMeta, AuthTokensResult } from '@/services/auth.service.
 import { attachDevVerificationCode } from '@/utils/dev-verification.helper.js';
 import { addMinutes } from '@/utils/date.helper.js';
 import { normalizeEmail } from '@/utils/email.helper.js';
-import { generateEmailOtp, hashEmailOtp, verifyEmailOtp } from '@/utils/email-otp.helper.js';
+import {
+  generateEmailOtp,
+  hashEmailOtp,
+  normalizeOtpInput,
+  verifyEmailOtp,
+} from '@/utils/email-otp.helper.js';
 import { ApiError } from '@/utils/errors/api-error.js';
 import { logger } from '@/config/logger.js';
 
@@ -18,8 +23,39 @@ export type OtpIssueResult = {
   otp: string;
 };
 
-async function invalidateExistingOtps(email: string): Promise<void> {
-  await EmailOtpModel.deleteMany({ email, verified: false });
+async function invalidateExpiredOtps(email: string): Promise<void> {
+  await EmailOtpModel.deleteMany({
+    email,
+    $or: [{ verified: true }, { expiresAt: { $lte: new Date() } }],
+  });
+}
+
+/** Accept any still-valid code for this email so a late first email still works after resend. */
+export async function findValidOtpRecord(email: string, otpRaw: string) {
+  const otp = normalizeOtpInput(otpRaw);
+  if (otp.length < 4) return null;
+
+  const records = await EmailOtpModel.find({
+    email,
+    verified: false,
+    expiresAt: { $gt: new Date() },
+  })
+    .sort({ createdAt: -1 })
+    .limit(5);
+
+  for (const record of records) {
+    if (record.attempts >= AUTH_LIMITS.OTP_MAX_ATTEMPTS) continue;
+    if (await verifyEmailOtp(otp, record.otpHash)) {
+      return record;
+    }
+  }
+
+  const latest = records[0];
+  if (latest && latest.attempts < AUTH_LIMITS.OTP_MAX_ATTEMPTS) {
+    latest.attempts += 1;
+    await latest.save();
+  }
+  return null;
 }
 
 async function createAndSendOtp(email: string, userId?: string): Promise<OtpIssueResult | null> {
@@ -31,7 +67,7 @@ async function createAndSendOtp(email: string, userId?: string): Promise<OtpIssu
     return null;
   }
 
-  await invalidateExistingOtps(email);
+  await invalidateExpiredOtps(email);
 
   const otp = generateEmailOtp();
   const otpHash = await hashEmailOtp(otp);
@@ -125,28 +161,8 @@ export const otpService = {
       throw ApiError.badRequest('Email is already verified', undefined, 'ALREADY_VERIFIED');
     }
 
-    const stored = await EmailOtpModel.findOne({
-      email,
-      verified: false,
-    }).sort({ createdAt: -1 });
-
-    if (!stored || stored.expiresAt.getTime() <= Date.now()) {
-      throw invalidCodeError();
-    }
-
-    if (stored.attempts >= AUTH_LIMITS.OTP_MAX_ATTEMPTS) {
-      await EmailOtpModel.deleteOne({ _id: stored._id });
-      throw ApiError.badRequest(
-        'Too many incorrect attempts. Request a new code.',
-        undefined,
-        'OTP_MAX_ATTEMPTS',
-      );
-    }
-
-    const valid = await verifyEmailOtp(otp, stored.otpHash);
-    if (!valid) {
-      stored.attempts += 1;
-      await stored.save();
+    const stored = await findValidOtpRecord(email, otp);
+    if (!stored) {
       throw invalidCodeError();
     }
 

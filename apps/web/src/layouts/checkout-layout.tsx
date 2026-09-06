@@ -1,4 +1,5 @@
-import { Outlet, useRouterState } from '@tanstack/react-router';
+import { Link, Outlet, useRouterState } from '@tanstack/react-router';
+import { ArrowLeft } from 'lucide-react';
 import { CheckoutStepIndicator } from '@/components/checkout/checkout-step-indicator';
 import { PaymentRedirectOverlay } from '@/components/checkout/payment-redirect-overlay';
 import { ForceLightTheme } from '@/components/common/force-light-theme';
@@ -11,6 +12,7 @@ import { useCheckoutStore } from '@/store';
 import { AnalyticsProvider } from '@/components/analytics/AnalyticsProvider';
 import { FlashSaleProvider } from '@/contexts/flash-sale-context';
 import { MobileFloatingFlashSaleCountdown } from '@/components/storefront/mobile-floating-flash-sale-countdown';
+import { Button } from '@/components/ui/button';
 
 function resolveStepId(pathname: string): CheckoutStepId | null {
   if (pathname === ROUTES.checkout || pathname === `${ROUTES.checkout}/`) return 'information';
@@ -47,6 +49,24 @@ export function CheckoutLayout() {
           <main className="mx-auto w-full max-w-7xl flex-1 px-3.5 pb-8 pt-6 sm:px-6 sm:pb-10 sm:pt-12 lg:px-10 lg:pt-14 xl:max-w-none xl:px-14 2xl:px-20">
             {!isTerminal && stepId ? (
               <>
+                <div className="mb-3 sm:mb-5">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="text-foreground -ml-2 h-8 gap-1.5 px-2 text-sm font-medium"
+                    asChild
+                  >
+                    <Link
+                      to={
+                        stepId === 'information' ? ROUTES.cart : ROUTES.checkout
+                      }
+                    >
+                      <ArrowLeft className="size-4" aria-hidden />
+                      Back
+                    </Link>
+                  </Button>
+                </div>
                 <div className="mb-4 space-y-1 sm:mb-8 sm:space-y-2">
                   <p className="text-muted-foreground text-[10px] font-semibold uppercase tracking-[0.18em] sm:text-[11px] sm:tracking-[0.2em]">
                     Secure checkout

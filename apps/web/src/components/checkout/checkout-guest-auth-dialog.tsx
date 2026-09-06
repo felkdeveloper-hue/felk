@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   Dialog,
@@ -21,24 +21,54 @@ import { cartApi } from '@/services/sdk/cart';
 import { QUERY_KEYS } from '@/constants/query-keys';
 import { AppError } from '@/lib/errors';
 import { getAttributionPayloadForAuth } from '@/lib/analytics/auth-attribution';
+import { useFlashSale } from '@/contexts/flash-sale-context';
+import { Zap } from 'lucide-react';
 
 type Step = 'email' | 'password' | 'otp' | 'create_password' | 'address';
+
+const RESEND_COOLDOWN_SEC = 30;
+
+function digitsOnly(value: string): string {
+  return value.replace(/\D/g, '');
+}
 
 export interface CheckoutGuestAuthDialogProps {
   open: boolean;
   onAuthenticated: () => void;
 }
 
-function FirstOrderPromo() {
+function FlashSaleCheckoutPromo() {
+  const { isFlashSaleActive, formattedTime } = useFlashSale();
+
   return (
-    <div className="relative overflow-hidden rounded-xl border border-emerald-800/15 bg-[linear-gradient(135deg,#ecfdf5_0%,#f8faf9_55%,#ffffff_100%)] px-4 py-4">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-800">
-        Member perk
+    <div
+      className="relative overflow-hidden rounded-xl px-4 py-4 text-white"
+      style={{
+        background: 'linear-gradient(135deg, #c2410c 0%, #ea580c 42%, #f97316 100%)',
+        boxShadow: '0 10px 28px rgba(234, 88, 12, 0.35)',
+      }}
+    >
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -right-6 -top-8 size-24 rounded-full bg-white/15"
+      />
+      <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.18em] text-orange-50">
+        <Zap className="size-3.5 fill-current" />
+        Sitewide flash sale
       </p>
-      <p className="text-foreground mt-1.5 text-lg font-semibold tracking-tight">
-        Get <span className="text-emerald-700">5% off</span> your first order
+      <p className="mt-1.5 font-display text-3xl font-bold leading-none tracking-tight">20% OFF</p>
+      <p className="mt-1.5 text-sm font-medium text-orange-50">
+        Time-limited deal on the whole website — no code needed.
       </p>
-      <p className="text-muted-foreground mt-1 text-sm">Sign in to unlock your welcome savings.</p>
+      {isFlashSaleActive ? (
+        <p className="mt-3 inline-flex items-center rounded-full bg-black/25 px-2.5 py-1 text-[11px] font-bold tracking-wide">
+          Ends in {formattedTime}
+        </p>
+      ) : (
+        <p className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-orange-50/90">
+          Limited-time offer
+        </p>
+      )}
     </div>
   );
 }
@@ -60,7 +90,17 @@ export function CheckoutGuestAuthDialog({ open, onAuthenticated }: CheckoutGuest
   const [phone, setPhone] = useState('');
   const [pending, setPending] = useState(false);
   const [guestPending, setGuestPending] = useState(false);
+  const [resendPending, setResendPending] = useState(false);
+  const [resendIn, setResendIn] = useState(0);
   const [error, setError] = useState<unknown>(null);
+
+  useEffect(() => {
+    if (step !== 'otp') return;
+    const id = window.setInterval(() => {
+      setResendIn((seconds) => (seconds <= 0 ? 0 : seconds - 1));
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [step]);
 
   const persistFlashSale = async () => {
     try {
@@ -145,6 +185,8 @@ export function CheckoutGuestAuthDialog({ open, onAuthenticated }: CheckoutGuest
         return;
       }
       await authApi.checkoutSendOtp(email.trim());
+      setOtp('');
+      setResendIn(RESEND_COOLDOWN_SEC);
       setStep('otp');
     } catch (err) {
       setError(err);
@@ -174,7 +216,7 @@ export function CheckoutGuestAuthDialog({ open, onAuthenticated }: CheckoutGuest
     setError(null);
     setPending(true);
     try {
-      const result = await authApi.checkoutVerifyOtp(email.trim(), otp.trim());
+      const result = await authApi.checkoutVerifyOtp(email.trim(), digitsOnly(otp));
       if (result.mode === 'login') {
         setSession(result);
         await afterAuth();
@@ -250,11 +292,26 @@ export function CheckoutGuestAuthDialog({ open, onAuthenticated }: CheckoutGuest
     );
   };
 
+  const handleResendCode = async () => {
+    if (resendIn > 0 || resendPending || pending) return;
+    setError(null);
+    setResendPending(true);
+    try {
+      await authApi.checkoutSendOtp(email.trim());
+      setResendIn(RESEND_COOLDOWN_SEC);
+    } catch (err) {
+      setError(err);
+    } finally {
+      setResendPending(false);
+    }
+  };
+
   const handleChangeEmail = () => {
     setError(null);
     setOtp('');
     setPassword('');
     setSignupToken(null);
+    setResendIn(0);
     setStep('email');
   };
 
@@ -270,7 +327,7 @@ export function CheckoutGuestAuthDialog({ open, onAuthenticated }: CheckoutGuest
     email: 'Enter your email to continue.',
     password: 'Enter your password to continue to checkout.',
     otp: 'Enter the verification code we sent to your email.',
-    create_password: 'Almost there — finish your account to claim 5% off.',
+    create_password: 'Almost there — finish your account while the 20% flash sale is on.',
     address: 'Add a shipping address to continue checkout.',
   };
 
@@ -290,7 +347,7 @@ export function CheckoutGuestAuthDialog({ open, onAuthenticated }: CheckoutGuest
           </DialogDescription>
         </DialogHeader>
 
-        {step === 'email' || step === 'create_password' ? <FirstOrderPromo /> : null}
+        {step === 'email' || step === 'create_password' ? <FlashSaleCheckoutPromo /> : null}
 
         {error ? (
           <AuthErrorAlert
@@ -320,7 +377,7 @@ export function CheckoutGuestAuthDialog({ open, onAuthenticated }: CheckoutGuest
               loading={pending}
               onClick={() => void handleEmailContinue()}
             >
-              Continue & save 5%
+              Continue — keep 20% off
             </Button>
 
             <div className="relative flex items-center gap-3" role="separator" aria-label="or">
@@ -385,19 +442,9 @@ export function CheckoutGuestAuthDialog({ open, onAuthenticated }: CheckoutGuest
 
         {step === 'otp' ? (
           <div className="space-y-4">
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-              <span className="text-muted-foreground">
-                Code sent to <span className="text-foreground font-medium">{email}</span>
-              </span>
-              <Button
-                type="button"
-                variant="link"
-                className="text-foreground h-auto p-0 text-sm font-medium underline-offset-4"
-                onClick={handleChangeEmail}
-              >
-                Change email
-              </Button>
-            </div>
+            <p className="text-muted-foreground text-sm">
+              Code sent to <span className="text-foreground font-medium">{email}</span>
+            </p>
             <div className="space-y-2">
               <Label htmlFor="checkout-guest-otp">Verification code</Label>
               <Input
@@ -405,27 +452,49 @@ export function CheckoutGuestAuthDialog({ open, onAuthenticated }: CheckoutGuest
                 inputMode="numeric"
                 autoComplete="one-time-code"
                 value={otp}
-                onChange={(e) => setOtp(e.target.value)}
+                onChange={(e) => setOtp(digitsOnly(e.target.value).slice(0, 6))}
+                maxLength={6}
               />
             </div>
-            <DialogFooter className="gap-2 sm:justify-between">
+            <Button
+              type="button"
+              className="w-full"
+              disabled={pending || digitsOnly(otp).length < 6}
+              loading={pending}
+              onClick={() => void handleVerifyOtp()}
+            >
+              Verify
+            </Button>
+            <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 pt-1">
               <Button
                 type="button"
-                variant="ghost"
-                disabled={pending}
-                onClick={() => void handleEmailContinue()}
+                variant="link"
+                className="text-foreground h-auto p-0 text-sm font-semibold underline underline-offset-4"
+                disabled={pending || resendPending}
+                onClick={handleChangeEmail}
               >
-                Resend code
+                Change email
               </Button>
-              <Button
-                type="button"
-                disabled={pending || otp.trim().length < 4}
-                loading={pending}
-                onClick={() => void handleVerifyOtp()}
-              >
-                Verify
-              </Button>
-            </DialogFooter>
+              <span className="text-border" aria-hidden>
+                |
+              </span>
+              <span className="inline-flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="link"
+                  className="text-foreground h-auto p-0 text-sm font-semibold underline underline-offset-4 disabled:no-underline disabled:opacity-50"
+                  disabled={pending || resendPending || resendIn > 0}
+                  onClick={() => void handleResendCode()}
+                >
+                  {resendPending ? 'Sending…' : 'Resend code'}
+                </Button>
+                {resendIn > 0 ? (
+                  <span className="text-muted-foreground min-w-8 text-sm font-semibold tabular-nums">
+                    {resendIn}s
+                  </span>
+                ) : null}
+              </span>
+            </div>
           </div>
         ) : null}
 
@@ -485,8 +554,12 @@ export function CheckoutGuestAuthDialog({ open, onAuthenticated }: CheckoutGuest
 
         {step === 'address' ? (
           <AddressForm
+            compact
             onSubmit={handleAddressSubmit}
-            onCancel={() => undefined}
+            onCancel={() => {
+              setError(null);
+              onAuthenticated();
+            }}
             isSubmitting={createAddress.isPending}
           />
         ) : null}
