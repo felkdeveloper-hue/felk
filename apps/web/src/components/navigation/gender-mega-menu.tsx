@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useRouterState } from '@tanstack/react-router';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { ROUTES } from '@/constants';
 import {
   DEFAULT_MEGA_MENUS,
@@ -13,9 +13,9 @@ import {
 import { Image } from '@/components/media/image';
 import { prefetchInfiniteProducts } from '@/lib/prefetch-catalog';
 import { cn } from '@/lib/utils';
-import { navigationMenusApi } from '@/services/sdk/navigation-menus';
 import type { Category } from '@/services/sdk';
 import { QUERY_KEYS } from '@/constants/query-keys';
+import { useNavigationMenu } from '@/hooks/storefront';
 import { resolveMegaMenuLink } from '@/utils/mega-menu-links';
 
 export type { MegaMenuGender, NavigationMenuKey };
@@ -174,13 +174,7 @@ export function GenderMegaMenu({
   activeHref,
 }: GenderMegaMenuProps) {
   const menuKey = menuKeyProp ?? gender ?? 'women';
-  const menuQuery = useQuery({
-    queryKey: QUERY_KEYS.storefront.navigationMenu(menuKey),
-    queryFn: () => navigationMenusApi.getByKey(menuKey),
-    // A hardcoded fallback renders instantly, so this never needs to refetch on
-    // every mount — that only added header requests during the first load.
-    staleTime: 1000 * 60 * 5,
-  });
+  const menuQuery = useNavigationMenu(menuKey);
   const config = menuQuery.data ?? DEFAULT_MEGA_MENUS[menuKey];
   const panelId = useId();
   const queryClient = useQueryClient();

@@ -18,17 +18,18 @@ import { toStorefrontMediaUrl } from '@/utils/media-url';
  * Mega-menu tiles saved from local Vite admin often persist `/src/assets/...`
  * paths. Those only work in `vite dev` and 404 on Vercel. Prefer bundled
  * hashed asset URLs from DEFAULT_MEGA_MENUS whenever the CMS URL is unusable.
+ *
+ * Admin uploads are rewritten to `/cdn/navigation-menus/…` (or stay on R2 /
+ * `/api/v1/media/…`). Those must count as usable — otherwise the homepage
+ * silently falls back to the old bundled TOPS / PANTS photos.
  */
 function isUsableStorefrontImageUrl(url: string): boolean {
   const value = url.trim();
   if (!value) return false;
   if (value.startsWith('/src/')) return false;
+  if (value.includes('/src/assets/')) return false;
   if (value.startsWith('/@fs/') || value.includes('/node_modules/')) return false;
-  // Absolute http(s) (R2/CDN/Unsplash) or Vite-built `/assets/<hash>.*` are fine.
-  if (/^https?:\/\//i.test(value)) return true;
-  if (value.startsWith('/assets/')) return true;
-  if (value.startsWith('data:') || value.startsWith('blob:')) return true;
-  return false;
+  return true;
 }
 
 function asTiles(raw: unknown): MegaMenuTile[] {
