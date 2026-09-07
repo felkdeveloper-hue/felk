@@ -131,6 +131,7 @@ export default defineConfig({
       'class-variance-authority',
       'sonner',
       'next-themes',
+      'meta-capi-param-builder-clientjs',
     ],
   },
   build: {

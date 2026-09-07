@@ -108,6 +108,7 @@ export function OrdersListPage() {
       </div>
 
       <ListToolbar
+        searchPlaceholder="Order #, payment ref, phone…"
         search={search}
         onSearchChange={(value) => {
           setSearch(value);
