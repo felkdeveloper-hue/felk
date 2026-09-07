@@ -401,7 +401,6 @@ export async function fulfillCodPaymentIfNeeded(payment: PaymentDocument): Promi
     paymentId,
     checkoutId: payment.checkoutId.toString(),
   });
-  await handlePaymentSucceededEvent(succeededPayload);
 }
 
 /** Backfill orders for COD payments that were created before fulfillment ran. */
@@ -470,10 +469,7 @@ export async function forceRecoverOrderByPaymentRef(paymentReference: string): P
   message: string;
 }> {
   const payment = await PaymentModel.findOne({
-    referenceNumber: new RegExp(
-      `^${paymentReference.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`,
-      'i',
-    ),
+    referenceNumber: new RegExp(`^${paymentReference.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i'),
     isDeleted: false,
   });
 
@@ -784,12 +780,10 @@ export async function recoverConfirmedKokoOrders(): Promise<{
       const attempt = attempts[0];
       const orderIdCandidates = await kokoOrderIdCandidatesForPayment(payment);
       let viewed: { status: string; gatewayTxnId?: string } | null = null;
-      let matchedOrderId = orderIdCandidates[0] ?? '';
       for (const candidate of orderIdCandidates) {
         const result = await kokoGateway.verifyTransaction(candidate);
         if (result?.status === PAYMENT_STATUS.PAID) {
           viewed = result;
-          matchedOrderId = candidate;
           break;
         }
       }
@@ -817,7 +811,6 @@ export async function recoverConfirmedKokoOrders(): Promise<{
             if (verified.valid && verified.status === PAYMENT_STATUS.PAID) {
               storedPaid = true;
               storedTxnId = verified.gatewayTxnId;
-              matchedOrderId = candidate;
               break;
             }
             const payload = parseWebhookPayload(row.rawPayload);
@@ -836,7 +829,6 @@ export async function recoverConfirmedKokoOrders(): Promise<{
             ) {
               storedPaid = true;
               storedTxnId = claimedTrnId;
-              matchedOrderId = candidate;
               break;
             }
           }

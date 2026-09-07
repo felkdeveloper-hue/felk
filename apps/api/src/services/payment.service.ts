@@ -910,13 +910,6 @@ export class PaymentService {
           },
           { paymentId: payment._id.toString(), checkoutId: payment.checkoutId.toString() },
         );
-        await handlePaymentSucceededEvent({
-          paymentId: payment._id.toString(),
-          checkoutToken: payment.checkoutToken,
-          amount: payment.amount,
-          currency: payment.currency,
-          method: payment.method,
-        });
 
         // Send payment success email (fire-and-forget)
         void (async () => {
@@ -1167,14 +1160,15 @@ export class PaymentService {
       return { ok: false, redirectUrl: cancelUrl };
     }
 
+    const purchaseId =
+      typeof payment.metadata?.mintpayPurchaseId === 'string'
+        ? payment.metadata.mintpayPurchaseId
+        : undefined;
+
     if (payment.status !== PAYMENT_STATUS.PAID) {
       payment.status = PAYMENT_STATUS.PAID;
       payment.paidAt = payment.paidAt ?? new Date();
       payment.failureReason = null;
-      const purchaseId =
-        typeof payment.metadata?.mintpayPurchaseId === 'string'
-          ? payment.metadata.mintpayPurchaseId
-          : undefined;
       payment.metadata = {
         ...payment.metadata,
         ...(purchaseId ? { mintpayPurchaseId: purchaseId } : {}),
@@ -1190,26 +1184,19 @@ export class PaymentService {
         resourceId: payment._id.toString(),
         after: toPlain(payment),
       });
-      await publishPaymentEvent(
-        PAYMENT_EVENT_TYPE.PAYMENT_SUCCEEDED,
-        {
-          paymentId: payment._id.toString(),
-          checkoutToken: payment.checkoutToken,
-          amount: payment.amount,
-          currency: payment.currency,
-          gatewayTxnId: purchaseId ?? orderId,
-        },
-        { paymentId: payment._id.toString(), checkoutId: payment.checkoutId.toString() },
-      );
     }
 
-    await handlePaymentSucceededEvent({
-      paymentId: payment._id.toString(),
-      checkoutToken: payment.checkoutToken,
-      amount: payment.amount,
-      currency: payment.currency,
-      method: payment.method,
-    });
+    await publishPaymentEvent(
+      PAYMENT_EVENT_TYPE.PAYMENT_SUCCEEDED,
+      {
+        paymentId: payment._id.toString(),
+        checkoutToken: payment.checkoutToken,
+        amount: payment.amount,
+        currency: payment.currency,
+        gatewayTxnId: purchaseId ?? orderId,
+      },
+      { paymentId: payment._id.toString(), checkoutId: payment.checkoutId.toString() },
+    );
 
     await writePaymentLog({
       paymentId: payment._id.toString(),
@@ -1371,33 +1358,19 @@ export class PaymentService {
         resourceId: payment._id.toString(),
         after: toPlain(payment),
       });
-      await publishPaymentEvent(
-        PAYMENT_EVENT_TYPE.PAYMENT_SUCCEEDED,
-        {
-          paymentId: payment._id.toString(),
-          checkoutToken: payment.checkoutToken,
-          amount: payment.amount,
-          currency: payment.currency,
-          gatewayTxnId: trnId || orderId,
-        },
-        { paymentId: payment._id.toString(), checkoutId: payment.checkoutId.toString() },
-      );
-      await handlePaymentSucceededEvent({
-        paymentId: payment._id.toString(),
-        checkoutToken: payment.checkoutToken,
-        amount: payment.amount,
-        currency: payment.currency,
-        method: payment.method,
-      });
-    } else {
-      await handlePaymentSucceededEvent({
-        paymentId: payment._id.toString(),
-        checkoutToken: payment.checkoutToken,
-        amount: payment.amount,
-        currency: payment.currency,
-        method: payment.method,
-      });
     }
+
+    await publishPaymentEvent(
+      PAYMENT_EVENT_TYPE.PAYMENT_SUCCEEDED,
+      {
+        paymentId: payment._id.toString(),
+        checkoutToken: payment.checkoutToken,
+        amount: payment.amount,
+        currency: payment.currency,
+        gatewayTxnId: trnId || orderId,
+      },
+      { paymentId: payment._id.toString(), checkoutId: payment.checkoutId.toString() },
+    );
 
     await writePaymentLog({
       paymentId: payment._id.toString(),
@@ -1466,8 +1439,7 @@ export class PaymentService {
         : [
             (attempt?.requestPayload && typeof attempt.requestPayload.orderId === 'string'
               ? attempt.requestPayload.orderId
-              : '') ||
-              toAttemptOrderId(payment.referenceNumber, Math.max(1, payment.attemptCount)),
+              : '') || toAttemptOrderId(payment.referenceNumber, Math.max(1, payment.attemptCount)),
           ].filter(Boolean);
 
     let result: { status: string; gatewayTxnId?: string } | null = null;
@@ -1542,13 +1514,6 @@ export class PaymentService {
       },
       { paymentId: payment._id.toString(), checkoutId: payment.checkoutId.toString() },
     );
-    await handlePaymentSucceededEvent({
-      paymentId: payment._id.toString(),
-      checkoutToken: payment.checkoutToken,
-      amount: payment.amount,
-      currency: payment.currency,
-      method: payment.method,
-    });
 
     logger.info(
       {

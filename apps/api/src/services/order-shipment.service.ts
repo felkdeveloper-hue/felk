@@ -1,16 +1,10 @@
 import { Types } from 'mongoose';
 import { OrderModel, type OrderDocument } from '@/models/order.models.js';
-import { ORDER_STATUS, type OrderStatus } from '@/constants/order-status.js';
+import { ORDER_STATUS } from '@/constants/order-status.js';
 import { ORDER_AUDIT } from '@/constants/order.js';
 import { fedClient } from '@/services/couriers/fed.client.js';
-import {
-  FULFILLMENT_PIPELINE,
-  mapFedStatusToOrderStatus,
-} from '@/services/couriers/fed-status-map.js';
-import type {
-  FedShipmentMetadata,
-  FedTrackingMetadata,
-} from '@/services/couriers/fed.types.js';
+import { mapFedStatusToOrderStatus } from '@/services/couriers/fed-status-map.js';
+import type { FedShipmentMetadata, FedTrackingMetadata } from '@/services/couriers/fed.types.js';
 import { orderService } from '@/services/order.service.js';
 import { recordOrderTimeline } from '@/services/order-timeline.service.js';
 import { writeAuditLog } from '@/services/audit.service.js';
@@ -72,7 +66,11 @@ function buildAddressLine(order: OrderDocument): string {
   return [address.line1, address.line2].filter(Boolean).join(', ').slice(0, 250);
 }
 
-function buildTrackingMetadata(waybillNo: string, fedStatus?: string, updatedAt?: string): {
+function buildTrackingMetadata(
+  waybillNo: string,
+  fedStatus?: string,
+  updatedAt?: string,
+): {
   shipment: FedShipmentMetadata;
   tracking: FedTrackingMetadata;
 } {
@@ -224,9 +222,7 @@ export class OrderShipmentService {
 
   async handleFedWebhook(body: Record<string, unknown>) {
     const waybillId = String(body.waybill_id ?? '').trim();
-    const deliveryStatus = String(
-      body.delivery_status ?? body.current_status ?? '',
-    ).trim();
+    const deliveryStatus = String(body.delivery_status ?? body.current_status ?? '').trim();
     const lastUpdateTime = String(body.last_update_time ?? '').trim() || new Date().toISOString();
 
     if (!waybillId) {
@@ -272,9 +268,7 @@ export class OrderShipmentService {
       orderId: order._id.toString(),
       event: 'fed_status_update',
       status: order.status,
-      note: deliveryStatus
-        ? `FED status: ${deliveryStatus}`
-        : `FED waybill ${waybillId} updated`,
+      note: deliveryStatus ? `FED status: ${deliveryStatus}` : `FED waybill ${waybillId} updated`,
       actorType: 'system',
     });
 

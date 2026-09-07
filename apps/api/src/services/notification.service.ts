@@ -1,4 +1,4 @@
-import { Types } from 'mongoose';
+import type { Types } from 'mongoose';
 import { NotificationModel, type NotificationSeverity } from '@/models/notification.model.js';
 import { ApiError } from '@/utils/errors/api-error.js';
 

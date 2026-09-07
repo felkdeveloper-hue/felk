@@ -1,4 +1,4 @@
-import { Types } from 'mongoose';
+import type { Types } from 'mongoose';
 import { EventModel, PageViewModel, SessionModel, VisitorModel } from '@/models/analytics/index.js';
 
 /** Unique-IP key: prefer ipHash, else visitorId (when hash missing/unknown). */

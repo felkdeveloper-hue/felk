@@ -16,8 +16,8 @@ import {
   startCheckout,
   createCodPayment,
   completeCodPaymentAndWaitForOrder,
+  postPayhereWebhook,
 } from '@/test/helpers/commerce.js';
-import { attemptOrderId, buildCodWebhookPayload, postCodWebhook } from '@/test/helpers/webhook.js';
 import { OrderModel } from '@/models/order.models.js';
 import { CheckoutSessionModel } from '@/models/checkout.models.js';
 import { StockReservationModel } from '@/models/inventory.models.js';
@@ -79,16 +79,8 @@ describe('Edge cases — commerce pipeline', () => {
     const checkout = await startCheckout(app, customer.auth, String(addr._id ?? addr.id));
     const payment = await createCodPayment(app, customer.auth, checkout.checkoutToken);
 
-    const orderId = attemptOrderId(payment.referenceNumber, 1);
-    const payload = buildCodWebhookPayload({
-      orderId,
-      amount: payment.amount,
-      currency: payment.currency,
-      collectionId: 'same-event-id-twice',
-    });
-
-    const first = await postCodWebhook(app, payload);
-    const second = await postCodWebhook(app, payload);
+    const first = await postPayhereWebhook(app, payment, { paymentId: 'same-event-id-twice' });
+    const second = await postPayhereWebhook(app, payment, { paymentId: 'same-event-id-twice' });
     expect(first.status).toBe(200);
     expect(second.status).toBe(200);
     expect(second.body.data?.duplicate === true || second.body.data?.ok === true).toBeTruthy();
@@ -141,7 +133,7 @@ describe('Edge cases — commerce pipeline', () => {
     const customer = await registerCustomer(app);
     const addr = await addCustomerAddress(app, customer.auth);
     await addToCart(app, customer.auth, catalog.variantId, 1);
-    const checkout = await startCheckout(app, customer.auth, String(addr._id ?? addr.id));
+    const checkout = await startCheckout(app, customer.auth, String(addr._id ?? addr.id), true);
 
     const reservation = await StockReservationModel.findOne({
       status: RESERVATION_STATUS.ACTIVE,
@@ -165,7 +157,7 @@ describe('Edge cases — commerce pipeline', () => {
     expect(item?.available).toBe(2);
   });
 
-  it('checkout expiry rejects further payment creation', async () => {
+  it('expired checkout reopens when customer retries prepaid payment', async () => {
     const customer = await registerCustomer(app);
     const catalog = await seedCatalogAndStock({ stock: 2 });
     const addr = await addCustomerAddress(app, customer.auth);
@@ -186,8 +178,8 @@ describe('Edge cases — commerce pipeline', () => {
     const res = await request(app)
       .post(`${API}/payments/create`)
       .set(customer.auth)
-      .send({ checkoutToken: checkout.checkoutToken, method: 'cod' });
-    expect(res.status).toBeGreaterThanOrEqual(400);
+      .send({ checkoutToken: checkout.checkoutToken, method: 'payhere' });
+    expect(res.status).toBeLessThan(400);
   });
 
   it('duplicate order creation from PaymentSucceeded is idempotent', async () => {
@@ -226,14 +218,10 @@ describe('Edge cases — commerce pipeline', () => {
     const checkout = await startCheckout(app, customer.auth, String(addr._id ?? addr.id));
     const payment = await createCodPayment(app, customer.auth, checkout.checkoutToken);
 
-    const failPayload = buildCodWebhookPayload({
-      orderId: attemptOrderId(payment.referenceNumber, 1),
-      amount: payment.amount,
-      currency: payment.currency,
-      status: 'refused',
-      collectionId: 'fail-once',
+    const failRes = await postPayhereWebhook(app, payment, {
+      statusCode: '-2',
+      paymentId: 'fail-once',
     });
-    const failRes = await postCodWebhook(app, failPayload);
     expect(failRes.status).toBe(200);
 
     await waitFor(async () => {

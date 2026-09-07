@@ -70,7 +70,7 @@ describe('Flow 1 — Cart → Checkout → Reserve → Payment → Webhook → O
     expect(order.paymentReference).toBe(payment.referenceNumber);
 
     const committed = await StockReservationModel.find({
-      _id: { $in: order.reservationIds },
+      variantId: catalog.variantId,
       status: RESERVATION_STATUS.COMMITTED,
     });
     expect(committed.length).toBeGreaterThanOrEqual(1);

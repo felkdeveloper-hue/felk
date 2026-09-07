@@ -20,7 +20,7 @@ function readAddress(address?: Record<string, unknown> | null) {
   };
 }
 
-function paymentStatus(order: OrderDocument, invoice: InvoiceDocument): string {
+function paymentStatus(order: OrderDocument, _invoice: InvoiceDocument): string {
   if (order.paidAt) return 'SUCCESS';
   if (order.status === 'cancelled') return 'CANCELLED';
   if (order.paymentMethod === 'cod') return 'PENDING';

@@ -10,21 +10,24 @@ import { logger } from '@/config/logger.js';
  * delivery path within a single process.
  */
 class DomainEventBus extends EventEmitter {
-  publish(type: string, payload: Record<string, unknown>, refs?: Record<string, unknown>): void {
-    // Listeners are async and must never crash the publisher or the process.
+  async publish(
+    type: string,
+    payload: Record<string, unknown>,
+    refs?: Record<string, unknown>,
+  ): Promise<void> {
     for (const listener of this.listeners(type)) {
-      void Promise.resolve()
-        .then(() =>
+      try {
+        await Promise.resolve(
           (
             listener as (
               payload: Record<string, unknown>,
               refs?: Record<string, unknown>,
             ) => unknown
           )(payload, refs),
-        )
-        .catch((error) => {
-          logger.error({ err: error, type }, 'Domain event listener failed');
-        });
+        );
+      } catch (error) {
+        logger.error({ err: error, type }, 'Domain event listener failed');
+      }
     }
   }
 }

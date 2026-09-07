@@ -10,6 +10,7 @@ import {
   addToCart,
   startCheckout,
   createCodPayment,
+  completeCodPaymentAndWaitForOrder,
 } from '@/test/helpers/commerce.js';
 import { InventoryItemModel, StockReservationModel } from '@/models/inventory.models.js';
 import { RESERVATION_STATUS } from '@/constants/inventory.js';
@@ -100,7 +101,7 @@ describe('Checkout inventory timing — reserve only at Place Order', () => {
     expect(active).toBe(0);
   });
 
-  it('COD place-order commits stock and creates a single order', async () => {
+  it('prepaid place-order commits stock and creates a single order', async () => {
     const customer = await registerCustomer(app);
     const catalog = await seedCatalogAndStock({ stock: 3, price: 2000 });
     const addr = await addCustomerAddress(app, customer.auth);
@@ -111,7 +112,8 @@ describe('Checkout inventory timing — reserve only at Place Order', () => {
       0,
     );
 
-    await createCodPayment(app, customer.auth, checkout.checkoutToken);
+    const payment = await createCodPayment(app, customer.auth, checkout.checkoutToken);
+    await completeCodPaymentAndWaitForOrder(app, payment);
 
     const after = await InventoryItemModel.findOne({ variantId: catalog.variantId }).lean();
     expect(after?.onHand).toBe(2);
