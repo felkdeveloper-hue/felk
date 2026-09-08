@@ -371,7 +371,7 @@ export const authService = {
     }
 
     const { customerService } = await import('@/services/customer.service.js');
-    const customer = await customerService.ensureForUser(
+    await customerService.ensureForUser(
       {
         id: user._id.toString(),
         email: user.email,

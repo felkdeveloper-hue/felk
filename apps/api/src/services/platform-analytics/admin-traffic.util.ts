@@ -1,4 +1,4 @@
-import { Types } from 'mongoose';
+import type { Types } from 'mongoose';
 import { STAFF_ROLES } from '@/constants/auth.js';
 import { UserModel } from '@/models/user.model.js';
 

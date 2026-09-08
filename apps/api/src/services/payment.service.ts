@@ -58,6 +58,7 @@ import {
   mintpaySuccessHashMessage,
 } from '@/services/gateways/mintpay.gateway.js';
 import { KOKO_RECOVER_LOOKBACK_MS, kokoSuccessFallbackAllowed } from '@/utils/koko-auto-recover.js';
+import { kokoOrderIdCandidatesForPayment } from '@/utils/koko-order-id.util.js';
 import { webhookRecordNeedsReplay } from '@/utils/webhook-replay.js';
 
 function kokoCallbackStrings(raw: Buffer | string) {
@@ -909,13 +910,6 @@ export class PaymentService {
           },
           { paymentId: payment._id.toString(), checkoutId: payment.checkoutId.toString() },
         );
-        await handlePaymentSucceededEvent({
-          paymentId: payment._id.toString(),
-          checkoutToken: payment.checkoutToken,
-          amount: payment.amount,
-          currency: payment.currency,
-          method: payment.method,
-        });
 
         // Send payment success email (fire-and-forget)
         void (async () => {
@@ -1166,14 +1160,15 @@ export class PaymentService {
       return { ok: false, redirectUrl: cancelUrl };
     }
 
+    const purchaseId =
+      typeof payment.metadata?.mintpayPurchaseId === 'string'
+        ? payment.metadata.mintpayPurchaseId
+        : undefined;
+
     if (payment.status !== PAYMENT_STATUS.PAID) {
       payment.status = PAYMENT_STATUS.PAID;
       payment.paidAt = payment.paidAt ?? new Date();
       payment.failureReason = null;
-      const purchaseId =
-        typeof payment.metadata?.mintpayPurchaseId === 'string'
-          ? payment.metadata.mintpayPurchaseId
-          : undefined;
       payment.metadata = {
         ...payment.metadata,
         ...(purchaseId ? { mintpayPurchaseId: purchaseId } : {}),
@@ -1189,26 +1184,19 @@ export class PaymentService {
         resourceId: payment._id.toString(),
         after: toPlain(payment),
       });
-      await publishPaymentEvent(
-        PAYMENT_EVENT_TYPE.PAYMENT_SUCCEEDED,
-        {
-          paymentId: payment._id.toString(),
-          checkoutToken: payment.checkoutToken,
-          amount: payment.amount,
-          currency: payment.currency,
-          gatewayTxnId: purchaseId ?? orderId,
-        },
-        { paymentId: payment._id.toString(), checkoutId: payment.checkoutId.toString() },
-      );
     }
 
-    await handlePaymentSucceededEvent({
-      paymentId: payment._id.toString(),
-      checkoutToken: payment.checkoutToken,
-      amount: payment.amount,
-      currency: payment.currency,
-      method: payment.method,
-    });
+    await publishPaymentEvent(
+      PAYMENT_EVENT_TYPE.PAYMENT_SUCCEEDED,
+      {
+        paymentId: payment._id.toString(),
+        checkoutToken: payment.checkoutToken,
+        amount: payment.amount,
+        currency: payment.currency,
+        gatewayTxnId: purchaseId ?? orderId,
+      },
+      { paymentId: payment._id.toString(), checkoutId: payment.checkoutId.toString() },
+    );
 
     await writePaymentLog({
       paymentId: payment._id.toString(),
@@ -1270,9 +1258,9 @@ export class PaymentService {
       rsaOk = Boolean(viewedAsWebhook.valid && viewedAsWebhook.status === PAYMENT_STATUS.PAID);
     }
     const viewed = await kokoGateway.verifyTransaction(orderId);
-    const viewedPaid = viewed?.status === PAYMENT_STATUS.PAID;
+    let viewedPaid = viewed?.status === PAYMENT_STATUS.PAID;
     const returnHmacOk = Boolean(providedSig && kokoReturnHmacMatches(orderId, providedSig));
-    const captureEvidence = refererOk || viewedPaid || rsaOk || (returnHmacOk && trnId.length >= 6);
+    let captureEvidence = refererOk || viewedPaid || rsaOk || (returnHmacOk && trnId.length >= 6);
 
     const mapped =
       status.toUpperCase() === 'SUCCESS' ||
@@ -1282,6 +1270,29 @@ export class PaymentService {
         : status.toUpperCase() === 'CANCELED' || status.toUpperCase() === 'CANCELLED'
           ? PAYMENT_STATUS.CANCELLED
           : PAYMENT_STATUS.FAILED;
+
+    if (!captureEvidence && mapped === PAYMENT_STATUS.PAID && trnId.length >= 6) {
+      const candidates = await kokoOrderIdCandidatesForPayment(payment);
+      for (const candidate of candidates) {
+        const verified = await kokoGateway.verifyTransaction(candidate);
+        if (verified?.status === PAYMENT_STATUS.PAID) {
+          viewedPaid = true;
+          captureEvidence = true;
+          break;
+        }
+      }
+      if (
+        !captureEvidence &&
+        kokoSuccessFallbackAllowed({
+          status,
+          trnId,
+          signature,
+          paymentStatus: payment.status,
+        })
+      ) {
+        captureEvidence = true;
+      }
+    }
 
     if (mapped !== PAYMENT_STATUS.PAID) {
       if (!PAYMENT_TERMINAL_SUCCESS_STATUSES.includes(payment.status as never)) {
@@ -1347,33 +1358,19 @@ export class PaymentService {
         resourceId: payment._id.toString(),
         after: toPlain(payment),
       });
-      await publishPaymentEvent(
-        PAYMENT_EVENT_TYPE.PAYMENT_SUCCEEDED,
-        {
-          paymentId: payment._id.toString(),
-          checkoutToken: payment.checkoutToken,
-          amount: payment.amount,
-          currency: payment.currency,
-          gatewayTxnId: trnId || orderId,
-        },
-        { paymentId: payment._id.toString(), checkoutId: payment.checkoutId.toString() },
-      );
-      await handlePaymentSucceededEvent({
-        paymentId: payment._id.toString(),
-        checkoutToken: payment.checkoutToken,
-        amount: payment.amount,
-        currency: payment.currency,
-        method: payment.method,
-      });
-    } else {
-      await handlePaymentSucceededEvent({
-        paymentId: payment._id.toString(),
-        checkoutToken: payment.checkoutToken,
-        amount: payment.amount,
-        currency: payment.currency,
-        method: payment.method,
-      });
     }
+
+    await publishPaymentEvent(
+      PAYMENT_EVENT_TYPE.PAYMENT_SUCCEEDED,
+      {
+        paymentId: payment._id.toString(),
+        checkoutToken: payment.checkoutToken,
+        amount: payment.amount,
+        currency: payment.currency,
+        gatewayTxnId: trnId || orderId,
+      },
+      { paymentId: payment._id.toString(), checkoutId: payment.checkoutId.toString() },
+    );
 
     await writePaymentLog({
       paymentId: payment._id.toString(),
@@ -1399,8 +1396,8 @@ export class PaymentService {
       isDeleted: false,
       createdAt: { $gte: since },
     })
-      .sort({ createdAt: -1 })
-      .limit(20);
+      .sort({ createdAt: 1 })
+      .limit(50);
 
     let paid = 0;
     for (const payment of payments) {
@@ -1435,23 +1432,32 @@ export class PaymentService {
     const attempt = await PaymentAttemptModel.findOne({ paymentId: payment._id }).sort({
       attemptNumber: -1,
     });
-    const requestOrderId =
-      attempt?.requestPayload && typeof attempt.requestPayload.orderId === 'string'
-        ? attempt.requestPayload.orderId
-        : '';
-    const orderId =
-      requestOrderId ||
-      toAttemptOrderId(payment.referenceNumber, Math.max(1, payment.attemptCount));
+
+    const orderIdCandidates =
+      payment.method === PAYMENT_METHOD.KOKO
+        ? await kokoOrderIdCandidatesForPayment(payment)
+        : [
+            (attempt?.requestPayload && typeof attempt.requestPayload.orderId === 'string'
+              ? attempt.requestPayload.orderId
+              : '') || toAttemptOrderId(payment.referenceNumber, Math.max(1, payment.attemptCount)),
+          ].filter(Boolean);
 
     let result: { status: string; gatewayTxnId?: string } | null = null;
-    try {
-      result = await gateway.verifyTransaction(orderId);
-    } catch (err) {
-      logger.warn(
-        { err, orderId, paymentId: payment._id.toString(), method: payment.method },
-        'Gateway verifyTransaction failed',
-      );
-      return;
+    let verifiedOrderId = orderIdCandidates[0] ?? '';
+    for (const orderId of orderIdCandidates) {
+      try {
+        const verified = await gateway.verifyTransaction(orderId);
+        if (verified) {
+          result = verified;
+          verifiedOrderId = orderId;
+          if (verified.status === PAYMENT_STATUS.PAID) break;
+        }
+      } catch (err) {
+        logger.warn(
+          { err, orderId, paymentId: payment._id.toString(), method: payment.method },
+          'Gateway verifyTransaction failed for candidate',
+        );
+      }
     }
     if (!result) return;
 
@@ -1508,18 +1514,11 @@ export class PaymentService {
       },
       { paymentId: payment._id.toString(), checkoutId: payment.checkoutId.toString() },
     );
-    await handlePaymentSucceededEvent({
-      paymentId: payment._id.toString(),
-      checkoutToken: payment.checkoutToken,
-      amount: payment.amount,
-      currency: payment.currency,
-      method: payment.method,
-    });
 
     logger.info(
       {
         paymentId: payment._id.toString(),
-        orderId,
+        orderId: verifiedOrderId,
         method: payment.method,
         gatewayTxnId: result.gatewayTxnId,
       },

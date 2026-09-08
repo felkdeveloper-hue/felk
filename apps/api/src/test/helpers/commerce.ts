@@ -10,8 +10,10 @@ import { MOVEMENT_TYPE } from '@/constants/inventory.js';
 import { OrderModel } from '@/models/order.models.js';
 import { InvoiceModel } from '@/models/order.models.js';
 import { CheckoutSessionModel } from '@/models/checkout.models.js';
+import { appConfig } from '@/config/app.config.js';
+import { md5Hex } from '@/utils/crypto.helper.js';
 import { waitFor } from '@/test/helpers/db.js';
-import { attemptOrderId, buildCodWebhookPayload, postCodWebhook } from '@/test/helpers/webhook.js';
+import { attemptOrderId } from '@/test/helpers/webhook.js';
 
 const API = '/api/v1';
 
@@ -163,11 +165,15 @@ export async function startCheckout(
   };
 }
 
-export async function createCodPayment(app: Application, auth: AuthHeaders, checkoutToken: string) {
+export async function createPayherePayment(
+  app: Application,
+  auth: AuthHeaders,
+  checkoutToken: string,
+) {
   const res = await request(app)
     .post(`${API}/payments/create`)
     .set(auth)
-    .send({ checkoutToken, method: 'cod' });
+    .send({ checkoutToken, method: 'payhere' });
   if (res.status >= 400) {
     throw new Error(`payment create failed: ${res.status} ${JSON.stringify(res.body)}`);
   }
@@ -181,19 +187,41 @@ export async function createCodPayment(app: Application, auth: AuthHeaders, chec
   };
 }
 
-export async function completeCodPaymentAndWaitForOrder(
+function buildPayhereNotifyHash(
+  orderId: string,
+  amount: string,
+  currency: string,
+  statusCode: string,
+): string {
+  const merchantId = String(appConfig.payment.payhere.merchantId ?? '').trim();
+  const hashSecret = md5Hex(String(appConfig.payment.payhere.merchantSecret ?? '').trim());
+  return md5Hex(`${merchantId}${orderId}${amount}${currency}${statusCode}${hashSecret}`);
+}
+
+export async function completePayherePaymentAndWaitForOrder(
   app: Application,
   payment: { referenceNumber: string; amount: number; currency: string; id: string },
-  opts: { attemptNumber?: number; collectionId?: string } = {},
+  opts: { attemptNumber?: number; paymentId?: string } = {},
 ) {
   const orderId = attemptOrderId(payment.referenceNumber, opts.attemptNumber ?? 1);
-  const payload = buildCodWebhookPayload({
-    orderId,
-    amount: payment.amount,
-    currency: payment.currency,
-    collectionId: opts.collectionId,
-  });
-  const webhookRes = await postCodWebhook(app, payload);
+  const amount = payment.amount.toFixed(2);
+  const currency = payment.currency;
+  const statusCode = '2';
+  const md5sig = buildPayhereNotifyHash(orderId, amount, currency, statusCode);
+  const body = new URLSearchParams({
+    merchant_id: String(appConfig.payment.payhere.merchantId ?? '').trim(),
+    order_id: orderId,
+    payhere_amount: amount,
+    payhere_currency: currency,
+    status_code: statusCode,
+    payment_id: opts.paymentId ?? `ph_${Date.now()}`,
+    md5sig,
+  }).toString();
+
+  const webhookRes = await request(app)
+    .post(`${API}/payments/webhooks/payhere`)
+    .set('Content-Type', 'application/x-www-form-urlencoded')
+    .send(body);
   if (webhookRes.status >= 400) {
     throw new Error(`webhook failed: ${webhookRes.status} ${JSON.stringify(webhookRes.body)}`);
   }
@@ -208,11 +236,53 @@ export async function completeCodPaymentAndWaitForOrder(
     timeoutMs: 10_000,
   });
 
-  return { order, invoice, webhookRes, attemptOrderId: orderId, payload };
+  return { order, invoice, webhookRes, attemptOrderId: orderId };
+}
+
+export async function postPayhereWebhook(
+  app: Application,
+  payment: { referenceNumber: string; amount: number; currency: string },
+  opts: { attemptNumber?: number; statusCode?: string; paymentId?: string } = {},
+) {
+  const orderId = attemptOrderId(payment.referenceNumber, opts.attemptNumber ?? 1);
+  const amount = payment.amount.toFixed(2);
+  const currency = payment.currency;
+  const statusCode = opts.statusCode ?? '2';
+  const md5sig = buildPayhereNotifyHash(orderId, amount, currency, statusCode);
+  const body = new URLSearchParams({
+    merchant_id: String(appConfig.payment.payhere.merchantId ?? '').trim(),
+    order_id: orderId,
+    payhere_amount: amount,
+    payhere_currency: currency,
+    status_code: statusCode,
+    payment_id: opts.paymentId ?? `ph_${Date.now()}`,
+    md5sig,
+  }).toString();
+
+  return request(app)
+    .post(`${API}/payments/webhooks/payhere`)
+    .set('Content-Type', 'application/x-www-form-urlencoded')
+    .send(body);
+}
+
+export async function createCodPayment(app: Application, auth: AuthHeaders, checkoutToken: string) {
+  // COD is disabled for checkout — integration tests simulate PayHere capture instead.
+  return createPayherePayment(app, auth, checkoutToken);
+}
+
+export async function completeCodPaymentAndWaitForOrder(
+  app: Application,
+  payment: { referenceNumber: string; amount: number; currency: string; id: string },
+  opts: { attemptNumber?: number; collectionId?: string } = {},
+) {
+  return completePayherePaymentAndWaitForOrder(app, payment, {
+    attemptNumber: opts.attemptNumber,
+    paymentId: opts.collectionId,
+  });
 }
 
 /**
- * Full happy path: catalog → cart → checkout → COD payment → order + invoice.
+ * Full happy path: catalog → cart → checkout → PayHere payment → order + invoice.
  */
 export async function runPurchaseFlow(
   app: Application,
@@ -224,7 +294,7 @@ export async function runPurchaseFlow(
   const addressId = String(address.id ?? address._id);
   await addToCart(app, auth, catalog.variantId, 1);
   const checkout = await startCheckout(app, auth, addressId, false);
-  const payment = await createCodPayment(app, auth, checkout.checkoutToken);
-  const { order, invoice } = await completeCodPaymentAndWaitForOrder(app, payment);
+  const payment = await createPayherePayment(app, auth, checkout.checkoutToken);
+  const { order, invoice } = await completePayherePaymentAndWaitForOrder(app, payment);
   return { catalog, addressId, checkout, payment, order, invoice };
 }

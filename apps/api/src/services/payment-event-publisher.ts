@@ -22,7 +22,7 @@ export async function publishPaymentEvent(
       publishedAt: new Date(),
     });
     logger.info({ type, ...refs }, `Published payment event: ${type}`);
-    domainEventBus.publish(type, payload, refs);
+    await domainEventBus.publish(type, payload, refs);
   } catch (error) {
     logger.error({ err: error, type }, 'Failed to publish payment event');
   }

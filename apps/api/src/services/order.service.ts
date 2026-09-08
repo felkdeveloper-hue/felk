@@ -205,7 +205,16 @@ export class OrderService {
 
     if (options.status) filter.status = options.status;
     if (options.q) {
-      filter.orderNumber = new RegExp(options.q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      const escaped = options.q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const re = new RegExp(escaped, 'i');
+      // Search across order number, payment reference AND shipping phone so
+      // staff can find orders by any of these identifiers (e.g. PAY-XXXX, +94XXXXXXXX).
+      filter.$or = [
+        { orderNumber: re },
+        { paymentReference: re },
+        { 'shippingAddress.phone': re },
+        { 'shippingAddress.fullName': re },
+      ];
     }
 
     const [items, total] = await Promise.all([

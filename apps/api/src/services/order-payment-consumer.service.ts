@@ -29,6 +29,10 @@ import type { PaymentDocument } from '@/models/payment.models.js';
 import { paymentReceivedAt } from '@/utils/order-received-at.js';
 import { liveOrderExistsForCheckout, liveOrderExistsForPayment } from '@/utils/live-order.js';
 import {
+  kokoHasStoredSuccessClaim,
+  kokoOrderIdCandidatesForPayment,
+} from '@/utils/koko-order-id.util.js';
+import {
   KOKO_RECOVER_LOOKBACK_MS,
   kokoReferenceIsConfirmedCapture,
   kokoSuccessFallbackAllowed,
@@ -397,7 +401,6 @@ export async function fulfillCodPaymentIfNeeded(payment: PaymentDocument): Promi
     paymentId,
     checkoutId: payment.checkoutId.toString(),
   });
-  await handlePaymentSucceededEvent(succeededPayload);
 }
 
 /** Backfill orders for COD payments that were created before fulfillment ran. */
@@ -451,6 +454,97 @@ export async function handlePaymentFailedEvent(
   } catch (error) {
     logger.error({ err: error, paymentId, payload }, 'Failed to release stock on PaymentFailed');
   }
+}
+
+/**
+ * Force-create an order for a given gateway payment reference (e.g. PAY-MTQM...).
+ * Marks the payment as PAID if it isn't already, then runs handlePaymentSucceededEvent.
+ * Safe to call multiple times — idempotent.
+ */
+export async function forceRecoverOrderByPaymentRef(paymentReference: string): Promise<{
+  created: boolean;
+  orderNumber: string | null;
+  paymentId: string | null;
+  status: string | null;
+  message: string;
+}> {
+  const payment = await PaymentModel.findOne({
+    referenceNumber: new RegExp(`^${paymentReference.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i'),
+    isDeleted: false,
+  });
+
+  if (!payment) {
+    throw new (await import('@/utils/errors/api-error.js')).ApiError(
+      404,
+      `No payment found with reference starting with "${paymentReference}"`,
+      'PAYMENT_NOT_FOUND',
+    );
+  }
+
+  const paymentId = payment._id.toString();
+
+  // Check if order already exists and is live
+  const existingOrder = await OrderModel.findOne({
+    paymentId: payment._id,
+    isDeleted: false,
+    status: { $ne: ORDER_STATUS.CANCELLED },
+  });
+  if (existingOrder) {
+    return {
+      created: false,
+      orderNumber: existingOrder.orderNumber,
+      paymentId,
+      status: existingOrder.status,
+      message: `Order ${existingOrder.orderNumber} already exists with status "${existingOrder.status}"`,
+    };
+  }
+
+  // Force-mark payment as PAID if it isn't
+  if (
+    payment.status !== PAYMENT_STATUS.PAID &&
+    payment.status !== PAYMENT_STATUS.PARTIALLY_REFUNDED &&
+    payment.status !== PAYMENT_STATUS.REFUNDED &&
+    payment.method !== PAYMENT_METHOD.COD
+  ) {
+    const receivedAt = paymentReceivedAt(payment) ?? new Date();
+    payment.status = PAYMENT_STATUS.PAID;
+    payment.paidAt = receivedAt;
+    payment.failureReason = null;
+    payment.metadata = {
+      ...payment.metadata,
+      forceRecovered: true,
+      forceRecoveredAt: new Date().toISOString(),
+    };
+    await payment.save();
+    logger.info(
+      { paymentId, referenceNumber: payment.referenceNumber },
+      'Force-recovery: marked payment as PAID',
+    );
+  }
+
+  await handlePaymentSucceededEvent({
+    paymentId,
+    checkoutToken: payment.checkoutToken,
+    amount: payment.amount,
+    currency: payment.currency,
+    method: payment.method,
+  });
+
+  const order = await OrderModel.findOne({
+    paymentId: payment._id,
+    isDeleted: false,
+    status: { $ne: ORDER_STATUS.CANCELLED },
+  });
+
+  return {
+    created: Boolean(order),
+    orderNumber: order?.orderNumber ?? null,
+    paymentId,
+    status: order?.status ?? null,
+    message: order
+      ? `Order ${order.orderNumber} created successfully`
+      : 'Payment marked as paid but order creation failed — check server logs',
+  };
 }
 
 /** Registers the real-time, in-process subscription. Call once at bootstrap. */
@@ -680,61 +774,68 @@ export async function recoverConfirmedKokoOrders(): Promise<{
     if (payment.metadata?.kokoAutoRecoveryReversed) continue;
 
     if (payment.status !== PAYMENT_STATUS.PAID) {
-      const attempt = await PaymentAttemptModel.findOne({ paymentId: payment._id }).sort({
+      const attempts = await PaymentAttemptModel.find({ paymentId: payment._id }).sort({
         attemptNumber: -1,
       });
-      const requestOrderId =
-        attempt?.requestPayload && typeof attempt.requestPayload.orderId === 'string'
-          ? attempt.requestPayload.orderId
-          : '';
-      const orderId =
-        requestOrderId || `${payment.referenceNumber}-A${Math.max(1, payment.attemptCount || 1)}`;
-      const viewed = await kokoGateway.verifyTransaction(orderId);
+      const attempt = attempts[0];
+      const orderIdCandidates = await kokoOrderIdCandidatesForPayment(payment);
+      let viewed: { status: string; gatewayTxnId?: string } | null = null;
+      for (const candidate of orderIdCandidates) {
+        const result = await kokoGateway.verifyTransaction(candidate);
+        if (result?.status === PAYMENT_STATUS.PAID) {
+          viewed = result;
+          break;
+        }
+      }
       const viewedPaid = viewed?.status === PAYMENT_STATUS.PAID;
       const merchantCaptured = kokoReferenceIsConfirmedCapture(payment.referenceNumber);
+      const storedClaim = kokoHasStoredSuccessClaim(payment.metadata);
       let storedTxnId: string | undefined;
       let storedPaid = false;
       if (!viewedPaid && !merchantCaptured) {
-        const escapedOrderId = orderId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const stored = await PaymentWebhookModel.find({
-          gateway: PAYMENT_METHOD.KOKO,
-          createdAt: { $gte: since },
-          rawPayload: new RegExp(escapedOrderId),
-        })
-          .sort({ createdAt: -1 })
-          .limit(3);
-        for (const row of stored) {
-          if (!row.rawPayload) continue;
-          const verified = await kokoGateway.verifyWebhook({
-            headers: {},
-            rawBody: row.rawPayload,
-          });
-          if (verified.valid && verified.status === PAYMENT_STATUS.PAID) {
-            storedPaid = true;
-            storedTxnId = verified.gatewayTxnId;
-            break;
+        for (const candidate of orderIdCandidates) {
+          const escapedOrderId = candidate.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const stored = await PaymentWebhookModel.find({
+            gateway: PAYMENT_METHOD.KOKO,
+            createdAt: { $gte: since },
+            rawPayload: new RegExp(escapedOrderId),
+          })
+            .sort({ createdAt: -1 })
+            .limit(3);
+          for (const row of stored) {
+            if (!row.rawPayload) continue;
+            const verified = await kokoGateway.verifyWebhook({
+              headers: {},
+              rawBody: row.rawPayload,
+            });
+            if (verified.valid && verified.status === PAYMENT_STATUS.PAID) {
+              storedPaid = true;
+              storedTxnId = verified.gatewayTxnId;
+              break;
+            }
+            const payload = parseWebhookPayload(row.rawPayload);
+            const claimedTrnId = String(
+              payload.trnId ?? payload.trn_id ?? payload.transactionId ?? '',
+            );
+            const claimedStatus = String(payload.status ?? payload.paymentStatus ?? '');
+            const claimedSignature = String(payload.signature ?? '');
+            if (
+              kokoSuccessFallbackAllowed({
+                status: claimedStatus,
+                trnId: claimedTrnId,
+                signature: claimedSignature,
+                paymentStatus: payment.status,
+              })
+            ) {
+              storedPaid = true;
+              storedTxnId = claimedTrnId;
+              break;
+            }
           }
-          const payload = parseWebhookPayload(row.rawPayload);
-          const claimedTrnId = String(
-            payload.trnId ?? payload.trn_id ?? payload.transactionId ?? '',
-          );
-          const claimedStatus = String(payload.status ?? payload.paymentStatus ?? '');
-          const claimedSignature = String(payload.signature ?? '');
-          if (
-            kokoSuccessFallbackAllowed({
-              status: claimedStatus,
-              trnId: claimedTrnId,
-              signature: claimedSignature,
-              paymentStatus: payment.status,
-            })
-          ) {
-            storedPaid = true;
-            storedTxnId = claimedTrnId;
-            break;
-          }
+          if (storedPaid) break;
         }
       }
-      if (!viewedPaid && !merchantCaptured && !storedPaid) continue;
+      if (!viewedPaid && !merchantCaptured && !storedPaid && !storedClaim) continue;
 
       const gatewayTxnId = viewed?.gatewayTxnId || storedTxnId;
       payment.status = PAYMENT_STATUS.PAID;
@@ -746,6 +847,7 @@ export async function recoverConfirmedKokoOrders(): Promise<{
         kokoAutoRecovered: false,
         ...(merchantCaptured && !viewedPaid && !storedPaid ? { kokoMerchantConfirmed: true } : {}),
         ...(storedPaid ? { kokoWebhookConfirmed: true } : {}),
+        ...(storedClaim ? { kokoStoredClaimConfirmed: true } : {}),
         ...(gatewayTxnId ? { gatewayTxnId } : {}),
       };
       await payment.save();
