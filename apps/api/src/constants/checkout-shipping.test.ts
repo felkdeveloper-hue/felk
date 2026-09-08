@@ -3,6 +3,7 @@ import {
   FIXED_SHIPPING_AMOUNT,
   FREE_SHIPPING_THRESHOLD,
   isFreeDeliveryUnlocked,
+  productWorthForFreeDelivery,
   remainingForFreeDelivery,
   shippingFeeForSubtotal,
 } from '@/constants/checkout.js';
@@ -26,6 +27,15 @@ describe('free delivery threshold', () => {
     expect(remainingForFreeDelivery(0)).toBe(5000);
     expect(remainingForFreeDelivery(3000)).toBe(2000);
     expect(remainingForFreeDelivery(4999.5)).toBe(0.5);
+  });
+
+  it('uses payable product worth after discounts, not the list price', () => {
+    expect(productWorthForFreeDelivery(5980, 1196)).toBe(4784);
+    expect(isFreeDeliveryUnlocked(productWorthForFreeDelivery(5980, 1196))).toBe(false);
+    expect(shippingFeeForSubtotal(productWorthForFreeDelivery(5980, 1196))).toBe(
+      FIXED_SHIPPING_AMOUNT,
+    );
+    expect(remainingForFreeDelivery(4784)).toBe(216);
   });
 
   it('still waives pickup and staff orders below the threshold', () => {

@@ -4,6 +4,7 @@ import {
   FREE_SHIPPING_THRESHOLD,
   isFreeDeliveryUnlocked,
   previewShippingAmount,
+  productWorthForFreeDelivery,
   remainingForFreeDelivery,
 } from './checkout.constants';
 
@@ -23,5 +24,13 @@ describe('previewShippingAmount', () => {
 
   it('waives shipping for staff even below the threshold', () => {
     expect(previewShippingAmount(500, true, 800)).toBe(0);
+  });
+
+  it('does not unlock free delivery when flash sale drops product worth below 5,000', () => {
+    const worth = productWorthForFreeDelivery(5980, 1196);
+    expect(worth).toBe(4784);
+    expect(isFreeDeliveryUnlocked(worth)).toBe(false);
+    expect(previewShippingAmount(0, false, worth)).toBe(FIXED_SHIPPING_AMOUNT);
+    expect(remainingForFreeDelivery(worth)).toBe(216);
   });
 });

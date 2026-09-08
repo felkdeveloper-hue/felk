@@ -11,7 +11,7 @@ import { formatCurrency } from '@/utils';
 import { customersApi } from '@/services/sdk';
 import { isGuestCheckoutUser } from '@/utils/auth/guest-checkout';
 import { isStaffUser } from '@/utils/auth-redirect';
-import { previewShippingAmount } from '@/constants/checkout.constants';
+import { previewShippingAmount, productWorthForFreeDelivery } from '@/constants/checkout.constants';
 import { Zap, AlertTriangle } from 'lucide-react';
 import { CartItemRow } from '@/components/cart/cart-item-row';
 import { CartOrderSummary } from '@/components/cart/cart-order-summary';
@@ -128,7 +128,11 @@ export function CartPageContent() {
       ? computeFlashSaving(cart.items, slugByCategoryId)
       : 0;
   const hasFlashDiscount = flashSaving > 0;
-  const shippingAmount = previewShippingAmount(cart.totals.shipping, isStaff, cart.totals.subtotal);
+  const productWorth =
+    hasFlashDiscount && flashSubtotal !== null
+      ? flashSubtotal
+      : productWorthForFreeDelivery(cart.totals.subtotal, cart.totals.discount);
+  const shippingAmount = previewShippingAmount(cart.totals.shipping, isStaff, productWorth);
   const regularTotal =
     cart.totals.shipping > 0
       ? cart.totals.total - cart.totals.shipping + shippingAmount
@@ -148,7 +152,7 @@ export function CartPageContent() {
         </h2>
 
         <FreeDeliveryBanner
-          subtotal={cart.totals.subtotal}
+          subtotal={productWorth}
           currency={cart.totals.currency ?? 'LKR'}
         />
 
@@ -205,7 +209,7 @@ export function CartPageContent() {
         <div className="mx-auto flex max-w-lg flex-col gap-2">
           <FreeDeliveryBanner
             compact
-            subtotal={cart.totals.subtotal}
+            subtotal={productWorth}
             currency={cart.totals.currency ?? 'LKR'}
           />
           <div className="flex items-baseline justify-between gap-3">

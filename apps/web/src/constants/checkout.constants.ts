@@ -27,11 +27,18 @@ export interface ShippingMethodOption {
 /** Flat shipping fee applied site-wide (LKR). */
 export const FIXED_SHIPPING_AMOUNT = 500;
 
-/** Cart merchandise subtotal (LKR) at which standard delivery becomes free. */
+/** Payable product worth (LKR, after discounts) at which standard delivery becomes free. */
 export const FREE_SHIPPING_THRESHOLD = 5000;
 
-export function isFreeDeliveryUnlocked(subtotal: number): boolean {
-  return Number(subtotal) >= FREE_SHIPPING_THRESHOLD;
+/** Product amount that counts toward free delivery — list price minus discounts. */
+export function productWorthForFreeDelivery(subtotal: number, discount = 0): number {
+  return Number(
+    Math.max(0, (Number(subtotal) || 0) - Math.max(0, Number(discount) || 0)).toFixed(2),
+  );
+}
+
+export function isFreeDeliveryUnlocked(productWorth: number): boolean {
+  return Number(productWorth) >= FREE_SHIPPING_THRESHOLD;
 }
 
 /** Remaining merchandise value needed to unlock free delivery (LKR). */
@@ -42,11 +49,15 @@ export function remainingForFreeDelivery(subtotal: number): number {
 
 /**
  * Cart / checkout preview only — payments always use server checkout totals.
- * Staff is waived; otherwise free at LKR 5,000+ cart size, else the flat fee.
+ * Staff is waived; otherwise free at LKR 5,000+ product worth, else the flat fee.
  */
-export function previewShippingAmount(actualShipping: number, isStaff: boolean, subtotal = 0) {
+export function previewShippingAmount(
+  actualShipping: number,
+  isStaff: boolean,
+  productWorth = 0,
+) {
   if (isStaff) return 0;
-  if (isFreeDeliveryUnlocked(subtotal)) return 0;
+  if (isFreeDeliveryUnlocked(productWorth)) return 0;
   return actualShipping > 0 ? actualShipping : FIXED_SHIPPING_AMOUNT;
 }
 

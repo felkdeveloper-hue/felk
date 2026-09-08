@@ -16,6 +16,7 @@ import {
   PAYMENT_METHOD_OPTIONS,
   SHIPPING_METHOD_OPTIONS,
   isCheckoutPaymentEnabled,
+  productWorthForFreeDelivery,
 } from '@/constants/checkout.constants';
 import { ROUTES } from '@/constants';
 import { useCheckoutSessionQuery, useRefreshCheckoutMutation } from '@/hooks/checkout';
@@ -356,7 +357,10 @@ export function CheckoutReviewPage() {
             <CheckoutValidationAlert issues={[...hardIssues, ...softIssues]} />
             <FreeDeliveryBanner
               compact
-              subtotal={session.totals.subtotal}
+              subtotal={productWorthForFreeDelivery(
+                session.totals.subtotal,
+                session.totals.discount,
+              )}
               currency={session.currency}
             />
 

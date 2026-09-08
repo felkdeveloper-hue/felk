@@ -15,6 +15,7 @@ import { ROUTES } from '@/constants';
 import {
   defaultCheckoutPaymentMethod,
   isCheckoutPaymentEnabled,
+  productWorthForFreeDelivery,
 } from '@/constants/checkout.constants';
 import { FreeDeliveryBanner } from '@/components/cart/free-delivery-banner';
 import { useCheckoutSessionQuery, useRefreshCheckoutMutation } from '@/hooks/checkout';
@@ -227,7 +228,10 @@ export function CheckoutPaymentPage() {
 
             <FreeDeliveryBanner
               compact={isMobile}
-              subtotal={session.totals.subtotal}
+              subtotal={productWorthForFreeDelivery(
+                session.totals.subtotal,
+                session.totals.discount,
+              )}
               currency={session.currency}
             />
 

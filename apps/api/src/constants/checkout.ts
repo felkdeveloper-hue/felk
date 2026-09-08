@@ -35,11 +35,18 @@ export const DELIVERY_METHOD = {
 /** Flat island-wide delivery fee (LKR). */
 export const FIXED_SHIPPING_AMOUNT = 500;
 
-/** Cart merchandise subtotal (LKR) at which standard delivery becomes free. */
+/** Payable product worth (LKR, after discounts) at which standard delivery becomes free. */
 export const FREE_SHIPPING_THRESHOLD = 5000;
 
-export function isFreeDeliveryUnlocked(subtotal: number): boolean {
-  return Number(subtotal) >= FREE_SHIPPING_THRESHOLD;
+/** Product amount that counts toward free delivery — list price minus discounts. */
+export function productWorthForFreeDelivery(subtotal: number, discount = 0): number {
+  return Number(
+    Math.max(0, (Number(subtotal) || 0) - Math.max(0, Number(discount) || 0)).toFixed(2),
+  );
+}
+
+export function isFreeDeliveryUnlocked(productWorth: number): boolean {
+  return Number(productWorth) >= FREE_SHIPPING_THRESHOLD;
 }
 
 /** Remaining merchandise value needed to unlock free delivery (LKR). */
@@ -50,7 +57,7 @@ export function remainingForFreeDelivery(subtotal: number): number {
 
 /**
  * Shipping fee used by checkout / payments.
- * Pickup and staff waivers stay free; otherwise LKR 500 unless cart ≥ 5,000.
+ * Pickup and staff waivers stay free; otherwise LKR 500 unless product worth ≥ 5,000.
  */
 export function shippingFeeForSubtotal(
   subtotal: number,

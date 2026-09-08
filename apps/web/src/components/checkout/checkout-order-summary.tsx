@@ -8,7 +8,10 @@ import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { QuantitySelector } from '@/components/cart/quantity-selector';
 import { FreeDeliveryBanner, ShippingFeeLabel } from '@/components/cart/free-delivery-banner';
-import { previewShippingAmount } from '@/constants/checkout.constants';
+import {
+  previewShippingAmount,
+  productWorthForFreeDelivery,
+} from '@/constants/checkout.constants';
 import { useRemoveCartItemMutation, useUpdateCartItemMutation } from '@/hooks/cart';
 import { useCancelCheckoutMutation, useRefreshCheckoutMutation } from '@/hooks/checkout';
 import { useCheckoutStore } from '@/store';
@@ -82,6 +85,10 @@ export function CheckoutOrderSummary({ session, editable = false }: CheckoutOrde
     : clientFlashSubtotal;
   const hasFlashDiscount = flashSaving > 0 && lines.length > 0 && displayTotals.subtotal > 0;
   const showFlashUi = (serverFlashApplied || flashEnabled) && hasFlashDiscount;
+  const productWorth =
+    showFlashUi && flashSubtotal !== null
+      ? flashSubtotal
+      : productWorthForFreeDelivery(displayTotals.subtotal, displayTotals.discount);
   const payableTotal = serverFlashApplied
     ? displayTotals.grandTotal
     : flashEnabled && flashSubtotal !== null && hasFlashDiscount
@@ -95,8 +102,17 @@ export function CheckoutOrderSummary({ session, editable = false }: CheckoutOrde
 
   const patchSessionLines = (nextLines: CheckoutSession['lines']) => {
     const nextSubtotal = nextLines.reduce((sum, line) => sum + line.lineSubtotal, 0);
+    const nextWorth =
+      flashEnabled || serverFlashApplied
+        ? nextLines.reduce((sum, line) => {
+            const eligible =
+              lineEligibility.find((entry) => entry.line.cartItemId === line.cartItemId)
+                ?.eligible ?? true;
+            return sum + applyFlashDiscount(line.lineSubtotal, eligible);
+          }, 0)
+        : productWorthForFreeDelivery(nextSubtotal, displayTotals.discount);
     // Preview only — Place Order / PayHere always re-read server checkout totals.
-    const nextShipping = previewShippingAmount(displayTotals.shipping ?? 0, false, nextSubtotal);
+    const nextShipping = previewShippingAmount(displayTotals.shipping ?? 0, false, nextWorth);
     const next: CheckoutSession = {
       ...session,
       ...(cached ?? {}),
@@ -290,7 +306,7 @@ export function CheckoutOrderSummary({ session, editable = false }: CheckoutOrde
 
       <Separator className="my-4" />
 
-      <FreeDeliveryBanner className="mb-3" subtotal={displayTotals.subtotal} currency={currency} />
+      <FreeDeliveryBanner className="mb-3" subtotal={productWorth} currency={currency} />
 
       {showFlashUi ? (
         <div

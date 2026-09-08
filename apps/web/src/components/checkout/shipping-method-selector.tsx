@@ -3,6 +3,7 @@ import {
   SHIPPING_METHOD_OPTIONS,
   isFreeDeliveryUnlocked,
   previewShippingAmount,
+  productWorthForFreeDelivery,
 } from '@/constants/checkout.constants';
 import { ShippingFeeLabel } from '@/components/cart/free-delivery-banner';
 import type { CheckoutSession, ShippingMethod } from '@/services/sdk';
@@ -41,11 +42,13 @@ function estimateForMethod(session: CheckoutSession, method: ShippingMethod) {
 
 function priceLabel(session: CheckoutSession, amount: number | undefined, isStaff: boolean) {
   const { currency } = session;
+  const productWorth = productWorthForFreeDelivery(
+    session.totals.subtotal,
+    session.totals.discount,
+  );
   const resolved =
-    amount != null
-      ? amount
-      : previewShippingAmount(session.totals.shipping, isStaff, session.totals.subtotal);
-  const unlocked = resolved <= 0 && (isStaff || isFreeDeliveryUnlocked(session.totals.subtotal));
+    amount != null ? amount : previewShippingAmount(session.totals.shipping, isStaff, productWorth);
+  const unlocked = resolved <= 0 && (isStaff || isFreeDeliveryUnlocked(productWorth));
   return <ShippingFeeLabel amount={resolved} currency={currency} unlocked={unlocked} />;
 }
 

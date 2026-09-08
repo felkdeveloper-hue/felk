@@ -171,12 +171,14 @@ export const checkoutHandlers = [
       extendReservation?: boolean;
     };
 
+    const payableWorth =
+      Number(checkoutState.totals.subtotal) - Number(checkoutState.totals.discount ?? 0);
     const shippingAmount =
       body.shippingMethod === 'pickup'
         ? 0
         : body.shippingMethod === 'express'
           ? 800
-          : Number(checkoutState.totals.subtotal) >= 5000
+          : payableWorth >= 5000
             ? 0
             : 500;
 

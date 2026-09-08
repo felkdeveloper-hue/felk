@@ -31,6 +31,7 @@ import {
   FIRST_ORDER_DISCOUNT,
   FLASH_SALE_DISCOUNT,
   SHIPPING_METHOD,
+  productWorthForFreeDelivery,
   type ShippingMethod,
 } from '@/constants/checkout.js';
 import { STAFF_ROLES } from '@/constants/auth.js';
@@ -292,24 +293,6 @@ export class CheckoutService {
       ? await UserModel.findById(session.userId).select('metadata roleKey').lean()
       : null;
 
-    const shippingEstimate = await calculateShipping({
-      country: shippingAddress?.country,
-      state: shippingAddress?.state,
-      subtotal,
-      totalWeightGrams,
-      method: session.shippingMethod as ShippingMethod,
-      currency: session.currency,
-      waiveFee: isStaffCheckout(checkoutUser?.roleKey),
-    });
-
-    const taxEstimate = await calculateTax({
-      country: shippingAddress?.country,
-      state: shippingAddress?.state,
-      subtotal,
-      shipping: shippingEstimate.amount,
-      currency: session.currency,
-    });
-
     if (opts?.couponCode !== undefined) {
       session.coupon = applyCouponPlaceholder(opts.couponCode);
     }
@@ -395,6 +378,26 @@ export class CheckoutService {
 
     const discount = Number((session.coupon as { amount?: number })?.amount ?? 0);
     const giftCard = Number((session.giftCard as { amount?: number })?.amount ?? 0);
+    const productWorth = productWorthForFreeDelivery(subtotal, discount);
+
+    const shippingEstimate = await calculateShipping({
+      country: shippingAddress?.country,
+      state: shippingAddress?.state,
+      subtotal: productWorth,
+      totalWeightGrams,
+      method: session.shippingMethod as ShippingMethod,
+      currency: session.currency,
+      waiveFee: isStaffCheckout(checkoutUser?.roleKey),
+    });
+
+    const taxEstimate = await calculateTax({
+      country: shippingAddress?.country,
+      state: shippingAddress?.state,
+      subtotal,
+      shipping: shippingEstimate.amount,
+      currency: session.currency,
+    });
+
     const shipping = shippingEstimate.amount;
     const tax = taxEstimate.amount;
     const grandTotal = Number(

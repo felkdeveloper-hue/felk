@@ -58,7 +58,7 @@ export interface TaxCalcResult {
 }
 
 /**
- * Shipping calculator — LKR 500 island-wide, or free at LKR 5,000+ cart subtotal.
+ * Shipping calculator — LKR 500 island-wide, or free at LKR 5,000+ payable product worth.
  * Pickup and staff waivers stay free. Amount here is what checkout totals / payments use.
  */
 export async function calculateShipping(input: ShippingCalcInput): Promise<ShippingCalcResult> {
