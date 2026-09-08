@@ -7,6 +7,8 @@ import { Image } from '@/components/media/image';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { QuantitySelector } from '@/components/cart/quantity-selector';
+import { FreeDeliveryBanner, ShippingFeeLabel } from '@/components/cart/free-delivery-banner';
+import { previewShippingAmount } from '@/constants/checkout.constants';
 import { useRemoveCartItemMutation, useUpdateCartItemMutation } from '@/hooks/cart';
 import { useCancelCheckoutMutation, useRefreshCheckoutMutation } from '@/hooks/checkout';
 import { useCheckoutStore } from '@/store';
@@ -92,17 +94,21 @@ export function CheckoutOrderSummary({ session, editable = false }: CheckoutOrde
       : displayTotals.grandTotal;
 
   const patchSessionLines = (nextLines: CheckoutSession['lines']) => {
+    const nextSubtotal = nextLines.reduce((sum, line) => sum + line.lineSubtotal, 0);
+    // Preview only — Place Order / PayHere always re-read server checkout totals.
+    const nextShipping = previewShippingAmount(displayTotals.shipping ?? 0, false, nextSubtotal);
     const next: CheckoutSession = {
       ...session,
       ...(cached ?? {}),
       lines: nextLines,
       totals: {
         ...displayTotals,
-        subtotal: nextLines.reduce((sum, line) => sum + line.lineSubtotal, 0),
+        subtotal: nextSubtotal,
+        shipping: nextShipping,
         totalQuantity: nextLines.reduce((sum, line) => sum + line.quantity, 0),
         grandTotal:
-          nextLines.reduce((sum, line) => sum + line.lineSubtotal, 0) +
-          (displayTotals.shipping ?? 0) +
+          nextSubtotal +
+          nextShipping +
           (displayTotals.tax ?? 0) -
           (displayTotals.discount ?? 0) -
           (displayTotals.giftCard ?? 0),
@@ -284,6 +290,8 @@ export function CheckoutOrderSummary({ session, editable = false }: CheckoutOrde
 
       <Separator className="my-4" />
 
+      <FreeDeliveryBanner className="mb-3" subtotal={displayTotals.subtotal} currency={currency} />
+
       {showFlashUi ? (
         <div
           className="mb-3 flex items-center gap-1.5 rounded-lg px-3 py-2 text-[11px] font-semibold"
@@ -336,7 +344,13 @@ export function CheckoutOrderSummary({ session, editable = false }: CheckoutOrde
         ) : null}
         <div className="flex justify-between">
           <dt className="text-muted-foreground">Shipping</dt>
-          <dd>{formatCurrency(displayTotals.shipping, currency)}</dd>
+          <dd>
+            <ShippingFeeLabel
+              amount={displayTotals.shipping}
+              currency={currency}
+              unlocked={(displayTotals.shipping ?? 0) <= 0}
+            />
+          </dd>
         </div>
         <div className="flex justify-between">
           <dt className="text-muted-foreground">Tax</dt>

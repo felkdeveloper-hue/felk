@@ -25,6 +25,12 @@ import {
   GUEST_CART_COOKIE,
   GUEST_CART_HEADER,
 } from '@/constants/cart.js';
+import {
+  FIXED_SHIPPING_AMOUNT,
+  FREE_SHIPPING_THRESHOLD,
+  isFreeDeliveryUnlocked,
+  shippingFeeForSubtotal,
+} from '@/constants/checkout.js';
 import { INVENTORY_STATUS } from '@/constants/inventory-status.js';
 import { PRODUCT_STATUS, VARIANT_STATUS } from '@/constants/product.js';
 import type { AuthenticatedUser } from '@/types/index.js';
@@ -46,9 +52,12 @@ export interface CartTotals {
     amount: number;
   };
   shippingEstimate: {
-    status: 'placeholder';
+    status: 'placeholder' | 'calculated';
     message: string;
     amount: number;
+    threshold?: number;
+    fee?: number;
+    unlocked?: boolean;
   };
 }
 
@@ -295,8 +304,9 @@ export class CartService {
 
     const discount = 0;
     const estimatedTax = 0;
-    const estimatedShipping = 0;
+    const estimatedShipping = cartItems.length === 0 ? 0 : shippingFeeForSubtotal(subtotal);
     const grandTotal = Number((subtotal - discount + estimatedTax + estimatedShipping).toFixed(2));
+    const freeDelivery = cartItems.length > 0 && isFreeDeliveryUnlocked(subtotal);
 
     return {
       currency,
@@ -315,9 +325,14 @@ export class CartService {
         amount: estimatedTax,
       },
       shippingEstimate: {
-        status: 'placeholder',
-        message: 'Shipping estimate reserved for checkout / shipping module',
+        status: freeDelivery ? 'calculated' : 'placeholder',
+        message: freeDelivery
+          ? `Free delivery — cart is LKR ${FREE_SHIPPING_THRESHOLD.toLocaleString('en-LK')} or more`
+          : 'Island-wide delivery — free at LKR 5,000+',
         amount: estimatedShipping,
+        threshold: FREE_SHIPPING_THRESHOLD,
+        fee: FIXED_SHIPPING_AMOUNT,
+        unlocked: freeDelivery,
       },
     };
   }

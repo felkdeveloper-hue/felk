@@ -27,9 +27,26 @@ export interface ShippingMethodOption {
 /** Flat shipping fee applied site-wide (LKR). */
 export const FIXED_SHIPPING_AMOUNT = 500;
 
-/** Cart / checkout preview: customers pay the flat fee; staff / admin is waived. */
-export function previewShippingAmount(actualShipping: number, isStaff: boolean) {
+/** Cart merchandise subtotal (LKR) at which standard delivery becomes free. */
+export const FREE_SHIPPING_THRESHOLD = 5000;
+
+export function isFreeDeliveryUnlocked(subtotal: number): boolean {
+  return Number(subtotal) >= FREE_SHIPPING_THRESHOLD;
+}
+
+/** Remaining merchandise value needed to unlock free delivery (LKR). */
+export function remainingForFreeDelivery(subtotal: number): number {
+  const remaining = FREE_SHIPPING_THRESHOLD - Math.max(0, Number(subtotal) || 0);
+  return Number(Math.max(0, remaining).toFixed(2));
+}
+
+/**
+ * Cart / checkout preview only — payments always use server checkout totals.
+ * Staff is waived; otherwise free at LKR 5,000+ cart size, else the flat fee.
+ */
+export function previewShippingAmount(actualShipping: number, isStaff: boolean, subtotal = 0) {
   if (isStaff) return 0;
+  if (isFreeDeliveryUnlocked(subtotal)) return 0;
   return actualShipping > 0 ? actualShipping : FIXED_SHIPPING_AMOUNT;
 }
 

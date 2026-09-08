@@ -16,7 +16,8 @@ export function CartPage() {
             My Bag{cartCount > 0 ? ` (${itemLabel})` : ''}
           </h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            Review items and totals before checkout.
+            Review items and totals before checkout. Free island-wide delivery on bags of LKR
+            5,000+.
           </p>
         </header>
         <CartPageContent />

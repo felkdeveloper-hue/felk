@@ -2,13 +2,14 @@ import { formatCurrency } from '@/utils';
 import type { CartLineItem, CartTotals, CartValidationResult } from '@/services/sdk';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
-import { previewShippingAmount } from '@/constants/checkout.constants';
+import { isFreeDeliveryUnlocked, previewShippingAmount } from '@/constants/checkout.constants';
 import { useAuthStore } from '@/store';
 import { isStaffUser } from '@/utils/auth-redirect';
 import { Zap } from 'lucide-react';
 import { useFlashSale } from '@/contexts/flash-sale-context';
 import { useCategorySlugLookup } from '@/hooks/use-flash-sale-eligibility';
 import { computeFlashAdjustedSubtotal, computeFlashSaving } from '@/utils/flash-sale-eligibility';
+import { FreeDeliveryBanner, ShippingFeeLabel } from '@/components/cart/free-delivery-banner';
 
 export interface CartOrderSummaryProps {
   totals: CartTotals;
@@ -22,8 +23,10 @@ export function CartOrderSummary({ totals, items = [], validation }: CartOrderSu
   const { isFlashSaleActive } = useFlashSale();
   const slugByCategoryId = useCategorySlugLookup();
   const isStaff = isStaffUser(authUser);
-  const shipping = previewShippingAmount(totals.shipping, isStaff);
-  const displayTotal = totals.shipping > 0 ? totals.total : totals.total + shipping;
+  const shipping = previewShippingAmount(totals.shipping, isStaff, totals.subtotal);
+  const unlocked = isStaff || isFreeDeliveryUnlocked(totals.subtotal);
+  const displayTotal =
+    totals.shipping > 0 ? totals.total - totals.shipping + shipping : totals.total + shipping;
 
   const flashEnabled = isFlashSaleActive;
   const flashSubtotal =
@@ -48,6 +51,8 @@ export function CartOrderSummary({ totals, items = [], validation }: CartOrderSu
   return (
     <aside className="border-border bg-card min-w-0 space-y-3 rounded-xl border p-4 sm:space-y-4 sm:p-5">
       <h2 className="text-sm font-semibold sm:text-base">Price summary</h2>
+
+      <FreeDeliveryBanner subtotal={totals.subtotal} currency={currency} />
 
       {flashEnabled && hasAnyFlashDiscount ? (
         <div
@@ -104,7 +109,9 @@ export function CartOrderSummary({ totals, items = [], validation }: CartOrderSu
         ) : null}
         <div className="flex justify-between">
           <dt className="text-muted-foreground">Shipping</dt>
-          <dd>{formatCurrency(shipping, currency)}</dd>
+          <dd>
+            <ShippingFeeLabel amount={shipping} currency={currency} unlocked={unlocked} />
+          </dd>
         </div>
         <div className="flex justify-between">
           <dt className="text-muted-foreground">Tax estimate</dt>

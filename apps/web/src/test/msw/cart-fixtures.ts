@@ -28,12 +28,19 @@ function createEmptyCart() {
 
 function recalcTotals() {
   const subtotal = cartState.items.reduce((sum, item) => sum + Number(item.lineSubtotal ?? 0), 0);
+  const estimatedShipping = cartState.items.length === 0 ? 0 : subtotal >= 5000 ? 0 : 500;
   cartState.totals = {
     ...cartState.totals,
     subtotal,
-    grandTotal: subtotal,
+    estimatedShipping,
+    grandTotal: subtotal + estimatedShipping,
     totalQuantity: cartState.items.reduce((sum, item) => sum + Number(item.quantity ?? 0), 0),
     itemCount: cartState.items.length,
+    shippingEstimate: {
+      ...(cartState.totals.shippingEstimate ?? {}),
+      amount: estimatedShipping,
+      unlocked: estimatedShipping === 0 && cartState.items.length > 0,
+    },
   };
 }
 

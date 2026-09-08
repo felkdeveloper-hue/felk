@@ -6,6 +6,7 @@ import { useCartStore } from '@/store/cart-store';
 import { useAuthStore } from '@/store';
 import { toGuestWishlistView, useWishlistStore } from '@/store/wishlist-store';
 import { getDefaultWishlist, normalizeWishlist, type EnrichedWishlistItem } from '@/utils/wishlist';
+import { previewShippingAmount } from '@/constants/checkout.constants';
 
 const WISHLIST_STALE_MS = 1000 * 60 * 10;
 
@@ -619,13 +620,15 @@ export function useMoveWishlistItemToCartMutation() {
               },
             ];
         const subtotal = nextItems.reduce((sum, line) => sum + line.totalPrice, 0);
+        const shipping = nextItems.length === 0 ? 0 : previewShippingAmount(0, false, subtotal);
         const optimisticCart: CartView = {
           ...previousCart,
           items: nextItems,
           totals: {
             ...previousCart.totals,
             subtotal,
-            total: subtotal + (previousCart.totals.shipping ?? 0),
+            shipping,
+            total: subtotal + shipping,
             itemCount: nextItems.length,
             totalQuantity: nextItems.reduce((sum, line) => sum + line.quantity, 0),
           },

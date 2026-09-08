@@ -172,7 +172,13 @@ export const checkoutHandlers = [
     };
 
     const shippingAmount =
-      body.shippingMethod === 'pickup' ? 0 : body.shippingMethod === 'express' ? 800 : 500;
+      body.shippingMethod === 'pickup'
+        ? 0
+        : body.shippingMethod === 'express'
+          ? 800
+          : Number(checkoutState.totals.subtotal) >= 5000
+            ? 0
+            : 500;
 
     checkoutState = {
       ...checkoutState,

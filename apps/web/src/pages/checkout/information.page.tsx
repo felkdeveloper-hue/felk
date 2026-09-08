@@ -410,7 +410,11 @@ export function CheckoutInformationPage() {
 
           <div className="min-w-0 lg:sticky lg:top-24 lg:self-start">
             {guestCart?.totals ? (
-              <CartOrderSummary totals={guestCart.totals} validation={guestCart.validation} />
+              <CartOrderSummary
+                totals={guestCart.totals}
+                items={guestCart.items}
+                validation={guestCart.validation}
+              />
             ) : (
               <Skeleton className="h-64 w-full" />
             )}
@@ -557,7 +561,11 @@ export function CheckoutInformationPage() {
                 </div>
               ) : null}
               {guestCart?.totals ? (
-                <CartOrderSummary totals={guestCart.totals} validation={guestCart.validation} />
+                <CartOrderSummary
+                  totals={guestCart.totals}
+                  items={guestCart.items}
+                  validation={guestCart.validation}
+                />
               ) : sessionPending ? (
                 <div aria-busy="true">
                   <Skeleton className="h-64 w-full" />

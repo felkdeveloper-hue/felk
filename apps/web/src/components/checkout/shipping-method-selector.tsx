@@ -1,6 +1,10 @@
 import { BadgeCheck, Clock3, ShieldCheck, Truck } from 'lucide-react';
-import { FIXED_SHIPPING_AMOUNT, SHIPPING_METHOD_OPTIONS } from '@/constants/checkout.constants';
-import { formatCurrency } from '@/utils/format';
+import {
+  SHIPPING_METHOD_OPTIONS,
+  isFreeDeliveryUnlocked,
+  previewShippingAmount,
+} from '@/constants/checkout.constants';
+import { ShippingFeeLabel } from '@/components/cart/free-delivery-banner';
 import type { CheckoutSession, ShippingMethod } from '@/services/sdk';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -19,6 +23,7 @@ const TRUST_BADGES = [
   { icon: ShieldCheck, label: 'Tracked delivery' },
   { icon: BadgeCheck, label: 'Secure packaging' },
   { icon: Clock3, label: 'Estimated windows shown' },
+  { icon: Truck, label: 'Free delivery at LKR 5,000+' },
 ] as const;
 
 function estimateForMethod(session: CheckoutSession, method: ShippingMethod) {
@@ -36,13 +41,12 @@ function estimateForMethod(session: CheckoutSession, method: ShippingMethod) {
 
 function priceLabel(session: CheckoutSession, amount: number | undefined, isStaff: boolean) {
   const { currency } = session;
-  if (amount != null) return formatCurrency(amount, currency);
-  const fallback = isStaff
-    ? 0
-    : session.totals.shipping > 0
-      ? session.totals.shipping
-      : FIXED_SHIPPING_AMOUNT;
-  return formatCurrency(fallback, currency);
+  const resolved =
+    amount != null
+      ? amount
+      : previewShippingAmount(session.totals.shipping, isStaff, session.totals.subtotal);
+  const unlocked = resolved <= 0 && (isStaff || isFreeDeliveryUnlocked(session.totals.subtotal));
+  return <ShippingFeeLabel amount={resolved} currency={currency} unlocked={unlocked} />;
 }
 
 export function ShippingMethodSelector({

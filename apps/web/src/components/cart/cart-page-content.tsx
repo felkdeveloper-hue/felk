@@ -16,6 +16,7 @@ import { Zap, AlertTriangle } from 'lucide-react';
 import { CartItemRow } from '@/components/cart/cart-item-row';
 import { CartOrderSummary } from '@/components/cart/cart-order-summary';
 import { EmptyBagState } from '@/components/cart/empty-bag-state';
+import { FreeDeliveryBanner } from '@/components/cart/free-delivery-banner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { ErrorState } from '@/components/ui/error-state';
@@ -127,9 +128,11 @@ export function CartPageContent() {
       ? computeFlashSaving(cart.items, slugByCategoryId)
       : 0;
   const hasFlashDiscount = flashSaving > 0;
-  const shippingAmount = previewShippingAmount(cart.totals.shipping, isStaff);
+  const shippingAmount = previewShippingAmount(cart.totals.shipping, isStaff, cart.totals.subtotal);
   const regularTotal =
-    cart.totals.shipping > 0 ? cart.totals.total : cart.totals.total + shippingAmount;
+    cart.totals.shipping > 0
+      ? cart.totals.total - cart.totals.shipping + shippingAmount
+      : cart.totals.total + shippingAmount;
   const flashGrandTotal =
     flashSubtotal !== null && hasFlashDiscount
       ? Math.round(
@@ -143,6 +146,11 @@ export function CartPageContent() {
         <h2 id="cart-items-heading" className="sr-only">
           Bag items ({cart.items.length})
         </h2>
+
+        <FreeDeliveryBanner
+          subtotal={cart.totals.subtotal}
+          currency={cart.totals.currency ?? 'LKR'}
+        />
 
         {checkoutBlocked ? (
           <Alert variant="destructive">
@@ -195,6 +203,11 @@ export function CartPageContent() {
         style={{ bottom: 'calc(3.5rem + env(safe-area-inset-bottom, 0px))' }}
       >
         <div className="mx-auto flex max-w-lg flex-col gap-2">
+          <FreeDeliveryBanner
+            compact
+            subtotal={cart.totals.subtotal}
+            currency={cart.totals.currency ?? 'LKR'}
+          />
           <div className="flex items-baseline justify-between gap-3">
             <span className="text-muted-foreground text-[10px] font-bold uppercase tracking-[0.16em]">
               Total

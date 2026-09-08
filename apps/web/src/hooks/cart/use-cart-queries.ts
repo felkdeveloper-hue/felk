@@ -12,6 +12,7 @@ import { useAuthStore } from '@/store';
 import { useCartStore } from '@/store/cart-store';
 import { trackCommerceEvent } from '@/lib/analytics';
 import { fireAddToCartPixel, prepareCartAddMeta } from '@/lib/analytics/add-to-cart-meta';
+import { previewShippingAmount } from '@/constants/checkout.constants';
 
 function syncCartToStore(cart: CartView | null) {
   useCartStore.getState().setCart(cart);
@@ -58,13 +59,15 @@ function readCartSnapshot(queryClient: ReturnType<typeof useQueryClient>): CartV
 function withTotals(items: CartLineItem[], previous: CartView): CartView {
   const subtotal = items.reduce((sum, item) => sum + item.totalPrice, 0);
   const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
+  const shipping = items.length === 0 ? 0 : previewShippingAmount(0, false, subtotal);
   return {
     ...previous,
     items,
     totals: {
       ...previous.totals,
       subtotal,
-      total: subtotal + (previous.totals.shipping ?? 0) - (previous.totals.discount ?? 0),
+      shipping,
+      total: subtotal + shipping - (previous.totals.discount ?? 0),
       itemCount: items.length,
       totalQuantity,
       currency: previous.totals.currency ?? 'LKR',

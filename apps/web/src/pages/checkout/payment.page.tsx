@@ -16,6 +16,7 @@ import {
   defaultCheckoutPaymentMethod,
   isCheckoutPaymentEnabled,
 } from '@/constants/checkout.constants';
+import { FreeDeliveryBanner } from '@/components/cart/free-delivery-banner';
 import { useCheckoutSessionQuery, useRefreshCheckoutMutation } from '@/hooks/checkout';
 import { useIsMobile } from '@/hooks';
 import { usePlaceOrderMutation } from '@/hooks/payment';
@@ -223,6 +224,12 @@ export function CheckoutPaymentPage() {
             {isMobile && hardIssues.length > 0 ? (
               <CheckoutValidationAlert issues={hardIssues} />
             ) : null}
+
+            <FreeDeliveryBanner
+              compact={isMobile}
+              subtotal={session.totals.subtotal}
+              currency={session.currency}
+            />
 
             <PaymentMethodSelector
               value={paymentMethod}

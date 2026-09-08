@@ -1,10 +1,16 @@
 import { ShippingZoneModel, TaxConfigModel } from '@/models/settings.models.js';
 import {
   FIRST_ORDER_DISCOUNT,
+  FIXED_SHIPPING_AMOUNT,
   FLASH_SALE_DISCOUNT,
+  FREE_SHIPPING_THRESHOLD,
   SHIPPING_METHOD,
+  isFreeDeliveryUnlocked,
+  shippingFeeForSubtotal,
   type ShippingMethod,
 } from '@/constants/checkout.js';
+
+export { FIXED_SHIPPING_AMOUNT, FREE_SHIPPING_THRESHOLD };
 
 export interface ShippingCalcInput {
   country?: string | null;
@@ -51,11 +57,9 @@ export interface TaxCalcResult {
   provider: string;
 }
 
-/** Flat island-wide shipping fee (LKR). Free shipping is intentionally disabled. */
-export const FIXED_SHIPPING_AMOUNT = 500;
-
 /**
- * Shipping calculator — fixed LKR 500 for delivery; pickup remains free.
+ * Shipping calculator — LKR 500 island-wide, or free at LKR 5,000+ cart subtotal.
+ * Pickup and staff waivers stay free. Amount here is what checkout totals / payments use.
  */
 export async function calculateShipping(input: ShippingCalcInput): Promise<ShippingCalcResult> {
   if (input.waiveFee) {
@@ -107,16 +111,23 @@ export async function calculateShipping(input: ShippingCalcInput): Promise<Shipp
         : true,
     ) ?? zones[0];
 
+  const freeDelivery = isFreeDeliveryUnlocked(input.subtotal);
+  const amount = shippingFeeForSubtotal(input.subtotal);
+
   return {
-    status: zone ? 'calculated' : 'placeholder',
+    status: zone || freeDelivery ? 'calculated' : 'placeholder',
     method,
-    amount: FIXED_SHIPPING_AMOUNT,
+    amount,
     currency: zone?.currency || input.currency,
     zoneId: zone?._id.toString() ?? null,
     zoneName: zone?.name ?? null,
     estimatedDaysMin: zone?.estimatedDaysMin ?? 3,
     estimatedDaysMax: zone?.estimatedDaysMax ?? 7,
-    message: zone ? `Fixed shipping via zone ${zone.name}` : 'Fixed island-wide shipping rate',
+    message: freeDelivery
+      ? `Free delivery — cart is LKR ${FREE_SHIPPING_THRESHOLD.toLocaleString('en-LK')} or more`
+      : zone
+        ? `Fixed shipping via zone ${zone.name}`
+        : 'Fixed island-wide shipping rate',
     carrier: zone ? 'internal' : 'placeholder',
   };
 }

@@ -28,6 +28,7 @@ import { useCheckoutStore } from '@/store';
 import { trackCommerceEvent } from '@/lib/analytics';
 import { formatCurrency } from '@/utils/format';
 import type { PaymentMethod, ShippingMethod } from '@/services/sdk';
+import { FreeDeliveryBanner, ShippingFeeLabel } from '@/components/cart/free-delivery-banner';
 
 const COUNTRY_LABELS: Record<string, string> = {
   LK: 'Sri Lanka',
@@ -353,6 +354,11 @@ export function CheckoutReviewPage() {
               isExtending={refreshCheckout.isPending}
             />
             <CheckoutValidationAlert issues={[...hardIssues, ...softIssues]} />
+            <FreeDeliveryBanner
+              compact
+              subtotal={session.totals.subtotal}
+              currency={session.currency}
+            />
 
             <div className="grid gap-4 sm:grid-cols-2">
               {session.shippingAddress ? (
@@ -389,7 +395,11 @@ export function CheckoutReviewPage() {
                 <p className="text-muted-foreground mt-2 text-sm">
                   Shipping:{' '}
                   <span className="text-foreground font-medium">
-                    {formatCurrency(session.totals.shipping, session.currency)}
+                    <ShippingFeeLabel
+                      amount={session.totals.shipping}
+                      currency={session.currency}
+                      unlocked={(session.totals.shipping ?? 0) <= 0}
+                    />
                   </span>
                 </p>
               </ReviewSection>

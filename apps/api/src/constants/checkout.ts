@@ -32,6 +32,35 @@ export const DELIVERY_METHOD = {
   PICKUP: 'pickup',
 } as const;
 
+/** Flat island-wide delivery fee (LKR). */
+export const FIXED_SHIPPING_AMOUNT = 500;
+
+/** Cart merchandise subtotal (LKR) at which standard delivery becomes free. */
+export const FREE_SHIPPING_THRESHOLD = 5000;
+
+export function isFreeDeliveryUnlocked(subtotal: number): boolean {
+  return Number(subtotal) >= FREE_SHIPPING_THRESHOLD;
+}
+
+/** Remaining merchandise value needed to unlock free delivery (LKR). */
+export function remainingForFreeDelivery(subtotal: number): number {
+  const remaining = FREE_SHIPPING_THRESHOLD - Math.max(0, Number(subtotal) || 0);
+  return Number(Math.max(0, remaining).toFixed(2));
+}
+
+/**
+ * Shipping fee used by checkout / payments.
+ * Pickup and staff waivers stay free; otherwise LKR 500 unless cart ≥ 5,000.
+ */
+export function shippingFeeForSubtotal(
+  subtotal: number,
+  opts?: { waiveFee?: boolean; pickup?: boolean },
+): number {
+  if (opts?.waiveFee || opts?.pickup) return 0;
+  if (isFreeDeliveryUnlocked(subtotal)) return 0;
+  return FIXED_SHIPPING_AMOUNT;
+}
+
 /** Payment-window reservation TTL (minutes). Stock is held only after Place Order. */
 export const CHECKOUT_RESERVATION_TTL_MINUTES = 10;
 
