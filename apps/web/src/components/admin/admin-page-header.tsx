@@ -41,19 +41,24 @@ export function AdminStatCard({
   hint,
   className,
   to,
+  onClick,
+  active,
 }: {
   title: string;
   value: string | number;
   hint?: string;
   className?: string;
   to?: string;
+  onClick?: () => void;
+  active?: boolean;
 }) {
   const card = (
     <article
       className={cn(
         'rounded-2xl border border-[var(--admin-line)] bg-[var(--admin-panel)] p-4 shadow-[var(--admin-shadow)] transition-colors sm:p-5',
-        to &&
+        (to || onClick) &&
           'hover:border-[var(--admin-accent)]/40 hover:bg-[var(--admin-surface)] active:scale-[0.99]',
+        active && 'border-[var(--admin-accent)]/50 ring-1 ring-[var(--admin-accent)]/30',
         className,
       )}
     >
@@ -68,6 +73,18 @@ export function AdminStatCard({
       ) : null}
     </article>
   );
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className="block w-full rounded-2xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--admin-accent)]"
+      >
+        {card}
+      </button>
+    );
+  }
 
   if (to) {
     return (

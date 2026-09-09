@@ -11,6 +11,11 @@ import {
   PageMotion,
 } from '@/components/admin';
 import { ADMIN_ROUTES, QUERY_KEYS } from '@/constants';
+import {
+  ADMIN_ORDER_FILTER_STATUSES,
+  orderStatusBadgeClass,
+  orderStatusLabel,
+} from '@/constants/order.constants';
 import { useAdminPermissions, useRevenueDashboard } from '@/hooks/admin';
 import { cn, formatCurrency, formatDate } from '@/lib/utils';
 import { formatOrderAddress, ordersApi } from '@/services/sdk/admin';
@@ -21,16 +26,10 @@ function StatusBadge({ status }: { status: string }) {
     <span
       className={cn(
         'inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium capitalize',
-        status === 'pending' && 'bg-amber-500/15 text-amber-700 dark:text-amber-300',
-        status === 'confirmed' && 'bg-blue-500/15 text-blue-700 dark:text-blue-300',
-        status === 'shipped' && 'bg-violet-500/15 text-violet-700 dark:text-violet-300',
-        status === 'delivered' && 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
-        status === 'cancelled' && 'bg-red-500/15 text-red-700 dark:text-red-300',
-        !['pending', 'confirmed', 'shipped', 'delivered', 'cancelled'].includes(status) &&
-          'bg-neutral-500/15 text-neutral-600 dark:text-neutral-300',
+        orderStatusBadgeClass(status),
       )}
     >
-      {status.replace(/_/g, ' ')}
+      {orderStatusLabel(status)}
     </span>
   );
 }
@@ -119,13 +118,7 @@ export function OrdersListPage() {
           setStatus(value);
           setPage(1);
         }}
-        statusOptions={[
-          { label: 'Pending', value: 'pending' },
-          { label: 'Confirmed', value: 'confirmed' },
-          { label: 'Shipped', value: 'shipped' },
-          { label: 'Delivered', value: 'delivered' },
-          { label: 'Cancelled', value: 'cancelled' },
-        ]}
+        statusOptions={ADMIN_ORDER_FILTER_STATUSES}
         page={page}
         totalPages={query.data?.meta.totalPages ?? 1}
         onPageChange={setPage}

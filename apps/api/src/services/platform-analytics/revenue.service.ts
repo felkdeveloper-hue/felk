@@ -1,9 +1,13 @@
+import { Types } from 'mongoose';
 import { SessionModel } from '@/models/analytics/index.js';
 import { OrderModel } from '@/models/order.models.js';
 import { PaymentModel } from '@/models/payment.models.js';
+import { ProductMediaModel, ProductModel } from '@/models/product.models.js';
+import { MEDIA_TYPES } from '@/constants/product.js';
 import { ORDER_STATUS } from '@/constants/order-status.js';
 import type { AnalyticsFilter } from '@/schemas/analytics/index.js';
 import { orderReceivedAt, paymentReceivedAt } from '@/utils/order-received-at.js';
+import { toPublicMediaUrl } from '@/utils/public-media-url.js';
 import { buildOrderMatch, resolveDateRange } from './analytics-query.builder.js';
 import {
   calendarDateInTz,
@@ -12,6 +16,34 @@ import {
   startOfAnalyticsYear,
 } from './date-range.util.js';
 import { pickSizeLabel, sizeNameByVariantId, toSizeCounts } from './size-breakdown.util.js';
+
+type SizeCount = ReturnType<typeof toSizeCounts>[number];
+
+type SoldProduct = {
+  productId: string;
+  productName: string;
+  revenue: number;
+  qty: number;
+  sizes: SizeCount[];
+  image?: string | null;
+  stockControlNumber?: string | null;
+};
+
+function publicImage(url?: string | null): string | undefined {
+  if (!url) return undefined;
+  return toPublicMediaUrl(url) ?? url;
+}
+
+function firstItemImage(item: Record<string, unknown>): string | undefined {
+  const images = Array.isArray(item.images) ? item.images : [];
+  const first = images.find((value) => typeof value === 'string' && value.trim());
+  return typeof first === 'string' ? first.trim() : undefined;
+}
+
+function itemStockControl(item: Record<string, unknown>): string | undefined {
+  const value = item.stockControlNumber;
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
 
 const PAID_STATUSES = [
   ORDER_STATUS.PENDING,
@@ -46,7 +78,7 @@ function inRange(at: Date | undefined, from: Date, to: Date) {
 function soldProductsFromOrders(
   orders: LeanOrder[],
   sizeByVariant: Map<string, string>,
-) {
+): SoldProduct[] {
   const productMap = new Map<
     string,
     {
@@ -55,6 +87,8 @@ function soldProductsFromOrders(
       revenue: number;
       qty: number;
       sizes: Map<string, number>;
+      image?: string;
+      stockControlNumber?: string;
     }
   >();
   for (const order of orders) {
@@ -80,6 +114,14 @@ function soldProductsFromOrders(
       current.revenue += Number.isFinite(lineTotal) && lineTotal > 0 ? lineTotal : 0;
       current.qty += qty;
       current.sizes.set(size, (current.sizes.get(size) ?? 0) + qty);
+      if (!current.image) {
+        const image = firstItemImage(item);
+        if (image) current.image = image;
+      }
+      if (!current.stockControlNumber) {
+        const number = itemStockControl(item);
+        if (number) current.stockControlNumber = number;
+      }
       productMap.set(productId, current);
     }
   }
@@ -90,8 +132,78 @@ function soldProductsFromOrders(
       revenue: Math.round(product.revenue * 100) / 100,
       qty: product.qty,
       sizes: toSizeCounts(product.sizes),
+      image: publicImage(product.image) ?? null,
+      stockControlNumber: product.stockControlNumber ?? null,
     }))
     .sort((a, b) => b.qty - a.qty || b.revenue - a.revenue);
+}
+
+async function enrichSoldProducts(products: SoldProduct[]): Promise<SoldProduct[]> {
+  const missingIds = [
+    ...new Set(
+      products
+        .filter((product) => !product.image || !product.stockControlNumber)
+        .map((product) => product.productId)
+        .filter((id) => Types.ObjectId.isValid(id)),
+    ),
+  ];
+  if (!missingIds.length) return products;
+
+  const objectIds = missingIds.map((id) => new Types.ObjectId(id));
+  const needNumbers = products.some(
+    (product) => missingIds.includes(product.productId) && !product.stockControlNumber,
+  );
+  const needImages = products.some(
+    (product) => missingIds.includes(product.productId) && !product.image,
+  );
+
+  const [catalog, media] = await Promise.all([
+    needNumbers
+      ? ProductModel.find({ _id: { $in: objectIds } })
+          .select('stockControlNumber')
+          .lean()
+      : Promise.resolve([] as Array<{ _id: Types.ObjectId; stockControlNumber?: string | null }>),
+    needImages
+      ? ProductMediaModel.find({
+          productId: { $in: objectIds },
+          isDeleted: false,
+          type: MEDIA_TYPES.IMAGE,
+        })
+          .select('productId url thumbnailUrl')
+          .sort({ isPrimary: -1, priority: 1, createdAt: 1 })
+          .lean()
+      : Promise.resolve(
+          [] as Array<{
+            productId: Types.ObjectId;
+            url?: string;
+            thumbnailUrl?: string | null;
+          }>,
+        ),
+  ]);
+
+  const numberById = new Map<string, string>();
+  for (const row of catalog) {
+    const number = row.stockControlNumber?.trim();
+    if (number) numberById.set(String(row._id), number);
+  }
+
+  const imageById = new Map<string, string>();
+  for (const row of media) {
+    const productId = String(row.productId);
+    if (imageById.has(productId)) continue;
+    const url =
+      (typeof row.thumbnailUrl === 'string' && row.thumbnailUrl.trim()) ||
+      (typeof row.url === 'string' && row.url.trim()) ||
+      '';
+    if (url) imageById.set(productId, url);
+  }
+
+  return products.map((product) => ({
+    ...product,
+    image: product.image || publicImage(imageById.get(product.productId)) || null,
+    stockControlNumber:
+      product.stockControlNumber || numberById.get(product.productId) || null,
+  }));
 }
 
 async function receivedAtByPaymentId(orders: LeanOrder[]): Promise<Map<string, Date | undefined>> {
@@ -179,8 +291,10 @@ export async function getRevenueDashboard(filter: AnalyticsFilter) {
     ),
   ];
   const sizeByVariant = await sizeNameByVariantId(saleVariantIds);
-  const topProducts = soldProductsFromOrders(periodOrders, sizeByVariant);
-  const yearProducts = soldProductsFromOrders(yearOrders, sizeByVariant);
+  const [topProducts, yearProducts] = await Promise.all([
+    enrichSoldProducts(soldProductsFromOrders(periodOrders, sizeByVariant)),
+    enrichSoldProducts(soldProductsFromOrders(yearOrders, sizeByVariant)),
+  ]);
 
   const userIds = [
     ...new Set(periodOrders.map((o) => (o.userId ? String(o.userId) : null)).filter(Boolean)),

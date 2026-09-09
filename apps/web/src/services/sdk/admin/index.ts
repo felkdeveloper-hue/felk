@@ -2,9 +2,11 @@ export { productsApi } from './products';
 export type {
   AdminProduct,
   AdminVariant,
+  AdminVariantStock,
   ProductInput,
   ProductListParams,
   ProductSpecification,
+  ProductStockFilter,
   VariantInput,
 } from './products';
 
@@ -21,6 +23,7 @@ export { inventoryApi } from './inventory';
 export type {
   InventoryItemCreateInput,
   InventoryItemRow,
+  InventoryStockSummary,
   StockAdjustInput,
   WarehouseRow,
 } from './inventory';

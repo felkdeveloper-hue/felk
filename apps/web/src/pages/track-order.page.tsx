@@ -15,7 +15,7 @@ const STATUS_LABELS: Record<string, string> = {
   pending: 'Order received',
   confirmed: 'Confirmed',
   packed: 'Packed',
-  ready_for_shipment: 'Ready to ship',
+  ready_for_shipment: 'Ready for shipment',
   shipped: 'Shipped',
   delivered: 'Delivered',
   completed: 'Completed',

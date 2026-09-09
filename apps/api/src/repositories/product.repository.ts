@@ -40,6 +40,8 @@ export interface ProductListFilters extends ListOptions {
   createdTo?: string;
   publishFrom?: string;
   publishTo?: string;
+  excludeIds?: string | string[];
+  stockFilter?: 'in_stock' | 'out_of_stock' | 'low_stock' | 'has_out_variant';
 }
 
 export class ProductRepository extends BaseRepository {
@@ -109,6 +111,30 @@ export class ProductRepository extends BaseRepository {
         return { data: [], meta: buildPaginationMeta(0, page, limit) };
       }
       filter._id = { $in: objectIds };
+    }
+    if (options.excludeIds?.length) {
+      const rawExclude = Array.isArray(options.excludeIds)
+        ? options.excludeIds
+        : String(options.excludeIds)
+            .split(',')
+            .map((id) => id.trim())
+            .filter(Boolean);
+      const excludeIds = rawExclude
+        .map((id) => toObjectId(id))
+        .filter((id): id is Types.ObjectId => Boolean(id));
+      if (excludeIds.length) {
+        const existing = filter._id;
+        if (existing && typeof existing === 'object' && '$in' in existing) {
+          const excludeSet = new Set(excludeIds.map(String));
+          const kept = (existing.$in as Types.ObjectId[]).filter((id) => !excludeSet.has(String(id)));
+          if (!kept.length) {
+            return { data: [], meta: buildPaginationMeta(0, page, limit) };
+          }
+          filter._id = { $in: kept };
+        } else {
+          filter._id = { $nin: excludeIds };
+        }
+      }
     }
     if (options.status) {
       filter.status = options.status;

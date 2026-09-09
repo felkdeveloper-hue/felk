@@ -5,6 +5,21 @@ export const INVENTORY_STATUS = {
   BACKORDER: 'backorder',
 } as const;
 
+/**
+ * A variant is low stock when it still has units, but fewer than this many.
+ * "Less than 2" means 1 unit left. 0 is out of stock, not low stock.
+ */
+export const DEFAULT_LOW_STOCK_THRESHOLD = 1;
+
+export const PRODUCT_STOCK_FILTERS = [
+  'in_stock',
+  'out_of_stock',
+  'low_stock',
+  'has_out_variant',
+] as const;
+
+export type ProductStockFilter = (typeof PRODUCT_STOCK_FILTERS)[number];
+
 export type InventoryStatus = (typeof INVENTORY_STATUS)[keyof typeof INVENTORY_STATUS];
 
 export const STOCK_LEDGER_TYPE = {

@@ -192,6 +192,7 @@ export const productListQuerySchema = paginationQuerySchema.extend({
     .enum(['true', 'false'])
     .optional()
     .transform((v) => v === 'true'),
+  stockFilter: z.enum(['in_stock', 'out_of_stock', 'low_stock', 'has_out_variant']).optional(),
 });
 
 export const dimensionsSchema = z

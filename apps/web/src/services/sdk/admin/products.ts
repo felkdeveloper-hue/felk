@@ -49,9 +49,18 @@ export interface AdminProduct {
   seoTitle?: string;
   seoDescription?: string;
   variantCount?: number;
+  totalStock?: number;
+  variantStocks?: AdminVariantStock[];
   thumbnailUrl?: string;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface AdminVariantStock {
+  variantId: string;
+  sku: string;
+  title: string;
+  available: number;
 }
 
 export interface AdminVariant {
@@ -184,6 +193,17 @@ function normalizeProduct(raw: unknown): AdminProduct {
     seoTitle: typeof seo?.title === 'string' ? seo.title : undefined,
     seoDescription: typeof seo?.description === 'string' ? seo.description : undefined,
     variantCount: Number(record.variantCount ?? 0),
+    totalStock: Number(record.totalStock ?? 0),
+    variantStocks: Array.isArray(record.variantStocks)
+      ? record.variantStocks
+          .filter((row): row is Record<string, unknown> => Boolean(row) && typeof row === 'object')
+          .map((row) => ({
+            variantId: String(row.variantId ?? ''),
+            sku: String(row.sku ?? ''),
+            title: String(row.title ?? row.sku ?? 'Variant'),
+            available: Number(row.available ?? 0),
+          }))
+      : [],
     thumbnailUrl: typeof record.thumbnailUrl === 'string' ? record.thumbnailUrl : undefined,
     createdAt: typeof record.createdAt === 'string' ? record.createdAt : undefined,
     updatedAt: typeof record.updatedAt === 'string' ? record.updatedAt : undefined,
@@ -213,11 +233,14 @@ function normalizeVariant(raw: unknown): AdminVariant {
   };
 }
 
+export type ProductStockFilter = 'in_stock' | 'out_of_stock' | 'low_stock' | 'has_out_variant';
+
 export interface ProductListParams extends ListQueryParams {
   status?: string;
   brandId?: string;
   categoryId?: string;
   includeDeleted?: boolean;
+  stockFilter?: ProductStockFilter;
 }
 
 export interface ProductInput {

@@ -53,6 +53,10 @@ export class InventoryService {
     return inventoryRepository.listInventory(options);
   }
 
+  async summarize() {
+    return inventoryRepository.summarizeStock();
+  }
+
   async getById(id: string) {
     const item = await InventoryItemModel.findOne({ _id: id, isDeleted: false })
       .populate('warehouseId', 'name code')

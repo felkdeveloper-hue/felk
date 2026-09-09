@@ -1,6 +1,7 @@
 import { Link } from '@tanstack/react-router';
 import { ADMIN_ROUTES } from '@/constants';
 import { SizeBreakdown } from '@/components/admin/analytics';
+import { Image } from '@/components/media/image';
 import { useRevenueDashboard } from '@/hooks/admin';
 import { formatCurrency } from '@/lib/utils';
 
@@ -106,22 +107,55 @@ export function DashboardRevenueHero() {
             </Link>
           </div>
           <ul className="divide-border max-h-72 divide-y overflow-auto pr-1">
-            {(data.yearProducts ?? data.topProducts).map((product) => (
-              <li
-                key={product.productId}
-                className="flex items-center justify-between gap-4 py-2"
-              >
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-[var(--admin-ink)]">
-                    {product.productName}
+            {(data.yearProducts ?? data.topProducts).map((product) => {
+              const stockControl = product.stockControlNumber?.trim();
+              return (
+                <li
+                  key={product.productId}
+                  className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 py-2 sm:gap-4"
+                >
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                      <p className="truncate text-sm font-medium text-[var(--admin-ink)]">
+                        {product.productName}
+                      </p>
+                      {stockControl ? (
+                        <span
+                          className="rounded-none border border-[var(--admin-line)] bg-[var(--admin-panel-soft)] px-1.5 py-0.5 font-mono text-[11px] tabular-nums text-neutral-500"
+                          title={`Stock control ${stockControl}`}
+                        >
+                          {stockControl}
+                        </span>
+                      ) : null}
+                    </div>
+                    <SizeBreakdown sizes={product.sizes} empty="Size not recorded" />
+                  </div>
+                  <Link
+                    to={ADMIN_ROUTES.productDetail}
+                    params={{ productId: product.productId }}
+                    className="bg-muted relative size-12 shrink-0 overflow-hidden rounded-md ring-1 ring-[var(--admin-line)] transition-opacity hover:opacity-85"
+                    title="Open product"
+                  >
+                    {product.image ? (
+                      <Image
+                        src={product.image}
+                        alt={product.productName}
+                        className="size-full object-cover"
+                        containerClassName="size-full"
+                        sizes="48px"
+                      />
+                    ) : (
+                      <span className="text-muted-foreground flex size-full items-center justify-center text-[10px] font-semibold uppercase">
+                        FE
+                      </span>
+                    )}
+                  </Link>
+                  <p className="text-muted-foreground shrink-0 text-xs tabular-nums">
+                    {product.qty} sold
                   </p>
-                  <SizeBreakdown sizes={product.sizes} empty="Size not recorded" />
-                </div>
-                <p className="text-muted-foreground shrink-0 text-xs tabular-nums">
-                  {product.qty} sold
-                </p>
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ul>
         </div>
       ) : null}

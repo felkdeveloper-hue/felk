@@ -22,6 +22,8 @@ import {
   ORDER_STATUS_CONFIG,
   ORDER_STATUS_EMAIL_PREVIEW,
   ORDER_STATUS_TRANSITIONS,
+  orderStatusBadgeClass,
+  orderStatusLabel,
 } from '@/constants/order.constants';
 import { useAdminPermissions } from '@/hooks/admin';
 import { AppError } from '@/lib/errors';
@@ -101,14 +103,10 @@ function StatusBadge({ status }: { status: string }) {
     <span
       className={cn(
         'inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium capitalize',
-        status === 'pending' && 'bg-amber-500/15 text-amber-700 dark:text-amber-300',
-        status === 'confirmed' && 'bg-blue-500/15 text-blue-700 dark:text-blue-300',
-        status === 'shipped' && 'bg-violet-500/15 text-violet-700 dark:text-violet-300',
-        status === 'delivered' && 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
-        status === 'cancelled' && 'bg-red-500/15 text-red-700 dark:text-red-300',
+        orderStatusBadgeClass(status),
       )}
     >
-      {status.replace(/_/g, ' ')}
+      {orderStatusLabel(status)}
     </span>
   );
 }

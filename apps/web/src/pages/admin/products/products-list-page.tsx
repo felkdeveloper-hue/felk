@@ -26,6 +26,8 @@ import {
   productsApi,
   productImportApi,
   type AdminProduct,
+  type AdminVariantStock,
+  type ProductStockFilter,
 } from '@/services/sdk/admin';
 import type { PaginatedResult } from '@/types';
 
@@ -109,6 +111,7 @@ function archiveIdsInProductLists(queryClient: QueryClient, ids: string[]) {
 function invalidateProductCaches(queryClient: QueryClient) {
   void queryClient.invalidateQueries({ queryKey: ['admin', 'products'] });
   void queryClient.invalidateQueries({ queryKey: ['products'] });
+  void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminInventory.summary() });
 }
 
 function productEditTo(productId: string) {
@@ -127,12 +130,44 @@ const actionPrimary = 'admin-btn-primary';
 const actionSecondary = 'admin-btn-secondary';
 const actionDanger = 'admin-btn-danger';
 
+const STOCK_FILTER_OPTIONS: Array<{ label: string; value: ProductStockFilter | '' }> = [
+  { label: 'All stock', value: '' },
+  { label: 'In stock', value: 'in_stock' },
+  { label: 'Low stock', value: 'low_stock' },
+  { label: 'Out of stock', value: 'out_of_stock' },
+  { label: 'Has empty variant', value: 'has_out_variant' },
+];
+
+const selectClass =
+  'h-11 w-full rounded-xl border border-[var(--admin-line)] bg-[var(--admin-panel-soft)] px-3 text-base text-[var(--admin-ink)] sm:h-10 sm:w-auto sm:rounded-lg sm:text-sm';
+
+function stockTone(quantity: number, threshold: number) {
+  if (quantity <= 0) return 'text-red-700 dark:text-red-300';
+  if (quantity <= threshold) return 'text-amber-700 dark:text-amber-300';
+  return 'text-[var(--admin-ink)]';
+}
+
+function variantChipClass(quantity: number, threshold: number) {
+  if (quantity <= 0) {
+    return 'bg-red-50 text-red-800 dark:bg-red-500/15 dark:text-red-300';
+  }
+  if (quantity <= threshold) {
+    return 'bg-amber-50 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300';
+  }
+  return 'bg-emerald-50 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300';
+}
+
+function variantLabel(variant: AdminVariantStock) {
+  return variant.title?.trim() || variant.sku || 'Variant';
+}
+
 export function ProductsListPage() {
   const queryClient = useQueryClient();
   const { products, inventory } = useAdminPermissions();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
+  const [stockFilter, setStockFilter] = useState<ProductStockFilter | ''>('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkUploadOpen, setBulkUploadOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -143,8 +178,9 @@ export function ProductsListPage() {
       limit: 20,
       q: search || undefined,
       status: normalizeProductStatusFilter(status),
+      stockFilter: stockFilter || undefined,
     }),
-    [page, search, status],
+    [page, search, status, stockFilter],
   );
 
   const query = useQuery({
@@ -174,19 +210,42 @@ export function ProductsListPage() {
         staleTime: 60_000,
         placeholderData: keepPreviousData,
       },
-      {
-        queryKey: QUERY_KEYS.adminInventory.items({ page: 1, limit: 1, lowStockOnly: true }),
-        queryFn: () => inventoryApi.listItems({ page: 1, limit: 1, lowStockOnly: true }),
-        staleTime: 60_000,
-        placeholderData: keepPreviousData,
-      },
     ],
+  });
+
+  const stockSummaryQuery = useQuery({
+    queryKey: QUERY_KEYS.adminInventory.summary(),
+    queryFn: () =>
+      inventoryApi.getSummary().catch(() => ({
+        totalOnHand: 0,
+        totalAvailable: 0,
+        totalReserved: 0,
+        skuCount: 0,
+        outOfStockSkus: 0,
+        lowStockSkus: 0,
+        outOfStockProducts: 0,
+        lowStockProducts: 0,
+        lowStockThreshold: 1,
+      })),
+    staleTime: 60_000,
+    placeholderData: keepPreviousData,
   });
 
   const totalProducts = summaryQueries[0]?.data?.meta.total ?? 0;
   const activeProducts = summaryQueries[1]?.data?.meta.total ?? 0;
   const draftProducts = summaryQueries[2]?.data?.meta.total ?? 0;
-  const lowStock = summaryQueries[3]?.data?.meta.total ?? 0;
+  const stockSummary = stockSummaryQuery.data;
+  const totalStock = stockSummary?.totalOnHand ?? 0;
+  const availableStock = stockSummary?.totalAvailable ?? 0;
+  const reservedStock = stockSummary?.totalReserved ?? 0;
+  const lowStock = stockSummary?.lowStockProducts ?? stockSummary?.lowStockSkus ?? 0;
+  const outOfStock = stockSummary?.outOfStockProducts ?? stockSummary?.outOfStockSkus ?? 0;
+  const lowStockThreshold = stockSummary?.lowStockThreshold ?? 1;
+
+  const applyStockFilter = (value: ProductStockFilter | '') => {
+    setStockFilter((current) => (current === value ? '' : value));
+    setPage(1);
+  };
 
   const deleteMutation = useMutation({
     mutationFn: (ids: string[]) => productsApi.bulkDelete(ids),
@@ -317,11 +376,33 @@ export function ProductsListPage() {
         }}
       />
 
-      <div className="mb-4 grid gap-3 sm:mb-5 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
+      <div className="mb-4 grid gap-3 sm:mb-5 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3 2xl:grid-cols-6">
         <AdminStatCard title="Total products" value={totalProducts} hint="All catalog items" />
         <AdminStatCard title="Active" value={activeProducts} hint="Active + published" />
         <AdminStatCard title="Draft" value={draftProducts} hint="Not ready to sell" />
-        <AdminStatCard title="Low stock" value={lowStock} hint="SKUs at or below threshold" />
+        <AdminStatCard
+          title="Total stock"
+          value={totalStock.toLocaleString()}
+          hint={
+            reservedStock > 0
+              ? `${availableStock.toLocaleString()} available, ${reservedStock.toLocaleString()} reserved`
+              : 'Units on hand across every SKU'
+          }
+        />
+        <AdminStatCard
+          title="Low stock"
+          value={lowStock}
+          hint="Products with a size/color at 1 unit (none at 0)"
+          active={stockFilter === 'low_stock'}
+          onClick={() => applyStockFilter('low_stock')}
+        />
+        <AdminStatCard
+          title="Out of stock"
+          value={outOfStock}
+          hint="Products with any size/color at 0"
+          active={stockFilter === 'out_of_stock'}
+          onClick={() => applyStockFilter('out_of_stock')}
+        />
       </div>
 
       {query.isError ? (
@@ -352,6 +433,23 @@ export function ProductsListPage() {
               { label: 'Draft', value: 'draft' },
               { label: 'Archived', value: 'archived' },
             ]}
+            extraFilters={
+              <select
+                value={stockFilter}
+                onChange={(event) => {
+                  setStockFilter((event.target.value || '') as ProductStockFilter | '');
+                  setPage(1);
+                }}
+                className={selectClass}
+                aria-label="Filter by stock"
+              >
+                {STOCK_FILTER_OPTIONS.map((option) => (
+                  <option key={option.value || 'all'} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            }
             page={page}
             totalPages={query.data?.meta.totalPages ?? 1}
             onPageChange={setPage}
@@ -426,6 +524,47 @@ export function ProductsListPage() {
                 cell: (row) => formatCurrency(row.price ?? 0, row.currency),
               },
               { id: 'variants', header: 'Variants', cell: (row) => row.variantCount ?? 0 },
+              {
+                id: 'totalStock',
+                header: 'Total stock',
+                cell: (row) => (
+                  <span
+                    className={cn(
+                      'tabular-nums font-medium',
+                      stockTone(row.totalStock ?? 0, lowStockThreshold),
+                    )}
+                  >
+                    {(row.totalStock ?? 0).toLocaleString()}
+                  </span>
+                ),
+              },
+              {
+                id: 'variantStock',
+                header: 'Variant stock',
+                cell: (row) => {
+                  const variants = row.variantStocks ?? [];
+                  if (!variants.length) {
+                    return <span className="text-neutral-400">No variants</span>;
+                  }
+                  return (
+                    <div className="flex max-w-[22rem] flex-wrap gap-1">
+                      {variants.map((variant) => (
+                        <span
+                          key={variant.variantId || variant.sku || variant.title}
+                          title={`${variant.title}${variant.sku ? ` · ${variant.sku}` : ''}`}
+                          className={cn(
+                            'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium',
+                            variantChipClass(variant.available, lowStockThreshold),
+                          )}
+                        >
+                          <span>{variantLabel(variant)}</span>
+                          <span className="tabular-nums">{variant.available}</span>
+                        </span>
+                      ))}
+                    </div>
+                  );
+                },
+              },
               {
                 id: 'updated',
                 header: 'Updated',

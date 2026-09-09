@@ -125,6 +125,14 @@ inventoryRouter.get(
 );
 
 inventoryRouter.get(
+  '/items/summary',
+  authorizeAny(...viewPerms),
+  asyncHandler(async (_req, res) => {
+    ApiResponse.success(res, await inventoryService.summarize());
+  }),
+);
+
+inventoryRouter.get(
   '/items/export',
   authorizeAny(...exportPerms),
   validate({ query: S.inventoryListQuerySchema }),

@@ -8,7 +8,9 @@ import {
 } from '@/models/product.models.js';
 import { BrandModel } from '@/models/master-data.models.js';
 import { InventoryItemModel } from '@/models/inventory.models.js';
+import { inventoryRepository } from '@/repositories/inventory.repository.js';
 import { productRepository, type ProductListFilters } from '@/repositories/product.repository.js';
+import { buildPaginationMeta, parsePagination } from '@/utils/pagination.js';
 import { writeActivityLog, writeAuditLog } from '@/services/audit.service.js';
 import type { ActorMeta } from '@/services/cms-crud.service.js';
 import { ApiError } from '@/utils/errors/api-error.js';
@@ -313,9 +315,37 @@ function resolveOwnListingDisplayName(
   return [...pool].sort((a, b) => b.length - a.length)[0] ?? fallbackProductName;
 }
 
+function intersectStringIds(
+  existing: string | string[] | undefined,
+  incoming: string[],
+): string[] {
+  if (!incoming.length) return [];
+  if (!existing) return incoming;
+  const list = (Array.isArray(existing) ? existing : String(existing).split(','))
+    .map((id) => id.trim())
+    .filter(Boolean);
+  const allow = new Set(incoming);
+  return list.filter((id) => allow.has(id));
+}
+
 export class ProductService {
   async list(options: ProductListFilters) {
-    const result = await productRepository.listCatalog(options);
+    let nextOptions = options;
+    if (options.stockFilter) {
+      const resolved = await inventoryRepository.findProductIdsByStockFilter(options.stockFilter);
+      if (resolved.mode === 'in') {
+        const merged = intersectStringIds(options.ids, resolved.ids);
+        if (!merged.length) {
+          const { page, limit } = parsePagination(options);
+          return { data: [], meta: buildPaginationMeta(0, page, limit) };
+        }
+        nextOptions = { ...options, ids: merged };
+      } else {
+        nextOptions = { ...options, excludeIds: resolved.ids };
+      }
+    }
+
+    const result = await productRepository.listCatalog(nextOptions);
     if (!result.data.length) return result;
 
     const productIds = result.data.map((product) => product._id);
@@ -386,18 +416,31 @@ export class ProductService {
 
     const variantIds = variants.map((v) => v._id);
     const inventoryRows =
-      variantIds.length > 0
+      variantIds.length > 0 || productIds.length > 0
         ? await InventoryItemModel.find({
-            variantId: { $in: variantIds },
             isDeleted: false,
+            $or: [
+              ...(variantIds.length ? [{ variantId: { $in: variantIds } }] : []),
+              { productId: { $in: productIds } },
+            ],
           })
-            .select('variantId available')
+            .select('variantId productId available sku')
             .lean()
         : [];
     const stockByVariantId = new Map<string, number>();
+    const stockByProductId = new Map<string, number>();
+    const skuByVariantId = new Map<string, string>();
     for (const row of inventoryRows) {
       const vid = String(row.variantId);
-      stockByVariantId.set(vid, (stockByVariantId.get(vid) ?? 0) + Number(row.available ?? 0));
+      const qty = Number(row.available ?? 0);
+      stockByVariantId.set(vid, (stockByVariantId.get(vid) ?? 0) + qty);
+      if (row.productId) {
+        const pid = String(row.productId);
+        stockByProductId.set(pid, (stockByProductId.get(pid) ?? 0) + qty);
+      }
+      if (typeof row.sku === 'string' && row.sku && !skuByVariantId.has(vid)) {
+        skuByVariantId.set(vid, row.sku);
+      }
     }
     const trackedVariantIds = new Set(stockByVariantId.keys());
 
@@ -534,6 +577,37 @@ export class ProductService {
                 ? false
                 : stockInStock;
 
+            const seenVariantIds = new Set<string>();
+            const variantStocks = productVariants.map((variant) => {
+              const variantId = String(variant._id);
+              seenVariantIds.add(variantId);
+              return {
+                variantId,
+                sku: variant.sku ?? skuByVariantId.get(variantId) ?? '',
+                title: variant.title || variant.sku || 'Variant',
+                available: stockByVariantId.get(variantId) ?? 0,
+              };
+            });
+            for (const [variantId, available] of stockByVariantId) {
+              if (seenVariantIds.has(variantId)) continue;
+              const belongsToProduct = inventoryRows.some(
+                (row) =>
+                  String(row.variantId) === variantId &&
+                  row.productId &&
+                  String(row.productId) === id,
+              );
+              if (!belongsToProduct) continue;
+              variantStocks.push({
+                variantId,
+                sku: skuByVariantId.get(variantId) ?? '',
+                title: skuByVariantId.get(variantId) || 'Variant',
+                available,
+              });
+            }
+            const totalStock =
+              stockByProductId.get(id) ??
+              variantStocks.reduce((sum, row) => sum + row.available, 0);
+
             return {
               _id: product._id,
               id,
@@ -572,6 +646,8 @@ export class ProductService {
                   ? String(product.defaultVariantId)
                   : undefined,
               variantCount: productVariants.length || product.variantCount || 0,
+              totalStock,
+              variantStocks,
               requiresOptionSelection: listingRequiresOptionSelection(productVariants),
               sku: product.sku ?? cardListingVariant?.sku,
               thumbnailUrl: cardThumbs.thumbnailUrl,

@@ -105,6 +105,7 @@ export const QUERY_KEYS = {
   },
   adminInventory: {
     items: (params?: unknown) => ['admin', 'inventory', 'items', params] as const,
+    summary: () => ['admin', 'inventory', 'summary'] as const,
     warehouses: () => ['admin', 'inventory', 'warehouses'] as const,
     alerts: () => ['admin', 'inventory', 'alerts'] as const,
   },

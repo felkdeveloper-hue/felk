@@ -9,7 +9,7 @@ export const ORDER_STATUS_CONFIG: Record<string, OrderStatusConfig> = {
   pending: { label: 'Pending', badgeVariant: 'secondary' },
   confirmed: { label: 'Confirmed', badgeVariant: 'default' },
   packed: { label: 'Packed', badgeVariant: 'default' },
-  ready_for_shipment: { label: 'Ready to ship', badgeVariant: 'default' },
+  ready_for_shipment: { label: 'Ready for shipment', badgeVariant: 'default' },
   shipped: { label: 'Shipped', badgeVariant: 'default' },
   delivered: { label: 'Delivered', badgeVariant: 'default' },
   completed: { label: 'Completed', badgeVariant: 'default' },
@@ -64,6 +64,8 @@ export const ORDER_FILTER_STATUSES: Array<{ value: OrderStatus | 'all'; label: s
   { value: 'all', label: 'All orders' },
   { value: 'pending', label: 'Pending' },
   { value: 'confirmed', label: 'Confirmed' },
+  { value: 'packed', label: 'Packed' },
+  { value: 'ready_for_shipment', label: 'Ready for shipment' },
   { value: 'shipped', label: 'Shipped' },
   { value: 'delivered', label: 'Delivered' },
   { value: 'completed', label: 'Completed' },
@@ -72,6 +74,42 @@ export const ORDER_FILTER_STATUSES: Array<{ value: OrderStatus | 'all'; label: s
   { value: 'refund_pending', label: 'Refund pending' },
   { value: 'refunded', label: 'Refunded' },
 ];
+
+/** Admin orders list filter — operational statuses staff actually search by. */
+export const ADMIN_ORDER_FILTER_STATUSES: Array<{ value: string; label: string }> = [
+  { value: 'pending', label: 'Pending' },
+  { value: 'confirmed', label: 'Confirmed' },
+  { value: 'packed', label: 'Packed' },
+  { value: 'ready_for_shipment', label: 'Ready for shipment' },
+  { value: 'shipped', label: 'Shipped' },
+  { value: 'delivered', label: 'Delivered' },
+  { value: 'completed', label: 'Completed' },
+  { value: 'cancelled', label: 'Cancelled' },
+];
+
+const ORDER_STATUS_BADGE_CLASS: Record<string, string> = {
+  pending: 'bg-amber-500/15 text-amber-700 dark:text-amber-300',
+  confirmed: 'bg-blue-500/15 text-blue-700 dark:text-blue-300',
+  packed: 'bg-sky-500/15 text-sky-700 dark:text-sky-300',
+  ready_for_shipment: 'bg-cyan-500/15 text-cyan-700 dark:text-cyan-300',
+  shipped: 'bg-violet-500/15 text-violet-700 dark:text-violet-300',
+  delivered: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
+  completed: 'bg-teal-500/15 text-teal-700 dark:text-teal-300',
+  cancelled: 'bg-red-500/15 text-red-700 dark:text-red-300',
+  returned: 'bg-orange-500/15 text-orange-700 dark:text-orange-300',
+  refund_pending: 'bg-amber-500/15 text-amber-700 dark:text-amber-300',
+  refunded: 'bg-neutral-500/15 text-neutral-600 dark:text-neutral-300',
+};
+
+export function orderStatusBadgeClass(status: string): string {
+  return (
+    ORDER_STATUS_BADGE_CLASS[status] ?? 'bg-neutral-500/15 text-neutral-600 dark:text-neutral-300'
+  );
+}
+
+export function orderStatusLabel(status: string): string {
+  return ORDER_STATUS_CONFIG[status]?.label ?? status.replace(/_/g, ' ');
+}
 
 export interface OrderTimelineStep {
   status: OrderStatus;

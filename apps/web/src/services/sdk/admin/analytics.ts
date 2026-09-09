@@ -744,6 +744,8 @@ export interface RevenueDashboardData {
     revenue: number;
     qty: number;
     sizes?: SizeCount[];
+    image?: string | null;
+    stockControlNumber?: string | null;
   }>;
   yearProducts?: Array<{
     productId: string;
@@ -751,6 +753,8 @@ export interface RevenueDashboardData {
     revenue: number;
     qty: number;
     sizes?: SizeCount[];
+    image?: string | null;
+    stockControlNumber?: string | null;
   }>;
   byTrafficSource: Array<{
     source: string;

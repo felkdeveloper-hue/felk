@@ -1,4 +1,7 @@
-import { INVENTORY_STATUS } from '@/constants/inventory-status.js';
+import {
+  DEFAULT_LOW_STOCK_THRESHOLD,
+  INVENTORY_STATUS,
+} from '@/constants/inventory-status.js';
 
 export interface StockBuckets {
   onHand: number;
@@ -15,8 +18,8 @@ export function deriveStockStatus(
   safetyStock: number,
 ): string {
   if (available <= 0) return INVENTORY_STATUS.OUT_OF_STOCK;
-  const threshold = Math.max(reorderPoint, safetyStock);
-  if (threshold > 0 && available <= threshold) return INVENTORY_STATUS.LOW_STOCK;
+  const threshold = Math.max(reorderPoint, safetyStock, DEFAULT_LOW_STOCK_THRESHOLD);
+  if (available <= threshold) return INVENTORY_STATUS.LOW_STOCK;
   return INVENTORY_STATUS.IN_STOCK;
 }
 

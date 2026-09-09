@@ -2,6 +2,18 @@ import { http } from '@/lib/http-client';
 import { normalizeId, normalizeList } from '@/lib/utils';
 import type { ListQueryParams, PaginatedResult } from '@/types';
 
+export interface InventoryStockSummary {
+  totalOnHand: number;
+  totalAvailable: number;
+  totalReserved: number;
+  skuCount: number;
+  outOfStockSkus: number;
+  lowStockSkus: number;
+  outOfStockProducts?: number;
+  lowStockProducts?: number;
+  lowStockThreshold: number;
+}
+
 export interface InventoryItemRow {
   id: string;
   productId: string;
@@ -86,6 +98,10 @@ const ITEMS_MAX_PAGE_SIZE = 100;
 const ITEMS_MAX_PAGES = 20;
 
 export const inventoryApi = {
+  async getSummary(): Promise<InventoryStockSummary> {
+    return http.get<InventoryStockSummary>('/inventory/items/summary');
+  },
+
   async listItems(params?: InventoryListFilters): Promise<PaginatedResult<InventoryItemRow>> {
     const result = await http.getPaginated<unknown>('/inventory/items', {
       params: {

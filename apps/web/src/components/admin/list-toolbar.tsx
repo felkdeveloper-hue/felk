@@ -10,6 +10,7 @@ export interface ListToolbarProps {
   page: number;
   totalPages: number;
   onPageChange: (page: number) => void;
+  extraFilters?: ReactNode;
   bulkActions?: ReactNode;
 }
 
@@ -23,6 +24,7 @@ export function ListToolbar({
   page,
   totalPages,
   onPageChange,
+  extraFilters,
   bulkActions,
 }: ListToolbarProps) {
   return (
@@ -51,6 +53,7 @@ export function ListToolbar({
             ))}
           </select>
         ) : null}
+        {extraFilters}
         {bulkActions ? (
           <div className="flex w-full flex-wrap gap-2 sm:w-auto">{bulkActions}</div>
         ) : null}
