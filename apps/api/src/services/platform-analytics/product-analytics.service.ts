@@ -1,7 +1,7 @@
 import { EventModel } from '@/models/analytics/index.js';
 import type { AnalyticsFilter } from '@/schemas/analytics/index.js';
 import { buildEventMatch, mergeMatch } from './analytics-query.builder.js';
-import { attachProductImagesToLists } from './product-images.util.js';
+import { attachProductImages, productImagesById } from './product-images.util.js';
 import { pickSizeLabel, sizeNameByVariantId, toSizeCounts } from './size-breakdown.util.js';
 
 const VIEW_NAMES = ['product_viewed', 'product_detail_opened'];
@@ -86,7 +86,9 @@ async function topCartWithSizes(filter: AnalyticsFilter, limit = 200): Promise<P
     },
   ]);
 
-  const sizeByVariant = await sizeNameByVariantId(rows.map((row) => String(row._id.variantId ?? '')));
+  const sizeByVariant = await sizeNameByVariantId(
+    rows.map((row) => String(row._id.variantId ?? '')),
+  );
   const products = new Map<
     string,
     { productId: string; productName: string; count: number; sizes: Map<string, number> }
@@ -132,20 +134,18 @@ export async function getProductAnalytics(filter: AnalyticsFilter) {
     getConversionProducts(filter),
   ]);
 
-  const [viewed, clicked, carts, wishlisted, converting] = await attachProductImagesToLists([
-    mostViewed,
-    mostClicked,
-    mostAddedToCart,
-    mostWishlisted,
-    conversion,
-  ]);
+  const imageById = await productImagesById(
+    [...mostViewed, ...mostClicked, ...mostAddedToCart, ...mostWishlisted, ...conversion].map(
+      (row) => row.productId,
+    ),
+  );
 
   return {
-    mostViewed: viewed,
-    mostClicked: clicked,
-    mostAddedToCart: carts,
-    mostWishlisted: wishlisted,
-    conversion: converting,
+    mostViewed: await attachProductImages(mostViewed, imageById),
+    mostClicked: await attachProductImages(mostClicked, imageById),
+    mostAddedToCart: await attachProductImages(mostAddedToCart, imageById),
+    mostWishlisted: await attachProductImages(mostWishlisted, imageById),
+    conversion: await attachProductImages(conversion, imageById),
   };
 }
 
