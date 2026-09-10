@@ -18,6 +18,17 @@ function syncCartToStore(cart: CartView | null) {
   useCartStore.getState().setCart(cart);
 }
 
+/** Skip applying a fetched cart when a mutation started after the GET began. */
+function shouldApplyFetchedCart(revisionAtFetchStart: number): boolean {
+  const { isSyncing, cartRevision } = useCartStore.getState();
+  return !isSyncing && cartRevision === revisionAtFetchStart;
+}
+
+function beginCartMutation() {
+  useCartStore.getState().bumpCartRevision();
+  useCartStore.getState().setSyncing(true);
+}
+
 /** Client-only fields for instant bag UI — stripped before the API call. */
 export type CartAddItemInput = CartAddItemPayload & {
   optimistic?: {
@@ -80,9 +91,12 @@ export function useCartQuery(options?: { enabled?: boolean }) {
 
   return useQuery({
     queryKey: QUERY_KEYS.cart.current(),
-    queryFn: async () => {
-      const cart = await cartApi.get();
-      setCart(cart);
+    queryFn: async ({ signal }) => {
+      const revisionAtStart = useCartStore.getState().cartRevision;
+      const cart = await cartApi.get({ signal });
+      if (shouldApplyFetchedCart(revisionAtStart)) {
+        setCart(cart);
+      }
       return cart;
     },
     staleTime: 1000 * 30,
@@ -144,7 +158,7 @@ export function useAddToCartMutation() {
       return cart;
     },
     onMutate: async (payload) => {
-      setSyncing(true);
+      beginCartMutation();
       await queryClient.cancelQueries({ queryKey: QUERY_KEYS.cart.current() });
       const previous = readCartSnapshot(queryClient);
       const qty = payload.quantity ?? 1;
@@ -207,7 +221,7 @@ export function useUpdateCartItemMutation() {
     mutationFn: ({ itemId, payload }: { itemId: string; payload: CartUpdateItemPayload }) =>
       cartApi.updateItem(itemId, payload),
     onMutate: async ({ itemId, payload }) => {
-      setSyncing(true);
+      beginCartMutation();
       await queryClient.cancelQueries({ queryKey: QUERY_KEYS.cart.current() });
       const previous = readCartSnapshot(queryClient);
 
@@ -247,7 +261,7 @@ export function useRemoveCartItemMutation() {
   return useMutation({
     mutationFn: (itemId: string) => cartApi.removeItem(itemId),
     onMutate: async (itemId) => {
-      setSyncing(true);
+      beginCartMutation();
       await queryClient.cancelQueries({ queryKey: QUERY_KEYS.cart.current() });
       const previous = readCartSnapshot(queryClient);
 

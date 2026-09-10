@@ -84,8 +84,8 @@ export interface CartValidationResult {
 
 /** Typed SDK for `/cart/*`. Works for both guest and authenticated carts. */
 export const cartApi = {
-  async get(): Promise<CartView> {
-    const raw = await http.get<unknown>('/cart');
+  async get(options?: { signal?: AbortSignal }): Promise<CartView> {
+    const raw = await http.get<unknown>('/cart', { signal: options?.signal });
     return normalizeCartView(raw);
   },
 

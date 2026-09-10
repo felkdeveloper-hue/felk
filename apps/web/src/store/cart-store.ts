@@ -8,12 +8,15 @@ interface CartState {
   cart: CartView | null;
   guestCartToken: string | null;
   isSyncing: boolean;
+  /** Bumped on every cart mutation so stale GET responses cannot overwrite optimistic state. */
+  cartRevision: number;
 }
 
 interface CartActions {
   setCart: (cart: CartView | null) => void;
   setGuestCartToken: (token: string | null) => void;
   setSyncing: (isSyncing: boolean) => void;
+  bumpCartRevision: () => number;
   clearCart: () => void;
 }
 
@@ -25,6 +28,7 @@ export const useCartStore = create<CartStore>()(
       cart: null,
       guestCartToken: null,
       isSyncing: false,
+      cartRevision: 0,
 
       setCart: (cart) =>
         set((state) => ({
@@ -37,6 +41,15 @@ export const useCartStore = create<CartStore>()(
       setGuestCartToken: (token) => set({ guestCartToken: token }),
 
       setSyncing: (isSyncing) => set({ isSyncing }),
+
+      bumpCartRevision: () => {
+        let next = 0;
+        set((state) => {
+          next = state.cartRevision + 1;
+          return { cartRevision: next };
+        });
+        return next;
+      },
 
       clearCart: () => set({ cart: null, guestCartToken: null }),
     }),
