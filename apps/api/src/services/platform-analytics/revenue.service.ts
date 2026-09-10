@@ -2,13 +2,12 @@ import { Types } from 'mongoose';
 import { SessionModel } from '@/models/analytics/index.js';
 import { OrderModel } from '@/models/order.models.js';
 import { PaymentModel } from '@/models/payment.models.js';
-import { ProductMediaModel, ProductModel } from '@/models/product.models.js';
-import { MEDIA_TYPES } from '@/constants/product.js';
+import { ProductModel } from '@/models/product.models.js';
 import { ORDER_STATUS } from '@/constants/order-status.js';
 import type { AnalyticsFilter } from '@/schemas/analytics/index.js';
 import { orderReceivedAt, paymentReceivedAt } from '@/utils/order-received-at.js';
-import { toPublicMediaUrl } from '@/utils/public-media-url.js';
 import { buildOrderMatch, resolveDateRange } from './analytics-query.builder.js';
+import { productImagesById, publicProductImage } from './product-images.util.js';
 import {
   calendarDateInTz,
   startOfAnalyticsDay,
@@ -29,10 +28,7 @@ type SoldProduct = {
   stockControlNumber?: string | null;
 };
 
-function publicImage(url?: string | null): string | undefined {
-  if (!url) return undefined;
-  return toPublicMediaUrl(url) ?? url;
-}
+const publicImage = publicProductImage;
 
 function firstItemImage(item: Record<string, unknown>): string | undefined {
   const images = Array.isArray(item.images) ? item.images : [];
@@ -157,28 +153,13 @@ async function enrichSoldProducts(products: SoldProduct[]): Promise<SoldProduct[
     (product) => missingIds.includes(product.productId) && !product.image,
   );
 
-  const [catalog, media] = await Promise.all([
+  const [catalog, imageById] = await Promise.all([
     needNumbers
       ? ProductModel.find({ _id: { $in: objectIds } })
           .select('stockControlNumber')
           .lean()
       : Promise.resolve([] as Array<{ _id: Types.ObjectId; stockControlNumber?: string | null }>),
-    needImages
-      ? ProductMediaModel.find({
-          productId: { $in: objectIds },
-          isDeleted: false,
-          type: MEDIA_TYPES.IMAGE,
-        })
-          .select('productId url thumbnailUrl')
-          .sort({ isPrimary: -1, priority: 1, createdAt: 1 })
-          .lean()
-      : Promise.resolve(
-          [] as Array<{
-            productId: Types.ObjectId;
-            url?: string;
-            thumbnailUrl?: string | null;
-          }>,
-        ),
+    needImages ? productImagesById(missingIds) : Promise.resolve(new Map<string, string>()),
   ]);
 
   const numberById = new Map<string, string>();
@@ -187,20 +168,9 @@ async function enrichSoldProducts(products: SoldProduct[]): Promise<SoldProduct[
     if (number) numberById.set(String(row._id), number);
   }
 
-  const imageById = new Map<string, string>();
-  for (const row of media) {
-    const productId = String(row.productId);
-    if (imageById.has(productId)) continue;
-    const url =
-      (typeof row.thumbnailUrl === 'string' && row.thumbnailUrl.trim()) ||
-      (typeof row.url === 'string' && row.url.trim()) ||
-      '';
-    if (url) imageById.set(productId, url);
-  }
-
   return products.map((product) => ({
     ...product,
-    image: product.image || publicImage(imageById.get(product.productId)) || null,
+    image: product.image || imageById.get(product.productId) || null,
     stockControlNumber:
       product.stockControlNumber || numberById.get(product.productId) || null,
   }));

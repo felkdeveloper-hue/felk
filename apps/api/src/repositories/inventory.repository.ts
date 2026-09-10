@@ -118,25 +118,27 @@ export class InventoryRepository extends BaseRepository {
   }
 
   async summarizeStock() {
-    const [totals] = await InventoryItemModel.aggregate<{
-      totalOnHand: number;
-      totalAvailable: number;
-      totalReserved: number;
-      skuCount: number;
-    }>([
-      { $match: { isDeleted: false } },
-      {
-        $group: {
-          _id: null,
-          totalOnHand: { $sum: '$onHand' },
-          totalAvailable: { $sum: '$available' },
-          totalReserved: { $sum: '$reserved' },
-          skuCount: { $sum: 1 },
+    const [totals, products, value] = await Promise.all([
+      InventoryItemModel.aggregate<{
+        totalOnHand: number;
+        totalAvailable: number;
+        totalReserved: number;
+        skuCount: number;
+      }>([
+        { $match: { isDeleted: false } },
+        {
+          $group: {
+            _id: null,
+            totalOnHand: { $sum: '$onHand' },
+            totalAvailable: { $sum: '$available' },
+            totalReserved: { $sum: '$reserved' },
+            skuCount: { $sum: 1 },
+          },
         },
-      },
+      ]).then((rows) => rows[0]),
+      this.aggregateProductStockFlags(),
+      this.aggregateStockValue(),
     ]);
-
-    const products = await this.aggregateProductStockFlags();
     const lowStockProducts = products.filter(
       (row) => row.hasLow > 0 && row.hasOut === 0 && row.totalAvailable > 0,
     ).length;
@@ -152,6 +154,9 @@ export class InventoryRepository extends BaseRepository {
       outOfStockProducts,
       lowStockProducts,
       lowStockThreshold: DEFAULT_LOW_STOCK_THRESHOLD,
+      stockValue: value.onHandValue,
+      availableStockValue: value.availableValue,
+      currency: value.currency,
     };
   }
 
@@ -169,6 +174,75 @@ export class InventoryRepository extends BaseRepository {
     if (stockFilter === 'low_stock') return { mode: 'in' as const, ids: lowStockIds };
     if (stockFilter === 'has_out_variant') return { mode: 'in' as const, ids: hasOutIds };
     return { mode: 'in' as const, ids: outOfStockIds };
+  }
+
+  private async aggregateStockValue() {
+    const [row] = await InventoryItemModel.aggregate<{
+      onHandValue: number;
+      availableValue: number;
+      currency?: string;
+    }>([
+      { $match: { isDeleted: false } },
+      {
+        $lookup: {
+          from: 'product_variants',
+          localField: 'variantId',
+          foreignField: '_id',
+          as: '_variant',
+        },
+      },
+      {
+        $lookup: {
+          from: 'products',
+          localField: 'productId',
+          foreignField: '_id',
+          as: '_product',
+        },
+      },
+      {
+        $addFields: {
+          _v: { $arrayElemAt: ['$_variant', 0] },
+          _p: { $arrayElemAt: ['$_product', 0] },
+        },
+      },
+      {
+        $addFields: {
+          unitPrice: {
+            $let: {
+              vars: {
+                sale: { $ifNull: ['$_v.salePrice', { $ifNull: ['$_p.pricing.salePrice', 0] }] },
+                price: { $ifNull: ['$_v.price', { $ifNull: ['$_p.pricing.price', 0] }] },
+              },
+              in: {
+                $cond: [
+                  { $and: [{ $ne: ['$$sale', null] }, { $gt: ['$$sale', 0] }] },
+                  '$$sale',
+                  { $ifNull: ['$$price', 0] },
+                ],
+              },
+            },
+          },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          onHandValue: {
+            $sum: { $multiply: [{ $ifNull: ['$onHand', 0] }, { $ifNull: ['$unitPrice', 0] }] },
+          },
+          availableValue: {
+            $sum: { $multiply: [{ $ifNull: ['$available', 0] }, { $ifNull: ['$unitPrice', 0] }] },
+          },
+          currency: { $first: { $ifNull: ['$_v.currency', { $ifNull: ['$_p.pricing.currency', 'LKR'] }] } },
+        },
+      },
+    ]);
+
+    return {
+      onHandValue: Number(row?.onHandValue ?? 0),
+      availableValue: Number(row?.availableValue ?? 0),
+      currency: row?.currency || 'LKR',
+    };
   }
 
   private async aggregateProductStockFlags() {

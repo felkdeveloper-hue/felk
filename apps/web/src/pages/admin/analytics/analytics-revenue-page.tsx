@@ -20,6 +20,7 @@ import {
   Drillable,
   AnalyticsExportButton,
   SizeBreakdown,
+  ProductThumb,
 } from '@/components/admin/analytics';
 import { useRevenueDashboard, useAnalyticsFilters, useAnalyticsDrillDown } from '@/hooks/admin';
 import { adminChartColor } from '@/lib/admin-chart-colors';
@@ -287,6 +288,25 @@ export function AnalyticsRevenuePage() {
                       >
                         {money(r.revenue)}
                       </Drillable>
+                    ),
+                  },
+                  {
+                    id: 'image',
+                    header: '',
+                    className: 'w-20',
+                    cell: (r) => (
+                      <ProductThumb
+                        src={r.image}
+                        alt={r.productName}
+                        onClick={() =>
+                          drill({
+                            destination: 'productDetail',
+                            label: r.productName,
+                            entityId: r.productId,
+                            append: { productId: r.productId },
+                          })
+                        }
+                      />
                     ),
                   },
                 ]}

@@ -16,6 +16,7 @@ import {
   ListToolbar,
   PageMotion,
 } from '@/components/admin';
+import { ProductThumb } from '@/components/admin/analytics';
 import { BulkProductUploadDialog } from '@/components/admin/bulk-product-upload-dialog';
 import { ADMIN_ROUTES, QUERY_KEYS } from '@/constants';
 import { useAdminPermissions } from '@/hooks/admin';
@@ -226,6 +227,9 @@ export function ProductsListPage() {
         outOfStockProducts: 0,
         lowStockProducts: 0,
         lowStockThreshold: 1,
+        stockValue: 0,
+        availableStockValue: 0,
+        currency: 'LKR',
       })),
     staleTime: 60_000,
     placeholderData: keepPreviousData,
@@ -241,6 +245,9 @@ export function ProductsListPage() {
   const lowStock = stockSummary?.lowStockProducts ?? stockSummary?.lowStockSkus ?? 0;
   const outOfStock = stockSummary?.outOfStockProducts ?? stockSummary?.outOfStockSkus ?? 0;
   const lowStockThreshold = stockSummary?.lowStockThreshold ?? 1;
+  const stockValue = stockSummary?.stockValue ?? 0;
+  const availableStockValue = stockSummary?.availableStockValue ?? 0;
+  const stockCurrency = stockSummary?.currency ?? 'LKR';
 
   const applyStockFilter = (value: ProductStockFilter | '') => {
     setStockFilter((current) => (current === value ? '' : value));
@@ -376,7 +383,7 @@ export function ProductsListPage() {
         }}
       />
 
-      <div className="mb-4 grid gap-3 sm:mb-5 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3 2xl:grid-cols-6">
+      <div className="mb-4 grid gap-3 sm:mb-5 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
         <AdminStatCard title="Total products" value={totalProducts} hint="All catalog items" />
         <AdminStatCard title="Active" value={activeProducts} hint="Active + published" />
         <AdminStatCard title="Draft" value={draftProducts} hint="Not ready to sell" />
@@ -387,6 +394,15 @@ export function ProductsListPage() {
             reservedStock > 0
               ? `${availableStock.toLocaleString()} available, ${reservedStock.toLocaleString()} reserved`
               : 'Units on hand across every SKU'
+          }
+        />
+        <AdminStatCard
+          title="Stock worth"
+          value={formatCurrency(stockValue, stockCurrency)}
+          hint={
+            reservedStock > 0 && availableStockValue !== stockValue
+              ? `${formatCurrency(availableStockValue, stockCurrency)} available to sell`
+              : 'On-hand units × selling price'
           }
         />
         <AdminStatCard
@@ -564,6 +580,14 @@ export function ProductsListPage() {
                     </div>
                   );
                 },
+              },
+              {
+                id: 'image',
+                header: '',
+                className: 'w-20',
+                cell: (row) => (
+                  <ProductThumb productId={row.id} src={row.thumbnailUrl} alt={row.name} />
+                ),
               },
               {
                 id: 'updated',

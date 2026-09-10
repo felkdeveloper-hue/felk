@@ -1,6 +1,6 @@
 import { Link } from '@tanstack/react-router';
 import { ADMIN_ROUTES } from '@/constants';
-import { SizeBreakdown } from '@/components/admin/analytics';
+import { ProductThumb, SizeBreakdown } from '@/components/admin/analytics';
 import { useProductAnalytics, useRevenueDashboard } from '@/hooks/admin';
 import type { AnalyticsFilter, SizeCount } from '@/services/sdk/admin';
 import { formatAnalyticsPeriodLabel } from '@/lib/analytics-period-label';
@@ -13,6 +13,7 @@ export type TopProductRow = {
   purchases: number;
   cartSizes?: SizeCount[];
   soldSizes?: SizeCount[];
+  image?: string | null;
 };
 
 function MetricWithSizes({ count, sizes }: { count: number; sizes?: SizeCount[] }) {
@@ -37,6 +38,7 @@ export function useTopProductRows(filter: AnalyticsFilter) {
       views: row.views,
       carts: row.carts,
       purchases: row.purchases,
+      image: row.image,
     });
   }
 
@@ -54,6 +56,7 @@ export function useTopProductRows(filter: AnalyticsFilter) {
     current.productName = current.productName || row.productName;
     current.purchases = Math.max(current.purchases, row.qty);
     current.soldSizes = row.sizes;
+    current.image = current.image || row.image;
     byId.set(row.productId, current);
   }
 
@@ -67,7 +70,19 @@ export function useTopProductRows(filter: AnalyticsFilter) {
     };
     current.carts = Math.max(current.carts, cart.count);
     current.cartSizes = cart.sizes;
+    current.image = current.image || cart.image;
     byId.set(productId, current);
+  }
+
+  for (const list of [
+    products.data?.mostViewed,
+    products.data?.mostClicked,
+    products.data?.mostWishlisted,
+  ]) {
+    for (const row of list ?? []) {
+      const current = byId.get(row.productId);
+      if (current && !current.image && row.image) current.image = row.image;
+    }
   }
 
   const rows = [...byId.values()].sort(
@@ -114,6 +129,9 @@ export function TopProductsTable({
               <th className="pb-2 font-medium">Views</th>
               <th className="pb-2 font-medium">Carts</th>
               <th className="pb-2 font-medium">Buys</th>
+              <th className="w-20 pb-2 font-medium">
+                <span className="sr-only">Photo</span>
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -124,8 +142,11 @@ export function TopProductsTable({
                 <td className="py-2 pr-3 align-top">
                   <MetricWithSizes count={row.carts} sizes={row.cartSizes} />
                 </td>
-                <td className="py-2 align-top">
+                <td className="py-2 pr-3 align-top">
                   <MetricWithSizes count={row.purchases} sizes={row.soldSizes} />
+                </td>
+                <td className="py-2 pl-2 align-middle">
+                  <ProductThumb productId={row.productId} src={row.image} alt={row.productName} />
                 </td>
               </tr>
             ))}

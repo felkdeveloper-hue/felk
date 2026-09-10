@@ -9,6 +9,7 @@ import {
   Drillable,
   AnalyticsExportButton,
   SizeBreakdown,
+  ProductThumb,
 } from '@/components/admin/analytics';
 import {
   useProductAnalytics,
@@ -40,7 +41,23 @@ export function AnalyticsProductsPage() {
       append: { productId },
     });
 
-  const productColumns = (countHeader: string): DataTableColumn<ProductCountRow>[] => [
+  const productImageColumn = {
+    id: 'image',
+    header: '',
+    className: 'w-20',
+    cell: (row: { productId: string; productName: string; image?: string | null }) => (
+      <ProductThumb
+        src={row.image}
+        alt={row.productName}
+        onClick={() => openProduct(row.productId, row.productName)}
+      />
+    ),
+  };
+
+  const productColumns = (
+    countHeader: string,
+    extra: DataTableColumn<ProductCountRow>[] = [],
+  ): DataTableColumn<ProductCountRow>[] => [
     {
       id: 'productName',
       header: 'Product',
@@ -73,6 +90,8 @@ export function AnalyticsProductsPage() {
         </Drillable>
       ),
     },
+    ...extra,
+    productImageColumn,
   ];
 
   const conversionColumns: DataTableColumn<ProductConversionRow>[] = useMemo(
@@ -149,6 +168,18 @@ export function AnalyticsProductsPage() {
         header: 'Views → Purchase',
         cell: (row) => `${row.conversionRate}%`,
       },
+      {
+        id: 'image',
+        header: '',
+        className: 'w-20',
+        cell: (row) => (
+          <ProductThumb
+            src={row.image}
+            alt={row.productName}
+            onClick={() => openProduct(row.productId, row.productName)}
+          />
+        ),
+      },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [drill],
@@ -210,14 +241,13 @@ export function AnalyticsProductsPage() {
               <DataTable
                 data={data.mostAddedToCart}
                 getRowId={(r) => r.productId}
-                columns={[
-                  ...productColumns('Count'),
+                columns={productColumns('Count', [
                   {
                     id: 'sizes',
                     header: 'Sizes added',
                     cell: (row) => <SizeBreakdown sizes={row.sizes} />,
                   },
-                ]}
+                ])}
               />
             </AnalyticsChartCard>
             <AnalyticsChartCard title="Most Wishlisted">

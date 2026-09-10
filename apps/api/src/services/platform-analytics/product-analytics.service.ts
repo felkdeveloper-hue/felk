@@ -1,6 +1,7 @@
 import { EventModel } from '@/models/analytics/index.js';
 import type { AnalyticsFilter } from '@/schemas/analytics/index.js';
 import { buildEventMatch, mergeMatch } from './analytics-query.builder.js';
+import { attachProductImagesToLists } from './product-images.util.js';
 import { pickSizeLabel, sizeNameByVariantId, toSizeCounts } from './size-breakdown.util.js';
 
 const VIEW_NAMES = ['product_viewed', 'product_detail_opened'];
@@ -131,7 +132,21 @@ export async function getProductAnalytics(filter: AnalyticsFilter) {
     getConversionProducts(filter),
   ]);
 
-  return { mostViewed, mostClicked, mostAddedToCart, mostWishlisted, conversion };
+  const [viewed, clicked, carts, wishlisted, converting] = await attachProductImagesToLists([
+    mostViewed,
+    mostClicked,
+    mostAddedToCart,
+    mostWishlisted,
+    conversion,
+  ]);
+
+  return {
+    mostViewed: viewed,
+    mostClicked: clicked,
+    mostAddedToCart: carts,
+    mostWishlisted: wishlisted,
+    conversion: converting,
+  };
 }
 
 async function getConversionProducts(filter: AnalyticsFilter, limit = 200) {

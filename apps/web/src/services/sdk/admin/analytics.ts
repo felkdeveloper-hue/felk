@@ -559,6 +559,7 @@ export interface ProductCountRow {
   productName: string;
   count: number;
   sizes?: SizeCount[];
+  image?: string | null;
 }
 
 export interface ProductConversionRow {
@@ -569,6 +570,7 @@ export interface ProductConversionRow {
   purchases: number;
   cartRate: number;
   conversionRate: number;
+  image?: string | null;
 }
 
 export interface ProductAnalyticsData {

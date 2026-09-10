@@ -12,6 +12,9 @@ export interface InventoryStockSummary {
   outOfStockProducts?: number;
   lowStockProducts?: number;
   lowStockThreshold: number;
+  stockValue?: number;
+  availableStockValue?: number;
+  currency?: string;
 }
 
 export interface InventoryItemRow {

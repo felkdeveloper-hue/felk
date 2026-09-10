@@ -1,7 +1,6 @@
 import { Link } from '@tanstack/react-router';
 import { ADMIN_ROUTES } from '@/constants';
-import { SizeBreakdown } from '@/components/admin/analytics';
-import { Image } from '@/components/media/image';
+import { ProductThumb, SizeBreakdown } from '@/components/admin/analytics';
 import { useRevenueDashboard } from '@/hooks/admin';
 import { formatCurrency } from '@/lib/utils';
 
@@ -130,29 +129,14 @@ export function DashboardRevenueHero() {
                     </div>
                     <SizeBreakdown sizes={product.sizes} empty="Size not recorded" />
                   </div>
-                  <Link
-                    to={ADMIN_ROUTES.productDetail}
-                    params={{ productId: product.productId }}
-                    className="bg-muted relative size-12 shrink-0 overflow-hidden rounded-md ring-1 ring-[var(--admin-line)] transition-opacity hover:opacity-85"
-                    title="Open product"
-                  >
-                    {product.image ? (
-                      <Image
-                        src={product.image}
-                        alt={product.productName}
-                        className="size-full object-cover"
-                        containerClassName="size-full"
-                        sizes="48px"
-                      />
-                    ) : (
-                      <span className="text-muted-foreground flex size-full items-center justify-center text-[10px] font-semibold uppercase">
-                        FE
-                      </span>
-                    )}
-                  </Link>
                   <p className="text-muted-foreground shrink-0 text-xs tabular-nums">
                     {product.qty} sold
                   </p>
+                  <ProductThumb
+                    productId={product.productId}
+                    src={product.image}
+                    alt={product.productName}
+                  />
                 </li>
               );
             })}
