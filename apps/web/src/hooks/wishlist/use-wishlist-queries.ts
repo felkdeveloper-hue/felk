@@ -585,6 +585,8 @@ export function useMoveWishlistItemToCartMutation() {
       }
 
       await queryClient.cancelQueries({ queryKey: QUERY_KEYS.cart.current() });
+      useCartStore.getState().bumpCartRevision();
+      useCartStore.getState().setSyncing(true);
       const previousCart =
         queryClient.getQueryData<CartView>(QUERY_KEYS.cart.current()) ??
         useCartStore.getState().cart;
@@ -649,6 +651,7 @@ export function useMoveWishlistItemToCartMutation() {
       queryClient.setQueryData(QUERY_KEYS.cart.current(), cart);
       useCartStore.getState().setCart(cart);
     },
+    onSettled: () => useCartStore.getState().setSyncing(false),
   });
 }
 

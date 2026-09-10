@@ -26,37 +26,35 @@ export function OtpInput({
     return Array.from({ length }, (_, index) => chars[index] ?? '');
   }, [value, length]);
 
-  const setDigit = (index: number, digit: string) => {
-    const next = [...digits];
-    next[index] = digit;
-    const nextValue = next.join('');
-    onChange(nextValue);
-
-    if (nextValue.length === length && !nextValue.includes('')) {
-      onComplete?.(nextValue);
-    }
-  };
-
   const focusInput = (index: number) => {
     const target = inputRefs.current[index];
     target?.focus();
     target?.select();
   };
 
-  const handleChange = (index: number, rawValue: string) => {
+  const applyInput = (startIndex: number, rawValue: string) => {
     const sanitized = rawValue.replace(/\D/g, '');
     if (!sanitized) {
-      setDigit(index, '');
+      const next = [...digits];
+      next[startIndex] = '';
+      onChange(next.join(''));
       return;
     }
 
-    const chars = sanitized.split('');
-    let cursor = index;
+    const next = [...digits];
+    let cursor = startIndex;
 
-    for (const char of chars) {
+    for (const char of sanitized) {
       if (cursor >= length) break;
-      setDigit(cursor, char);
+      next[cursor] = char;
       cursor += 1;
+    }
+
+    const nextValue = next.join('');
+    onChange(nextValue);
+
+    if (nextValue.length === length && !nextValue.includes('')) {
+      onComplete?.(nextValue);
     }
 
     focusInput(Math.min(cursor, length - 1));
@@ -74,8 +72,7 @@ export function OtpInput({
 
   const handlePaste = (index: number, event: React.ClipboardEvent<HTMLInputElement>) => {
     event.preventDefault();
-    const pasted = event.clipboardData.getData('text');
-    handleChange(index, pasted);
+    applyInput(index, event.clipboardData.getData('text'));
   };
 
   return (
@@ -93,11 +90,11 @@ export function OtpInput({
           inputMode="numeric"
           autoComplete={index === 0 ? 'one-time-code' : 'off'}
           pattern="[0-9]*"
-          maxLength={1}
+          maxLength={index === 0 ? length : 1}
           value={digit}
           disabled={disabled}
           autoFocus={autoFocus && index === 0}
-          onChange={(event) => handleChange(index, event.target.value)}
+          onChange={(event) => applyInput(index, event.target.value)}
           onKeyDown={(event) => handleKeyDown(index, event)}
           onPaste={(event) => handlePaste(index, event)}
           onFocus={(event) => event.target.select()}

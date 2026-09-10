@@ -1,5 +1,5 @@
 import { Link, useNavigate } from '@tanstack/react-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { CheckCircle2, Mail } from 'lucide-react';
@@ -31,6 +31,8 @@ export interface VerifyEmailPanelProps {
   email?: string;
   pending?: boolean;
 }
+
+const RESEND_COOLDOWN_SEC = 30;
 
 export function VerifyEmailPanel({ email }: VerifyEmailPanelProps) {
   const navigate = useNavigate();
@@ -64,8 +66,9 @@ export function VerifyEmailPanel({ email }: VerifyEmailPanelProps) {
   }, [resendMutation.data]);
 
   const handleVerify = (submittedCode: string) => {
-    if (!verifiedEmail || submittedCode.length !== 6) return;
-    verifyMutation.mutate({ email: verifiedEmail, code: submittedCode });
+    const normalized = submittedCode.replace(/\D/g, '');
+    if (!verifiedEmail || normalized.length !== 6) return;
+    verifyMutation.mutate({ email: verifiedEmail, code: normalized });
   };
 
   if (verifyMutation.isSuccess && verifyMutation.data) {
@@ -212,22 +215,45 @@ interface ResendFormProps {
 }
 
 function ResendForm({ form, mutation, defaultEmail, onSuccess }: ResendFormProps) {
+  const [resendIn, setResendIn] = useState(0);
+
   useEffect(() => {
     if (defaultEmail) {
       form.setValue('email', defaultEmail);
     }
   }, [defaultEmail, form]);
 
-  if (mutation.isSuccess) {
-    return (
-      <Alert variant="success">
-        <AlertDescription>A new verification code was sent to your email.</AlertDescription>
-      </Alert>
-    );
-  }
+  useEffect(() => {
+    if (resendIn <= 0) return;
+    const id = window.setInterval(() => {
+      setResendIn((seconds) => (seconds <= 0 ? 0 : seconds - 1));
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [resendIn]);
+
+  const handleResend = useCallback(
+    (email: string) => {
+      mutation.mutate(email, {
+        onSuccess: () => {
+          setResendIn(RESEND_COOLDOWN_SEC);
+          onSuccess?.(email);
+        },
+      });
+    },
+    [mutation, onSuccess],
+  );
 
   return (
     <div>
+      {mutation.isSuccess ? (
+        <Alert variant="success" className="mb-4">
+          <AlertDescription>
+            A new verification code was sent to your email.
+            {resendIn > 0 ? ` You can request another in ${resendIn}s.` : null}
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
       {mutation.error ? (
         <div className="mb-4">
           <AuthErrorAlert error={mutation.error} onRetry={() => mutation.reset()} />
@@ -236,11 +262,7 @@ function ResendForm({ form, mutation, defaultEmail, onSuccess }: ResendFormProps
 
       <Form {...form}>
         <form
-          onSubmit={form.handleSubmit((values) =>
-            mutation.mutate(values.email, {
-              onSuccess: () => onSuccess?.(values.email),
-            }),
-          )}
+          onSubmit={form.handleSubmit((values) => handleResend(values.email))}
           className="space-y-4"
           noValidate
         >
@@ -257,8 +279,14 @@ function ResendForm({ form, mutation, defaultEmail, onSuccess }: ResendFormProps
               </FormItem>
             )}
           />
-          <Button type="submit" className="w-full" variant="outline" loading={mutation.isPending}>
-            Resend verification code
+          <Button
+            type="submit"
+            className="w-full"
+            variant="outline"
+            loading={mutation.isPending}
+            disabled={resendIn > 0}
+          >
+            {resendIn > 0 ? `Resend available in ${resendIn}s` : 'Resend verification code'}
           </Button>
         </form>
       </Form>
