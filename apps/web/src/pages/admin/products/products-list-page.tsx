@@ -510,14 +510,27 @@ export function ProductsListPage() {
               {
                 id: 'name',
                 header: 'Product',
-                cell: (row) => (
-                  <Link
-                    {...productEditTo(row.id)}
-                    className="font-medium text-[var(--admin-ink)] hover:underline"
-                  >
-                    {row.name}
-                  </Link>
-                ),
+                cell: (row) => {
+                  const stockControl = row.stockControlNumber?.trim();
+                  return (
+                    <div className="flex min-w-0 flex-col gap-1">
+                      <Link
+                        {...productEditTo(row.id)}
+                        className="font-medium text-[var(--admin-ink)] hover:underline"
+                      >
+                        {row.name}
+                      </Link>
+                      {stockControl ? (
+                        <span
+                          className="w-fit font-mono text-[11px] tabular-nums text-neutral-500 dark:text-neutral-400"
+                          title={`Stock control ${stockControl}`}
+                        >
+                          {stockControl}
+                        </span>
+                      ) : null}
+                    </div>
+                  );
+                },
               },
               { id: 'sku', header: 'SKU', cell: (row) => row.sku ?? '—' },
               {

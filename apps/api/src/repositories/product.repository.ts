@@ -391,6 +391,7 @@ export class ProductRepository extends BaseRepository {
             'defaultVariantId',
             'variantCount',
             'sku',
+            'stockControlNumber',
             'materialId',
             'occasionIds',
             'createdAt',

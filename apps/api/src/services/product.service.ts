@@ -650,6 +650,10 @@ export class ProductService {
               variantStocks,
               requiresOptionSelection: listingRequiresOptionSelection(productVariants),
               sku: product.sku ?? cardListingVariant?.sku,
+              stockControlNumber:
+                typeof (product as { stockControlNumber?: unknown }).stockControlNumber === 'string'
+                  ? (product as { stockControlNumber: string }).stockControlNumber.trim() || null
+                  : null,
               thumbnailUrl: cardThumbs.thumbnailUrl,
               hoverImageUrl: cardThumbs.hoverImageUrl,
               createdAt: product.createdAt,
