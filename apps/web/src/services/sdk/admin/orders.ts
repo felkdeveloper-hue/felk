@@ -124,6 +124,18 @@ export const ordersApi = {
     return { ...result, data: normalizeList(result.data, normalizeOrder) };
   },
 
+  async downloadExcel(params?: { q?: string; status?: string; customerId?: string }): Promise<void> {
+    const { downloadOrderDocument } = await import('@/utils/orders/download-order-document');
+    const search = new URLSearchParams();
+    if (params?.q) search.set('q', params.q);
+    if (params?.status) search.set('status', params.status);
+    if (params?.customerId) search.set('customerId', params.customerId);
+    const qs = search.toString();
+    await downloadOrderDocument(`/orders/export${qs ? `?${qs}` : ''}`, 'felk-orders-export.xlsx', {
+      timeout: 120_000,
+    });
+  },
+
   async getById(id: string): Promise<unknown> {
     return http.get<unknown>(`/orders/${id}`);
   },

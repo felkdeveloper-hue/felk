@@ -180,10 +180,8 @@ export class OrderService {
     };
   }
 
-  async list(
+  private async listFilter(
     options: {
-      page?: number;
-      limit?: number;
       status?: string;
       customerId?: string;
       q?: string;
@@ -191,9 +189,8 @@ export class OrderService {
     user: AuthenticatedUser,
   ) {
     const isStaff = user.permissions.some((p: string) =>
-      ['orders.view', 'orders.read'].includes(p),
+      ['orders.view', 'orders.read', 'orders.export'].includes(p),
     );
-    const { page, limit } = parsePagination(options);
     const filter: Record<string, unknown> = { isDeleted: false };
 
     if (!isStaff) {
@@ -217,6 +214,22 @@ export class OrderService {
       ];
     }
 
+    return { filter, isStaff };
+  }
+
+  async list(
+    options: {
+      page?: number;
+      limit?: number;
+      status?: string;
+      customerId?: string;
+      q?: string;
+    },
+    user: AuthenticatedUser,
+  ) {
+    const { page, limit } = parsePagination(options);
+    const { filter, isStaff } = await this.listFilter(options, user);
+
     const [items, total] = await Promise.all([
       OrderModel.find(filter)
         .sort({ placedAt: -1, createdAt: -1 })
@@ -239,6 +252,33 @@ export class OrderService {
       })),
       meta: buildPaginationMeta(total, page, limit),
     };
+  }
+
+  /** Unpaginated staff export — newest first, hard-capped to keep the workbook usable. */
+  async listForExport(
+    options: {
+      status?: string;
+      customerId?: string;
+      q?: string;
+    },
+    user: AuthenticatedUser,
+    maxRows = 5000,
+  ) {
+    const { filter, isStaff } = await this.listFilter(options, user);
+    if (!isStaff) {
+      throw ApiError.forbidden('You do not have permission to export orders');
+    }
+
+    const items = await OrderModel.find(filter)
+      .sort({ placedAt: -1, createdAt: -1 })
+      .limit(maxRows);
+
+    const summaries = await this.withReceivedAtMany(items.map((order) => this.toSummary(order)));
+    const sources = await resolveOrderSources(items);
+    return summaries.map((summary, index) => ({
+      ...summary,
+      source: sources.get(String(items[index]!._id)) ?? UNKNOWN_ORDER_SOURCE,
+    }));
   }
 
   /**

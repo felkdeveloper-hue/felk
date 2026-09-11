@@ -3,6 +3,7 @@ import { PERMISSIONS } from '@/constants/permissions.js';
 import { authenticate, authorizeAny, authRateLimiter, validate } from '@/middlewares/index.js';
 import { actorFromRequest } from '@/services/cms-crud.service.js';
 import { orderService } from '@/services/order.service.js';
+import { orderExportService } from '@/services/order-export.service.js';
 import { returnService } from '@/services/return.service.js';
 import { asyncHandler } from '@/utils/async-handler.js';
 import { ApiResponse } from '@/utils/response/api-response.js';
@@ -20,7 +21,7 @@ const cancelPerms = [P.ORDERS_CANCEL_OWN, P.ORDERS_CANCEL] as const;
 const notesPerms = [P.ORDERS_NOTES] as const;
 const invoicePerms = [P.ORDERS_INVOICE, P.ORDERS_READ_OWN, P.ORDERS_READ, P.ORDERS_VIEW] as const;
 const invoiceSendPerms = [P.ORDERS_INVOICE, P.ORDERS_UPDATE, P.ORDERS_VIEW, P.ORDERS_READ] as const;
-const exportPerms = [P.ORDERS_EXPORT] as const;
+const exportPerms = [P.ORDERS_EXPORT, P.ORDERS_READ, P.ORDERS_VIEW] as const;
 const returnPerms = [P.ORDERS_RETURN_OWN, P.ORDERS_RETURN_MANAGE] as const;
 
 export const ordersRouter = Router();
@@ -43,12 +44,28 @@ ordersRouter.get(
   '/export',
   authenticate,
   authorizeAny(...exportPerms),
-  validate({ query: S.orderListQuerySchema }),
+  validate({ query: S.orderExportQuerySchema }),
   asyncHandler(async (req, res) => {
     if (!req.user) throw ApiError.unauthorized();
-    const query = req.query as Record<string, string>;
-    const { items, meta } = await orderService.list({ ...query, limit: 100 }, req.user);
-    ApiResponse.success(res, items, 'Export snapshot', undefined, meta);
+    const query = req.query as {
+      format?: 'xlsx' | 'json';
+      status?: string;
+      customerId?: string;
+      q?: string;
+    };
+    if (query.format === 'json') {
+      const { items, meta } = await orderService.list({ ...query, limit: 100 }, req.user);
+      ApiResponse.success(res, items, 'Export snapshot', undefined, meta);
+      return;
+    }
+    const buffer = await orderExportService.exportWorkbook(query, req.user);
+    const stamp = new Date().toISOString().slice(0, 10);
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader('Content-Disposition', `attachment; filename="felk-orders-export-${stamp}.xlsx"`);
+    res.send(buffer);
   }),
 );
 

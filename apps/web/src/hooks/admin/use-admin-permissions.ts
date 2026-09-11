@@ -27,6 +27,11 @@ export function useAdminPermissions() {
       view: hasAnyPermission([PERMISSIONS.ORDERS_VIEW, PERMISSIONS.ORDERS_READ]),
       update: hasPermission(PERMISSIONS.ORDERS_UPDATE),
       cancel: hasPermission(PERMISSIONS.ORDERS_CANCEL),
+      export: hasAnyPermission([
+        PERMISSIONS.ORDERS_EXPORT,
+        PERMISSIONS.ORDERS_VIEW,
+        PERMISSIONS.ORDERS_READ,
+      ]),
     },
     customers: {
       view: hasPermission(PERMISSIONS.CUSTOMERS_VIEW),

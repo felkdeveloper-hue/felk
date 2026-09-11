@@ -26,6 +26,13 @@ export const orderListQuerySchema = z.object({
   q: z.string().trim().max(100).optional(),
 });
 
+export const orderExportQuerySchema = z.object({
+  format: z.enum(['xlsx', 'json']).optional(),
+  status: statusEnum.optional(),
+  customerId: objectIdSchema.optional(),
+  q: z.string().trim().max(100).optional(),
+});
+
 export const orderStatusUpdateSchema = z.object({
   status: statusEnum,
   note: z.string().trim().max(500).optional(),

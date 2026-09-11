@@ -70,6 +70,27 @@ export function orderReceivedAt(order: {
   return earliestDate(order.paidAt, order.placedAt, order.createdAt);
 }
 
+const COLOMBO_TZ = 'Asia/Colombo';
+
+/** Sortable Sri Lanka local timestamp, e.g. 2026-09-11 01:20:00 */
+export function formatReceivedAtTimestamp(value: Date | string | null | undefined): string {
+  const date = earliestDate(value);
+  if (!date) return '';
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: COLOMBO_TZ,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).formatToParts(date);
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? '';
+  return `${get('year')}-${get('month')}-${get('day')} ${get('hour')}:${get('minute')}:${get('second')}`;
+}
+
 /** Mongo expression used by revenue / analytics date filters. */
 export function orderReceivedAtExpr() {
   return { $ifNull: ['$paidAt', { $ifNull: ['$placedAt', '$createdAt'] }] };

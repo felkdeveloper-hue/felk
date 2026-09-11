@@ -72,6 +72,7 @@ export { publishPaymentEvent } from '@/services/payment-event-publisher.js';
 export { writePaymentLog } from '@/services/payment-log.service.js';
 export { domainEventBus } from '@/services/events/event-bus.js';
 export { orderService } from '@/services/order.service.js';
+export { orderExportService } from '@/services/order-export.service.js';
 export { invoiceService } from '@/services/invoice.service.js';
 export { returnService } from '@/services/return.service.js';
 export { recordOrderTimeline } from '@/services/order-timeline.service.js';

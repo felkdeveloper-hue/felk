@@ -1,7 +1,12 @@
+import type { AxiosRequestConfig } from 'axios';
 import { httpClient } from '@/lib/http-client';
 
-export async function downloadOrderDocument(url: string, fallbackFileName: string): Promise<void> {
-  const response = await httpClient.get<Blob>(url, { responseType: 'blob' });
+export async function downloadOrderDocument(
+  url: string,
+  fallbackFileName: string,
+  config?: AxiosRequestConfig,
+): Promise<void> {
+  const response = await httpClient.get<Blob>(url, { responseType: 'blob', ...config });
   const disposition = response.headers['content-disposition'] as string | undefined;
   const match = disposition?.match(/filename="([^"]+)"/i);
   const fileName = match?.[1] ?? fallbackFileName;

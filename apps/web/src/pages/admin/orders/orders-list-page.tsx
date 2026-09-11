@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
+import { Download, Loader2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
 import { Button } from '@fe-platform/ui';
 import {
   AdminErrorState,
@@ -17,6 +19,7 @@ import {
   orderStatusLabel,
 } from '@/constants/order.constants';
 import { useAdminPermissions, useRevenueDashboard } from '@/hooks/admin';
+import { AppError } from '@/lib/errors';
 import { cn, formatCurrency, formatDate } from '@/lib/utils';
 import { formatOrderAddress, ordersApi } from '@/services/sdk/admin';
 import { orderReceivedAt } from '@/utils/orders';
@@ -46,6 +49,7 @@ export function OrdersListPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState(rawSearch.q ?? '');
   const [status, setStatus] = useState(rawSearch.status ?? '');
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     if (typeof rawSearch.q === 'string') setSearch(rawSearch.q);
@@ -71,13 +75,52 @@ export function OrdersListPage() {
   const revenue = useRevenueDashboard({ period: '30d' });
   const orderStats = revenue.data;
 
+  const downloadExcel = async () => {
+    setExporting(true);
+    const toastId = toast.loading('Preparing Excel export…');
+    try {
+      await ordersApi.downloadExcel({
+        q: search || undefined,
+        status: status || undefined,
+        customerId: rawSearch.customerId || undefined,
+      });
+      toast.success('Excel download started', { id: toastId });
+    } catch (error) {
+      toast.error(error instanceof AppError ? error.message : 'Unable to export orders', {
+        id: toastId,
+      });
+    } finally {
+      setExporting(false);
+    }
+  };
+
   if (query.isError) {
     return <AdminErrorState message="Unable to load orders." onRetry={() => query.refetch()} />;
   }
 
   return (
     <PageMotion>
-      <AdminPageHeader title="Orders" description="Review, filter, and update customer orders." />
+      <AdminPageHeader
+        title="Orders"
+        description="Review, filter, and update customer orders."
+        actions={
+          orderPerms.export ? (
+            <button
+              type="button"
+              className="admin-btn admin-btn-secondary admin-btn-lg inline-flex items-center gap-2"
+              disabled={exporting}
+              onClick={() => void downloadExcel()}
+            >
+              {exporting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
+              {exporting ? 'Preparing…' : 'Download Excel'}
+            </button>
+          ) : null
+        }
+      />
 
       <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <AdminStatCard
