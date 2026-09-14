@@ -117,7 +117,7 @@ export function AddressForm({
         className={compact ? 'space-y-2 sm:space-y-4' : 'space-y-4'}
         noValidate
       >
-        <div className={compact ? 'grid grid-cols-2 gap-2 sm:gap-4' : 'space-y-4'}>
+        <div className={compact ? 'space-y-2 sm:space-y-4' : 'space-y-4'}>
           <FormField
             control={form.control}
             name="fullName"
@@ -137,11 +137,13 @@ export function AddressForm({
             name="phone"
             render={({ field }) => (
               <FormItem className={compact ? compactField : undefined}>
-                <FormLabel className={compact ? compactLabel : undefined}>Phone</FormLabel>
+                <FormLabel className={compact ? compactLabel : undefined}>Mobile number</FormLabel>
                 <FormControl>
                   <Input
                     type="tel"
+                    inputMode="tel"
                     autoComplete="tel"
+                    placeholder="07XXXXXXXX"
                     className={compact ? compactInput : undefined}
                     {...field}
                   />

@@ -43,6 +43,7 @@ import {
   ensureMetaPurchaseTracked,
   trackMetaPurchaseForOrder,
 } from '@/services/analytics/purchase-tracking.service.js';
+import { composeVariantTitle } from '@/utils/variant-display.js';
 
 const SYSTEM_ACTOR: ActorMeta = {};
 const PAYMENT_SUCCEEDED = CONSUMED_PAYMENT_EVENT_TYPES[0];
@@ -121,7 +122,9 @@ async function buildOrderItems(checkout: CheckoutSessionDocument): Promise<Order
       variantId: line.variantId,
       name: product?.name ?? line.title,
       stockControlNumber: product?.stockControlNumber ?? null,
-      variantTitle: variant?.title ?? line.title,
+      variantTitle:
+        composeVariantTitle(line.colorName, line.sizeName, variant?.title) ?? line.title,
+      colorName: line.colorName ?? null,
       sizeName: line.sizeName ?? null,
       sku: line.sku,
       barcode: variant?.barcode ?? null,

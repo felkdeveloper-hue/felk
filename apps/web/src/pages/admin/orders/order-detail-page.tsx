@@ -49,6 +49,14 @@ function resolveOrderItemImage(value: unknown): string | undefined {
   return toStorefrontMediaUrl(value);
 }
 
+function formatLineVariant(row: Record<string, unknown>): string {
+  const color = typeof row.colorName === 'string' ? row.colorName.trim() : '';
+  const size = typeof row.sizeName === 'string' ? row.sizeName.trim() : '';
+  const composed = [color, size].filter(Boolean).join(' / ');
+  if (composed) return composed;
+  return typeof row.variantTitle === 'string' ? row.variantTitle.trim() : '';
+}
+
 function readItemImage(row: Record<string, unknown>): string | undefined {
   const images = Array.isArray(row.images) ? row.images : [];
   const first = images.find((image) => typeof image === 'string' && image.length > 0);
@@ -72,6 +80,10 @@ function readAddress(value: unknown): AdminOrderAddress | null {
   };
 }
 
+function isDisplayablePhone(phone?: string | null): phone is string {
+  return Boolean(phone && phone.replace(/\D/g, '').length >= 9);
+}
+
 function AddressBlock({ address, title }: { address: AdminOrderAddress | null; title: string }) {
   if (!address) {
     return (
@@ -85,7 +97,7 @@ function AddressBlock({ address, title }: { address: AdminOrderAddress | null; t
     <AdminPanel title={title}>
       <div className="text-sm text-neutral-600 dark:text-neutral-300">
         <p className="font-medium text-[var(--admin-ink)]">{address.fullName}</p>
-        {address.phone ? (
+        {isDisplayablePhone(address.phone) ? (
           <p className="mt-1">
             <a href={`tel:${address.phone}`} className="hover:underline">
               {address.phone}
@@ -295,7 +307,7 @@ export function OrderDetailPage({ orderId }: { orderId: string }) {
             Customer
           </p>
           <p className="mt-2 font-medium">{shippingAddress?.fullName ?? '—'}</p>
-          {shippingAddress?.phone ? (
+          {isDisplayablePhone(shippingAddress?.phone) ? (
             <p className="text-muted-foreground mt-0.5 text-sm">{shippingAddress.phone}</p>
           ) : null}
         </AdminPanel>
@@ -328,6 +340,7 @@ export function OrderDetailPage({ orderId }: { orderId: string }) {
                 const row = readRecord(item);
                 const productId = row.productId ? String(row.productId) : '';
                 const imageUrl = readItemImage(row);
+                const variantLabel = formatLineVariant(row);
                 return (
                   <li
                     key={String(row.id ?? row._id ?? index)}
@@ -378,7 +391,7 @@ export function OrderDetailPage({ orderId }: { orderId: string }) {
                         ) : null}
                       </div>
                       <p className="text-muted-foreground text-xs">
-                        {String(row.variantTitle ?? '')} · SKU {String(row.sku ?? '—')}
+                        {variantLabel ? `${variantLabel} · ` : ''}SKU {String(row.sku ?? '—')}
                       </p>
                     </div>
                     <div className="shrink-0 text-right text-sm">
@@ -591,8 +604,8 @@ export function OrderDetailPage({ orderId }: { orderId: string }) {
             ) : orderPerms.update ? (
               <div className="space-y-3">
                 <p className="text-sm text-neutral-500 dark:text-neutral-400">
-                  Create a FED waybill for this FE order. The FE order number is sent to FED as the
-                  reference so only your website orders are linked.
+                  Create a FED waybill for this FE order. Leave the box unchecked to generate a new
+                  tracking number. Only tick it if you already have an unused CRE or CCP sticker.
                 </p>
                 <label className="flex items-center gap-2 text-sm">
                   <input
@@ -600,13 +613,13 @@ export function OrderDetailPage({ orderId }: { orderId: string }) {
                     checked={useExistingWaybill}
                     onChange={(event) => setUseExistingWaybill(event.target.checked)}
                   />
-                  Use an existing CRE/CCP waybill number
+                  Use an unused CRE/CCP waybill number
                 </label>
                 {useExistingWaybill ? (
                   <input
                     value={existingWaybillId}
                     onChange={(event) => setExistingWaybillId(event.target.value)}
-                    placeholder="Enter existing waybill ID"
+                    placeholder="Unused CRE or CCP number"
                     className="w-full rounded-lg border border-[var(--admin-line)] bg-[var(--admin-panel)] px-3 py-2 text-sm"
                   />
                 ) : null}

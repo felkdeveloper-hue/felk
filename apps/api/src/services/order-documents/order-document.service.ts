@@ -5,6 +5,8 @@ import {
 } from './order-document.types.js';
 import { generateInvoicePdf } from './invoice-pdf.generator.js';
 import { generateShippingLabelPdf } from './shipping-label-pdf.generator.js';
+import { isValidRecipientPhone, resolveOrderRecipientPhone } from '@/utils/recipient-phone.js';
+import { enrichItemsVariantDisplay } from '@/utils/variant-display.js';
 
 function readAddress(address?: Record<string, unknown> | null) {
   if (!address) return {};
@@ -27,11 +29,27 @@ function paymentStatus(order: OrderDocument, _invoice: InvoiceDocument): string 
   return 'SUCCESS';
 }
 
-export function buildOrderDocumentPayload(
+export async function buildOrderDocumentPayload(
   order: OrderDocument,
   invoice: InvoiceDocument,
-): OrderDocumentPayload {
+): Promise<OrderDocumentPayload> {
   const recipient = readAddress(order.shippingAddress ?? order.billingAddress);
+  if (!isValidRecipientPhone(recipient.phone)) {
+    recipient.phone = await resolveOrderRecipientPhone(order);
+  }
+
+  const items = await enrichItemsVariantDisplay(
+    order.items.map((item) => ({
+      variantId: item.variantId.toString(),
+      name: item.name,
+      variantTitle: item.variantTitle,
+      colorName: item.colorName ?? null,
+      sizeName: item.sizeName ?? null,
+      sku: item.sku,
+      quantity: item.quantity,
+      lineTotal: item.lineTotal,
+    })),
+  );
 
   return {
     orderNumber: order.orderNumber,
@@ -42,7 +60,7 @@ export function buildOrderDocumentPayload(
     paymentReference: order.paymentReference,
     paymentStatus: paymentStatus(order, invoice),
     recipient,
-    items: order.items.map((item) => ({
+    items: items.map((item) => ({
       name: item.name,
       variantTitle: item.variantTitle,
       sku: item.sku,
@@ -65,12 +83,12 @@ export async function renderOrderInvoicePdf(
   order: OrderDocument,
   invoice: InvoiceDocument,
 ): Promise<Buffer> {
-  return generateInvoicePdf(buildOrderDocumentPayload(order, invoice));
+  return generateInvoicePdf(await buildOrderDocumentPayload(order, invoice));
 }
 
 export async function renderOrderShippingLabelPdf(
   order: OrderDocument,
   invoice: InvoiceDocument,
 ): Promise<Buffer> {
-  return generateShippingLabelPdf(buildOrderDocumentPayload(order, invoice));
+  return generateShippingLabelPdf(await buildOrderDocumentPayload(order, invoice));
 }

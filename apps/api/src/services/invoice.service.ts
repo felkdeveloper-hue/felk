@@ -3,6 +3,7 @@ import { writeAuditLog } from '@/services/audit.service.js';
 import type { ActorMeta } from '@/services/cms-crud.service.js';
 import { ApiError } from '@/utils/errors/api-error.js';
 import { INVOICE_TAX_PLACEHOLDER, ORDER_AUDIT } from '@/constants/order.js';
+import { composeVariantTitle } from '@/utils/variant-display.js';
 
 function toPlain(doc: { toObject: () => Record<string, unknown> }) {
   return doc.toObject();
@@ -28,7 +29,7 @@ export class InvoiceService {
       shippingAddress: order.shippingAddress,
       items: order.items.map((item) => ({
         name: item.name,
-        variantTitle: item.variantTitle,
+        variantTitle: composeVariantTitle(item.colorName, item.sizeName, item.variantTitle),
         sku: item.sku,
         quantity: item.quantity,
         price: item.salePrice ?? item.price,

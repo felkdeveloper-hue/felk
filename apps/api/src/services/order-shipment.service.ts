@@ -1,10 +1,16 @@
 import { Types } from 'mongoose';
 import { OrderModel, type OrderDocument } from '@/models/order.models.js';
+import { CustomerAddressModel } from '@/models/customer.models.js';
 import { ORDER_STATUS } from '@/constants/order-status.js';
 import { ORDER_AUDIT } from '@/constants/order.js';
 import { fedClient } from '@/services/couriers/fed.client.js';
 import { mapFedStatusToOrderStatus } from '@/services/couriers/fed-status-map.js';
-import type { FedShipmentMetadata, FedTrackingMetadata } from '@/services/couriers/fed.types.js';
+import {
+  formatFedContact,
+  sanitizeFedOrderId,
+  type FedShipmentMetadata,
+  type FedTrackingMetadata,
+} from '@/services/couriers/fed.types.js';
 import { orderService } from '@/services/order.service.js';
 import { recordOrderTimeline } from '@/services/order-timeline.service.js';
 import { writeAuditLog } from '@/services/audit.service.js';
@@ -12,6 +18,11 @@ import type { ActorMeta } from '@/services/cms-crud.service.js';
 import type { AuthenticatedUser } from '@/types/index.js';
 import { HTTP_STATUS } from '@/constants/http.js';
 import { ApiError } from '@/utils/errors/api-error.js';
+import {
+  isValidRecipientPhone,
+  normalizeRecipientPhone,
+  resolveOrderRecipientPhone,
+} from '@/utils/recipient-phone.js';
 
 const FED_TRACKING_BASE = 'https://www.fdedomestic.com/client/all_parcel.php';
 
@@ -31,11 +42,50 @@ function readShipmentMetadata(metadata: Record<string, unknown>): FedShipmentMet
   return record.waybillNo ? record : null;
 }
 
-function normalizePhone(phone: string | null | undefined): string {
-  const digits = (phone ?? '').replace(/\D/g, '');
-  if (digits.startsWith('94') && digits.length >= 11) return digits.slice(2);
-  if (digits.startsWith('0')) return digits.slice(1);
-  return digits;
+async function persistRecoveredRecipientPhone(order: OrderDocument, rawPhone: string | null) {
+  if (!rawPhone || !isValidRecipientPhone(rawPhone)) return;
+
+  const shipping = asAddressRecord(order.shippingAddress);
+  const billing = asAddressRecord(order.billingAddress);
+  let touched = false;
+
+  if (
+    shipping &&
+    !isValidRecipientPhone(typeof shipping.phone === 'string' ? shipping.phone : null)
+  ) {
+    shipping.phone = rawPhone;
+    order.markModified('shippingAddress');
+    touched = true;
+  }
+  if (
+    billing &&
+    !isValidRecipientPhone(typeof billing.phone === 'string' ? billing.phone : null)
+  ) {
+    billing.phone = rawPhone;
+    order.markModified('billingAddress');
+    touched = true;
+  }
+
+  const addressId = shipping?.addressId;
+  if (addressId) {
+    const stored = await CustomerAddressModel.findOne({
+      _id: addressId,
+      customerId: order.customerId,
+      isDeleted: false,
+    }).select('phone');
+    if (stored && !isValidRecipientPhone(stored.phone)) {
+      stored.phone = rawPhone;
+      await stored.save();
+    }
+  }
+
+  if (touched) {
+    await order.save();
+  }
+}
+
+function asAddressRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' ? (value as Record<string, unknown>) : null;
 }
 
 function buildParcelDescription(order: OrderDocument, override?: string): string {
@@ -140,7 +190,8 @@ export class OrderShipmentService {
 
     const shipping = (order.shippingAddress ?? {}) as Record<string, string | null | undefined>;
     const recipientName = String(shipping.fullName ?? '').trim();
-    const recipientPhone = normalizePhone(shipping.phone);
+    const recipientPhoneRaw = await resolveOrderRecipientPhone(order);
+    const recipientPhone = normalizeRecipientPhone(recipientPhoneRaw);
     const recipientAddress = buildAddressLine(order);
     const recipientCity = String(shipping.city ?? '').trim();
 
@@ -151,6 +202,8 @@ export class OrderShipmentService {
     if (!recipientAddress) throw ApiError.badRequest('Shipping address line is required');
     if (!recipientCity) throw ApiError.badRequest('Shipping city is required');
 
+    await persistRecoveredRecipientPhone(order, recipientPhoneRaw);
+
     const mode = input.mode ?? 'new';
     const parcelWeight = String(resolveWeightKg(order, input.parcelWeightKg));
     const parcelDescription = buildParcelDescription(order, input.parcelDescription);
@@ -158,11 +211,11 @@ export class OrderShipmentService {
     const exchange = input.exchange ? '1' : '0';
 
     const payload = {
-      order_id: order.orderNumber,
+      order_id: sanitizeFedOrderId(order.orderNumber),
       parcel_weight: parcelWeight,
       parcel_description: parcelDescription,
       recipient_name: recipientName,
-      recipient_contact_1: recipientPhone,
+      recipient_contact_1: formatFedContact(recipientPhone),
       recipient_address: recipientAddress,
       recipient_city: recipientCity,
       amount,

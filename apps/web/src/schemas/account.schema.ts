@@ -13,7 +13,11 @@ export const addressSchema = z.object({
   type: z.enum(['billing', 'shipping', 'both']).default('both'),
   label: z.enum(['home', 'office', 'other']).optional(),
   fullName: z.string().min(1, 'Full name is required'),
-  phone: z.string().min(1, 'Phone is required'),
+  phone: z
+    .string()
+    .trim()
+    .min(1, 'Mobile number is required')
+    .refine((value) => value.replace(/\D/g, '').length >= 9, 'Enter a valid mobile number'),
   line1: z.string().min(1, 'Address line 1 is required'),
   line2: z.string().optional(),
   city: z.string().min(1, 'City is required'),

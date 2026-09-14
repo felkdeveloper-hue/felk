@@ -5,7 +5,8 @@ import {
   OrderTimelineModel,
   type OrderDocument,
 } from '@/models/order.models.js';
-import { CustomerModel } from '@/models/customer.models.js';
+import { CustomerModel, CustomerAddressModel } from '@/models/customer.models.js';
+import { UserModel } from '@/models/user.model.js';
 import { PaymentModel } from '@/models/payment.models.js';
 import { ProductModel } from '@/models/product.models.js';
 import { appConfig } from '@/config/app.config.js';
@@ -43,6 +44,11 @@ import { ORDER_AUDIT, ORDER_EVENT_TYPE } from '@/constants/order.js';
 import { MOVEMENT_TYPE } from '@/constants/inventory.js';
 import type { AuthenticatedUser } from '@/types/index.js';
 import { orderReceivedAt, paymentReceivedAt } from '@/utils/order-received-at.js';
+import {
+  isValidRecipientPhone,
+  pickValidRecipientPhoneRaw,
+} from '@/utils/recipient-phone.js';
+import { enrichItemsVariantDisplay } from '@/utils/variant-display.js';
 
 function toPlain(doc: { toObject: () => Record<string, unknown> }) {
   return doc.toObject();
@@ -99,7 +105,12 @@ export class OrderService {
     const { isStaff } = await this.assertAccess(order, user);
     const [summary, source] = await Promise.all([
       this.withReceivedAt(
-        await this.withStockControlNumbers(this.toSummary(order), isStaff, order),
+        await this.withRecipientPhone(
+          await this.withVariantTitles(
+            await this.withStockControlNumbers(this.toSummary(order), isStaff, order),
+            order,
+          ),
+        ),
       ),
       resolveOrderSource(order),
     ]);
@@ -110,7 +121,12 @@ export class OrderService {
     const order = await this.findByOrderNumber(orderNumber);
     const { isStaff } = await this.assertAccess(order, user);
     return this.withReceivedAt(
-      await this.withStockControlNumbers(this.toSummary(order), isStaff, order),
+      await this.withRecipientPhone(
+        await this.withVariantTitles(
+          await this.withStockControlNumbers(this.toSummary(order), isStaff, order),
+          order,
+        ),
+      ),
     );
   }
 
@@ -162,13 +178,18 @@ export class OrderService {
       currency: order.currency,
       totals: order.totals,
       paymentMethod: order.paymentMethod,
-      items: order.items.map((item) => ({
-        name: item.name,
-        variantTitle: item.variantTitle,
-        quantity: item.quantity,
-        lineTotal: item.lineTotal,
-        images: item.images?.slice(0, 1) ?? [],
-      })),
+      items: await enrichItemsVariantDisplay(
+        order.items.map((item) => ({
+          variantId: item.variantId.toString(),
+          name: item.name,
+          variantTitle: item.variantTitle,
+          colorName: item.colorName ?? null,
+          sizeName: item.sizeName ?? null,
+          quantity: item.quantity,
+          lineTotal: item.lineTotal,
+          images: item.images?.slice(0, 1) ?? [],
+        })),
+      ),
       shippingMethod: order.shippingMethod,
       placedAt: receivedAt,
       confirmedAt: order.confirmedAt,
@@ -238,7 +259,9 @@ export class OrderService {
       OrderModel.countDocuments(filter),
     ]);
 
-    const summaries = await this.withReceivedAtMany(items.map((o) => this.toSummary(o)));
+    const summaries = await this.withRecipientPhones(
+      await this.withReceivedAtMany(items.map((o) => this.toSummary(o))),
+    );
     const summariesWithStock = await Promise.all(
       summaries.map((summary, index) =>
         this.withStockControlNumbers(summary, isStaff, items[index]!),
@@ -273,7 +296,9 @@ export class OrderService {
       .sort({ placedAt: -1, createdAt: -1 })
       .limit(maxRows);
 
-    const summaries = await this.withReceivedAtMany(items.map((order) => this.toSummary(order)));
+    const summaries = await this.withRecipientPhones(
+      await this.withReceivedAtMany(items.map((order) => this.toSummary(order))),
+    );
     const sources = await resolveOrderSources(items);
     return summaries.map((summary, index) => ({
       ...summary,
@@ -730,6 +755,8 @@ export class OrderService {
         variantId: item.variantId.toString(),
         name: item.name,
         variantTitle: item.variantTitle,
+        colorName: item.colorName ?? null,
+        sizeName: item.sizeName ?? null,
         sku: item.sku,
         barcode: item.barcode,
         images: item.images,
@@ -766,6 +793,138 @@ export class OrderService {
       createdAt: order.createdAt,
       updatedAt: order.updatedAt,
     };
+  }
+
+  private async withVariantTitles<T extends { items: Array<Record<string, unknown>> }>(
+    summary: T,
+    order?: OrderDocument,
+  ): Promise<T> {
+    const snapshotByItemId = new Map<
+      string,
+      { colorName?: string | null; sizeName?: string | null }
+    >();
+    if (order) {
+      for (const item of order.items) {
+        snapshotByItemId.set(item._id.toString(), {
+          colorName: item.colorName ?? null,
+          sizeName: item.sizeName ?? null,
+        });
+      }
+    }
+
+    const withSnapshots = summary.items.map((item) => {
+      const snapshot = snapshotByItemId.get(String(item.id ?? ''));
+      return {
+        ...item,
+        colorName:
+          (typeof item.colorName === 'string' ? item.colorName : null) ??
+          snapshot?.colorName ??
+          null,
+        sizeName:
+          (typeof item.sizeName === 'string' ? item.sizeName : null) ?? snapshot?.sizeName ?? null,
+        variantTitle: typeof item.variantTitle === 'string' ? item.variantTitle : null,
+        variantId: item.variantId,
+      };
+    });
+
+    const enriched = await enrichItemsVariantDisplay(withSnapshots);
+    return { ...summary, items: enriched };
+  }
+
+  private addressRecord(value: unknown): Record<string, unknown> | null {
+    if (!value || typeof value !== 'object') return null;
+    if (typeof (value as { toObject?: () => Record<string, unknown> }).toObject === 'function') {
+      return (value as { toObject: () => Record<string, unknown> }).toObject();
+    }
+    return { ...(value as Record<string, unknown>) };
+  }
+
+  private async withRecipientPhone<
+    T extends {
+      customerId: string;
+      shippingAddress?: unknown;
+      billingAddress?: unknown;
+    },
+  >(summary: T): Promise<T> {
+    const [row] = await this.withRecipientPhones([summary]);
+    return row ?? summary;
+  }
+
+  private async withRecipientPhones<
+    T extends {
+      customerId: string;
+      shippingAddress?: unknown;
+      billingAddress?: unknown;
+    },
+  >(summaries: T[]): Promise<T[]> {
+    const needing = summaries.filter((row) => {
+      const shipping = this.addressRecord(row.shippingAddress);
+      return !isValidRecipientPhone(typeof shipping?.phone === 'string' ? shipping.phone : null);
+    });
+    if (!needing.length) return summaries;
+
+    const customerIds = [...new Set(needing.map((row) => row.customerId).filter(Boolean))];
+    const customers = await CustomerModel.find({ _id: { $in: customerIds } })
+      .select('phone userId')
+      .lean();
+    const phoneByCustomer = new Map<string, string | null>(
+      customers.map((row) => [String(row._id), typeof row.phone === 'string' ? row.phone : null]),
+    );
+
+    const missingAfterProfile = customers.filter(
+      (row) => !isValidRecipientPhone(row.phone) && row.userId,
+    );
+    if (missingAfterProfile.length) {
+      const users = await UserModel.find({
+        _id: { $in: missingAfterProfile.map((row) => row.userId) },
+      })
+        .select('phone')
+        .lean();
+      const phoneByUser = new Map(
+        users.map((row) => [String(row._id), typeof row.phone === 'string' ? row.phone : null]),
+      );
+      for (const customer of missingAfterProfile) {
+        const recovered = pickValidRecipientPhoneRaw([
+          phoneByUser.get(String(customer.userId)),
+        ]);
+        if (recovered) phoneByCustomer.set(String(customer._id), recovered);
+      }
+    }
+
+    const stillMissing = customerIds.filter((id) => !isValidRecipientPhone(phoneByCustomer.get(id)));
+    if (stillMissing.length) {
+      const addresses = await CustomerAddressModel.find({
+        customerId: { $in: stillMissing },
+        isDeleted: false,
+      })
+        .select('customerId phone')
+        .lean();
+      for (const address of addresses) {
+        const customerId = String(address.customerId);
+        if (isValidRecipientPhone(phoneByCustomer.get(customerId))) continue;
+        if (isValidRecipientPhone(address.phone)) {
+          phoneByCustomer.set(customerId, address.phone);
+        }
+      }
+    }
+
+    return summaries.map((row) => {
+      const shipping = this.addressRecord(row.shippingAddress);
+      const billing = this.addressRecord(row.billingAddress);
+      if (isValidRecipientPhone(typeof shipping?.phone === 'string' ? shipping.phone : null)) {
+        return row;
+      }
+      const recovered = pickValidRecipientPhoneRaw([phoneByCustomer.get(row.customerId)]);
+      if (!recovered) return row;
+      return {
+        ...row,
+        shippingAddress: shipping ? { ...shipping, phone: recovered } : row.shippingAddress,
+        billingAddress:
+          billing && !isValidRecipientPhone(typeof billing.phone === 'string' ? billing.phone : null)
+            ? { ...billing, phone: recovered }
+            : row.billingAddress,
+      };
+    });
   }
 
   /** Staff sees stock control numbers; customers and guest tracking never do. */

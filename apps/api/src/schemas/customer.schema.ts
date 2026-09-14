@@ -7,6 +7,7 @@ import {
   WISHLIST_VISIBILITY,
   LOYALTY_TIER,
 } from '@/constants/customer.js';
+import { isValidRecipientPhone } from '@/utils/recipient-phone.js';
 
 export const customerListQuerySchema = paginationQuerySchema.extend({
   status: z.string().optional(),
@@ -70,7 +71,12 @@ export const addressCreateSchema = z.object({
   type: z.enum(Object.values(ADDRESS_TYPE) as [string, ...string[]]).optional(),
   label: z.enum(Object.values(ADDRESS_LABEL) as [string, ...string[]]).optional(),
   fullName: z.string().trim().min(1).max(160),
-  phone: z.string().trim().min(5).max(40),
+  phone: z
+    .string()
+    .trim()
+    .min(1)
+    .max(40)
+    .refine(isValidRecipientPhone, 'Enter a valid mobile number'),
   line1: z.string().trim().min(1).max(200),
   line2: z.string().trim().max(200).nullable().optional(),
   city: z.string().trim().min(1).max(100),
