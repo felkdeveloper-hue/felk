@@ -88,7 +88,7 @@ function OptionRow({
 function InlineFilters({
   state,
   onChange,
-  onClear,
+  onClear: _onClear,
   priceBounds,
 }: Omit<CatalogFilterSidebarProps, 'variant' | 'layout' | 'hideHeading'>) {
   const facets = useCatalogFilterFacets();

@@ -61,11 +61,24 @@ export function DataTable<T>({
                     'rounded-2xl border border-[var(--admin-line)] bg-[var(--admin-panel)] p-4 shadow-[var(--admin-shadow)] transition active:scale-[0.995]',
                     onRowClick && 'cursor-pointer',
                   )}
+                  role={onRowClick ? 'button' : undefined}
+                  tabIndex={onRowClick ? 0 : undefined}
                   onClick={
                     onRowClick
                       ? (event) => {
                           const target = event.target as HTMLElement;
                           if (target.closest('a, button, input, label, textarea, select')) return;
+                          onRowClick(row);
+                        }
+                      : undefined
+                  }
+                  onKeyDown={
+                    onRowClick
+                      ? (event) => {
+                          if (event.key !== 'Enter' && event.key !== ' ') return;
+                          const target = event.target as HTMLElement;
+                          if (target.closest('a, button, input, label, textarea, select')) return;
+                          event.preventDefault();
                           onRowClick(row);
                         }
                       : undefined

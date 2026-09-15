@@ -9,7 +9,8 @@ export function catalogStatusMatch(
 ): { status: string | { $in: string[] } | { $nin: string[] } } | undefined {
   if (status) {
     const statuses = (Array.isArray(status) ? status : [status]).filter(Boolean);
-    if (statuses.length === 1) return { status: statuses[0] };
+    const first = statuses[0];
+    if (statuses.length === 1 && first) return { status: first };
     if (statuses.length > 1) return { status: { $in: statuses } };
   }
   if (excludeStatuses?.length) {

@@ -9,10 +9,7 @@ import {
 } from '@/models/product.models.js';
 import { buildPaginationMeta, getPaginationSkip, parsePagination } from '@/utils/pagination.js';
 import { catalogStatusMatch } from '@/utils/catalog-status-filter.js';
-import {
-  PLACE_UNSET_SENTINEL,
-  resolveProductPlaceSort,
-} from '@/utils/product-place-sort.js';
+import { PLACE_UNSET_SENTINEL, resolveProductPlaceSort } from '@/utils/product-place-sort.js';
 import { parseSort } from '@/utils/sorting.js';
 
 export interface ProductListFilters extends ListOptions {
@@ -137,7 +134,9 @@ export class ProductRepository extends BaseRepository {
         const existing = filter._id;
         if (existing && typeof existing === 'object' && '$in' in existing) {
           const excludeSet = new Set(excludeIds.map(String));
-          const kept = (existing.$in as Types.ObjectId[]).filter((id) => !excludeSet.has(String(id)));
+          const kept = (existing.$in as Types.ObjectId[]).filter(
+            (id) => !excludeSet.has(String(id)),
+          );
           if (!kept.length) {
             return { data: [], meta: buildPaginationMeta(0, page, limit) };
           }
@@ -389,24 +388,27 @@ export class ProductRepository extends BaseRepository {
         .limit(limit)
         .lean();
 
-    const [data, total] = await Promise.all([
-      placeField
-        ? ProductModel.aggregate<ProductDocument>([
-            { $match: match },
-            {
-              $addFields: {
-                _placeSort: { $ifNull: [`$${placeField}`, PLACE_UNSET_SENTINEL] },
-              },
+    const runPlacedList = async () => {
+      try {
+        return await ProductModel.aggregate<ProductDocument>([
+          { $match: match },
+          {
+            $addFields: {
+              _placeSort: { $ifNull: [`$${placeField}`, PLACE_UNSET_SENTINEL] },
             },
-            { $sort: { _placeSort: 1, createdAt: -1, _id: -1 } },
-            { $skip: skip },
-            { $limit: limit },
-            { $unset: '_placeSort' },
-          ])
-            .option({ allowDiskUse: true })
-            .then((rows) => rows)
-            .catch(() => runFind())
-        : runFind(),
+          },
+          { $sort: { _placeSort: 1, createdAt: -1, _id: -1 } },
+          { $skip: skip },
+          { $limit: limit },
+          { $unset: '_placeSort' },
+        ]).allowDiskUse(true);
+      } catch {
+        return runFind();
+      }
+    };
+
+    const [data, total] = await Promise.all([
+      placeField ? runPlacedList() : runFind(),
       ProductModel.countDocuments(match),
     ]);
 

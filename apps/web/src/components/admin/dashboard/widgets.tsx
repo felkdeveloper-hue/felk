@@ -29,11 +29,7 @@ import {
   useWishlistAnalytics,
   useDashboardStatsQuery,
 } from '@/hooks/admin';
-import {
-  AnalyticsEmpty,
-  KpiCardWithDelta,
-  formatDuration,
-} from '@/components/admin/analytics';
+import { AnalyticsEmpty, formatDuration } from '@/components/admin/analytics';
 import { AdminStatCard } from '@/components/admin';
 import { formatCurrency } from '@/lib/utils';
 import type { AnalyticsFilter, DashboardWidgetPlacement } from '@/services/sdk/admin';

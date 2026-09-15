@@ -10,7 +10,7 @@ export interface ListOptions {
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
   q?: string;
-  status?: string | string[];
+  status?: string;
   includeDeleted?: boolean;
   filters?: Record<string, unknown>;
 }

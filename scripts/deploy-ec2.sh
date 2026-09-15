@@ -24,6 +24,7 @@ pm2 flush 2>/dev/null || true
 rm -f "${HOME}/.pm2/logs/"*.log 2>/dev/null || true
 rm -f /tmp/felk-import-* /tmp/core* 2>/dev/null || true
 rm -rf "${APP_DIR}/.turbo" "${APP_DIR}/node_modules/.cache" "${APP_DIR}/apps/api/node_modules/.cache" 2>/dev/null || true
+rm -rf "${APP_DIR}/apps/web/dist" "${APP_DIR}/apps/web/.turbo" 2>/dev/null || true
 if command -v pnpm >/dev/null 2>&1; then
   pnpm store prune >/dev/null 2>&1 || true
 fi
@@ -37,13 +38,13 @@ git fetch origin "${BRANCH}"
 git checkout "${BRANCH}"
 git reset --hard "origin/${BRANCH}"
 
-echo "==> Installing dependencies"
+echo "==> Installing dependencies (API workspace only)"
 if command -v pnpm >/dev/null 2>&1; then
-  pnpm install --frozen-lockfile
+  pnpm install --frozen-lockfile --filter @fe-platform/api...
 else
   corepack enable
   corepack prepare pnpm@9.15.0 --activate
-  pnpm install --frozen-lockfile
+  pnpm install --frozen-lockfile --filter @fe-platform/api...
 fi
 
 # Small EC2 instances OOM-kill `tsc` (exit 137). Ensure swap + free RAM first.

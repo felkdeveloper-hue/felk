@@ -35,6 +35,8 @@ export const reactConfig = [
       'react/prop-types': 'off',
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
       'jsx-a11y/anchor-is-valid': 'off',
+      // OTP and create-name fields focus on purpose after a user action.
+      'jsx-a11y/no-autofocus': 'off',
     },
   },
 ];

@@ -61,6 +61,17 @@ export function ProductGallery({ media, productName, badgeLabel, className }: Pr
     else goPrev();
   };
 
+  const toggleMobileZoom = () => {
+    if (shortPhoto) return;
+    if (
+      typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(hover: none)').matches
+    ) {
+      setMobileZoom((v) => !v);
+    }
+  };
+
   return (
     <div className={cn('lg:sticky lg:top-24 lg:self-start', className)}>
       <div className="flex gap-3 lg:gap-4">
@@ -114,15 +125,11 @@ export function ProductGallery({ media, productName, badgeLabel, className }: Pr
             onMouseLeave={() => setZoomed(false)}
             onTouchStart={onTouchStart}
             onTouchEnd={onTouchEnd}
-            onClick={() => {
-              if (shortPhoto) return;
-              // Tap-to-zoom on touch devices only (desktop keeps hover zoom)
-              if (
-                typeof window !== 'undefined' &&
-                typeof window.matchMedia === 'function' &&
-                window.matchMedia('(hover: none)').matches
-              ) {
-                setMobileZoom((v) => !v);
+            onClick={toggleMobileZoom}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                toggleMobileZoom();
               }
             }}
           >
