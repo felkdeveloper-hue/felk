@@ -38,6 +38,19 @@ export const PRODUCT_VISIBILITY = {
   CATALOG_ONLY: 'catalog_only',
 } as const;
 
+/** Same exclusions the live Women/shop list uses — warmup must match or it can cache an empty page. */
+export const STOREFRONT_CATALOG_LIST_OPTIONS = {
+  includeDeleted: false,
+  excludeStatuses: [
+    PRODUCT_STATUS.DRAFT,
+    PRODUCT_STATUS.ARCHIVED,
+    PRODUCT_STATUS.DISCONTINUED,
+    PRODUCT_STATUS.HIDDEN,
+    PRODUCT_STATUS.SCHEDULED,
+  ],
+  excludeVisibility: [PRODUCT_VISIBILITY.HIDDEN],
+} as const;
+
 export const VARIANT_STATUS = {
   ACTIVE: 'active',
   INACTIVE: 'inactive',

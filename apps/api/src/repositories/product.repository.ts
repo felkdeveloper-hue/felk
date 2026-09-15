@@ -8,6 +8,7 @@ import {
   type ProductDocument,
 } from '@/models/product.models.js';
 import { buildPaginationMeta, getPaginationSkip, parsePagination } from '@/utils/pagination.js';
+import { catalogStatusMatch } from '@/utils/catalog-status-filter.js';
 import {
   PLACE_UNSET_SENTINEL,
   resolveProductPlaceSort,
@@ -146,11 +147,7 @@ export class ProductRepository extends BaseRepository {
         }
       }
     }
-    if (options.status) {
-      filter.status = options.status;
-    } else if (options.excludeStatuses?.length) {
-      filter.status = { $nin: options.excludeStatuses };
-    }
+    Object.assign(filter, catalogStatusMatch(options.status, options.excludeStatuses));
     if (options.visibility) {
       filter.visibility = options.visibility;
     } else if (options.excludeVisibility?.length) {
@@ -384,6 +381,14 @@ export class ProductRepository extends BaseRepository {
     const placeField = resolveProductPlaceSort(options);
     const match = filter as FilterQuery<ProductDocument>;
 
+    const runFind = () =>
+      ProductModel.find(match)
+        .select(LIST_SELECT_FIELDS.join(' '))
+        .sort(parseSort(options, this.sortableFields))
+        .skip(skip)
+        .limit(limit)
+        .lean();
+
     const [data, total] = await Promise.all([
       placeField
         ? ProductModel.aggregate<ProductDocument>([
@@ -393,17 +398,15 @@ export class ProductRepository extends BaseRepository {
                 _placeSort: { $ifNull: [`$${placeField}`, PLACE_UNSET_SENTINEL] },
               },
             },
-            { $sort: { _placeSort: 1, createdAt: -1 } },
+            { $sort: { _placeSort: 1, createdAt: -1, _id: -1 } },
             { $skip: skip },
             { $limit: limit },
             { $unset: '_placeSort' },
           ])
-        : ProductModel.find(match)
-            .select(LIST_SELECT_FIELDS.join(' '))
-            .sort(parseSort(options, this.sortableFields))
-            .skip(skip)
-            .limit(limit)
-            .lean(),
+            .option({ allowDiskUse: true })
+            .then((rows) => rows)
+            .catch(() => runFind())
+        : runFind(),
       ProductModel.countDocuments(match),
     ]);
 

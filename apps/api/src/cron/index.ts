@@ -2,7 +2,7 @@ import { logger } from '@/config/logger.js';
 import { EmailLogModel } from '@/models/email-log.model.js';
 import { AnalyticsEventLogModel } from '@/models/analytics.model.js';
 import { sweepPending, type RetrySweepDoc } from '@/services/retry-sweep.service.js';
-import { PRODUCT_STATUS, PRODUCT_VISIBILITY } from '@/constants/product.js';
+import { STOREFRONT_CATALOG_LIST_OPTIONS } from '@/constants/product.js';
 import { productService } from '@/services/product.service.js';
 import { reservationService } from '@/services/reservation.service.js';
 import { checkoutService } from '@/services/checkout.service.js';
@@ -70,15 +70,16 @@ async function runStorefrontWarmup() {
     await Promise.all(
       warmQueries.map(async (query) => {
         const cacheKey = storefrontProductsCacheKey(query as unknown as Record<string, unknown>);
-        if (getCached(cacheKey)) return;
+        const existing = getCached<{ data?: unknown[] }>(cacheKey);
+        if (Array.isArray(existing?.data) && existing.data.length > 0) return;
         const result = await productService.list({
           ...query,
-          includeDeleted: false,
+          ...STOREFRONT_CATALOG_LIST_OPTIONS,
           excludeFeBasicsExclusive: true,
-          status: [PRODUCT_STATUS.ACTIVE, PRODUCT_STATUS.OUT_OF_STOCK],
-          excludeVisibility: [PRODUCT_VISIBILITY.HIDDEN],
         } as never);
-        setCache(cacheKey, { data: result.data, meta: result.meta }, 300_000);
+        if (Array.isArray(result.data) && result.data.length > 0) {
+          setCache(cacheKey, { data: result.data, meta: result.meta }, 300_000);
+        }
       }),
     );
   } catch (err) {

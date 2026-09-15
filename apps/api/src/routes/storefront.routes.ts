@@ -24,7 +24,7 @@ import {
 import { productService } from '@/services/product.service.js';
 import { CmsCrudService } from '@/services/cms-crud.service.js';
 import { settingsService } from '@/services/settings.service.js';
-import { PRODUCT_STATUS, PRODUCT_VISIBILITY } from '@/constants/product.js';
+import { PRODUCT_STATUS, PRODUCT_VISIBILITY, STOREFRONT_CATALOG_LIST_OPTIONS } from '@/constants/product.js';
 import { FE_BASICS_SLUG } from '@/constants/fe-basics.js';
 import { asyncHandler } from '@/utils/async-handler.js';
 import { ApiResponse } from '@/utils/response/api-response.js';
@@ -228,7 +228,7 @@ storefrontRouter.get(
     const started = performance.now();
     // Always cache briefly — Render cold starts hurt without it, and list payloads are public.
     const cached = getCached<{ data: unknown; meta: unknown }>(cacheKey);
-    if (cached) {
+    if (cached && Array.isArray(cached.data) && cached.data.length > 0) {
       setPublicCache(res, 300);
       appendServerTiming(res, 'total', performance.now() - started, 'cache-hit');
       return ApiResponse.success(
@@ -246,23 +246,22 @@ storefrontRouter.get(
       queryRecord.isFeBasics === true || queryRecord.isFeBasics === 'true';
     const result = await productService.list({
       ...query,
-      includeDeleted: false,
+      ...STOREFRONT_CATALOG_LIST_OPTIONS,
       isFeBasics: isFeBasicsListing ? true : undefined,
       excludeFeBasicsExclusive: !isFeBasicsListing,
-      // Keep sold-out products visible on the catalog (Sold out badge).
-      excludeStatuses: [
-        PRODUCT_STATUS.DRAFT,
-        PRODUCT_STATUS.ARCHIVED,
-        PRODUCT_STATUS.DISCONTINUED,
-        PRODUCT_STATUS.HIDDEN,
-        PRODUCT_STATUS.SCHEDULED,
-      ],
-      excludeVisibility: [PRODUCT_VISIBILITY.HIDDEN],
     } as never);
     appendServerTiming(res, 'svc', performance.now() - dbStarted);
 
-    setCache(cacheKey, { data: result.data, meta: result.meta }, PRODUCT_LIST_CACHE_MS);
-    setPublicCache(res, 300);
+    const listPayload = { data: result.data, meta: result.meta };
+    const hasProducts = Array.isArray(result.data) && result.data.length > 0;
+    // Never cache an empty catalog page — warmup/blips were serving "no products"
+    // to the Women shop for minutes at a time.
+    if (hasProducts) {
+      setCache(cacheKey, listPayload, PRODUCT_LIST_CACHE_MS);
+      setPublicCache(res, 300);
+    } else {
+      res.set('Cache-Control', 'no-store');
+    }
     appendServerTiming(res, 'total', performance.now() - started);
     ApiResponse.success(
       res,
@@ -286,15 +285,16 @@ storefrontRouter.get(
     await Promise.all(
       warmQueries.map(async (query) => {
         const cacheKey = storefrontProductsCacheKey(query as unknown as Record<string, unknown>);
-        if (getCached(cacheKey)) return;
+        const existing = getCached<{ data?: unknown[] }>(cacheKey);
+        if (Array.isArray(existing?.data) && existing.data.length > 0) return;
         const result = await productService.list({
           ...query,
-          includeDeleted: false,
+          ...STOREFRONT_CATALOG_LIST_OPTIONS,
           excludeFeBasicsExclusive: true,
-          status: [PRODUCT_STATUS.ACTIVE, PRODUCT_STATUS.OUT_OF_STOCK],
-          excludeVisibility: [PRODUCT_VISIBILITY.HIDDEN],
         } as never);
-        setCache(cacheKey, { data: result.data, meta: result.meta }, 300_000);
+        if (Array.isArray(result.data) && result.data.length > 0) {
+          setCache(cacheKey, { data: result.data, meta: result.meta }, 300_000);
+        }
       }),
     );
 

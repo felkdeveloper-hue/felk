@@ -11,6 +11,12 @@ import {
 
 const PRODUCT_LIST_STALE_MS = 1000 * 60 * 10;
 
+function catalogPagesHaveProducts(data: unknown): boolean {
+  if (!data || typeof data !== 'object') return false;
+  const pages = (data as { pages?: Array<{ data?: unknown[] }> }).pages;
+  return Array.isArray(pages) && pages.some((page) => Array.isArray(page.data) && page.data.length > 0);
+}
+
 function infiniteListKey(state: CatalogSearchState) {
   const baseParams = catalogSearchToProductParams({
     ...state,
@@ -34,7 +40,7 @@ export function prefetchInfiniteProducts(
   state: CatalogSearchState,
 ): Promise<void> {
   const { baseParams, queryKey } = infiniteListKey(state);
-  if (queryClient.getQueryData(queryKey)) return Promise.resolve();
+  if (catalogPagesHaveProducts(queryClient.getQueryData(queryKey))) return Promise.resolve();
 
   return queryClient
     .prefetchInfiniteQuery({
@@ -65,4 +71,4 @@ export function prefetchDefaultCatalogLists(queryClient: QueryClient): void {
   void prefetchInfiniteProducts(queryClient, { gender: 'women' });
 }
 
-export { PRODUCT_LIST_STALE_MS };
+export { PRODUCT_LIST_STALE_MS, catalogPagesHaveProducts };

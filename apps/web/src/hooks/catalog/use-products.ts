@@ -1,6 +1,6 @@
 import { useQuery, useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { QUERY_KEYS } from '@/constants/query-keys';
-import { PRODUCT_LIST_STALE_MS } from '@/lib/prefetch-catalog';
+import { catalogPagesHaveProducts, PRODUCT_LIST_STALE_MS } from '@/lib/prefetch-catalog';
 import { productsApi, type Product } from '@/services/sdk';
 import {
   applyClientCatalogFilters,
@@ -101,6 +101,7 @@ export function useInfiniteProducts(state: CatalogSearchState, options?: { enabl
     // Extra retries for cold starts / brief API blips — UI keeps skeleton until done.
     retry: 2,
     retryDelay: (attempt) => Math.min(800 * 2 ** attempt, 4_000),
+    refetchOnMount: (query) => !catalogPagesHaveProducts(query.state.data),
   });
 }
 
