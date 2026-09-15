@@ -74,6 +74,7 @@ async function runStorefrontWarmup() {
         const result = await productService.list({
           ...query,
           includeDeleted: false,
+          excludeFeBasicsExclusive: true,
           status: [PRODUCT_STATUS.ACTIVE, PRODUCT_STATUS.OUT_OF_STOCK],
           excludeVisibility: [PRODUCT_VISIBILITY.HIDDEN],
         } as never);

@@ -224,6 +224,8 @@ export function normalizeProduct(raw: unknown): Product {
     isMoreToLove: Boolean(record.isMoreToLove),
     isNewArrival: Boolean(record.isNewArrival),
     isBestSeller: Boolean(record.isBestSeller),
+    isFeBasics: Boolean(record.isFeBasics),
+    feBasicsExclusive: Boolean(record.feBasicsExclusive),
     isClearance: Boolean(record.isClearance),
     paymentOption:
       record.paymentOption === 'cod' ||

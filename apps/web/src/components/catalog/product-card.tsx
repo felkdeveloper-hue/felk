@@ -383,8 +383,6 @@ function ProductCardComponent({
             </span>
           </Link>
 
-          {showFlashSale ? <ProductFlashSaleMobile formattedTime={formattedTime} /> : null}
-
           {/* Desktop status badges */}
           <div className="absolute left-3 top-3 z-[2] hidden w-auto flex-col items-start gap-1.5 sm:flex">
             {showFlashSale ? <ProductFlashSaleBadge formattedTime={formattedTime} /> : null}
@@ -399,29 +397,27 @@ function ProductCardComponent({
             ) : isLowStock ? (
               <span className={SALE_BADGE_CLASS}>Low in Stock</span>
             ) : null}
-          </div>
-
-          {/* Mobile status badges (non-flash) */}
-          <div className="absolute left-2 top-2 z-[2] flex w-auto flex-col items-start gap-1 sm:hidden">
-            {discountPct ? (
-              <span className={cn(SALE_BADGE_CLASS, showFlashSale && 'mt-[2.125rem]')}>
-                Save {discountPct}%
+            {product.isFeBasics ? (
+              <span className="inline-flex w-fit items-center rounded-none bg-[#1a1714] px-2 py-[3px] text-[10px] font-bold uppercase leading-none tracking-[0.08em] text-[#e8c57a]">
+                FE Basics
               </span>
             ) : null}
+          </div>
+
+          {/* Mobile status badges — one column so flash sale + FE Basics never overlap */}
+          <div className="absolute left-2 top-2 z-[2] flex w-auto flex-col items-start gap-1 sm:hidden">
+            {showFlashSale ? <ProductFlashSaleMobile formattedTime={formattedTime} /> : null}
+            {discountPct ? <span className={SALE_BADGE_CLASS}>Save {discountPct}%</span> : null}
             {isSoldOut ? (
-              <span
-                className={cn(
-                  'inline-flex w-fit items-center rounded-[4px] border border-neutral-200/80 bg-white/95 px-1.5 py-[3px] text-[9px] font-semibold uppercase leading-none tracking-wide text-neutral-700 backdrop-blur-sm',
-                  showFlashSale && !discountPct && 'mt-[2.125rem]',
-                )}
-              >
+              <span className="inline-flex w-fit items-center rounded-[4px] border border-neutral-200/80 bg-white/95 px-1.5 py-[3px] text-[9px] font-semibold uppercase leading-none tracking-wide text-neutral-700 backdrop-blur-sm">
                 Sold out
               </span>
             ) : isLowStock ? (
-              <span
-                className={cn(SALE_BADGE_CLASS, showFlashSale && !discountPct && 'mt-[2.125rem]')}
-              >
-                Low in Stock
+              <span className={SALE_BADGE_CLASS}>Low in Stock</span>
+            ) : null}
+            {product.isFeBasics ? (
+              <span className="inline-flex w-fit items-center rounded-[4px] bg-[#1a1714]/95 px-1.5 py-[3px] text-[9px] font-bold uppercase leading-none tracking-[0.08em] text-[#e8c57a] backdrop-blur-sm">
+                FE Basics
               </span>
             ) : null}
           </div>

@@ -1,6 +1,7 @@
 export * from './applied-filter-chips';
 export * from './bnpl-installment-hint';
 export * from './catalog-category-hero';
+export * from './fe-basics-hero';
 export * from './back-to-top';
 export * from './catalog-filter-sidebar';
 export * from './catalog-highlight-rails';

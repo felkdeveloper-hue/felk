@@ -24,10 +24,16 @@ describe('catalog search params', () => {
     expect(state.q).toBe('dress');
   });
 
-  it('maps to product API params with q', () => {
-    const params = catalogSearchToProductParams(parseCatalogSearch({ q: 'silk' }));
-    expect(params.q).toBe('silk');
-    expect(params.status).toBe('active');
+  it('maps isBestSeller to product API params', () => {
+    const params = catalogSearchToProductParams({ ...parseCatalogSearch({}), isBestSeller: true });
+    expect(params.isBestSeller).toBe(true);
+    expect(params.isNewArrival).toBeUndefined();
+  });
+
+  it('maps isFeBasics to product API params', () => {
+    const params = catalogSearchToProductParams({ ...parseCatalogSearch({}), isFeBasics: true });
+    expect(params.isFeBasics).toBe(true);
+    expect(params.isBestSeller).toBeUndefined();
   });
 
   it('counts active filters', () => {

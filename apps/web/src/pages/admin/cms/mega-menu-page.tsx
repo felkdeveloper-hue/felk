@@ -17,7 +17,7 @@ import {
   type MegaMenuLink,
   type MegaMenuTile,
 } from '@/constants/mega-menu-defaults';
-import { isLegacyHomeCategoryList } from '@/constants/home-category-nav';
+import { isLegacyHomeCategoryList, ensureFeBasicsHomeTiles } from '@/constants/home-category-nav';
 import { AppError } from '@/lib/errors';
 import { cn } from '@/lib/utils';
 import { QUERY_KEYS } from '@/constants/query-keys';
@@ -124,11 +124,13 @@ function normalizeConfig(
     columns: columns.length ? columns : fallback.columns,
     specials: mapTiles(raw.specials, fallback.specials),
     featured: mapTiles(raw.featured, fallback.featured),
-    homeCategories: mapTiles(
-      isLegacyHomeCategoryList(Array.isArray(raw.homeCategories) ? raw.homeCategories : [])
-        ? []
-        : raw.homeCategories,
-      homeFallback,
+    homeCategories: ensureFeBasicsHomeTiles(
+      mapTiles(
+        isLegacyHomeCategoryList(Array.isArray(raw.homeCategories) ? raw.homeCategories : [])
+          ? []
+          : raw.homeCategories,
+        homeFallback,
+      ),
     ),
   };
 }

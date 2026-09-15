@@ -48,6 +48,13 @@ function publicMediaUrl(url?: string | null): string | undefined {
   return toPublicMediaUrl(url);
 }
 
+function optionalPlace(value: unknown): number | null {
+  if (value === undefined || value === null || value === '') return null;
+  const n = typeof value === 'number' ? value : Number(value);
+  if (!Number.isInteger(n) || n < 1 || n > 9999) return null;
+  return n;
+}
+
 function toPlain(doc: { toObject?: () => Record<string, unknown> } | Record<string, unknown>) {
   if (doc && typeof (doc as { toObject?: () => Record<string, unknown> }).toObject === 'function') {
     return (doc as { toObject: () => Record<string, unknown> }).toObject();
@@ -637,6 +644,7 @@ export class ProductService {
               ),
               isNewArrival: product.isNewArrival,
               isBestSeller: product.isBestSeller,
+              isFeBasics: Boolean((product as { isFeBasics?: boolean }).isFeBasics),
               isClearance: product.isClearance,
               averageRating: product.averageRating ?? 0,
               reviewCount: product.reviewCount ?? 0,
@@ -967,6 +975,12 @@ export class ProductService {
       isNewArrival: Boolean(payload.isNewArrival),
       isBestSeller: Boolean(payload.isBestSeller),
       isClearance: Boolean(payload.isClearance),
+      isFeBasics: Boolean(payload.isFeBasics),
+      feBasicsExclusive: Boolean(payload.isFeBasics) && Boolean(payload.feBasicsExclusive),
+      catalogPlace: optionalPlace(payload.catalogPlace),
+      bestSellerPlace: payload.isBestSeller ? optionalPlace(payload.bestSellerPlace) : null,
+      newArrivalPlace: payload.isNewArrival ? optionalPlace(payload.newArrivalPlace) : null,
+      feBasicsPlace: payload.isFeBasics ? optionalPlace(payload.feBasicsPlace) : null,
       status: payload.status ?? PRODUCT_STATUS.DRAFT,
       visibility: payload.visibility ?? 'public',
       publishAt: payload.publishAt ?? null,
@@ -1038,6 +1052,56 @@ export class ProductService {
 
     if (payload.description !== undefined) {
       payload.description = sanitizeRichText(payload.description as string) ?? null;
+    }
+
+    if (payload.catalogPlace !== undefined) {
+      payload.catalogPlace = optionalPlace(payload.catalogPlace);
+    }
+    if (payload.bestSellerPlace !== undefined || payload.isBestSeller !== undefined) {
+      const isBestSeller =
+        payload.isBestSeller !== undefined ? Boolean(payload.isBestSeller) : before.isBestSeller;
+      payload.bestSellerPlace = isBestSeller
+        ? optionalPlace(
+            payload.bestSellerPlace !== undefined
+              ? payload.bestSellerPlace
+              : before.bestSellerPlace,
+          )
+        : null;
+    }
+    if (payload.newArrivalPlace !== undefined || payload.isNewArrival !== undefined) {
+      const isNewArrival =
+        payload.isNewArrival !== undefined ? Boolean(payload.isNewArrival) : before.isNewArrival;
+      payload.newArrivalPlace = isNewArrival
+        ? optionalPlace(
+            payload.newArrivalPlace !== undefined
+              ? payload.newArrivalPlace
+              : before.newArrivalPlace,
+          )
+        : null;
+    }
+    if (payload.feBasicsPlace !== undefined || payload.isFeBasics !== undefined) {
+      const isFeBasics =
+        payload.isFeBasics !== undefined
+          ? Boolean(payload.isFeBasics)
+          : Boolean((before as { isFeBasics?: boolean }).isFeBasics);
+      payload.feBasicsPlace = isFeBasics
+        ? optionalPlace(
+            payload.feBasicsPlace !== undefined
+              ? payload.feBasicsPlace
+              : (before as { feBasicsPlace?: number | null }).feBasicsPlace,
+          )
+        : null;
+    }
+    if (payload.feBasicsExclusive !== undefined || payload.isFeBasics !== undefined) {
+      const isFeBasics =
+        payload.isFeBasics !== undefined
+          ? Boolean(payload.isFeBasics)
+          : Boolean((before as { isFeBasics?: boolean }).isFeBasics);
+      payload.feBasicsExclusive =
+        isFeBasics &&
+        (payload.feBasicsExclusive !== undefined
+          ? Boolean(payload.feBasicsExclusive)
+          : Boolean((before as { feBasicsExclusive?: boolean }).feBasicsExclusive));
     }
 
     const priceChanged =
@@ -1218,6 +1282,8 @@ export class ProductService {
         isTrending: false,
         isNewArrival: false,
         isBestSeller: false,
+        isFeBasics: false,
+        feBasicsExclusive: false,
         isClearance: Boolean(base.isClearance),
       },
       actor,

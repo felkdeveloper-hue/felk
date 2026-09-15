@@ -25,9 +25,11 @@ import { productService } from '@/services/product.service.js';
 import { CmsCrudService } from '@/services/cms-crud.service.js';
 import { settingsService } from '@/services/settings.service.js';
 import { PRODUCT_STATUS, PRODUCT_VISIBILITY } from '@/constants/product.js';
+import { FE_BASICS_SLUG } from '@/constants/fe-basics.js';
 import { asyncHandler } from '@/utils/async-handler.js';
 import { ApiResponse } from '@/utils/response/api-response.js';
 import { ApiError } from '@/utils/errors/api-error.js';
+import { ensureFeBasicsCategory } from '@/utils/ensure-fe-basics-category.js';
 import {
   stripInternalProductFields,
   stripInternalProductFieldsList,
@@ -131,6 +133,7 @@ storefrontRouter.get(
     const pageBase = { includeDeleted: false, status: 'published' as const, limit: 100 };
 
     const dbStarted = performance.now();
+    await ensureFeBasicsCategory();
     const [
       settings,
       categories,
@@ -238,9 +241,14 @@ storefrontRouter.get(
     }
 
     const dbStarted = performance.now();
+    const queryRecord = query as Record<string, unknown>;
+    const isFeBasicsListing =
+      queryRecord.isFeBasics === true || queryRecord.isFeBasics === 'true';
     const result = await productService.list({
       ...query,
       includeDeleted: false,
+      isFeBasics: isFeBasicsListing ? true : undefined,
+      excludeFeBasicsExclusive: !isFeBasicsListing,
       // Keep sold-out products visible on the catalog (Sold out badge).
       excludeStatuses: [
         PRODUCT_STATUS.DRAFT,
@@ -282,6 +290,7 @@ storefrontRouter.get(
         const result = await productService.list({
           ...query,
           includeDeleted: false,
+          excludeFeBasicsExclusive: true,
           status: [PRODUCT_STATUS.ACTIVE, PRODUCT_STATUS.OUT_OF_STOCK],
           excludeVisibility: [PRODUCT_VISIBILITY.HIDDEN],
         } as never);
@@ -452,6 +461,9 @@ storefrontRouter.get(
     if (cached) {
       setPublicCache(res);
       return ApiResponse.success(res, cached);
+    }
+    if (slug === FE_BASICS_SLUG) {
+      await ensureFeBasicsCategory();
     }
     const category = await CategoryModel.findOne({
       slug,

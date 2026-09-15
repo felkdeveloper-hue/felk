@@ -32,12 +32,14 @@ import { adminRouteTree } from './admin.routes';
 import { notFoundRoute } from './not-found.routes';
 import {
   aboutRoute,
+  bestSellersRoute,
   cartRoute,
   categoriesRoute,
   categoryDetailRoute,
   contactRoute,
   indexRoute,
   legacyVerifyEmailRoute,
+  newArrivalsRoute,
   privacyRoute,
   productDetailRoute,
   productsRoute,
@@ -51,6 +53,8 @@ import { rootRoute } from './root-route';
 const publicRouteTree = publicLayoutRoute.addChildren([
   indexRoute,
   productsRoute,
+  bestSellersRoute,
+  newArrivalsRoute,
   productDetailRoute,
   categoriesRoute,
   categoryDetailRoute,

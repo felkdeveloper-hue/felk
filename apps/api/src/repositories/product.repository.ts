@@ -8,6 +8,10 @@ import {
   type ProductDocument,
 } from '@/models/product.models.js';
 import { buildPaginationMeta, getPaginationSkip, parsePagination } from '@/utils/pagination.js';
+import {
+  PLACE_UNSET_SENTINEL,
+  resolveProductPlaceSort,
+} from '@/utils/product-place-sort.js';
 import { parseSort } from '@/utils/sorting.js';
 
 export interface ProductListFilters extends ListOptions {
@@ -32,6 +36,8 @@ export interface ProductListFilters extends ListOptions {
   isMoreToLove?: boolean;
   isNewArrival?: boolean;
   isBestSeller?: boolean;
+  isFeBasics?: boolean;
+  excludeFeBasicsExclusive?: boolean;
   isClearance?: boolean;
   visibility?: string;
   excludeStatuses?: string[];
@@ -59,6 +65,10 @@ export class ProductRepository extends BaseRepository {
         'variantCount',
         'averageRating',
         'reviewCount',
+        'catalogPlace',
+        'bestSellerPlace',
+        'newArrivalPlace',
+        'feBasicsPlace',
       ],
     );
   }
@@ -187,6 +197,13 @@ export class ProductRepository extends BaseRepository {
     if (options.isMoreToLove !== undefined) filter.isMoreToLove = Boolean(options.isMoreToLove);
     if (options.isNewArrival !== undefined) filter.isNewArrival = Boolean(options.isNewArrival);
     if (options.isBestSeller !== undefined) filter.isBestSeller = Boolean(options.isBestSeller);
+    if (options.isFeBasics) {
+      // Only products explicitly enabled in admin ("Show on FE Basics").
+      filter.isFeBasics = true;
+    }
+    if (options.excludeFeBasicsExclusive && !options.isFeBasics) {
+      filter.feBasicsExclusive = { $ne: true };
+    }
     if (options.isClearance !== undefined) filter.isClearance = Boolean(options.isClearance);
 
     if (options.minPrice != null || options.maxPrice != null) {
@@ -363,46 +380,31 @@ export class ProductRepository extends BaseRepository {
       }
     }
 
-    const sort = parseSort(options, this.sortableFields);
     const skip = getPaginationSkip(page, limit);
+    const placeField = resolveProductPlaceSort(options);
+    const match = filter as FilterQuery<ProductDocument>;
 
     const [data, total] = await Promise.all([
-      ProductModel.find(filter as FilterQuery<ProductDocument>)
-        .select(
-          [
-            'name',
-            'slug',
-            'shortDescription',
-            'status',
-            'visibility',
-            'pricing',
-            'brandId',
-            'categoryId',
-            'categoryIds',
-            'gender',
-            'isFeatured',
-            'isTrending',
-            'isMoreToLove',
-            'isNewArrival',
-            'isBestSeller',
-            'isClearance',
-            'averageRating',
-            'reviewCount',
-            'defaultVariantId',
-            'variantCount',
-            'sku',
-            'stockControlNumber',
-            'materialId',
-            'occasionIds',
-            'createdAt',
-            'updatedAt',
-          ].join(' '),
-        )
-        .sort(sort)
-        .skip(skip)
-        .limit(limit)
-        .lean(),
-      ProductModel.countDocuments(filter as FilterQuery<ProductDocument>),
+      placeField
+        ? ProductModel.aggregate<ProductDocument>([
+            { $match: match },
+            {
+              $addFields: {
+                _placeSort: { $ifNull: [`$${placeField}`, PLACE_UNSET_SENTINEL] },
+              },
+            },
+            { $sort: { _placeSort: 1, createdAt: -1 } },
+            { $skip: skip },
+            { $limit: limit },
+            { $unset: '_placeSort' },
+          ])
+        : ProductModel.find(match)
+            .select(LIST_SELECT_FIELDS.join(' '))
+            .sort(parseSort(options, this.sortableFields))
+            .skip(skip)
+            .limit(limit)
+            .lean(),
+      ProductModel.countDocuments(match),
     ]);
 
     return {
@@ -411,6 +413,40 @@ export class ProductRepository extends BaseRepository {
     };
   }
 }
+
+const LIST_SELECT_FIELDS = [
+  'name',
+  'slug',
+  'shortDescription',
+  'status',
+  'visibility',
+  'pricing',
+  'brandId',
+  'categoryId',
+  'categoryIds',
+  'gender',
+  'isFeatured',
+  'isTrending',
+  'isMoreToLove',
+  'isNewArrival',
+  'isBestSeller',
+  'isFeBasics',
+  'isClearance',
+  'catalogPlace',
+  'bestSellerPlace',
+  'newArrivalPlace',
+  'feBasicsPlace',
+  'averageRating',
+  'reviewCount',
+  'defaultVariantId',
+  'variantCount',
+  'sku',
+  'stockControlNumber',
+  'materialId',
+  'occasionIds',
+  'createdAt',
+  'updatedAt',
+] as const;
 
 function escapeRegex(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

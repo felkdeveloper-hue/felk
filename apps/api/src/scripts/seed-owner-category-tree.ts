@@ -95,6 +95,7 @@ const OWNER_TREE: CatNode[] = [
 
 /** Mega-menu Specials / Shop the edit still need these campaign links. */
 const CAMPAIGN_CATEGORIES: Array<{ name: string; slug: string; sortOrder: number }> = [
+  { name: 'FE Basics', slug: 'fe-basics', sortOrder: 1 },
   { name: 'New Arrivals', slug: 'new-arrivals', sortOrder: 900 },
   { name: 'Oversized', slug: 'oversized', sortOrder: 901 },
 ];
@@ -176,7 +177,10 @@ async function seedCampaigns() {
           deletedAt: null,
         },
         $setOnInsert: {
-          description: `Shop ${item.name.toLowerCase()}.`,
+          description:
+            item.slug === 'fe-basics'
+              ? 'Pieces we manufacture in our own factory — not imported. Everyday essentials, made here.'
+              : `Shop ${item.name.toLowerCase()}.`,
         },
       },
       { upsert: true },

@@ -4,6 +4,7 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { Section } from '@/components/common/section';
 import { Image } from '@/components/media/image';
 import { resolveHomeCategoryTiles } from '@/constants/home-category-nav';
+import { FE_BASICS_TAGLINE, isFeBasicsSlug } from '@/constants/fe-basics';
 import { useNavigationMenu } from '@/hooks/storefront';
 import { cn } from '@/lib/utils';
 import { MotionItem, MotionReveal } from './motion-reveal';
@@ -48,8 +49,10 @@ export function HomeCategoriesSection() {
         stagger
         className="mx-auto grid max-w-[1680px] grid-cols-2 gap-3 px-4 sm:grid-cols-3 sm:gap-4 sm:px-6 md:grid-cols-4 lg:gap-5 lg:px-8 xl:px-10"
       >
-        {tiles.map((category) => (
-          <MotionItem key={category.id}>
+        {tiles.map((category) => {
+          const isFeBasics = isFeBasicsSlug(category.slug);
+          return (
+          <MotionItem key={category.id} className={isFeBasics ? 'col-span-2 md:col-span-2' : undefined}>
             <motion.div
               whileHover={reduceMotion ? undefined : { y: -4 }}
               transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
@@ -58,7 +61,10 @@ export function HomeCategoriesSection() {
                 to="/categories/$slug"
                 params={{ slug: category.slug }}
                 preload="intent"
-                className="group relative block overflow-hidden rounded-2xl"
+                className={cn(
+                  'group relative block overflow-hidden rounded-2xl',
+                  isFeBasics && 'ring-1 ring-[#c6a15b]/70 ring-offset-2 ring-offset-background',
+                )}
                 data-radius="lookbook"
                 aria-label={`Shop ${category.name}`}
               >
@@ -66,25 +72,43 @@ export function HomeCategoriesSection() {
                   <Image
                     src={category.imageUrl}
                     alt={category.name}
-                    aspectRatio="3/4"
+                    aspectRatio={isFeBasics ? '16/9' : '3/4'}
                     className={cn(
                       'transition-transform duration-700 ease-out group-hover:scale-[1.06]',
                       category.objectClass,
                     )}
                   />
                 ) : (
-                  <div className="bg-muted aspect-[3/4] w-full" />
+                  <div className={cn('bg-muted w-full', isFeBasics ? 'aspect-[16/9]' : 'aspect-[3/4]')} />
                 )}
-                <div className="bg-linear-to-t absolute inset-0 from-black/70 via-black/15 to-transparent transition-opacity duration-300 group-hover:from-black/80" />
+                <div
+                  className={cn(
+                    'absolute inset-0 bg-linear-to-t from-black/70 via-black/15 to-transparent transition-opacity duration-300 group-hover:from-black/80',
+                    isFeBasics && 'from-black/80 via-black/35 to-black/10',
+                  )}
+                />
                 <div className="absolute inset-x-0 bottom-0 flex flex-col items-center px-2 pb-3 pt-8 sm:pb-4">
-                  <h3 className="text-center text-[10px] font-bold uppercase tracking-[0.14em] text-white transition-transform duration-300 group-hover:-translate-y-0.5 sm:text-[11px] lg:text-xs">
+                  {isFeBasics ? (
+                    <p className="mb-1.5 rounded-full bg-[#c6a15b] px-2.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.16em] text-[#1a1408] sm:text-[9px]">
+                      {FE_BASICS_TAGLINE}
+                    </p>
+                  ) : null}
+                  <h3
+                    className={cn(
+                      'text-center font-bold uppercase text-white transition-transform duration-300 group-hover:-translate-y-0.5',
+                      isFeBasics
+                        ? 'font-display text-lg tracking-[0.12em] sm:text-xl lg:text-2xl'
+                        : 'text-[10px] tracking-[0.14em] sm:text-[11px] lg:text-xs',
+                    )}
+                  >
                     {category.name}
                   </h3>
                 </div>
               </Link>
             </motion.div>
           </MotionItem>
-        ))}
+          );
+        })}
       </MotionReveal>
     </Section>
   );

@@ -45,6 +45,12 @@ export interface AdminProduct {
   isNewArrival?: boolean;
   isBestSeller?: boolean;
   isClearance?: boolean;
+  isFeBasics?: boolean;
+  feBasicsExclusive?: boolean;
+  catalogPlace?: number | null;
+  bestSellerPlace?: number | null;
+  newArrivalPlace?: number | null;
+  feBasicsPlace?: number | null;
   specifications?: ProductSpecification[];
   seoTitle?: string;
   seoDescription?: string;
@@ -102,6 +108,12 @@ function readMoneyAmount(value: unknown): number | undefined {
     return Number.isFinite(amount) ? amount : undefined;
   }
   return undefined;
+}
+
+function optionalPlace(value: unknown): number | null {
+  if (value === undefined || value === null || value === '') return null;
+  const n = typeof value === 'number' ? value : Number(value);
+  return Number.isInteger(n) && n >= 1 && n <= 9999 ? n : null;
 }
 
 function normalizeProduct(raw: unknown): AdminProduct {
@@ -180,6 +192,12 @@ function normalizeProduct(raw: unknown): AdminProduct {
     isNewArrival: Boolean(record.isNewArrival),
     isBestSeller: Boolean(record.isBestSeller),
     isClearance: Boolean(record.isClearance),
+    isFeBasics: Boolean(record.isFeBasics),
+    feBasicsExclusive: Boolean(record.feBasicsExclusive),
+    catalogPlace: optionalPlace(record.catalogPlace),
+    bestSellerPlace: optionalPlace(record.bestSellerPlace),
+    newArrivalPlace: optionalPlace(record.newArrivalPlace),
+    feBasicsPlace: optionalPlace(record.feBasicsPlace),
     specifications: Array.isArray(record.specifications)
       ? (record.specifications as ProductSpecification[])
           .filter((row) => row && typeof row === 'object')
@@ -273,6 +291,12 @@ export interface ProductInput {
   isNewArrival?: boolean;
   isBestSeller?: boolean;
   isClearance?: boolean;
+  isFeBasics?: boolean;
+  feBasicsExclusive?: boolean;
+  catalogPlace?: number | null;
+  bestSellerPlace?: number | null;
+  newArrivalPlace?: number | null;
+  feBasicsPlace?: number | null;
   specifications?: ProductSpecification[];
   seo?: { title?: string; description?: string };
   price?: number;

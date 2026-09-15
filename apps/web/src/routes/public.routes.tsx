@@ -1,6 +1,7 @@
 import { createRoute, redirect } from '@tanstack/react-router';
 import { ROUTES } from '@/constants';
 import { QUERY_KEYS } from '@/constants/query-keys';
+import { prefetchInfiniteProducts } from '@/lib/prefetch-catalog';
 import { productsApi } from '@/services/sdk';
 import {
   applyClientCatalogFilters,
@@ -20,6 +21,8 @@ import {
   PrivacyPage,
   ProductDetailPage,
   ProductsPage,
+  BestSellersPage,
+  NewArrivalsPage,
   SearchPage,
   TermsPage,
   TrackOrderPage,
@@ -38,13 +41,26 @@ export const productsRoute = createRoute({
   path: ROUTES.products,
   validateSearch: (search: Record<string, unknown>) => parseCatalogSearch(search),
   beforeLoad: ({ context, search }) => {
-    const state = parseCatalogSearch(search as Record<string, unknown>);
+    const parsed = parseCatalogSearch(search as Record<string, unknown>);
+    const state = {
+      ...parsed,
+      isNewArrival: undefined,
+      isBestSeller: undefined,
+      isFeBasics: undefined,
+    };
     // Shop /products always opens the women collection — never a bare "All Products"
     // page that falls back to the All Top Wear campaign banner.
     if (!state.gender) {
       throw redirect({
         to: ROUTES.products,
         search: { ...catalogSearchToUrlParams(state), gender: 'women' },
+        replace: true,
+      });
+    }
+    if (parsed.isNewArrival || parsed.isBestSeller || parsed.isFeBasics) {
+      throw redirect({
+        to: ROUTES.products,
+        search: catalogSearchToUrlParams(state) as never,
         replace: true,
       });
     }
@@ -73,6 +89,28 @@ export const productsRoute = createRoute({
     });
   },
   component: ProductsPage,
+});
+
+export const bestSellersRoute = createRoute({
+  getParentRoute: () => publicLayoutRoute,
+  path: ROUTES.bestSellers,
+  validateSearch: (search: Record<string, unknown>) => parseCatalogSearch(search),
+  beforeLoad: ({ context, search }) => {
+    const state = parseCatalogSearch(search as Record<string, unknown>);
+    void prefetchInfiniteProducts(context.queryClient, { ...state, isBestSeller: true });
+  },
+  component: BestSellersPage,
+});
+
+export const newArrivalsRoute = createRoute({
+  getParentRoute: () => publicLayoutRoute,
+  path: ROUTES.newArrivals,
+  validateSearch: (search: Record<string, unknown>) => parseCatalogSearch(search),
+  beforeLoad: ({ context, search }) => {
+    const state = parseCatalogSearch(search as Record<string, unknown>);
+    void prefetchInfiniteProducts(context.queryClient, { ...state, isNewArrival: true });
+  },
+  component: NewArrivalsPage,
 });
 
 export const productDetailRoute = createRoute({

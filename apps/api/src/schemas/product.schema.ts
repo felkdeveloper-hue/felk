@@ -23,6 +23,13 @@ const optionalSlug = z.preprocess((value) => {
   return value;
 }, slugSchema.optional());
 
+/** Optional merchandising place (1 = first). Blank / omitted = default order. */
+const optionalPlace = z.preprocess((value) => {
+  if (value === '' || value === null || value === undefined) return null;
+  if (typeof value === 'string' && value.trim() === '') return null;
+  return value;
+}, z.coerce.number().int().min(1).max(9999).nullable().optional());
+
 export const pricingZodSchema = z
   .object({
     price: priceNumber,
@@ -102,6 +109,12 @@ export const productCreateSchema = z.object({
   isNewArrival: z.boolean().optional(),
   isBestSeller: z.boolean().optional(),
   isClearance: z.boolean().optional(),
+  isFeBasics: z.boolean().optional(),
+  feBasicsExclusive: z.boolean().optional(),
+  catalogPlace: optionalPlace,
+  bestSellerPlace: optionalPlace,
+  newArrivalPlace: optionalPlace,
+  feBasicsPlace: optionalPlace,
   status: z.enum(Object.values(PRODUCT_STATUS) as [string, ...string[]]).optional(),
   visibility: z.enum(Object.values(PRODUCT_VISIBILITY) as [string, ...string[]]).optional(),
   publishAt: z.coerce.date().nullable().optional(),
@@ -173,6 +186,10 @@ export const productListQuerySchema = paginationQuerySchema.extend({
     .optional()
     .transform((v) => (v === undefined ? undefined : v === 'true')),
   isBestSeller: z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((v) => (v === undefined ? undefined : v === 'true')),
+  isFeBasics: z
     .enum(['true', 'false'])
     .optional()
     .transform((v) => (v === undefined ? undefined : v === 'true')),

@@ -223,6 +223,12 @@ export const DEFAULT_MEGA_MENUS: Record<NavigationMenuKey, GenderMegaMenuConfig>
     homeCategories: DEFAULT_HOME_CATEGORIES.map((tile) => ({ ...tile })),
     columns: WOMEN_CATEGORY_COLUMNS,
     specials: [
+      {
+        label: 'FE Basics',
+        slug: 'fe-basics',
+        imageUrl: shopForLookImage,
+        imageClassName: 'object-[55%_center]',
+      },
       { label: 'New Arrival', slug: 'new-arrivals', imageUrl: newArrivalImage },
       { label: 'Oversized', slug: 'oversized', imageUrl: oversizedBanner },
       { label: 'Jeans', slug: 'jeans-denim', imageUrl: jeansBanner },

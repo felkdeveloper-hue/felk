@@ -29,15 +29,15 @@ const railParams: Record<ProductRailKind, ProductListParams> = {
   'best-sellers': {
     status: 'active',
     isBestSeller: true,
-    sortBy: 'updatedAt',
-    sortOrder: 'desc',
+    sortBy: 'bestSellerPlace',
+    sortOrder: 'asc',
     limit: 8,
   },
   'new-arrivals': {
     status: 'active',
     isNewArrival: true,
-    sortBy: 'createdAt',
-    sortOrder: 'desc',
+    sortBy: 'newArrivalPlace',
+    sortOrder: 'asc',
     limit: 8,
   },
   'more-to-love': {
@@ -114,7 +114,18 @@ export function useProductRail(
     queryKey: QUERY_KEYS.products.list({ rail: kind, ...params }),
     queryFn: async () => {
       try {
-        return await productsApi.list(params);
+        const result = await productsApi.list(params);
+        // Until products are flagged New Arrival in admin, keep the home rail filled
+        // with the latest uploads instead of hiding the section.
+        if (kind === 'new-arrivals' && params.isNewArrival && !result.data.length) {
+          const { isNewArrival: _flag, ...rest } = params;
+          return await productsApi.list({
+            ...rest,
+            sortBy: 'createdAt',
+            sortOrder: 'desc',
+          });
+        }
+        return result;
       } catch (error) {
         // Soft fallback: reuse any already-loaded catalog page so rails stay populated.
         const cached = findCachedProductPage(queryClient);

@@ -49,6 +49,8 @@ export interface Product {
   isMoreToLove?: boolean;
   isNewArrival?: boolean;
   isBestSeller?: boolean;
+  isFeBasics?: boolean;
+  feBasicsExclusive?: boolean;
   isClearance?: boolean;
   paymentOption?: 'cod' | 'prepaid' | 'both';
   returnsAvailable?: boolean;
@@ -149,6 +151,7 @@ export interface ProductListParams {
   isMoreToLove?: boolean;
   isNewArrival?: boolean;
   isBestSeller?: boolean;
+  isFeBasics?: boolean;
   isClearance?: boolean;
   colorId?: string;
   sizeId?: string;

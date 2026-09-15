@@ -23,6 +23,7 @@ import {
 } from '@/components/catalog';
 import { buildAbsoluteUrl, siteConfig } from '@/config';
 import { ROUTES } from '@/constants';
+import { FE_BASICS_NAME, FE_BASICS_SLUG } from '@/constants/fe-basics';
 import {
   useProductDetail,
   useRecentlyViewed,
@@ -45,10 +46,12 @@ function resolveBadgeLabel(product: {
   isTrending?: boolean;
   isNewArrival?: boolean;
   isBestSeller?: boolean;
+  isFeBasics?: boolean;
   tags?: string[];
 }): string | undefined {
   if (product.tags?.some((t) => /design of the week/i.test(t))) return 'Design of the Week';
   if (product.isFeatured) return 'Design of the Week';
+  if (product.isFeBasics) return 'FE Basics';
   if (product.isBestSeller) return 'Best Seller';
   if (product.isTrending) return 'Trending';
   if (product.isNewArrival) return 'New Arrival';
@@ -225,19 +228,41 @@ export function ProductDetailPage() {
   );
 
   const breadcrumbItems = useMemo(() => {
-    const items: { label: string; href?: string }[] = [{ label: 'Home', href: '/' }];
-    const category = categoriesQuery.data?.data?.find((c) => c.id === product?.categoryId);
-    if (category) {
+    const items: { label: string; href?: string; params?: Record<string, string> }[] = [
+      { label: 'Home', href: '/' },
+    ];
+    if (product?.isFeBasics && product.feBasicsExclusive) {
       items.push({
-        label: category.name,
-        href: `/categories/${category.slug}`,
+        label: FE_BASICS_NAME,
+        href: '/categories/$slug',
+        params: { slug: FE_BASICS_SLUG },
       });
     } else {
-      items.push({ label: 'Shop', href: ROUTES.products });
+      const category = categoriesQuery.data?.data?.find((c) => c.id === product?.categoryId);
+      if (category) {
+        items.push({
+          label: category.name,
+          href: `/categories/${category.slug}`,
+        });
+      } else if (product?.isFeBasics) {
+        items.push({
+          label: FE_BASICS_NAME,
+          href: '/categories/$slug',
+          params: { slug: FE_BASICS_SLUG },
+        });
+      } else {
+        items.push({ label: 'Shop', href: ROUTES.products });
+      }
     }
     if (product?.name) items.push({ label: product.name });
     return items;
-  }, [categoriesQuery.data?.data, product?.categoryId, product?.name]);
+  }, [
+    categoriesQuery.data?.data,
+    product?.categoryId,
+    product?.feBasicsExclusive,
+    product?.isFeBasics,
+    product?.name,
+  ]);
 
   const occasionLabel = useMemo(() => {
     const id = product?.occasionIds?.[0];

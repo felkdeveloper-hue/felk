@@ -88,6 +88,8 @@ export const ROUTES = {
   privacy: '/privacy',
   terms: '/terms',
   notFound: '/not-found',
+  bestSellers: '/best-sellers',
+  newArrivals: '/new-arrivals',
 } as const;
 
 export type RouteKey = keyof typeof ROUTES;

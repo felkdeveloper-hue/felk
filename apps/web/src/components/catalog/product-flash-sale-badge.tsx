@@ -16,7 +16,7 @@ const MOBILE_DISCOUNT_GRADIENT = 'linear-gradient(135deg, #e11d48, #ef4444, #f97
 export function ProductFlashSaleMobile({ formattedTime }: { formattedTime: string }) {
   return (
     <div
-      className="pointer-events-none absolute left-2 top-2 z-[2] inline-flex flex-col items-start gap-[3px] sm:hidden"
+      className="pointer-events-none inline-flex flex-col items-start gap-[3px]"
       style={{ width: 'fit-content', maxWidth: 'max-content' }}
       aria-label={`Flash sale 20% off, ${formattedTime} remaining`}
     >

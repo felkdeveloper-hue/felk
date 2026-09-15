@@ -1,3 +1,4 @@
+import { FE_BASICS_NAME, FE_BASICS_SLUG, isFeBasicsSlug } from '@/constants/fe-basics';
 import allBottomwearBanner from '@/assets/images/Categories/all-bottomwear.webp';
 import hoodieImage from '@/assets/images/Categories/Hoddiewomen.png';
 import corsetBanner from '@/assets/images/Categories/corset-banner.webp';
@@ -12,6 +13,7 @@ export type HomeCategoryNavItem = {
   slug: string;
   imageUrl: string;
   imageClassName?: string | null;
+  highlight?: boolean;
 };
 
 type HomeCategoryTileLike = Pick<HomeCategoryNavItem, 'label' | 'slug' | 'imageUrl' | 'imageClassName'>;
@@ -33,11 +35,20 @@ const STALE_ADMIN_HOME_CATEGORY_SLUGS = new Set([
   'bags',
 ]);
 
+export const FE_BASICS_NAV_ITEM: HomeCategoryNavItem = {
+  label: FE_BASICS_NAME,
+  slug: FE_BASICS_SLUG,
+  imageUrl: shopForLookImage,
+  imageClassName: 'object-[55%_center]',
+  highlight: true,
+};
+
 /**
  * Homepage Categories grid + mobile drawer CATEGORIES tab + admin tile editor.
  * CMS uploads override these images; labels/slugs stay this designed set.
  */
 export const HOME_CATEGORY_NAV_ITEMS: ReadonlyArray<HomeCategoryNavItem> = [
+  FE_BASICS_NAV_ITEM,
   {
     label: 'TOPS',
     slug: 'all-tops',
@@ -94,6 +105,7 @@ const HOME_CATEGORY_SLUG_SET = new Set(
 
 /** Unique shop-grid slugs — `shoes` also existed on the old admin tile list. */
 const DESIGNED_HOME_CATEGORY_MARKERS = new Set([
+  FE_BASICS_SLUG,
   'all-tops',
   'pants',
   'all-dresses',
@@ -105,6 +117,30 @@ const DESIGNED_HOME_CATEGORY_MARKERS = new Set([
 
 function normalizeHomeCategorySlug(slug: string): string {
   return slug.trim().toLowerCase();
+}
+
+/** Pin FE Basics first so factory-made pieces stay the lead category even if CMS tiles omit it. */
+export function ensureFeBasicsHomeTiles<T extends HomeCategoryTileLike>(tiles: T[]): T[] {
+  const featured = {
+    label: FE_BASICS_NAV_ITEM.label,
+    slug: FE_BASICS_NAV_ITEM.slug,
+    imageUrl: FE_BASICS_NAV_ITEM.imageUrl,
+    imageClassName: FE_BASICS_NAV_ITEM.imageClassName,
+  } as T;
+  const existing = tiles.find((tile) => isFeBasicsSlug(tile.slug));
+  const rest = tiles.filter((tile) => !isFeBasicsSlug(tile.slug));
+  if (!existing) return [{ ...featured }, ...rest];
+  return [
+    {
+      ...featured,
+      ...existing,
+      label: existing.label.trim() || featured.label,
+      slug: FE_BASICS_SLUG,
+      imageUrl: existing.imageUrl.trim() || featured.imageUrl,
+      imageClassName: existing.imageClassName ?? featured.imageClassName,
+    },
+    ...rest,
+  ];
 }
 
 /**
@@ -164,13 +200,19 @@ export function resolveHomeCategoryTiles(
     return HOME_CATEGORY_NAV_ITEMS.map((tile) => ({ ...tile }));
   }
 
-  return tiles.map((tile) => {
-    const fallback = getHomeCategoryNavItem(tile.slug);
-    return {
-      label: tile.label.trim(),
-      slug: tile.slug.trim(),
-      imageUrl: tile.imageUrl.trim() || fallback?.imageUrl || '',
-      imageClassName: tile.imageClassName ?? fallback?.imageClassName,
-    };
-  });
+  return ensureFeBasicsHomeTiles(
+    tiles.map((tile) => {
+      const fallback = getHomeCategoryNavItem(tile.slug);
+      return {
+        label: tile.label.trim(),
+        slug: tile.slug.trim(),
+        imageUrl: tile.imageUrl.trim() || fallback?.imageUrl || '',
+        imageClassName: tile.imageClassName ?? fallback?.imageClassName,
+        highlight: isFeBasicsSlug(tile.slug) || fallback?.highlight,
+      };
+    }),
+  ).map((tile) => ({
+    ...tile,
+    highlight: isFeBasicsSlug(tile.slug) ? true : tile.highlight,
+  }));
 }

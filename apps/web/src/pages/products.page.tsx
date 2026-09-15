@@ -25,7 +25,18 @@ const GENDER_META: Record<
 
 export function ProductsPage() {
   const { state, setSearch, clearFilters } = useCatalogSearchParams();
-  const query = useInfiniteProducts(state);
+  // Dedicated collection flags must never leak onto Women / shop — those pages
+  // always show the full catalog, with optional shop-place ordering only.
+  const shopState = useMemo(
+    () => ({
+      ...state,
+      isNewArrival: undefined,
+      isBestSeller: undefined,
+      isFeBasics: undefined,
+    }),
+    [state],
+  );
+  const query = useInfiniteProducts(shopState);
   const categoriesQuery = useCategoriesList();
 
   const products = useMemo(
@@ -78,7 +89,7 @@ export function ProductsPage() {
       />
 
       <CatalogListShell
-        state={state}
+        state={shopState}
         products={products}
         total={total}
         isLoading={query.isLoading}

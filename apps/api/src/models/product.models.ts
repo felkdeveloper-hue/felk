@@ -111,6 +111,18 @@ export interface ProductDocument extends Document {
   isNewArrival: boolean;
   isBestSeller: boolean;
   isClearance: boolean;
+  /** Factory-made shop: appears on the FE Basics page. */
+  isFeBasics: boolean;
+  /** When true, hide this product from every storefront listing except FE Basics. */
+  feBasicsExclusive: boolean;
+  /** Optional shop-page merchandising position (1 = first). Null = default order. */
+  catalogPlace?: number | null;
+  /** Optional Best Seller page/rail position. Null = default order among best sellers. */
+  bestSellerPlace?: number | null;
+  /** Optional New Arrivals page/rail position. Null = default order among new arrivals. */
+  newArrivalPlace?: number | null;
+  /** Optional FE Basics page position. Null = default order among FE Basics products. */
+  feBasicsPlace?: number | null;
   status: string;
   visibility: string;
   publishAt?: Date | null;
@@ -180,6 +192,12 @@ const productSchema = new Schema<ProductDocument>(
     isNewArrival: { type: Boolean, default: false },
     isBestSeller: { type: Boolean, default: false, index: true },
     isClearance: { type: Boolean, default: false },
+    isFeBasics: { type: Boolean, default: false, index: true },
+    feBasicsExclusive: { type: Boolean, default: false, index: true },
+    catalogPlace: { type: Number, default: null, min: 1 },
+    bestSellerPlace: { type: Number, default: null, min: 1 },
+    newArrivalPlace: { type: Number, default: null, min: 1 },
+    feBasicsPlace: { type: Number, default: null, min: 1 },
     status: {
       type: String,
       enum: Object.values(PRODUCT_STATUS),
@@ -242,9 +260,13 @@ productSchema.index({ gender: 1, isDeleted: 1, status: 1, createdAt: -1 });
 // Home-page rails filter on a boolean flag + status and sort by newest.
 productSchema.index({ isFeatured: 1, isDeleted: 1, status: 1, createdAt: -1 });
 productSchema.index({ isBestSeller: 1, isDeleted: 1, status: 1, updatedAt: -1 });
+productSchema.index({ isBestSeller: 1, isDeleted: 1, status: 1, bestSellerPlace: 1, createdAt: -1 });
 productSchema.index({ isTrending: 1, isDeleted: 1, status: 1, updatedAt: -1 });
 productSchema.index({ isMoreToLove: 1, isDeleted: 1, status: 1, updatedAt: -1 });
 productSchema.index({ isNewArrival: 1, isDeleted: 1, status: 1, createdAt: -1 });
+productSchema.index({ isNewArrival: 1, isDeleted: 1, status: 1, newArrivalPlace: 1, createdAt: -1 });
+productSchema.index({ isFeBasics: 1, isDeleted: 1, status: 1, feBasicsPlace: 1, createdAt: -1 });
+productSchema.index({ isDeleted: 1, status: 1, catalogPlace: 1, createdAt: -1 });
 productSchema.index({
   name: 'text',
   shortDescription: 'text',

@@ -1,5 +1,6 @@
 export { HomePage } from './home.page';
 export { ProductsPage } from './products.page';
+export { BestSellersPage, NewArrivalsPage } from './collection.page';
 export { ProductDetailPage } from './product-detail.page';
 export { CategoriesPage } from './categories.page';
 export { CategoryDetailPage } from './category-detail.page';

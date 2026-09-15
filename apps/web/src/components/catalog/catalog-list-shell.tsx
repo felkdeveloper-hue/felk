@@ -5,6 +5,7 @@ import { Container } from '@/components/layout/container';
 import { useCatalogFilterFacets } from '@/hooks/catalog';
 import { useUiStore } from '@/store/ui-store';
 import { CATALOG_BATCH_SIZE, type CatalogSearchState } from '@/utils/catalog';
+import { cn } from '@/lib/utils';
 import type { Product } from '@/services/sdk';
 import { CatalogFilterAndSortSheet } from './catalog-filter-sidebar';
 import { CatalogSortSheet } from './catalog-sort-sheet';
@@ -36,6 +37,8 @@ export interface CatalogListShellProps {
   emptyTitle?: string;
   emptyDescription?: string;
   emptyAction?: ReactNode;
+  /** Warm factory-line treatment for FE Basics. */
+  tone?: 'default' | 'fe-basics';
 }
 
 export function CatalogListShell({
@@ -59,6 +62,7 @@ export function CatalogListShell({
   emptyTitle,
   emptyDescription,
   emptyAction,
+  tone = 'default',
 }: CatalogListShellProps) {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
@@ -170,7 +174,12 @@ export function CatalogListShell({
   const catalogTotal = typeof total === 'number' ? total : undefined;
 
   return (
-    <div className="pb-[calc(3.5rem+env(safe-area-inset-bottom,0px))] sm:pb-16 lg:pb-16">
+    <div
+      className={cn(
+        'pb-[calc(3.5rem+env(safe-area-inset-bottom,0px))] sm:pb-16 lg:pb-16',
+        tone === 'fe-basics' && 'bg-[#f7f1e8]',
+      )}
+    >
       <Container className="space-y-4 pt-4 sm:space-y-5 sm:pt-6">
         {banner}
 

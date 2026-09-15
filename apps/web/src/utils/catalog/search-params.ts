@@ -24,6 +24,8 @@ export interface CatalogSearchState {
   onSale?: boolean;
   rating?: string;
   isNewArrival?: boolean;
+  isBestSeller?: boolean;
+  isFeBasics?: boolean;
   /** Fashion attribute filters, e.g. { fit: 'Oversized', rise: 'High Rise' }. */
   specs?: Record<string, string>;
 }
@@ -87,6 +89,8 @@ export function parseCatalogSearch(search: Record<string, unknown>): CatalogSear
     onSale: bool(search.onSale),
     rating: typeof search.rating === 'string' ? search.rating : undefined,
     isNewArrival: bool(search.isNewArrival),
+    isBestSeller: bool(search.isBestSeller),
+    isFeBasics: bool(search.isFeBasics),
     specs: Object.keys(specs).length ? specs : undefined,
   };
 }
@@ -110,6 +114,8 @@ export function catalogSearchToProductParams(state: CatalogSearchState): Product
     materialId: state.materialId,
     occasionId: state.occasionId,
     isNewArrival: state.isNewArrival,
+    isBestSeller: state.isBestSeller,
+    isFeBasics: state.isFeBasics,
     isClearance: state.onSale ? true : undefined,
   };
 
@@ -133,6 +139,7 @@ export function countActiveFilters(state: CatalogSearchState): number {
   if (state.onSale != null) count += 1;
   if (state.rating) count += 1;
   if (state.isNewArrival != null) count += 1;
+  if (state.isBestSeller != null) count += 1;
   if (state.specs) count += Object.keys(state.specs).length;
   return count;
 }
@@ -173,7 +180,6 @@ export function catalogSearchToUrlParams(state: CatalogSearchState): Record<stri
   );
   assign('onSale', state.onSale === true ? 'true' : undefined);
   assign('rating', state.rating);
-  assign('isNewArrival', state.isNewArrival ? 'true' : undefined);
   if (state.specs) {
     for (const [key, value] of Object.entries(state.specs)) {
       assign(`spec_${key}`, value);

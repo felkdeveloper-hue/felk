@@ -13,7 +13,7 @@ import {
   isLegacyWomenMegaMenuColumns,
 } from '@/constants/mega-menu-defaults';
 import { normalizeBannerDevice } from '@/utils/mega-menu-links';
-import { isLegacyHomeCategoryList } from '@/constants/home-category-nav';
+import { isLegacyHomeCategoryList, ensureFeBasicsHomeTiles } from '@/constants/home-category-nav';
 import { toStorefrontMediaUrl } from '@/utils/media-url';
 
 /**
@@ -148,13 +148,15 @@ export const navigationMenusApi = {
         columns: resolvedColumns,
         specials: mergeTilesWithFallback(specials, fallback.specials),
         featured: mergeTilesWithFallback(featured, fallback.featured),
-        homeCategories: mergeTilesWithFallback(
-          isLegacyHomeCategoryList(homeCategories) ? [] : homeCategories,
-          fallback.homeCategories?.length
-            ? fallback.homeCategories
-            : key === 'women'
-              ? DEFAULT_HOME_CATEGORIES
-              : [],
+        homeCategories: ensureFeBasicsHomeTiles(
+          mergeTilesWithFallback(
+            isLegacyHomeCategoryList(homeCategories) ? [] : homeCategories,
+            fallback.homeCategories?.length
+              ? fallback.homeCategories
+              : key === 'women'
+                ? DEFAULT_HOME_CATEGORIES
+                : [],
+          ),
         ),
       };
     } catch {

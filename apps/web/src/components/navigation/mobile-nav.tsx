@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from '@tanstack/react-router';
-import { ChevronRight, Heart, Menu, Search, User, X } from 'lucide-react';
+import { ChevronRight, Factory, Heart, Menu, Search, User, X } from 'lucide-react';
 import { ROUTES } from '@/constants';
+import { FE_BASICS_TAGLINE, isFeBasicsSlug } from '@/constants/fe-basics';
 import { resolveHomeCategoryTiles } from '@/constants/home-category-nav';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
@@ -208,19 +209,45 @@ export function MobileNav({ items: _items, transparent, open, onOpenChange }: Mo
             </ul>
           ) : (
             <ul>
-              {categoryItems.map((item) => (
-                <li key={item.slug}>
-                  <Link
-                    to="/categories/$slug"
-                    params={{ slug: item.slug }}
-                    preload="intent"
-                    onClick={close}
-                    className={rowClass}
-                  >
-                    {item.label}
-                  </Link>
-                </li>
-              ))}
+              {categoryItems.map((item) => {
+                const isFeBasics = isFeBasicsSlug(item.slug);
+                return (
+                  <li key={item.slug}>
+                    <Link
+                      to="/categories/$slug"
+                      params={{ slug: item.slug }}
+                      preload="intent"
+                      onClick={close}
+                      className={cn(
+                        rowClass,
+                        isFeBasics &&
+                          'from-[#1a1714] via-[#111] to-[#0c0b0a] min-h-[4.15rem] items-center border-b-0 bg-linear-to-r px-4 text-white',
+                      )}
+                    >
+                      {isFeBasics ? (
+                        <span className="flex min-w-0 flex-1 items-center gap-3">
+                          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#c6a15b]/15 text-[#e8c57a]">
+                            <Factory className="size-4" strokeWidth={1.6} aria-hidden />
+                          </span>
+                          <span className="min-w-0">
+                            <span className="flex items-center gap-2">
+                              <span className="font-semibold tracking-[0.14em]">{item.label}</span>
+                              <span className="rounded-full bg-[#c6a15b] px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.12em] text-[#1a1408]">
+                                Made here
+                              </span>
+                            </span>
+                            <span className="mt-0.5 block text-[10px] font-normal normal-case tracking-normal text-white/55">
+                              {FE_BASICS_TAGLINE}
+                            </span>
+                          </span>
+                        </span>
+                      ) : (
+                        item.label
+                      )}
+                    </Link>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </nav>

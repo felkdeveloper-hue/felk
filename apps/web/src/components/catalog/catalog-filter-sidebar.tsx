@@ -95,7 +95,9 @@ function InlineFilters({
   const bounds = priceBounds ?? { min: 0, max: 50_000 };
   const categories = useMemo(
     () =>
-      (facets.categories.data?.data ?? []).filter((c) => c.slug !== 'men' && c.slug !== 'women'),
+      (facets.categories.data?.data ?? []).filter(
+        (c) => c.slug !== 'men' && c.slug !== 'women' && c.slug !== 'fe-basics',
+      ),
     [facets.categories.data?.data],
   );
   const brands = facets.brands.data?.data ?? [];
@@ -296,7 +298,9 @@ export function CatalogFilterAndSortSheet({
 
   const categories = useMemo(
     () =>
-      (facets.categories.data?.data ?? []).filter((c) => c.slug !== 'men' && c.slug !== 'women'),
+      (facets.categories.data?.data ?? []).filter(
+        (c) => c.slug !== 'men' && c.slug !== 'women' && c.slug !== 'fe-basics',
+      ),
     [facets.categories.data?.data],
   );
   const colors = facets.colors.data?.data ?? [];

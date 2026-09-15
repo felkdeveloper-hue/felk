@@ -84,7 +84,13 @@ export function ProductRailSection({
   const isEmpty = !query.isLoading && !query.isError && !query.data?.data?.length;
   const hasProducts = Boolean(query.data?.data?.length);
   const resolvedTitle = header ? undefined : title === false ? undefined : (title ?? copy.title);
-  const railLabel = typeof title === 'string' ? title : header ? 'Best Seller' : copy.title;
+  const railLabel = typeof title === 'string' ? title : header ? copy.title : copy.title;
+  const viewAllTo =
+    kind === 'best-sellers'
+      ? ROUTES.bestSellers
+      : kind === 'new-arrivals'
+        ? ROUTES.newArrivals
+        : ROUTES.products;
 
   // After retries fail, hide the whole rail (title included) — no red error blocks.
   if (inView && query.isError && !query.isFetching && !hasProducts) return null;
@@ -107,7 +113,7 @@ export function ProductRailSection({
         action={
           header ? undefined : (
             <Button variant="ghost" asChild className="hidden sm:inline-flex">
-              <Link to={ROUTES.products}>
+              <Link to={viewAllTo}>
                 View all
                 <ArrowRight />
               </Link>

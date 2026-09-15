@@ -43,6 +43,12 @@ const HERO_FALLBACKS: Record<string, HeroArt> = {
     objectClass: 'object-[70%_center] md:object-[68%_center]',
   },
   'new-arrivals': { desktop: '/catalog/categories/new-arrivals.png' },
+  'best-sellers': {
+    desktop: shopForLookImage,
+    mobile: shopForLookImageMobile,
+    bakedCopy: false,
+    objectClass: 'object-[55%_center] md:object-center',
+  },
   oversized: {
     desktop: oversizedBanner,
     bakedCopy: true,
@@ -105,6 +111,8 @@ const TAGLINES: Record<string, string> = {
   shoes: 'Step out with intention.',
   oversized: 'Comfort without compromise.',
   corset: 'Shape. Style. Confidence.',
+  'new-arrivals': 'Fresh drops. Just landed.',
+  'best-sellers': 'Most wanted pieces right now.',
 };
 
 export interface CatalogCategoryHeroProps {

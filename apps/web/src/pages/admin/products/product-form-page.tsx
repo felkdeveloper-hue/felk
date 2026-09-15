@@ -61,7 +61,13 @@ const productSchema = z.object({
   isMoreToLove: z.boolean().default(false),
   isNewArrival: z.boolean().default(false),
   isBestSeller: z.boolean().default(false),
+  isFeBasics: z.boolean().default(false),
+  feBasicsExclusive: z.boolean().default(false),
   isClearance: z.boolean().default(false),
+  catalogPlace: z.string().optional(),
+  bestSellerPlace: z.string().optional(),
+  newArrivalPlace: z.string().optional(),
+  feBasicsPlace: z.string().optional(),
   returnsAvailable: z.boolean().default(true),
   warrantyAvailable: z.boolean().default(false),
   warrantyDetails: z.string().optional(),
@@ -81,6 +87,14 @@ function parseMoney(v?: string) {
   if (!v?.trim()) return undefined;
   const n = Number(v);
   return Number.isFinite(n) && n >= 0 ? n : undefined;
+}
+function parsePlace(v?: string): number | null {
+  if (!v?.trim()) return null;
+  const n = Number(v);
+  return Number.isInteger(n) && n >= 1 && n <= 9999 ? n : null;
+}
+function placeToInput(value?: number | null): string {
+  return typeof value === 'number' && value >= 1 ? String(value) : '';
 }
 function masterDataCode(name: string) {
   return slugify(name).toUpperCase().replace(/-/g, '_').slice(0, 32) || 'ITEM';
@@ -1437,7 +1451,13 @@ export function ProductFormPage({ productId }: { productId?: string }) {
       isMoreToLove: false,
       isNewArrival: false,
       isBestSeller: false,
+      isFeBasics: false,
+      feBasicsExclusive: false,
       isClearance: false,
+      catalogPlace: '',
+      bestSellerPlace: '',
+      newArrivalPlace: '',
+      feBasicsPlace: '',
       returnsAvailable: true,
       warrantyAvailable: false,
       warrantyDetails: '',
@@ -1475,7 +1495,13 @@ export function ProductFormPage({ productId }: { productId?: string }) {
       isMoreToLove: product.isMoreToLove ?? false,
       isNewArrival: product.isNewArrival ?? false,
       isBestSeller: product.isBestSeller ?? false,
+      isFeBasics: product.isFeBasics ?? false,
+      feBasicsExclusive: product.feBasicsExclusive ?? false,
       isClearance: product.isClearance ?? false,
+      catalogPlace: placeToInput(product.catalogPlace),
+      bestSellerPlace: placeToInput(product.bestSellerPlace),
+      newArrivalPlace: placeToInput(product.newArrivalPlace),
+      feBasicsPlace: placeToInput(product.feBasicsPlace),
       returnsAvailable: product.returnsAvailable ?? true,
       warrantyAvailable: product.warrantyAvailable ?? false,
       warrantyDetails: product.warrantyDetails ?? '',
@@ -1542,7 +1568,13 @@ export function ProductFormPage({ productId }: { productId?: string }) {
     isMoreToLove: data.isMoreToLove,
     isNewArrival: data.isNewArrival,
     isBestSeller: data.isBestSeller,
+    isFeBasics: data.isFeBasics,
+    feBasicsExclusive: data.isFeBasics ? data.feBasicsExclusive : false,
     isClearance: data.isClearance,
+    catalogPlace: parsePlace(data.catalogPlace),
+    bestSellerPlace: data.isBestSeller ? parsePlace(data.bestSellerPlace) : null,
+    newArrivalPlace: data.isNewArrival ? parsePlace(data.newArrivalPlace) : null,
+    feBasicsPlace: data.isFeBasics ? parsePlace(data.feBasicsPlace) : null,
     returnsAvailable: data.returnsAvailable,
     returnsCriteria: data.returnsCriteria?.trim() || null,
     warrantyAvailable: data.warrantyAvailable,
@@ -2099,10 +2131,93 @@ export function ProductFormPage({ productId }: { productId?: string }) {
               </p>
               <PlacementToggle
                 label="Best Seller"
-                description="Shows in the Best Sellers row on the home page"
+                description="Shows in the Best Sellers row on the home page and the Best Seller page"
                 checked={w.isBestSeller ?? false}
-                onChange={(v) => setFlag('isBestSeller', v)}
+                onChange={(v) => {
+                  setFlag('isBestSeller', v);
+                  if (!v) setValue('bestSellerPlace', '', { shouldDirty: true });
+                }}
               />
+              {w.isBestSeller ? (
+                <Field label="Best Seller place">
+                  <input
+                    type="number"
+                    min={1}
+                    max={9999}
+                    inputMode="numeric"
+                    placeholder="e.g. 1"
+                    className={fieldCls}
+                    {...register('bestSellerPlace')}
+                  />
+                  <p className="mt-1 text-[11px] text-[var(--admin-ink-muted)]">
+                    1 shows first on the Best Seller page. Leave blank for default order.
+                  </p>
+                </Field>
+              ) : null}
+              <PlacementToggle
+                label="New Arrival"
+                description="Shows in the New Arrivals row on the home page and the New Arrivals page"
+                checked={w.isNewArrival ?? false}
+                onChange={(v) => {
+                  setFlag('isNewArrival', v);
+                  if (!v) setValue('newArrivalPlace', '', { shouldDirty: true });
+                }}
+              />
+              {w.isNewArrival ? (
+                <Field label="New Arrival place">
+                  <input
+                    type="number"
+                    min={1}
+                    max={9999}
+                    inputMode="numeric"
+                    placeholder="e.g. 1"
+                    className={fieldCls}
+                    {...register('newArrivalPlace')}
+                  />
+                  <p className="mt-1 text-[11px] text-[var(--admin-ink-muted)]">
+                    1 shows first on the New Arrivals page. Leave blank for default order.
+                  </p>
+                </Field>
+              ) : null}
+              <p className="pt-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--admin-ink-muted)]">
+                FE Basics — factory made
+              </p>
+              <PlacementToggle
+                label="Show on FE Basics"
+                description="Appears on the FE Basics page (first in Categories). Leave off to keep this product working as usual."
+                checked={w.isFeBasics ?? false}
+                onChange={(v) => {
+                  setFlag('isFeBasics', v);
+                  if (!v) {
+                    setFlag('feBasicsExclusive', false);
+                    setValue('feBasicsPlace', '', { shouldDirty: true });
+                  }
+                }}
+              />
+              {w.isFeBasics ? (
+                <>
+                  <Field label="FE Basics place">
+                    <input
+                      type="number"
+                      min={1}
+                      max={9999}
+                      inputMode="numeric"
+                      placeholder="e.g. 1"
+                      className={fieldCls}
+                      {...register('feBasicsPlace')}
+                    />
+                    <p className="mt-1 text-[11px] text-[var(--admin-ink-muted)]">
+                      1 shows first on the FE Basics page. Leave blank for default order.
+                    </p>
+                  </Field>
+                  <PlacementToggle
+                    label="Only on FE Basics page"
+                    description="Hide this cloth from shop, other categories, home, and search. It will only appear on FE Basics."
+                    checked={w.feBasicsExclusive ?? false}
+                    onChange={(v) => setFlag('feBasicsExclusive', v)}
+                  />
+                </>
+              ) : null}
               <PlacementToggle
                 label="More To Love"
                 description="Shows in the More to love row on the home page"
@@ -2115,6 +2230,21 @@ export function ProductFormPage({ productId }: { productId?: string }) {
                 checked={w.isFeatured ?? false}
                 onChange={(v) => setFlag('isFeatured', v)}
               />
+              <Field label="Shop place (optional)">
+                <input
+                  type="number"
+                  min={1}
+                  max={9999}
+                  inputMode="numeric"
+                  placeholder="Leave blank for default"
+                  className={fieldCls}
+                  {...register('catalogPlace')}
+                />
+                <p className="mt-1 text-[11px] text-[var(--admin-ink-muted)]">
+                  Position on the Women shop page. Products with a place show first, in that order;
+                  everything else stays in the usual order after them.
+                </p>
+              </Field>
             </SidebarCard>
 
             {/* Product details */}

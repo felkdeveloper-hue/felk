@@ -1,12 +1,18 @@
 import { useCallback, useMemo } from 'react';
 import { Link, useNavigate, useParams } from '@tanstack/react-router';
 import { Seo } from '@/components/common/seo';
-import { CatalogCategoryHero, CatalogListShell } from '@/components/catalog';
+import {
+  CatalogCategoryHero,
+  CatalogListShell,
+  FeBasicsHero,
+  FeBasicsIntro,
+} from '@/components/catalog';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Button } from '@/components/ui/button';
 import { Container } from '@/components/layout/container';
 import { buildAbsoluteUrl, siteConfig } from '@/config';
 import { ROUTES } from '@/constants';
+import { FE_BASICS_DESCRIPTION, FE_BASICS_NAME, isFeBasicsSlug } from '@/constants/fe-basics';
 import {
   useCatalogSearchParams,
   useCategoriesList,
@@ -25,13 +31,20 @@ export function CategoryDetailPage() {
   const categoriesQuery = useCategoriesList();
 
   const { state, setSearch, clearFilters } = useCatalogSearchParams();
+  const isFeBasics = isFeBasicsSlug(slug);
   // Only filter once the slug resolves — never reuse a stale categoryId from URL/search.
+  // FE Basics is merchandised by flag so exclusive factory pieces still appear here.
   const mergedState = useMemo(
-    () => ({ ...state, categoryId: category?.id }),
-    [state, category?.id],
+    () => ({
+      ...state,
+      categoryId: isFeBasics ? undefined : category?.id,
+      isFeBasics: isFeBasics ? true : state.isFeBasics,
+    }),
+    [state, category?.id, isFeBasics],
   );
-  const categoryReady = Boolean(category?.id);
-  const categoryMissing = categoryQuery.isFetched && !category?.id && !categoryQuery.isError;
+  const categoryReady = isFeBasics || Boolean(category?.id);
+  const categoryMissing =
+    !isFeBasics && categoryQuery.isFetched && !category?.id && !categoryQuery.isError;
 
   const womenMenuQuery = useNavigationMenu('women');
   const menMenuQuery = useNavigationMenu('men');
@@ -108,8 +121,8 @@ export function CategoryDetailPage() {
     clearFilters();
   }, [clearFilters]);
 
-  const heroTitle = category?.name ?? slug.replace(/-/g, ' ');
-  const prettyName = category?.name ?? slug.replace(/-/g, ' ');
+  const heroTitle = isFeBasics ? FE_BASICS_NAME : (category?.name ?? slug.replace(/-/g, ' '));
+  const prettyName = isFeBasics ? FE_BASICS_NAME : (category?.name ?? slug.replace(/-/g, ' '));
 
   const heroProps = {
     title: heroTitle,
@@ -148,22 +161,36 @@ export function CategoryDetailPage() {
   return (
     <>
       <Seo
-        title={category?.name ?? 'Category'}
+        title={isFeBasics ? FE_BASICS_NAME : (category?.name ?? 'Category')}
         description={
-          category?.description ?? `Shop ${category?.name ?? 'category'} at ${siteConfig.name}.`
+          isFeBasics
+            ? (category?.description ?? FE_BASICS_DESCRIPTION)
+            : (category?.description ?? `Shop ${category?.name ?? 'category'} at ${siteConfig.name}.`)
         }
-        image={pageBanner?.desktop ?? defaultShopBannerUrl}
+        image={
+          isFeBasics
+            ? (category?.imageUrl ?? pageBanner?.desktop ?? defaultShopBannerUrl)
+            : (pageBanner?.desktop ?? defaultShopBannerUrl)
+        }
         url={buildAbsoluteUrl(`/categories/${slug}`)}
       />
 
-      <CatalogCategoryHero {...heroProps} />
+      {isFeBasics ? (
+        <FeBasicsHero imageUrl={pageBanner?.desktop || category?.imageUrl} />
+      ) : (
+        <CatalogCategoryHero {...heroProps} />
+      )}
+      {isFeBasics ? <FeBasicsIntro description={category?.description} /> : null}
 
       <CatalogListShell
+        tone={isFeBasics ? 'fe-basics' : 'default'}
         state={mergedState}
         products={products}
         total={total}
         isLoading={
-          categoryQuery.isPending || (categoryReady && (query.isPending || query.isLoading))
+          isFeBasics
+            ? query.isPending || query.isLoading
+            : categoryQuery.isPending || (categoryReady && (query.isPending || query.isLoading))
         }
         isError={query.isError}
         isFetching={query.isFetching}
@@ -174,8 +201,14 @@ export function CategoryDetailPage() {
         onSearchChange={onSearchChange}
         onClearFilters={onClearFilters}
         facetKeys={category?.filterFacetKeys}
-        emptyTitle={`No products in ${prettyName} yet`}
-        emptyDescription="We’re still adding pieces to this edit. Explore other categories or check back soon."
+        emptyTitle={
+          isFeBasics ? 'FE Basics is being stocked' : `No products in ${prettyName} yet`
+        }
+        emptyDescription={
+          isFeBasics
+            ? 'Factory-made pieces will land here. Explore the rest of the shop in the meantime.'
+            : 'We’re still adding pieces to this edit. Explore other categories or check back soon.'
+        }
         emptyAction={
           <Button asChild variant="outline">
             <Link to={ROUTES.products}>Continue shopping</Link>

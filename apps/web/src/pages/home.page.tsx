@@ -4,6 +4,7 @@ import { buildAbsoluteUrl, siteConfig } from '@/config';
 import { Seo } from '@/components/common/seo';
 import { buildOrganizationJsonLd, buildStoreJsonLd, buildWebsiteJsonLd } from '@/lib/seo';
 import { getSetting } from '@/utils/cms';
+import { ROUTES } from '@/constants';
 import {
   HeroBannerSection,
   HomeAfterBestSellersBannerSection,
@@ -115,7 +116,13 @@ export function HomePage() {
           eager
           spacing="none"
           title={false}
-          header={<HomeRailHeading subtitle="Most wanted pieces right now." title="Best Seller" />}
+          header={
+            <HomeRailHeading
+              subtitle="Most wanted pieces right now."
+              title="Best Seller"
+              href={ROUTES.bestSellers}
+            />
+          }
         />
 
         {/* Mid-home promo — Admin → Banners → After Best Sellers */}
@@ -126,9 +133,13 @@ export function HomePage() {
           eager={false}
           spacing="none"
           title={false}
-          // Show newest uploads even when nothing is flagged isNewArrival in admin.
-          scope={{ newestUploads: true }}
-          header={<HomeRailHeading subtitle="Fresh drops. Just landed." title="New Arrivals" />}
+          header={
+            <HomeRailHeading
+              subtitle="Fresh drops. Just landed."
+              title="New Arrivals"
+              href={ROUTES.newArrivals}
+            />
+          }
         />
 
         <HomeCategoriesSection />
