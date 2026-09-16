@@ -171,8 +171,24 @@ catalogRouter.get(
   authorizeAny(...viewPerms),
   validate({ query: S.productListQuerySchema }),
   asyncHandler(async (req, res) => {
-    const result = await productService.list(req.query as never);
+    const result = await productService.list({
+      ...(req.query as object),
+      includeInternalSearch: true,
+    } as never);
     ApiResponse.success(res, result.data, 'OK', 200, result.meta);
+  }),
+);
+
+catalogRouter.get(
+  '/products/stock-control-check',
+  authorizeAny(...viewPerms),
+  validate({ query: S.stockControlCheckQuerySchema }),
+  asyncHandler(async (req, res) => {
+    const query = req.query as { value: string; excludeId?: string };
+    ApiResponse.success(
+      res,
+      await productService.checkStockControlNumber(query.value, query.excludeId),
+    );
   }),
 );
 

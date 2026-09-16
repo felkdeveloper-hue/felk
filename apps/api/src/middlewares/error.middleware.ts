@@ -112,6 +112,7 @@ export function errorHandler(err: unknown, req: Request, res: Response, _next: N
       email: { label: 'Email', code: 'EMAIL_EXISTS' },
       userId: { label: 'User', code: 'USER_EXISTS' },
       referralCode: { label: 'Referral code', code: 'REFERRAL_EXISTS' },
+      stockControlNumber: { label: 'Stock control number', code: 'STOCK_CONTROL_EXISTS' },
     };
     const mapped = (field && duplicateMap[field]) || {
       label: field ? field : 'Record',

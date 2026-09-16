@@ -93,6 +93,8 @@ export const QUERY_KEYS = {
   adminProducts: {
     list: (params?: unknown) => ['admin', 'products', 'list', params] as const,
     detail: (id: string) => ['admin', 'products', 'detail', id] as const,
+    stockControlCheck: (value: string, excludeId?: string) =>
+      ['admin', 'products', 'stock-control-check', value, excludeId ?? ''] as const,
   },
   adminOrders: {
     list: (params?: unknown) => ['admin', 'orders', 'list', params] as const,

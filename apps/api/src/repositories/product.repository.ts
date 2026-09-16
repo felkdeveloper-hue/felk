@@ -46,6 +46,8 @@ export interface ProductListFilters extends ListOptions {
   publishTo?: string;
   excludeIds?: string | string[];
   stockFilter?: 'in_stock' | 'out_of_stock' | 'low_stock' | 'has_out_variant';
+  /** Admin catalog search: match name / SKU / stock control number by substring. */
+  includeInternalSearch?: boolean;
 }
 
 export class ProductRepository extends BaseRepository {
@@ -80,6 +82,20 @@ export class ProductRepository extends BaseRepository {
 
   async findByBarcode(barcode: string) {
     return ProductVariantModel.findOne({ barcode, isDeleted: false });
+  }
+
+  async findByStockControlNumber(value: string, excludeProductId?: string) {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+
+    const filter: FilterQuery<ProductDocument> = {
+      isDeleted: false,
+      stockControlNumber: new RegExp(`^${escapeRegex(trimmed)}$`, 'i'),
+    };
+    const excludeId = toObjectId(excludeProductId);
+    if (excludeId) filter._id = { $ne: excludeId };
+
+    return ProductModel.findOne(filter).select('_id name stockControlNumber').lean();
   }
 
   async findProductIdsBySkuOrBarcode(sku?: string, barcode?: string) {
@@ -290,88 +306,92 @@ export class ProductRepository extends BaseRepository {
 
     if (options.q) {
       const q = options.q.trim();
-      const looksLikeSku = /^[a-z0-9][a-z0-9_-]{2,40}$/i.test(q) && !/\s/.test(q);
-
-      // Related categories: "jeans" → jeans-denim, "heel" → heels, etc.
-      const relatedCategoryIds = await findRelatedCategoryIds(q);
-
-      if (looksLikeSku) {
-        // SKU / barcode / exact-ish codes: keep regex path (text index is poor for codes).
-        const skuMatch = await ProductVariantModel.distinct('productId', {
-          isDeleted: false,
-          $or: [
-            { sku: new RegExp(`^${escapeRegex(q)}$`, 'i') },
-            { barcode: new RegExp(`^${escapeRegex(q)}$`, 'i') },
-            { sku: new RegExp(escapeRegex(q), 'i') },
-            { barcode: new RegExp(escapeRegex(q), 'i') },
-          ],
-        });
-
-        filter.$or = [
-          { name: new RegExp(escapeRegex(q), 'i') },
-          { slug: new RegExp(escapeRegex(q), 'i') },
-          { shortDescription: new RegExp(escapeRegex(q), 'i') },
-          { tags: new RegExp(escapeRegex(q), 'i') },
-          { searchKeywords: new RegExp(escapeRegex(q), 'i') },
-          ...(skuMatch.length ? [{ _id: { $in: skuMatch } }] : []),
-          ...(relatedCategoryIds.length
-            ? [
-                { categoryId: { $in: relatedCategoryIds } },
-                { categoryIds: { $in: relatedCategoryIds } },
-                { subcategoryId: { $in: relatedCategoryIds } },
-              ]
-            : []),
-        ];
+      if (options.includeInternalSearch) {
+        await applyAdminCatalogSearch(filter, q);
       } else {
-        // Keyword search: use the existing text index (name/shortDescription/tags/searchKeywords).
-        // Also OR in SKU + related-category hits — $text cannot live inside $or, so we
-        // resolve to an _id union when extra matches exist; otherwise filter with $text alone.
-        const skuMatch = await ProductVariantModel.distinct('productId', {
-          isDeleted: false,
-          $or: [
-            { sku: new RegExp(escapeRegex(q), 'i') },
-            { barcode: new RegExp(escapeRegex(q), 'i') },
-          ],
-        });
+        const looksLikeSku = /^[a-z0-9][a-z0-9_-]{2,40}$/i.test(q) && !/\s/.test(q);
 
-        let categoryProductIds: Types.ObjectId[] = [];
-        if (relatedCategoryIds.length) {
-          categoryProductIds = (
-            await ProductModel.find({
-              isDeleted: false,
-              $or: [
-                { categoryId: { $in: relatedCategoryIds } },
-                { categoryIds: { $in: relatedCategoryIds } },
-                { subcategoryId: { $in: relatedCategoryIds } },
-              ],
+        // Related categories: "jeans" → jeans-denim, "heel" → heels, etc.
+        const relatedCategoryIds = await findRelatedCategoryIds(q);
+
+        if (looksLikeSku) {
+          // SKU / barcode / exact-ish codes: keep regex path (text index is poor for codes).
+          const skuMatch = await ProductVariantModel.distinct('productId', {
+            isDeleted: false,
+            $or: [
+              { sku: new RegExp(`^${escapeRegex(q)}$`, 'i') },
+              { barcode: new RegExp(`^${escapeRegex(q)}$`, 'i') },
+              { sku: new RegExp(escapeRegex(q), 'i') },
+              { barcode: new RegExp(escapeRegex(q), 'i') },
+            ],
+          });
+
+          filter.$or = [
+            { name: new RegExp(escapeRegex(q), 'i') },
+            { slug: new RegExp(escapeRegex(q), 'i') },
+            { shortDescription: new RegExp(escapeRegex(q), 'i') },
+            { tags: new RegExp(escapeRegex(q), 'i') },
+            { searchKeywords: new RegExp(escapeRegex(q), 'i') },
+            ...(skuMatch.length ? [{ _id: { $in: skuMatch } }] : []),
+            ...(relatedCategoryIds.length
+              ? [
+                  { categoryId: { $in: relatedCategoryIds } },
+                  { categoryIds: { $in: relatedCategoryIds } },
+                  { subcategoryId: { $in: relatedCategoryIds } },
+                ]
+              : []),
+          ];
+        } else {
+          // Keyword search: use the existing text index (name/shortDescription/tags/searchKeywords).
+          // Also OR in SKU + related-category hits — $text cannot live inside $or, so we
+          // resolve to an _id union when extra matches exist; otherwise filter with $text alone.
+          const skuMatch = await ProductVariantModel.distinct('productId', {
+            isDeleted: false,
+            $or: [
+              { sku: new RegExp(escapeRegex(q), 'i') },
+              { barcode: new RegExp(escapeRegex(q), 'i') },
+            ],
+          });
+
+          let categoryProductIds: Types.ObjectId[] = [];
+          if (relatedCategoryIds.length) {
+            categoryProductIds = (
+              await ProductModel.find({
+                isDeleted: false,
+                $or: [
+                  { categoryId: { $in: relatedCategoryIds } },
+                  { categoryIds: { $in: relatedCategoryIds } },
+                  { subcategoryId: { $in: relatedCategoryIds } },
+                ],
+              })
+                .select('_id')
+                .limit(500)
+                .lean()
+            ).map((row) => row._id as Types.ObjectId);
+          }
+
+          if (skuMatch.length || categoryProductIds.length) {
+            const textHits = await ProductModel.find({
+              ...filter,
+              $text: { $search: q },
             })
               .select('_id')
               .limit(500)
-              .lean()
-          ).map((row) => row._id as Types.ObjectId);
-        }
-
-        if (skuMatch.length || categoryProductIds.length) {
-          const textHits = await ProductModel.find({
-            ...filter,
-            $text: { $search: q },
-          })
-            .select('_id')
-            .limit(500)
-            .lean();
-          const merged = [
-            ...new Set([
-              ...textHits.map((row) => row._id.toString()),
-              ...skuMatch.map((id) => id.toString()),
-              ...categoryProductIds.map((id) => id.toString()),
-            ]),
-          ].map((id) => new Types.ObjectId(id));
-          if (!merged.length) {
-            return { data: [], meta: buildPaginationMeta(0, page, limit) };
+              .lean();
+            const merged = [
+              ...new Set([
+                ...textHits.map((row) => row._id.toString()),
+                ...skuMatch.map((id) => id.toString()),
+                ...categoryProductIds.map((id) => id.toString()),
+              ]),
+            ].map((id) => new Types.ObjectId(id));
+            if (!merged.length) {
+              return { data: [], meta: buildPaginationMeta(0, page, limit) };
+            }
+            filter._id = { $in: merged };
+          } else {
+            filter.$text = { $search: q };
           }
-          filter._id = { $in: merged };
-        } else {
-          filter.$text = { $search: q };
         }
       }
     }
@@ -455,6 +475,29 @@ const LIST_SELECT_FIELDS = [
 
 function escapeRegex(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** Admin list: substring match on name, SKU, and stock control number. */
+async function applyAdminCatalogSearch(filter: Record<string, unknown>, q: string) {
+  const pattern = new RegExp(escapeRegex(q), 'i');
+  const skuMatch = await ProductVariantModel.distinct('productId', {
+    isDeleted: false,
+    $or: [{ sku: pattern }, { barcode: pattern }],
+  });
+  const searchOr: Record<string, unknown>[] = [
+    { name: pattern },
+    { slug: pattern },
+    { sku: pattern },
+    { stockControlNumber: pattern },
+  ];
+  if (skuMatch.length) {
+    searchOr.push({ _id: { $in: skuMatch } });
+  }
+  if (Array.isArray(filter.$and)) {
+    (filter.$and as unknown[]).push({ $or: searchOr });
+  } else {
+    filter.$or = searchOr;
+  }
 }
 
 function toObjectId(value?: string): Types.ObjectId | undefined {

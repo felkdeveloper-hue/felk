@@ -24,6 +24,7 @@ import { ProductInsightsPanel } from '@/components/admin/analytics/ProductInsigh
 import { ADMIN_ROUTES, QUERY_KEYS } from '@/constants';
 import { findOfficialBrandId, OFFICIAL_BRAND_NAME } from '@/constants/store-brand';
 import { useAdminPermissions } from '@/hooks/admin';
+import { useDebounce } from '@/hooks/use-debounce';
 import { AppError } from '@/lib/errors';
 import { isProductLive } from '@/lib/product-status';
 import { cn } from '@/lib/utils';
@@ -1428,6 +1429,8 @@ export function ProductFormPage({ productId }: { productId?: string }) {
     reset,
     setValue,
     watch,
+    setError,
+    clearErrors,
     formState: { errors, isDirty },
   } = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
@@ -1468,6 +1471,56 @@ export function ProductFormPage({ productId }: { productId?: string }) {
   });
 
   const w = watch();
+  const stockControlValue = w.stockControlNumber ?? '';
+  const debouncedStockControl = useDebounce(stockControlValue.trim(), 300);
+
+  const stockControlCheckQuery = useQuery({
+    queryKey: QUERY_KEYS.adminProducts.stockControlCheck(debouncedStockControl, productId),
+    queryFn: () => productsApi.checkStockControlNumber(debouncedStockControl, productId),
+    enabled: debouncedStockControl.length > 0,
+    staleTime: 15_000,
+  });
+
+  const stockControlTaken =
+    debouncedStockControl.length > 0 &&
+    stockControlValue.trim() === debouncedStockControl &&
+    Boolean(stockControlCheckQuery.data?.taken);
+
+  useEffect(() => {
+    const current = stockControlValue.trim();
+    if (!current || current !== debouncedStockControl) {
+      if (errors.stockControlNumber?.type === 'validate') {
+        clearErrors('stockControlNumber');
+      }
+      return;
+    }
+    if (stockControlCheckQuery.data?.taken) {
+      const other = stockControlCheckQuery.data.productName?.trim();
+      const message = other
+        ? `This stock control number is already used on “${other}”`
+        : 'This stock control number is already used on another product';
+      if (errors.stockControlNumber?.message !== message) {
+        setError('stockControlNumber', {
+          type: 'validate',
+          message,
+        });
+      }
+      return;
+    }
+    if (stockControlCheckQuery.data && !stockControlCheckQuery.data.taken) {
+      if (errors.stockControlNumber?.type === 'validate') {
+        clearErrors('stockControlNumber');
+      }
+    }
+  }, [
+    clearErrors,
+    debouncedStockControl,
+    errors.stockControlNumber?.message,
+    errors.stockControlNumber?.type,
+    setError,
+    stockControlCheckQuery.data,
+    stockControlValue,
+  ]);
 
   const setFlag = (field: keyof ProductFormValues, value: boolean) =>
     setValue(field as 'isFeatured', value as any, { shouldDirty: true });
@@ -1638,6 +1691,7 @@ export function ProductFormPage({ productId }: { productId?: string }) {
   });
 
   const onSubmit = (data: ProductFormValues) => {
+    if (stockControlTaken) return;
     if (isEdit) updateMutation.mutate(data);
     else createMutation.mutate(data);
   };
@@ -1799,7 +1853,7 @@ export function ProductFormPage({ productId }: { productId?: string }) {
             ) : null}
             <button
               type="submit"
-              disabled={isSaving}
+              disabled={isSaving || stockControlTaken}
               className="inline-flex h-9 items-center gap-1.5 rounded-none bg-[var(--admin-ink)] px-5 text-sm font-semibold text-[var(--admin-surface)] transition hover:opacity-90 disabled:opacity-60"
             >
               {isSaving ? <Loader2 className="size-3.5 animate-spin" /> : null}
@@ -1831,11 +1885,15 @@ export function ProductFormPage({ productId }: { productId?: string }) {
                     placeholder="e.g. Women's Silk Wrap Midi Dress"
                   />
                 </Field>
-                <Field label="Stock control number">
+                <Field label="Stock control number" error={errors.stockControlNumber?.message}>
                   <input
                     {...register('stockControlNumber')}
-                    className={fieldCls}
+                    className={cn(
+                      fieldCls,
+                      errors.stockControlNumber && 'border-red-600 focus:border-red-600',
+                    )}
                     placeholder="Internal reference (admin only)"
+                    aria-invalid={Boolean(errors.stockControlNumber)}
                   />
                 </Field>
               </div>

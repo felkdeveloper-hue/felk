@@ -306,6 +306,18 @@ export const openApiSpec = {
         responses: { 201: { description: 'Created' } },
       },
     },
+    '/catalog/products/stock-control-check': {
+      get: {
+        tags: ['Catalog'],
+        security: [{ bearerAuth: [] }],
+        summary: 'Check whether a stock control number is already used',
+        parameters: [
+          { name: 'value', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'excludeId', in: 'query', schema: { type: 'string' } },
+        ],
+        responses: { 200: { description: 'taken flag plus the other product if found' } },
+      },
+    },
     '/catalog/products/{id}': {
       get: {
         tags: ['Catalog'],

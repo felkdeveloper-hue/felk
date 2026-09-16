@@ -136,6 +136,11 @@ export const productCreateSchema = z.object({
 
 export const productUpdateSchema = productCreateSchema.partial();
 
+export const stockControlCheckQuerySchema = z.object({
+  value: z.string().trim().min(1).max(64),
+  excludeId: objectIdSchema.optional(),
+});
+
 export const productListQuerySchema = paginationQuerySchema.extend({
   status: z.string().optional(),
   visibility: z.string().optional(),

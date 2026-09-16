@@ -253,6 +253,7 @@ productSchema.index(
   { sku: 1 },
   { unique: true, partialFilterExpression: { sku: { $type: 'string' } } },
 );
+productSchema.index({ stockControlNumber: 1, isDeleted: 1 });
 productSchema.index({ status: 1, isDeleted: 1, publishAt: -1 });
 // Storefront listing: filter by isDeleted + status (+ gender) and sort by createdAt.
 productSchema.index({ isDeleted: 1, status: 1, createdAt: -1 });

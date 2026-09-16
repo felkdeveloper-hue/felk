@@ -43,6 +43,11 @@ import { readFile } from 'node:fs/promises';
 import type { ZodIssue } from 'zod';
 import { ApiError } from '@/utils/errors/api-error.js';
 import { slugify } from '@/utils/slug.helper.js';
+import { escapeRegex } from '@/utils/search.js';
+import {
+  normalizeStockControlNumber,
+  stockControlNumberKey,
+} from '@/utils/stock-control-number.js';
 
 /* -------------------------------------------------------------------------- */
 /* Sheet contract                                                             */
@@ -1060,6 +1065,7 @@ function buildProducts(
   const usedSlugs = new Map<string, string>();
   // Track SKUs used in this file to catch intra-file duplicates
   const usedSkus = new Map<string, number>();
+  const usedStockControlNumbers = new Map<string, string>();
   /** Handles rejected for product-level field errors — skip their later rows. */
   const rejectedHandles = new Set<string>();
 
@@ -1313,7 +1319,21 @@ function buildProducts(
       const brand = values.brand?.trim() || OFFICIAL_BRAND_NAME;
       const material = values.material ?? '';
       const stockControlNumberRaw = values.stockControlNumber ?? '';
-      const stockControlNumber = stockControlNumberRaw.trim() || null;
+      const stockControlNumber = normalizeStockControlNumber(stockControlNumberRaw);
+      if (stockControlNumber) {
+        const stockKey = stockControlNumberKey(stockControlNumber);
+        const stockOwner = usedStockControlNumbers.get(stockKey);
+        if (stockOwner) {
+          issues.push({
+            row,
+            column: 'Stock Control Number',
+            message: `"${stockControlNumber}" is already used by "${stockOwner}" in this sheet. Each product needs its own stock control number.`,
+          });
+          rejectedHandles.add(handle);
+          continue;
+        }
+        usedStockControlNumbers.set(stockKey, name);
+      }
       const returnsCriteria = values.returnPolicy ?? '';
       const warrantyDetails = values.warrantyDetails ?? '';
       const occasions = splitList(values.occasions ?? '');
@@ -1701,6 +1721,35 @@ export class ProductImportService {
             row: 0,
             column: 'Variant SKU',
             message: `SKU "${skuVal}" already exists in the database. Remove or change it.`,
+          });
+        }
+      }
+    }
+
+    const stockControlNumbers = [
+      ...new Set(
+        products
+          .map((product) => product.stockControlNumber?.trim())
+          .filter((value): value is string => Boolean(value)),
+      ),
+    ];
+    if (stockControlNumbers.length) {
+      const existingStockControls = await ProductModel.find({
+        isDeleted: false,
+        $or: stockControlNumbers.map((value) => ({
+          stockControlNumber: new RegExp(`^${escapeRegex(value)}$`, 'i'),
+        })),
+      })
+        .select('stockControlNumber name')
+        .lean();
+      for (const row of existingStockControls) {
+        const number = String(row.stockControlNumber ?? '').trim();
+        const productName = String(row.name ?? 'another product');
+        if (number) {
+          issues.push({
+            row: 0,
+            column: 'Stock Control Number',
+            message: `"${number}" is already used by "${productName}". Each product needs its own stock control number.`,
           });
         }
       }
@@ -2267,7 +2316,7 @@ export class ProductImportService {
       {
         topic: 'Stock Control Number',
         explanation:
-          'Optional internal admin reference (max 64 characters). Not shown on the storefront. Set on the first row of each product; leave blank if unused.',
+          'Optional internal admin reference (max 64 characters). Must be unique across products. Not shown on the storefront. Set on the first row of each product; leave blank if unused.',
       },
       {
         topic: 'SEO Title & Description',

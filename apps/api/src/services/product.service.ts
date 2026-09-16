@@ -31,6 +31,7 @@ import {
 import { allocateUniqueParentSku, isSkuTaken } from '@/services/sku-allocation.service.js';
 import { env } from '@/config/env.js';
 import { toPublicMediaUrl } from '@/utils/public-media-url.js';
+import { normalizeStockControlNumber } from '@/utils/stock-control-number.js';
 
 /** Rewrite localhost upload URLs and blocked `*.r2.dev` hosts to a public origin. */
 function publicMediaUrl(url?: string | null): string | undefined {
@@ -746,6 +747,25 @@ export class ProductService {
     return this.hydrateProductDetail(doc as never, String((doc as { _id: unknown })._id));
   }
 
+  async checkStockControlNumber(value: string, excludeProductId?: string) {
+    const stockControlNumber = normalizeStockControlNumber(value);
+    if (!stockControlNumber) {
+      return { taken: false, productId: null, productName: null };
+    }
+    const existing = await productRepository.findByStockControlNumber(
+      stockControlNumber,
+      excludeProductId,
+    );
+    if (!existing) {
+      return { taken: false, productId: null, productName: null };
+    }
+    return {
+      taken: true,
+      productId: String(existing._id),
+      productName: typeof existing.name === 'string' ? existing.name : null,
+    };
+  }
+
   /**
    * Shared PDP enrichment: one parallel batch for variants/media/relationships.
    * Only creates a default variant when the product has none (avoids an extra find on every hit).
@@ -900,6 +920,18 @@ export class ProductService {
       throw ApiError.conflict('SKU already exists', undefined, 'SKU_EXISTS');
     }
 
+    const stockControlNumber = normalizeStockControlNumber(payload.stockControlNumber);
+    if (
+      stockControlNumber &&
+      (await productRepository.findByStockControlNumber(stockControlNumber))
+    ) {
+      throw ApiError.conflict(
+        'This stock control number is already used on another product',
+        undefined,
+        'STOCK_CONTROL_EXISTS',
+      );
+    }
+
     const pricing = (payload.pricing as Record<string, unknown>) ?? {
       price: payload.price ?? 0,
       salePrice: payload.salePrice ?? null,
@@ -943,7 +975,7 @@ export class ProductService {
 
     const doc = await ProductModel.create({
       name,
-      stockControlNumber: (payload.stockControlNumber as string | null | undefined) ?? null,
+      stockControlNumber,
       slug,
       sku,
       shortDescription: payload.shortDescription ?? null,
@@ -1034,6 +1066,21 @@ export class ProductService {
       }
     } else if (!before.sku) {
       payload.sku = await allocateUniqueParentSku();
+    }
+
+    if (payload.stockControlNumber !== undefined) {
+      const stockControlNumber = normalizeStockControlNumber(payload.stockControlNumber);
+      payload.stockControlNumber = stockControlNumber;
+      if (
+        stockControlNumber &&
+        (await productRepository.findByStockControlNumber(stockControlNumber, id))
+      ) {
+        throw ApiError.conflict(
+          'This stock control number is already used on another product',
+          undefined,
+          'STOCK_CONTROL_EXISTS',
+        );
+      }
     }
 
     if (payload.pricing) {

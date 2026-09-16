@@ -317,6 +317,21 @@ export const productsApi = {
     return { ...result, data: normalizeList(result.data, normalizeProduct) };
   },
 
+  async checkStockControlNumber(
+    value: string,
+    excludeId?: string,
+  ): Promise<{ taken: boolean; productId: string | null; productName: string | null }> {
+    return http.get<{ taken: boolean; productId: string | null; productName: string | null }>(
+      '/catalog/products/stock-control-check',
+      {
+        params: {
+          value,
+          ...(excludeId ? { excludeId } : {}),
+        },
+      },
+    );
+  },
+
   async getById(id: string): Promise<AdminProduct> {
     return normalizeProduct(await http.get<unknown>(`/catalog/products/${id}`));
   },

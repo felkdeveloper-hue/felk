@@ -20,6 +20,7 @@ import { ProductThumb } from '@/components/admin/analytics';
 import { BulkProductUploadDialog } from '@/components/admin/bulk-product-upload-dialog';
 import { ADMIN_ROUTES, QUERY_KEYS } from '@/constants';
 import { useAdminPermissions } from '@/hooks/admin';
+import { useDebounce } from '@/hooks/use-debounce';
 import { cn, formatCurrency, formatDate } from '@/lib/utils';
 import { normalizeProductStatusFilter } from '@/lib/product-status';
 import {
@@ -167,6 +168,7 @@ export function ProductsListPage() {
   const { products, inventory } = useAdminPermissions();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 300);
   const [status, setStatus] = useState('');
   const [stockFilter, setStockFilter] = useState<ProductStockFilter | ''>('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -177,11 +179,11 @@ export function ProductsListPage() {
     () => ({
       page,
       limit: 20,
-      q: search || undefined,
+      q: debouncedSearch || undefined,
       status: normalizeProductStatusFilter(status),
       stockFilter: stockFilter || undefined,
     }),
-    [page, search, status, stockFilter],
+    [page, debouncedSearch, status, stockFilter],
   );
 
   const query = useQuery({
@@ -438,7 +440,7 @@ export function ProductsListPage() {
               setSearch(value);
               setPage(1);
             }}
-            searchPlaceholder="Search products, SKU…"
+            searchPlaceholder="Search by name or stock control number…"
             status={status}
             onStatusChange={(value) => {
               setStatus(value);
