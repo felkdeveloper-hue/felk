@@ -14,21 +14,46 @@ const PERIODS = [
 
 type PeriodKey = (typeof PERIODS)[number]['key'];
 
-function orderCount(
-  data: {
-    todayOrders?: number;
-    yesterdayOrders?: number;
-    weekOrders?: number;
-    monthOrders?: number;
-    yearOrders?: number;
-  },
-  key: PeriodKey,
+/**
+ * Temporary display overlay only — real revenue fetch/logic is unchanged.
+ * Figures are a plausible 10M+ LKR/year store (not a scaled copy of live totals).
+ */
+const DEMO_REVENUE: Record<PeriodKey, { amount: number; orders: number }> = {
+  today: { amount: 52_680, orders: 10 },
+  yesterday: { amount: 41_350, orders: 8 },
+  week: { amount: 298_740, orders: 59 },
+  month: { amount: 1_024_860, orders: 204 },
+  year: { amount: 11_486_320, orders: 2287 },
+};
+
+function demoSoldScale(yearOrders?: number) {
+  if (!yearOrders || yearOrders <= 0) return 28;
+  return DEMO_REVENUE.year.orders / yearOrders;
+}
+
+function demoSoldQty(qty: number, scale: number) {
+  if (qty <= 0) return 0;
+  return Math.max(1, Math.round(qty * scale));
+}
+
+function demoSoldSizes(
+  sizes: Array<{ size: string; count: number }> | undefined,
+  scaledQty: number,
 ) {
-  if (key === 'today') return data.todayOrders ?? 0;
-  if (key === 'yesterday') return data.yesterdayOrders ?? 0;
-  if (key === 'week') return data.weekOrders ?? 0;
-  if (key === 'month') return data.monthOrders ?? 0;
-  return data.yearOrders ?? 0;
+  if (!sizes?.length) return sizes;
+  const total = sizes.reduce((sum, row) => sum + row.count, 0);
+  if (total <= 0) return sizes;
+
+  const scaled = sizes.map((row) => ({
+    ...row,
+    count: Math.round((row.count / total) * scaledQty),
+  }));
+  const drift = scaledQty - scaled.reduce((sum, row) => sum + row.count, 0);
+  if (drift !== 0) {
+    const richest = scaled.reduce((best, row, index) => (row.count > scaled[best].count ? index : best), 0);
+    scaled[richest] = { ...scaled[richest], count: Math.max(0, scaled[richest].count + drift) };
+  }
+  return scaled;
 }
 
 export function DashboardRevenueHero() {
@@ -65,7 +90,7 @@ export function DashboardRevenueHero() {
       ) : (
         <div className="grid gap-px bg-[var(--admin-line)] sm:grid-cols-2 xl:grid-cols-5">
           {PERIODS.map((period, index) => {
-            const orders = orderCount(data, period.key);
+            const demo = DEMO_REVENUE[period.key];
             return (
               <article
                 key={period.key}
@@ -75,10 +100,10 @@ export function DashboardRevenueHero() {
                   {period.label}
                 </p>
                 <p className="mt-2 font-serif text-2xl tabular-nums tracking-tight text-[var(--admin-ink)]">
-                  {formatCurrency(data[period.key])}
+                  {formatCurrency(demo.amount)}
                 </p>
                 <p className="mt-1.5 text-xs text-neutral-500">
-                  {orders} {orders === 1 ? 'order' : 'orders'} · {period.hint}
+                  {demo.orders} {demo.orders === 1 ? 'order' : 'orders'} · {period.hint}
                 </p>
               </article>
             );
@@ -108,6 +133,7 @@ export function DashboardRevenueHero() {
           <ul className="divide-border max-h-72 divide-y overflow-auto pr-1">
             {(data.yearProducts ?? data.topProducts).map((product) => {
               const stockControl = product.stockControlNumber?.trim();
+              const soldQty = demoSoldQty(product.qty, demoSoldScale(data.yearOrders));
               return (
                 <li
                   key={product.productId}
@@ -127,10 +153,10 @@ export function DashboardRevenueHero() {
                         </span>
                       ) : null}
                     </div>
-                    <SizeBreakdown sizes={product.sizes} empty="Size not recorded" />
+                    <SizeBreakdown sizes={demoSoldSizes(product.sizes, soldQty)} empty="Size not recorded" />
                   </div>
                   <p className="text-muted-foreground shrink-0 text-xs tabular-nums">
-                    {product.qty} sold
+                    {soldQty} sold
                   </p>
                   <ProductThumb
                     productId={product.productId}
