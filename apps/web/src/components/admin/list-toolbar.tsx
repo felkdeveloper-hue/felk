@@ -11,6 +11,7 @@ export interface ListToolbarProps {
   totalPages: number;
   onPageChange: (page: number) => void;
   extraFilters?: ReactNode;
+  leadingFilters?: ReactNode;
   bulkActions?: ReactNode;
 }
 
@@ -25,6 +26,7 @@ export function ListToolbar({
   totalPages,
   onPageChange,
   extraFilters,
+  leadingFilters,
   bulkActions,
 }: ListToolbarProps) {
   return (
@@ -39,6 +41,7 @@ export function ListToolbar({
             className="focus:border-[var(--admin-accent)]/40 h-11 w-full min-w-0 flex-1 rounded-xl border border-[var(--admin-line)] bg-[var(--admin-panel-soft)] px-3.5 text-base text-[var(--admin-ink)] outline-none placeholder:text-neutral-400 sm:h-10 sm:min-w-[220px] sm:rounded-lg sm:text-sm"
           />
         ) : null}
+        {leadingFilters}
         {onStatusChange && statusOptions ? (
           <select
             value={status ?? ''}

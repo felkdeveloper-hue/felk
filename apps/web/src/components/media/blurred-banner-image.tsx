@@ -10,6 +10,8 @@ export interface BlurredBannerImageProps {
   objectClass?: string;
   loading?: 'eager' | 'lazy';
   fetchPriority?: 'high' | 'low' | 'auto';
+  /** Extra classes on the contained foreground image wrapper (e.g. header offset). */
+  contentClassName?: string;
   onLoad?: () => void;
 }
 
@@ -27,6 +29,7 @@ export function BlurredBannerImage({
   objectClass,
   loading = 'lazy',
   fetchPriority = 'auto',
+  contentClassName,
   onLoad,
 }: BlurredBannerImageProps) {
   const [loaded, setLoaded] = useState(false);
@@ -63,22 +66,24 @@ export function BlurredBannerImage({
         className="absolute inset-0 bg-gradient-to-b from-black/25 via-transparent to-black/40"
       />
 
-      <picture>
-        {mobileSrc ? <source media={MOBILE_MEDIA} srcSet={mobileSrc} /> : null}
-        <img
-          src={src}
-          alt={alt}
-          loading={loading}
-          decoding="async"
-          fetchPriority={fetchPriority}
-          onLoad={handleLoad}
-          className={cn(
-            'absolute inset-0 h-full w-full object-contain transition-[opacity,transform] duration-700 ease-out',
-            objectClass,
-            loaded ? 'scale-100 opacity-100' : 'scale-[1.02] opacity-0',
-          )}
-        />
-      </picture>
+      <div className={cn('absolute inset-0', contentClassName)}>
+        <picture className="block h-full w-full">
+          {mobileSrc ? <source media={MOBILE_MEDIA} srcSet={mobileSrc} /> : null}
+          <img
+            src={src}
+            alt={alt}
+            loading={loading}
+            decoding="async"
+            fetchPriority={fetchPriority}
+            onLoad={handleLoad}
+            className={cn(
+              'h-full w-full object-contain object-center transition-[opacity,transform] duration-700 ease-out',
+              objectClass,
+              loaded ? 'scale-100 opacity-100' : 'scale-[1.02] opacity-0',
+            )}
+          />
+        </picture>
+      </div>
     </div>
   );
 }

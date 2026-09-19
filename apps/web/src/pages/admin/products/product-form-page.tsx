@@ -27,7 +27,7 @@ import { useAdminPermissions } from '@/hooks/admin';
 import { useDebounce } from '@/hooks/use-debounce';
 import { AppError } from '@/lib/errors';
 import { isProductLive } from '@/lib/product-status';
-import { cn } from '@/lib/utils';
+import { cn, normalizeId } from '@/lib/utils';
 import {
   cmsApi,
   inventoryApi,
@@ -99,6 +99,52 @@ function placeToInput(value?: number | null): string {
 }
 function masterDataCode(name: string) {
   return slugify(name).toUpperCase().replace(/-/g, '_').slice(0, 32) || 'ITEM';
+}
+
+function relationId(value: unknown): string {
+  if (value == null || value === '') return '';
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed === '[object Object]' ? '' : trimmed;
+  }
+  if (typeof value === 'object') {
+    const id = normalizeId(value);
+    return id === '[object Object]' ? '' : id;
+  }
+  return '';
+}
+
+function colorNameFromTitle(title?: string) {
+  const part = title?.split('/')[0]?.trim();
+  return part || undefined;
+}
+
+function buildColorSelectOptions(
+  colors: Array<{ id: string; name: string }>,
+  colorKey: string,
+  fallbackName?: string,
+) {
+  const currentId = colorKey === '__no_color__' ? '' : relationId(colorKey);
+  const seen = new Set<string>();
+  const options: Array<{ id: string; name: string }> = [];
+
+  if (currentId) {
+    const fromList = colors.find((c) => relationId(c.id) === currentId);
+    options.push({
+      id: currentId,
+      name: fromList?.name || fallbackName || 'Current color',
+    });
+    seen.add(currentId);
+  }
+
+  for (const color of colors) {
+    const id = relationId(color.id);
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    options.push({ id, name: color.name });
+  }
+
+  return { value: currentId, options };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -267,6 +313,11 @@ function ColorVariantCard({
 
   const usedSizeIds = new Set(colorVariants.map((v) => v.sizeId).filter(Boolean) as string[]);
   const availableSizes = sizes.filter((s) => !usedSizeIds.has(s.id));
+  const resolvedColorName =
+    colors.find((c) => relationId(c.id) === relationId(colorKey))?.name ||
+    colorNameFromTitle(firstVariant?.title) ||
+    (colorLabel && colorLabel !== colorKey ? colorLabel : undefined);
+  const colorSelect = buildColorSelectOptions(colors, colorKey, resolvedColorName);
 
   useEffect(() => {
     if (imgIdx >= colorImages.length) setImgIdx(Math.max(0, colorImages.length - 1));
@@ -293,17 +344,17 @@ function ColorVariantCard({
           ) : null}
           {canUpdate ? (
             <select
-              value={colorKey === '__no_color__' ? '' : colorKey}
+              value={colorSelect.value}
               onChange={(e) => {
                 const next = e.target.value;
-                if (!next || next === colorKey) return;
+                if (!next || next === colorSelect.value) return;
                 onChangeColor(next);
               }}
               className="rounded-none border border-[var(--admin-line)] bg-white px-2 py-1 text-sm font-bold text-[var(--admin-ink)] outline-none focus:border-[var(--admin-accent)]"
               title="Change color for all sizes in this group"
             >
               {colorKey === '__no_color__' ? <option value="">No color</option> : null}
-              {colors.map((c) => (
+              {colorSelect.options.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
                 </option>
@@ -689,21 +740,21 @@ function VariantsSection({
     staleTime: 0,
   });
   const sizesQuery = useQuery({
-    queryKey: ['cms', 'sizes', 'variant-form'],
-    queryFn: () => cmsApi.sizes.list({ limit: 100, status: 'active' }),
+    queryKey: ['cms', 'sizes', 'variant-form-all'],
+    queryFn: () => cmsApi.sizes.listAll({ sortBy: 'name', sortOrder: 'asc' }),
     staleTime: 5 * 60_000,
   });
   const colorsQuery = useQuery({
-    queryKey: ['cms', 'colors', 'variant-form'],
-    queryFn: () => cmsApi.colors.list({ limit: 100, status: 'active' }),
+    queryKey: ['cms', 'colors', 'variant-form-all'],
+    queryFn: () => cmsApi.colors.listAll({ sortBy: 'name', sortOrder: 'asc' }),
     staleTime: 5 * 60_000,
   });
 
   const variants = variantsQuery.data ?? [];
   const stockRows = stockQuery.data ?? [];
   const media = mediaQuery.data ?? [];
-  const sizes = sizesQuery.data?.data ?? [];
-  const colors = colorsQuery.data?.data ?? [];
+  const sizes = sizesQuery.data ?? [];
+  const colors = colorsQuery.data ?? [];
 
   const [addingColor, setAddingColor] = useState(false);
   const [newColorId, setNewColorId] = useState('');
@@ -756,7 +807,7 @@ function VariantsSection({
   const colorGroups = useMemo(() => {
     const groups = new Map<string, AdminVariant[]>();
     for (const v of variants) {
-      const key = v.colorId ?? '__no_color__';
+      const key = relationId(v.colorId) || '__no_color__';
       groups.set(key, [...(groups.get(key) ?? []), v]);
     }
     return groups;
@@ -797,8 +848,8 @@ function VariantsSection({
       for (const sizeId of sizeOptions) {
         const key = `${newColorId}:${sizeId}`;
         if (existingKeys.has(key)) continue;
-        const colorName = colors.find((c) => c.id === newColorId)?.name;
-        const sizeName = sizes.find((s) => s.id === sizeId)?.name;
+        const colorName = colors.find((c) => relationId(c.id) === relationId(newColorId))?.name;
+        const sizeName = sizes.find((s) => relationId(s.id) === relationId(sizeId))?.name;
         const autoTitle = [colorName, sizeName].filter(Boolean).join(' / ') || undefined;
         const variant = await productsApi.createVariant(productId, {
           title: autoTitle,
@@ -940,9 +991,9 @@ function VariantsSection({
     mutationFn: ({ id, sizeId }: { id: string; sizeId: string | null }) => {
       const variant = variants.find((v) => v.id === id);
       const colorName = variant?.colorId
-        ? colors.find((c) => c.id === variant.colorId)?.name
+        ? colors.find((c) => relationId(c.id) === relationId(variant.colorId))?.name
         : undefined;
-      const sizeName = sizeId ? sizes.find((s) => s.id === sizeId)?.name : undefined;
+      const sizeName = sizeId ? sizes.find((s) => relationId(s.id) === relationId(sizeId))?.name : undefined;
       const title = [colorName, sizeName].filter(Boolean).join(' / ') || undefined;
       return productsApi.updateVariant(id, {
         sizeId,
@@ -968,7 +1019,7 @@ function VariantsSection({
       groupVariants: AdminVariant[];
     }) => {
       if (!groupVariants.length) return;
-      const colorName = colors.find((c) => c.id === toColorId)?.name;
+      const colorName = colors.find((c) => relationId(c.id) === relationId(toColorId))?.name;
       const [first, ...rest] = groupVariants;
       await productsApi.updateVariant(first!.id, {
         colorId: toColorId,
@@ -1021,7 +1072,7 @@ function VariantsSection({
       basePrice: number;
       baseSale: number | null;
     }) => {
-      const colorName = colors.find((c) => c.id === colorId)?.name;
+      const colorName = colors.find((c) => relationId(c.id) === relationId(colorId))?.name;
       const existingKeys = new Set(variants.map((v) => `${v.colorId ?? ''}:${v.sizeId ?? ''}`));
       let created = 0;
       for (const sizeId of sizeIds) {
@@ -1094,8 +1145,14 @@ function VariantsSection({
   const toggleSize = (id: string) =>
     setNewSizeIds((prev) => (prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]));
 
-  const usedColorIds = new Set([...colorGroups.keys()].filter((k) => k !== '__no_color__'));
-  const availableColors = colors.filter((c) => !usedColorIds.has(c.id));
+  const usedColorIds = new Set(
+    [...colorGroups.keys()].filter((k) => k !== '__no_color__').map((k) => relationId(k)),
+  );
+  const availableColors = colors.filter((c) => {
+    const id = relationId(c.id);
+    if (!id || usedColorIds.has(id)) return false;
+    return !c.status || c.status === 'active' || c.status === 'published';
+  });
 
   if (variantsQuery.isLoading) {
     return (
@@ -1124,11 +1181,14 @@ function VariantsSection({
 
       {/* Existing variant groups */}
       {[...colorGroups.entries()].map(([colorKey, colorVariants]) => {
+        const firstVariant = colorVariants[0] as AdminVariant | undefined;
+        const resolvedKey = colorKey === '__no_color__' ? '' : relationId(colorKey);
         const colorLabel =
           colorKey === '__no_color__'
             ? 'No color'
-            : (colors.find((c) => c.id === colorKey)?.name ?? colorKey);
-        const firstVariant = colorVariants[0] as AdminVariant | undefined;
+            : (colors.find((c) => relationId(c.id) === resolvedKey)?.name ??
+              colorNameFromTitle(firstVariant?.title) ??
+              'Color');
         const colorImages = colorVariants.flatMap((v) => variantMediaMap.get(v.id) ?? []);
         // Attach new photos to the default size of this color (else first size).
         const uploadTargetId = colorVariants.find((v) => v.isDefault)?.id ?? firstVariant?.id;

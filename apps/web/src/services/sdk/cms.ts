@@ -56,6 +56,7 @@ export interface HeroBanner {
   title: string;
   subtitle?: string;
   imageUrl?: string;
+  mobileImageUrl?: string;
   linkUrl?: string;
   ctaLabel?: string;
   priority?: number;

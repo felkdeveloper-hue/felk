@@ -96,11 +96,15 @@ export function getSetting<T = unknown>(
 
 export function normalizeHeroBanner(raw: unknown): HeroBanner {
   const record = asRecord(raw);
+  const images = record.images;
+  const imageUrl = resolveResponsiveImageUrl(images) ?? resolveMediaUrl(record.imageUrl);
+  const mobileImageUrl = resolveMediaUrl(asRecord(images).mobile);
   return {
     id: pickId(record),
     title: asString(record.title),
     subtitle: asString(record.subtitle) || undefined,
-    imageUrl: resolveResponsiveImageUrl(record.images),
+    imageUrl,
+    mobileImageUrl: mobileImageUrl && mobileImageUrl !== imageUrl ? mobileImageUrl : undefined,
     linkUrl: asString(record.ctaUrl ?? record.linkUrl) || undefined,
     ctaLabel: asString(record.ctaLabel ?? record.buttonText) || undefined,
     priority: asNumber(record.priority),

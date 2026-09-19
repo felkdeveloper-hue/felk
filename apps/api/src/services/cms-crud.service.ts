@@ -4,6 +4,7 @@ import { BaseRepository, type ListOptions } from '@/repositories/base.repository
 import { writeActivityLog, writeAuditLog } from '@/services/audit.service.js';
 import { ApiError } from '@/utils/errors/api-error.js';
 import { slugify } from '@/utils/slug.helper.js';
+import { invalidateStorefrontCmsCache } from '@/utils/simple-cache.js';
 
 export interface ActorMeta {
   userId?: string;
@@ -113,6 +114,7 @@ export class CmsCrudService {
       metadata: { id: doc._id.toString() },
     });
 
+    invalidateStorefrontCmsCache();
     return doc;
   }
 
@@ -147,6 +149,7 @@ export class CmsCrudService {
       metadata: { id },
     });
 
+    invalidateStorefrontCmsCache();
     return doc;
   }
 
@@ -164,6 +167,7 @@ export class CmsCrudService {
       before: before.toObject() as Record<string, unknown>,
     });
 
+    invalidateStorefrontCmsCache();
     return doc;
   }
 
@@ -178,6 +182,7 @@ export class CmsCrudService {
       requestId: actor.requestId,
       after: doc.toObject() as Record<string, unknown>,
     });
+    invalidateStorefrontCmsCache();
     return doc;
   }
 
@@ -191,6 +196,7 @@ export class CmsCrudService {
       requestId: actor.requestId,
       metadata: { ids, count },
     });
+    invalidateStorefrontCmsCache();
     return { count };
   }
 
@@ -204,6 +210,7 @@ export class CmsCrudService {
       requestId: actor.requestId,
       metadata: { ids, status, count },
     });
+    invalidateStorefrontCmsCache();
     return { count };
   }
 

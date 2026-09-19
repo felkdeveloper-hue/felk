@@ -116,6 +116,22 @@ function optionalPlace(value: unknown): number | null {
   return Number.isInteger(n) && n >= 1 && n <= 9999 ? n : null;
 }
 
+function optionalRelationId(value: unknown): string | undefined {
+  if (value == null || value === '') return undefined;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed && trimmed !== '[object Object]' ? trimmed : undefined;
+  }
+  if (typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    const inner = record.id ?? record._id;
+    if (typeof inner === 'string' && inner && inner !== '[object Object]') return inner;
+    const fallback = normalizeId(value);
+    return fallback && fallback !== '[object Object]' ? fallback : undefined;
+  }
+  return undefined;
+}
+
 function normalizeProduct(raw: unknown): AdminProduct {
   const record = raw as Record<string, unknown>;
   const pricing =
@@ -235,8 +251,8 @@ function normalizeVariant(raw: unknown): AdminVariant {
     productId: String(record.productId ?? ''),
     sku: String(record.sku ?? ''),
     title: typeof record.title === 'string' ? record.title : undefined,
-    colorId: record.colorId ? String(record.colorId) : undefined,
-    sizeId: record.sizeId ? String(record.sizeId) : undefined,
+    colorId: optionalRelationId(record.colorId),
+    sizeId: optionalRelationId(record.sizeId),
     optionValues:
       record.optionValues && typeof record.optionValues === 'object'
         ? (record.optionValues as Record<string, string>)
@@ -259,6 +275,9 @@ export interface ProductListParams extends ListQueryParams {
   categoryId?: string;
   includeDeleted?: boolean;
   stockFilter?: ProductStockFilter;
+  isBestSeller?: boolean;
+  isNewArrival?: boolean;
+  isFeBasics?: boolean;
 }
 
 export interface ProductInput {

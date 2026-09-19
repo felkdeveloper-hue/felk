@@ -54,6 +54,21 @@ export function createCmsResourceApi(basePath: string) {
       return { ...result, data: normalizeList(result.data, normalizeCmsResource) };
     },
 
+    /** Walk every page — color/size pickers need the full set, not the first 100. */
+    async listAll(params?: ListQueryParams): Promise<CmsResource[]> {
+      const limit = 100;
+      const rows: CmsResource[] = [];
+      let page = 1;
+      const maxPages = 30;
+      while (page <= maxPages) {
+        const result = await this.list({ ...params, page, limit });
+        rows.push(...result.data);
+        if (!result.meta.hasNextPage || result.data.length < limit) break;
+        page += 1;
+      }
+      return rows;
+    },
+
     async getById(id: string): Promise<CmsResource> {
       return normalizeCmsResource(await http.get<unknown>(`${basePath}/${id}`));
     },

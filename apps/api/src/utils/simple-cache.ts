@@ -76,6 +76,11 @@ export function invalidateStorefrontCatalogCache(): void {
   clearCacheByPrefix('storefront:products:', 'storefront:product:', 'storefront:bootstrap');
 }
 
+/** Drop public CMS lists (hero banners, promos, etc.) after admin writes. */
+export function invalidateStorefrontCmsCache(): void {
+  clearCacheByPrefix('storefront:bootstrap', 'storefront:list:');
+}
+
 export function cacheStats(): { size: number } {
   return { size: store.size };
 }

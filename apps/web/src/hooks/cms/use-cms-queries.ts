@@ -68,8 +68,9 @@ export function useHeroBanners(options?: CmsQueryOptions<{ data: HeroBanner[] }>
       const result = await cmsApi.listHeroBanners({ status: 'active', limit: 10 });
       return { data: result.data };
     },
-    staleTime: CMS_STALE,
+    staleTime: 15_000,
     gcTime: CMS_GC,
+    refetchOnMount: true,
     ...options,
   });
 }

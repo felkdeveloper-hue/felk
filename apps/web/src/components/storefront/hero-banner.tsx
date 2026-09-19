@@ -14,6 +14,7 @@ import { CmsLink } from '@/components/common/cms-link';
 import { Image } from '@/components/media/image';
 import type { HeroBanner } from '@/services/sdk/cms';
 import { cn } from '@/lib/utils';
+import { toStorefrontMediaUrl } from '@/utils/media-url';
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 const AUTO_SLIDE_MS = 5000;
@@ -73,24 +74,124 @@ const DOT_RADIUS = (DOT_SIZE - DOT_STROKE) / 2;
 const DOT_CIRCUMFERENCE = 2 * Math.PI * DOT_RADIUS;
 
 function resolveHeroBanners(cmsBanners: HeroBanner[]): LocalHeroBanner[] {
-  return FALLBACK_HERO_BANNERS.map((fallback, index) => {
-    const cms = cmsBanners[index];
-    if (!cms) return fallback;
-    return {
-      ...fallback,
-      id: cms.id || fallback.id,
-      title: cms.title || fallback.title,
-      subtitle: cms.subtitle || fallback.subtitle,
-      linkUrl: cms.linkUrl || fallback.linkUrl,
-      ctaLabel: cms.ctaLabel || fallback.ctaLabel,
-      // Keep local carousel images so all slides always show.
-      imageUrl: fallback.imageUrl,
-      mobileImageUrl: fallback.mobileImageUrl,
-    };
-  });
+  const uploaded = cmsBanners.filter((banner) => Boolean(banner.imageUrl));
+  return uploaded.length ? uploaded : FALLBACK_HERO_BANNERS;
+}
+
+function isLocalHero(banner: LocalHeroBanner) {
+  return banner.id.startsWith('local-');
+}
+
+/**
+ * Fills letterbox gaps by stretching the uploaded banner’s own edges
+ * (left / right / top / bottom), so any photo’s background continues
+ * automatically — no hardcoded color.
+ */
+function BannerEdgeBleed({ src }: { src: string }) {
+  const url = toStorefrontMediaUrl(src);
+  return (
+    <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+      <div className="absolute inset-y-0 left-0 w-1/2 overflow-hidden">
+        <img
+          src={url}
+          alt=""
+          className="absolute left-0 top-0 h-full w-1 origin-left object-cover object-left blur-[1px]"
+          style={{ transform: 'scaleX(500)' }}
+        />
+      </div>
+      <div className="absolute inset-y-0 right-0 w-1/2 overflow-hidden">
+        <img
+          src={url}
+          alt=""
+          className="absolute right-0 top-0 h-full w-1 origin-right object-cover object-right blur-[1px]"
+          style={{ transform: 'scaleX(500)' }}
+        />
+      </div>
+      <div className="absolute inset-x-0 top-0 h-1/2 overflow-hidden">
+        <img
+          src={url}
+          alt=""
+          className="absolute left-0 top-0 h-1 w-full origin-top object-cover object-top blur-[1px]"
+          style={{ transform: 'scaleY(200)' }}
+        />
+      </div>
+      <div className="absolute inset-x-0 bottom-0 h-1/2 overflow-hidden">
+        <img
+          src={url}
+          alt=""
+          className="absolute bottom-0 left-0 h-1 w-full origin-bottom object-cover object-bottom blur-[1px]"
+          style={{ transform: 'scaleY(200)' }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function ShopCta({ banner, compact }: { banner: LocalHeroBanner; compact?: boolean }) {
+  if (!banner.linkUrl) return null;
+  return (
+    <CmsLink
+      href={banner.linkUrl}
+      data-radius="pill"
+      className={cn(
+        'shop-cta group/cta relative inline-flex items-center justify-center overflow-hidden',
+        'border border-white bg-transparent',
+        compact ? 'mt-0 px-8 py-2' : 'mt-7 px-10 py-2.5',
+        'text-[11px] font-bold uppercase tracking-[0.2em]',
+        'focus-visible:outline-none',
+      )}
+    >
+      <span
+        aria-hidden
+        className={cn(
+          'pointer-events-none absolute inset-0 origin-top scale-y-0 bg-white',
+          'transition-transform duration-[900ms] ease-[cubic-bezier(0.22,1,0.36,1)]',
+          'group-hover/cta:scale-y-100',
+        )}
+      />
+      <span
+        className={cn(
+          'relative z-10 text-white',
+          'transition-colors duration-[900ms] ease-[cubic-bezier(0.22,1,0.36,1)]',
+          'group-hover/cta:text-zinc-950',
+        )}
+      >
+        {banner.ctaLabel ?? 'Shop Now'}
+      </span>
+    </CmsLink>
+  );
+}
+
+function UploadedHeroSlide({ banner, eager }: { banner: LocalHeroBanner; eager: boolean }) {
+  return (
+    <div className="relative h-full w-full overflow-hidden bg-transparent">
+      {banner.imageUrl ? (
+        <Image
+          src={banner.imageUrl}
+          sources={
+            banner.mobileImageUrl
+              ? [{ media: MOBILE_MEDIA_QUERY, srcSet: banner.mobileImageUrl }]
+              : undefined
+          }
+          alt={banner.title}
+          objectFit="contain"
+          className="h-full w-full object-center"
+          containerClassName="absolute inset-0 bg-transparent"
+          loading={eager ? 'eager' : 'lazy'}
+          fetchPriority={eager ? 'high' : 'auto'}
+        />
+      ) : (
+        <div className="absolute inset-0 bg-zinc-950" />
+      )}
+    </div>
+  );
 }
 
 function HeroSlide({ banner, eager }: { banner: LocalHeroBanner; eager: boolean }) {
+  if (!isLocalHero(banner)) {
+    return <UploadedHeroSlide banner={banner} eager={eager} />;
+  }
+
   return (
     <div className="relative min-h-[100svh] overflow-hidden bg-zinc-950">
       {banner.imageUrl ? (
@@ -113,7 +214,6 @@ function HeroSlide({ banner, eager }: { banner: LocalHeroBanner; eager: boolean 
         <div className="absolute inset-0 bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-950" />
       )}
 
-      {/* Static readability gradient only — no hover lighten / scale */}
       <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-black/25" />
 
       <div className="relative flex min-h-[100svh] flex-col items-center justify-end px-6 pb-24 text-center sm:pb-28 lg:pb-32">
@@ -125,36 +225,7 @@ function HeroSlide({ banner, eager }: { banner: LocalHeroBanner; eager: boolean 
         <h1 className="font-display max-w-5xl text-5xl font-bold uppercase leading-[0.9] tracking-[-0.04em] text-white sm:text-7xl lg:text-8xl">
           {banner.title}
         </h1>
-        {banner.linkUrl ? (
-          <CmsLink
-            href={banner.linkUrl}
-            data-radius="pill"
-            className={cn(
-              'shop-cta group/cta relative mt-7 inline-flex items-center justify-center overflow-hidden',
-              'border border-white bg-transparent px-10 py-2.5',
-              'text-[11px] font-bold uppercase tracking-[0.2em]',
-              'focus-visible:outline-none',
-            )}
-          >
-            <span
-              aria-hidden
-              className={cn(
-                'pointer-events-none absolute inset-0 origin-top scale-y-0 bg-white',
-                'transition-transform duration-[900ms] ease-[cubic-bezier(0.22,1,0.36,1)]',
-                'group-hover/cta:scale-y-100',
-              )}
-            />
-            <span
-              className={cn(
-                'relative z-10 text-white',
-                'transition-colors duration-[900ms] ease-[cubic-bezier(0.22,1,0.36,1)]',
-                'group-hover/cta:text-zinc-950',
-              )}
-            >
-              {banner.ctaLabel ?? 'Shop Now'}
-            </span>
-          </CmsLink>
-        ) : null}
+        <ShopCta banner={banner} />
       </div>
     </div>
   );
@@ -233,6 +304,7 @@ function HeroCarousel({ banners }: { banners: LocalHeroBanner[] }) {
   const [direction, setDirection] = useState(-1);
   const reduceMotion = useReducedMotion();
   const active = banners[Math.min(index, Math.max(banners.length - 1, 0))];
+  const uploaded = Boolean(active && !isLocalHero(active));
 
   const goTo = (nextIndex: number, dir: 1 | -1) => {
     setDirection(dir);
@@ -253,9 +325,21 @@ function HeroCarousel({ banners }: { banners: LocalHeroBanner[] }) {
   return (
     <section
       aria-label="Hero"
-      className="relative -mt-[calc(3.5rem+env(safe-area-inset-top,0px))] overflow-hidden lg:-mt-[4.75rem]"
+      className={cn(
+        'relative overflow-hidden',
+        uploaded
+          ? '-mt-[calc(3.5rem+env(safe-area-inset-top,0px))] pt-[calc(3.5rem+env(safe-area-inset-top,0px))] lg:-mt-[4.75rem] lg:pt-[4.75rem]'
+          : '-mt-[calc(3.5rem+env(safe-area-inset-top,0px))] lg:-mt-[4.75rem]',
+      )}
     >
-      <div className="relative min-h-[100svh]">
+      {uploaded && active.imageUrl ? <BannerEdgeBleed src={active.imageUrl} /> : null}
+      <div
+        className={
+          uploaded
+            ? 'relative z-[1] mx-auto aspect-[16/9] w-[min(100%,calc((100svh-3.5rem-env(safe-area-inset-top,0px))*16/9))] lg:w-[min(100%,calc((100svh-4.75rem)*16/9))]'
+            : 'relative min-h-[100svh]'
+        }
+      >
         <AnimatePresence initial={!reduceMotion} custom={direction} mode="popLayout">
           <motion.div
             key={active.id ?? active.title}
@@ -270,19 +354,38 @@ function HeroCarousel({ banners }: { banners: LocalHeroBanner[] }) {
             <HeroSlide banner={active} eager={index === 0} />
           </motion.div>
         </AnimatePresence>
+
+        {banners.length > 1 && !uploaded ? (
+          <div className="absolute bottom-8 left-1/2 z-10 flex -translate-x-1/2 items-center gap-3">
+            {banners.map((banner, dotIndex) => (
+              <HeroDot
+                key={`${banner.id ?? banner.title}-${dotIndex === index ? index : 'idle'}`}
+                active={dotIndex === index}
+                label={`Go to slide ${dotIndex + 1}`}
+                reduceMotion={reduceMotion}
+                onClick={() => goTo(dotIndex, dotIndex > index ? 1 : -1)}
+              />
+            ))}
+          </div>
+        ) : null}
       </div>
 
-      {banners.length > 1 ? (
-        <div className="absolute bottom-8 left-1/2 z-10 flex -translate-x-1/2 items-center gap-3">
-          {banners.map((banner, dotIndex) => (
-            <HeroDot
-              key={`${banner.id ?? banner.title}-${dotIndex === index ? index : 'idle'}`}
-              active={dotIndex === index}
-              label={`Go to slide ${dotIndex + 1}`}
-              reduceMotion={reduceMotion}
-              onClick={() => goTo(dotIndex, dotIndex > index ? 1 : -1)}
-            />
-          ))}
+      {uploaded ? (
+        <div className="relative z-[1] flex flex-col items-center gap-3 px-4 py-4">
+          <ShopCta banner={active} compact />
+          {banners.length > 1 ? (
+            <div className="flex items-center justify-center gap-3">
+              {banners.map((banner, dotIndex) => (
+                <HeroDot
+                  key={`${banner.id ?? banner.title}-${dotIndex === index ? index : 'idle'}`}
+                  active={dotIndex === index}
+                  label={`Go to slide ${dotIndex + 1}`}
+                  reduceMotion={reduceMotion}
+                  onClick={() => goTo(dotIndex, dotIndex > index ? 1 : -1)}
+                />
+              ))}
+            </div>
+          ) : null}
         </div>
       ) : null}
     </section>

@@ -3,6 +3,7 @@ import type { Model } from 'mongoose';
 import { storageService } from '@/services/storage.factory.js';
 import { ApiError } from '@/utils/errors/api-error.js';
 import { processImage } from '@/utils/image.helper.js';
+import { invalidateStorefrontCmsCache } from '@/utils/simple-cache.js';
 
 export async function uploadBannerDesktopImage(
   model: Model<any>,
@@ -17,9 +18,9 @@ export async function uploadBannerDesktopImage(
   }
 
   const webp = await processImage(file.buffer, {
-    width: 2400,
-    height: 1600,
-    quality: 85,
+    width: 1920,
+    height: 1080,
+    quality: 88,
     format: 'webp',
   });
   const key = `${folder}/${id}/${randomUUID()}.webp`;
@@ -41,6 +42,7 @@ export async function uploadBannerDesktopImage(
     mobile: image,
   });
   await doc.save();
+  invalidateStorefrontCmsCache();
   return doc.toObject();
 }
 
@@ -65,5 +67,6 @@ export async function uploadPromoBannerVideo(
 
   doc.set('videoUrl', stored.url);
   await doc.save();
+  invalidateStorefrontCmsCache();
   return doc.toObject();
 }

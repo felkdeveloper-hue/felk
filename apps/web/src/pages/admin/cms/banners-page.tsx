@@ -46,7 +46,7 @@ const TABS: Array<{
     title: 'Hero banners',
     description: 'Full-screen carousel slides at the top of the home page.',
     kind: 'hero',
-    hint: 'Priority order: highest number shows first. Choose an image when creating.',
+    hint: 'Upload 1920 × 1080 px (16:9). Highest priority shows first. The homepage shows the full image without cropping.',
   },
   {
     id: 'split',
@@ -185,6 +185,7 @@ function BannerTabPanel({ tab }: { tab: (typeof TABS)[number] }) {
     void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminCms.resource(resourceKey) });
     void queryClient.invalidateQueries({ queryKey: ['cms', 'hero-banners'] });
     void queryClient.invalidateQueries({ queryKey: ['cms', 'promo-banners'] });
+    void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.storefront.bootstrap() });
   };
 
   const saveMutation = useMutation({

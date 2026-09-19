@@ -140,6 +140,15 @@ const STOCK_FILTER_OPTIONS: Array<{ label: string; value: ProductStockFilter | '
   { label: 'Has empty variant', value: 'has_out_variant' },
 ];
 
+type ProductSectionFilter = '' | 'best_seller' | 'new_arrival' | 'fe_basics';
+
+const SECTION_FILTER_OPTIONS: Array<{ label: string; value: ProductSectionFilter }> = [
+  { label: 'All', value: '' },
+  { label: 'Best Seller', value: 'best_seller' },
+  { label: 'New Arrival', value: 'new_arrival' },
+  { label: 'FE Basics', value: 'fe_basics' },
+];
+
 const selectClass =
   'h-11 w-full rounded-xl border border-[var(--admin-line)] bg-[var(--admin-panel-soft)] px-3 text-base text-[var(--admin-ink)] sm:h-10 sm:w-auto sm:rounded-lg sm:text-sm';
 
@@ -170,6 +179,7 @@ export function ProductsListPage() {
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, 300);
   const [status, setStatus] = useState('');
+  const [section, setSection] = useState<ProductSectionFilter>('');
   const [stockFilter, setStockFilter] = useState<ProductStockFilter | ''>('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkUploadOpen, setBulkUploadOpen] = useState(false);
@@ -182,8 +192,11 @@ export function ProductsListPage() {
       q: debouncedSearch || undefined,
       status: normalizeProductStatusFilter(status),
       stockFilter: stockFilter || undefined,
+      isBestSeller: section === 'best_seller' ? true : undefined,
+      isNewArrival: section === 'new_arrival' ? true : undefined,
+      isFeBasics: section === 'fe_basics' ? true : undefined,
     }),
-    [page, debouncedSearch, status, stockFilter],
+    [page, debouncedSearch, status, stockFilter, section],
   );
 
   const query = useQuery({
@@ -451,6 +464,23 @@ export function ProductsListPage() {
               { label: 'Draft', value: 'draft' },
               { label: 'Archived', value: 'archived' },
             ]}
+            leadingFilters={
+              <select
+                value={section}
+                onChange={(event) => {
+                  setSection((event.target.value || '') as ProductSectionFilter);
+                  setPage(1);
+                }}
+                className={selectClass}
+                aria-label="Filter by section"
+              >
+                {SECTION_FILTER_OPTIONS.map((option) => (
+                  <option key={option.value || 'all'} value={option.value}>
+                    {option.label === 'All' ? 'All sections' : option.label}
+                  </option>
+                ))}
+              </select>
+            }
             extraFilters={
               <select
                 value={stockFilter}
@@ -529,6 +559,25 @@ export function ProductsListPage() {
                         >
                           {stockControl}
                         </span>
+                      ) : null}
+                      {row.isBestSeller || row.isNewArrival || row.isFeBasics ? (
+                        <div className="flex flex-wrap gap-1">
+                          {row.isBestSeller ? (
+                            <span className="w-fit rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-800 dark:bg-amber-500/15 dark:text-amber-300">
+                              Best Seller
+                            </span>
+                          ) : null}
+                          {row.isNewArrival ? (
+                            <span className="w-fit rounded-full bg-sky-50 px-1.5 py-0.5 text-[10px] font-medium text-sky-800 dark:bg-sky-500/15 dark:text-sky-300">
+                              New Arrival
+                            </span>
+                          ) : null}
+                          {row.isFeBasics ? (
+                            <span className="w-fit rounded-full bg-violet-50 px-1.5 py-0.5 text-[10px] font-medium text-violet-800 dark:bg-violet-500/15 dark:text-violet-300">
+                              FE Basics
+                            </span>
+                          ) : null}
+                        </div>
                       ) : null}
                     </div>
                   );
