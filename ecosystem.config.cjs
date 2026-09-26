@@ -22,7 +22,10 @@ module.exports = {
       wait_ready: true,
       listen_timeout: 60_000,
       kill_timeout: 15_000,
-      max_memory_restart: '512M',
+      // Photo processing briefly uses more than 512MB. Restarting at that
+      // line killed the process mid-upload and the browser showed
+      // "Unable to reach the server".
+      max_memory_restart: '1200M',
       exp_backoff_restart_delay: 200,
       // Keep autorestart on; stop the infinite ghost-id thrash after hard failures.
       max_restarts: 30,

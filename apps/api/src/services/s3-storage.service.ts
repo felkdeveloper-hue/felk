@@ -61,16 +61,32 @@ export class S3StorageService implements StorageService {
   async upload(input: StorageUploadInput): Promise<StorageObject> {
     const key = normalizeKey(input.key);
 
-    await this.client.send(
-      new PutObjectCommand({
-        Bucket: this.bucket,
-        Key: key,
-        Body: input.body,
-        ContentType: input.contentType,
-        Metadata: input.metadata,
-        CacheControl: input.isPublic === false ? undefined : 'public, max-age=31536000, immutable',
-      }),
-    );
+    const abort = new AbortController();
+    const timer = setTimeout(() => abort.abort(), 45_000);
+    try {
+      await this.client.send(
+        new PutObjectCommand({
+          Bucket: this.bucket,
+          Key: key,
+          Body: input.body,
+          ContentType: input.contentType,
+          Metadata: input.metadata,
+          CacheControl: input.isPublic === false ? undefined : 'public, max-age=31536000, immutable',
+        }),
+        { abortSignal: abort.signal },
+      );
+    } catch (error) {
+      if (abort.signal.aborted) {
+        throw ApiError.badRequest(
+          'Saving the photo took too long. Try a smaller image.',
+          undefined,
+          'STORAGE_TIMEOUT',
+        );
+      }
+      throw error;
+    } finally {
+      clearTimeout(timer);
+    }
 
     return {
       key,

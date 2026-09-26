@@ -57,16 +57,35 @@ export class ProductMediaService {
       });
       url = stored.url;
     } else {
-      const webp = await processImage(file.buffer, {
-        width: 1600,
-        quality: 82,
-        format: 'webp',
-      });
-      const thumb = await processImage(file.buffer, {
-        width: 400,
-        quality: 75,
-        format: 'webp',
-      });
+      if (!file.buffer?.length) {
+        throw ApiError.badRequest(
+          'The photo was empty. Choose the file again.',
+          undefined,
+          'FILE_REQUIRED',
+        );
+      }
+      let webp: Buffer;
+      let thumb: Buffer;
+      try {
+        webp = await processImage(file.buffer, {
+          width: 1600,
+          quality: 82,
+          format: 'webp',
+        });
+        // Thumbnail from the already-resized photo so we do not decode the
+        // original (often a multi-megabyte phone picture) a second time.
+        thumb = await processImage(webp, {
+          width: 400,
+          quality: 75,
+          format: 'webp',
+        });
+      } catch {
+        throw ApiError.badRequest(
+          'Could not read that photo. Save it as a JPG or PNG and try again.',
+          undefined,
+          'INVALID_IMAGE',
+        );
+      }
       const metadata = await getImageMetadata(webp);
       width = metadata.width ?? null;
       height = metadata.height ?? null;

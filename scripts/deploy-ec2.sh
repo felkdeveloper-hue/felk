@@ -38,6 +38,11 @@ git fetch origin "${BRANCH}"
 git checkout "${BRANCH}"
 git reset --hard "origin/${BRANCH}"
 
+echo "==> Repairing nginx so product photo uploads reach the API"
+if [[ -f scripts/fix-nginx-uploads.sh ]]; then
+  bash scripts/fix-nginx-uploads.sh || echo "WARNING: nginx upload fix did not apply"
+fi
+
 echo "==> Installing dependencies (API workspace only)"
 if command -v pnpm >/dev/null 2>&1; then
   pnpm install --frozen-lockfile --filter @fe-platform/api...

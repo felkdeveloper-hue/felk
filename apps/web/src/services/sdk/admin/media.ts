@@ -1,5 +1,7 @@
 import { http } from '@/lib/http-client';
+import { AppError } from '@/lib/errors';
 import { normalizeId, normalizeList } from '@/lib/utils';
+import { prepareProductImage } from '@/utils/prepare-product-image';
 
 export interface ProductMediaRow {
   id: string;
@@ -45,8 +47,17 @@ export const mediaApi = {
     file: File,
     options?: MediaUploadOptions,
   ): Promise<ProductMediaRow> {
+    let prepared = file;
+    try {
+      prepared = await prepareProductImage(file);
+    } catch (error) {
+      throw error instanceof AppError
+        ? error
+        : new AppError(error instanceof Error ? error.message : 'Could not prepare that photo.');
+    }
+
     const form = new FormData();
-    form.append('file', file);
+    form.append('file', prepared);
     if (options?.variantId) form.append('variantId', options.variantId);
     if (options?.isPrimary) form.append('isPrimary', 'true');
     if (options?.alt) form.append('alt', options.alt);

@@ -52,7 +52,9 @@ const envSchema = z
       .default('debug'),
     MORGAN_FORMAT: z.string().default('dev'),
     UPLOAD_MAX_SIZE_MB: z.coerce.number().positive().default(10),
-    UPLOAD_ALLOWED_MIME: z.string().default('image/jpeg,image/png,image/webp,image/avif'),
+    UPLOAD_ALLOWED_MIME: z
+      .string()
+      .default('image/jpeg,image/png,image/webp,image/avif,image/gif,image/heic,image/heif'),
     SMTP_HOST: z.string().default('smtp.gmail.com'),
     SMTP_PORT: z.coerce.number().default(587),
     SMTP_SECURE: z

@@ -1,14 +1,46 @@
 import multer, { type FileFilterCallback } from 'multer';
 import type { Request } from 'express';
 import os from 'node:os';
+import path from 'node:path';
 import { appConfig } from '@/config/app.config.js';
 import { ApiError } from '@/utils/errors/api-error.js';
 
+const IMAGE_EXTENSIONS = new Set([
+  '.jpg',
+  '.jpeg',
+  '.png',
+  '.webp',
+  '.gif',
+  '.avif',
+  '.heic',
+  '.heif',
+]);
+
+/** Browsers often mislabel real photos (image/jpg, empty type, octet-stream). */
+function isAllowedImageUpload(file: Express.Multer.File): boolean {
+  const mime = (file.mimetype || '').toLowerCase();
+  const ext = path.extname(file.originalname ?? '').toLowerCase();
+  if (appConfig.upload.allowedMimeTypes.includes(mime)) return true;
+  if (
+    mime === 'image/jpg' ||
+    mime === 'image/pjpeg' ||
+    mime === 'image/heic' ||
+    mime === 'image/heif' ||
+    mime === 'image/gif'
+  ) {
+    return true;
+  }
+  return (
+    IMAGE_EXTENSIONS.has(ext) &&
+    (mime === '' || mime === 'application/octet-stream' || mime.startsWith('image/'))
+  );
+}
+
 function fileFilter(_req: Request, file: Express.Multer.File, cb: FileFilterCallback): void {
-  if (!appConfig.upload.allowedMimeTypes.includes(file.mimetype)) {
+  if (!isAllowedImageUpload(file)) {
     cb(
       ApiError.badRequest(
-        `File type ${file.mimetype} is not allowed`,
+        `File type ${file.mimetype || 'unknown'} is not allowed. Use a JPG, PNG, or WEBP photo.`,
         undefined,
         'INVALID_FILE_TYPE',
       ),

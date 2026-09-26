@@ -294,7 +294,7 @@ function ColorVariantCard({
   setEditTitle: (v: string) => void;
   onSetDefault: (id: string) => void;
   onToggleOwnListing: (id: string, next: boolean) => void;
-  onUpload: (variantId: string, file: File) => void;
+  onUpload: (variantId: string, file: File) => void | Promise<void>;
   onRemoveImage: (mediaId: string) => void;
   onUpdateTitle: (id: string, title: string) => void;
   onSetStock: (variantId: string, quantity: number) => void;
@@ -458,9 +458,18 @@ function ColorVariantCard({
                 multiple
                 className="hidden"
                 onChange={(e) => {
-                  const files = Array.from(e.target.files ?? []);
-                  files.forEach((file) => onUpload(firstVariant.id, file));
-                  e.target.value = '';
+                  const input = e.currentTarget;
+                  const files = Array.from(input.files ?? []);
+                  input.value = '';
+                  void (async () => {
+                    for (const file of files) {
+                      try {
+                        await onUpload(firstVariant.id, file);
+                      } catch {
+                        break;
+                      }
+                    }
+                  })();
                 }}
               />
             </label>
@@ -1221,7 +1230,7 @@ function VariantsSection({
               listSeparatelyMutation.mutate({ id, listSeparately: next })
             }
             onUpload={(variantId, file) =>
-              uploadVariantImageMutation.mutate({
+              uploadVariantImageMutation.mutateAsync({
                 variantId: uploadTargetId ?? variantId,
                 file,
               })

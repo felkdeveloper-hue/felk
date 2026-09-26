@@ -118,10 +118,8 @@ export async function attachImportImages(options: AttachOptions): Promise<number
       const rawBuffer = await fetchBuffer(url);
 
       // Process through sharp (same as uploadImage)
-      const [webp, thumb] = await Promise.all([
-        processImage(rawBuffer, { width: 1600, quality: 82, format: 'webp' }),
-        processImage(rawBuffer, { width: 400, quality: 75, format: 'webp' }),
-      ]);
+      const webp = await processImage(rawBuffer, { width: 1600, quality: 82, format: 'webp' });
+      const thumb = await processImage(webp, { width: 400, quality: 75, format: 'webp' });
       const metadata = await getImageMetadata(webp);
       const id = randomUUID();
       const key = `products/${productId}/images/${id}.webp`;
