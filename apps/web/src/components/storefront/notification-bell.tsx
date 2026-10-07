@@ -15,6 +15,7 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { FLASH_SALE_FEATURE_ENABLED } from '@/constants/flash-sale';
 import { ROUTES } from '@/constants/routes';
 import { QUERY_KEYS } from '@/constants/query-keys';
 import { customersApi, type CustomerNotification } from '@/services/sdk/customers';
@@ -138,7 +139,7 @@ export function NotificationBell({
   const serverNotifications = notificationData?.notifications ?? [];
   const unreadServerCount = notificationData?.unreadCount ?? 0;
   const flashSaleUnread = isAuthenticated && isFlashSaleActive ? 1 : 0;
-  const guestPromo = !isAuthenticated ? 1 : 0;
+  const guestPromo = !isAuthenticated && FLASH_SALE_FEATURE_ENABLED ? 1 : 0;
   const totalBadgeCount = unreadServerCount + flashSaleUnread + guestPromo;
   const hasNotification = totalBadgeCount > 0;
 
@@ -269,7 +270,7 @@ export function NotificationBell({
               </div>
             </div>
           </div>
-        ) : !isAuthenticated ? (
+        ) : !isAuthenticated && FLASH_SALE_FEATURE_ENABLED ? (
           <div
             className="p-4"
             style={{

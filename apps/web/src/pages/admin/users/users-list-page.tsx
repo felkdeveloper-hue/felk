@@ -21,6 +21,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { QUERY_KEYS } from '@/constants';
+import { FLASH_SALE_FEATURE_ENABLED } from '@/constants/flash-sale';
 import { ADMIN_ROUTES } from '@/constants/routes';
 import { ADMIN_REFETCH_MS } from '@/constants/admin-poll';
 import { ADMIN_ROLE_OPTIONS, roleSummary } from '@/constants/admin-role-guide';
@@ -356,7 +357,7 @@ export function UsersListPage() {
                 </option>
               ))}
             </select>
-            {userPerms.update ? (
+            {userPerms.update && FLASH_SALE_FEATURE_ENABLED ? (
               <Button
                 type="button"
                 variant="outline"
@@ -516,7 +517,7 @@ export function UsersListPage() {
                 >
                   View
                 </Link>
-                {userPerms.update ? (
+                {userPerms.update && FLASH_SALE_FEATURE_ENABLED ? (
                   <button
                     type="button"
                     className={cn(actionBtn, actionSecondary)}

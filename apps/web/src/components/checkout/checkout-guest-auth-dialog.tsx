@@ -21,6 +21,7 @@ import { cartApi } from '@/services/sdk/cart';
 import { QUERY_KEYS } from '@/constants/query-keys';
 import { AppError } from '@/lib/errors';
 import { getAttributionPayloadForAuth } from '@/lib/analytics/auth-attribution';
+import { FLASH_SALE_FEATURE_ENABLED } from '@/constants/flash-sale';
 import { useFlashSale } from '@/contexts/flash-sale-context';
 import { Zap } from 'lucide-react';
 
@@ -56,7 +57,7 @@ function FlashSaleCheckoutPromo() {
         <Zap className="size-3.5 fill-current" />
         Sitewide flash sale
       </p>
-      <p className="mt-1.5 font-display text-3xl font-bold leading-none tracking-tight">20% OFF</p>
+      <p className="font-display mt-1.5 text-3xl font-bold leading-none tracking-tight">20% OFF</p>
       <p className="mt-1.5 text-sm font-medium text-orange-50">
         Time-limited deal on the whole website — no code needed.
       </p>
@@ -327,7 +328,9 @@ export function CheckoutGuestAuthDialog({ open, onAuthenticated }: CheckoutGuest
     email: 'Enter your email to continue.',
     password: 'Enter your password to continue to checkout.',
     otp: 'Enter the verification code we sent to your email.',
-    create_password: 'Almost there — finish your account while the 20% flash sale is on.',
+    create_password: FLASH_SALE_FEATURE_ENABLED
+      ? 'Almost there — finish your account while the 20% flash sale is on.'
+      : 'Almost there — finish your account to continue checkout.',
     address: 'Add a shipping address to continue checkout.',
   };
 
@@ -347,7 +350,9 @@ export function CheckoutGuestAuthDialog({ open, onAuthenticated }: CheckoutGuest
           </DialogDescription>
         </DialogHeader>
 
-        {step === 'email' || step === 'create_password' ? <FlashSaleCheckoutPromo /> : null}
+        {FLASH_SALE_FEATURE_ENABLED && (step === 'email' || step === 'create_password') ? (
+          <FlashSaleCheckoutPromo />
+        ) : null}
 
         {error ? (
           <AuthErrorAlert
@@ -377,7 +382,7 @@ export function CheckoutGuestAuthDialog({ open, onAuthenticated }: CheckoutGuest
               loading={pending}
               onClick={() => void handleEmailContinue()}
             >
-              Continue — keep 20% off
+              {FLASH_SALE_FEATURE_ENABLED ? 'Continue — keep 20% off' : 'Continue'}
             </Button>
 
             <div className="relative flex items-center gap-3" role="separator" aria-label="or">

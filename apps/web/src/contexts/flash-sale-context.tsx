@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { FLASH_SALE_FEATURE_ENABLED } from '@/constants/flash-sale';
 import { QUERY_KEYS } from '@/constants/query-keys';
 import { customersApi, type FlashSaleStatus } from '@/services/sdk';
 import { storefrontApi } from '@/services/sdk/storefront';
@@ -112,7 +113,9 @@ export function FlashSaleProvider({ children }: FlashSaleProviderProps) {
   const user = useAuthStore((state) => state.user);
   const queryClient = useQueryClient();
 
-  const [timeRemaining, setTimeRemaining] = useState(() => remainingFromStart(readStoredStartTime()));
+  const [timeRemaining, setTimeRemaining] = useState(() =>
+    remainingFromStart(readStoredStartTime()),
+  );
   const [showPopup, setShowPopup] = useState(false);
   const [showUniversalPopup, setShowUniversalPopup] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -121,6 +124,7 @@ export function FlashSaleProvider({ children }: FlashSaleProviderProps) {
 
   // Universal popup — fires for ALL visitors on every page load, no storage gate.
   useEffect(() => {
+    if (!FLASH_SALE_FEATURE_ENABLED) return;
     const timer = setTimeout(() => setShowUniversalPopup(true), 1500);
     return () => clearTimeout(timer);
   }, []);
@@ -141,23 +145,26 @@ export function FlashSaleProvider({ children }: FlashSaleProviderProps) {
   const { data: flashSaleData, isLoading: isLoadingAuthed } = useQuery({
     queryKey: QUERY_KEYS.customers.flashSale(),
     queryFn: () => customersApi.getFlashSale(),
-    enabled: isAuthenticated,
+    enabled: FLASH_SALE_FEATURE_ENABLED && isAuthenticated,
     staleTime: 15 * 1000,
     refetchOnWindowFocus: false,
-    placeholderData: () => queryClient.getQueryData<FlashSaleStatus>(QUERY_KEYS.storefront.flashSale()),
+    placeholderData: () =>
+      queryClient.getQueryData<FlashSaleStatus>(QUERY_KEYS.storefront.flashSale()),
   });
 
   // Anonymous: IP-persisted flash sale for unsigned visitors
   const { data: anonymousFlashSaleData, isLoading: isLoadingAnonymous } = useQuery({
     queryKey: QUERY_KEYS.storefront.flashSale(),
     queryFn: () => storefrontApi.getFlashSale(),
-    enabled: !isAuthenticated,
+    enabled: FLASH_SALE_FEATURE_ENABLED && !isAuthenticated,
     staleTime: 0,
     refetchOnMount: 'always',
     refetchOnWindowFocus: false,
   });
 
-  const guestFallback = anonymousFlashSaleData ?? queryClient.getQueryData<FlashSaleStatus>(QUERY_KEYS.storefront.flashSale());
+  const guestFallback =
+    anonymousFlashSaleData ??
+    queryClient.getQueryData<FlashSaleStatus>(QUERY_KEYS.storefront.flashSale());
   const storedStart = readStoredStartTime();
   const storedFallback: FlashSaleStatus | undefined = storedStart
     ? {
@@ -218,6 +225,7 @@ export function FlashSaleProvider({ children }: FlashSaleProviderProps) {
 
   // Start or transfer flash sale when user logs in — never drop an active guest window.
   useEffect(() => {
+    if (!FLASH_SALE_FEATURE_ENABLED) return;
     if (!isAuthenticated || isLoadingAuthed) return;
     if (flashSaleData === undefined) return;
 
@@ -240,7 +248,13 @@ export function FlashSaleProvider({ children }: FlashSaleProviderProps) {
     ensureAttemptedForUserRef.current = userKey;
     startFlashSaleMutation.mutate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated, isLoadingAuthed, flashSaleData?.flashSaleStartTime, flashSaleData?.isActive, user?.id]);
+  }, [
+    isAuthenticated,
+    isLoadingAuthed,
+    flashSaleData?.flashSaleStartTime,
+    flashSaleData?.isActive,
+    user?.id,
+  ]);
 
   // Real-time countdown (works for both authenticated and anonymous)
   useEffect(() => {
@@ -298,7 +312,8 @@ export function FlashSaleProvider({ children }: FlashSaleProviderProps) {
     queryClient,
   ]);
 
-  const isFlashSaleActive = (activeFlashSaleData?.isActive ?? false) && timeRemaining > 0;
+  const isFlashSaleActive =
+    FLASH_SALE_FEATURE_ENABLED && (activeFlashSaleData?.isActive ?? false) && timeRemaining > 0;
 
   const dismissPopup = () => {
     setShowPopup(false);
@@ -315,9 +330,9 @@ export function FlashSaleProvider({ children }: FlashSaleProviderProps) {
         formattedTime: formatTime(timeRemaining),
         alwaysOnFormattedTime: formatTime(alwaysOnRemaining),
         alwaysOnTimeRemaining: alwaysOnRemaining,
-        showPopup: showPopup && isFlashSaleActive,
+        showPopup: FLASH_SALE_FEATURE_ENABLED && showPopup && isFlashSaleActive,
         dismissPopup,
-        showUniversalPopup,
+        showUniversalPopup: FLASH_SALE_FEATURE_ENABLED && showUniversalPopup,
         dismissUniversalPopup,
         isLoading,
       }}

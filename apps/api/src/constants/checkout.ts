@@ -80,6 +80,11 @@ export const FIRST_ORDER_DISCOUNT = {
 
 /** Personal flash sale — 20% off eligible items for 60 minutes (guest IP/cookie + member). */
 export const FLASH_SALE_DISCOUNT = {
+  /**
+   * Master switch. `false` disconnects the sale from checkout and the public
+   * flash-sale endpoints without removing the implementation.
+   */
+  ENABLED: false,
   CODE: 'FLASH20',
   PERCENT: 20,
   LABEL: 'Flash Sale — 20% OFF',

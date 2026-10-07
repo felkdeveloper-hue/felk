@@ -24,8 +24,13 @@ import {
 import { productService } from '@/services/product.service.js';
 import { CmsCrudService } from '@/services/cms-crud.service.js';
 import { settingsService } from '@/services/settings.service.js';
-import { PRODUCT_STATUS, PRODUCT_VISIBILITY, STOREFRONT_CATALOG_LIST_OPTIONS } from '@/constants/product.js';
+import {
+  PRODUCT_STATUS,
+  PRODUCT_VISIBILITY,
+  STOREFRONT_CATALOG_LIST_OPTIONS,
+} from '@/constants/product.js';
 import { FE_BASICS_SLUG } from '@/constants/fe-basics.js';
+import { FLASH_SALE_DISCOUNT } from '@/constants/checkout.js';
 import { asyncHandler } from '@/utils/async-handler.js';
 import { ApiResponse } from '@/utils/response/api-response.js';
 import { ApiError } from '@/utils/errors/api-error.js';
@@ -242,8 +247,7 @@ storefrontRouter.get(
 
     const dbStarted = performance.now();
     const queryRecord = query as Record<string, unknown>;
-    const isFeBasicsListing =
-      queryRecord.isFeBasics === true || queryRecord.isFeBasics === 'true';
+    const isFeBasicsListing = queryRecord.isFeBasics === true || queryRecord.isFeBasics === 'true';
     const result = await productService.list({
       ...query,
       ...STOREFRONT_CATALOG_LIST_OPTIONS,
@@ -529,6 +533,14 @@ storefrontRouter.get(
   '/flash-sale',
   asyncHandler(async (req, res) => {
     res.set('Cache-Control', 'no-store');
+    if (!FLASH_SALE_DISCOUNT.ENABLED) {
+      ApiResponse.success(res, {
+        flashSaleStartTime: null,
+        isActive: false,
+        expiresAt: null,
+      });
+      return;
+    }
     const status = await anonymousFlashSaleService.getOrCreateForRequest(req);
     applyFlashSaleCookie(res, status);
     ApiResponse.success(res, status);

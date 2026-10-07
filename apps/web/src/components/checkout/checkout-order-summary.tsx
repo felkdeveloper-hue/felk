@@ -8,16 +8,14 @@ import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { QuantitySelector } from '@/components/cart/quantity-selector';
 import { FreeDeliveryBanner, ShippingFeeLabel } from '@/components/cart/free-delivery-banner';
-import {
-  previewShippingAmount,
-  productWorthForFreeDelivery,
-} from '@/constants/checkout.constants';
+import { previewShippingAmount, productWorthForFreeDelivery } from '@/constants/checkout.constants';
 import { useRemoveCartItemMutation, useUpdateCartItemMutation } from '@/hooks/cart';
 import { useCancelCheckoutMutation, useRefreshCheckoutMutation } from '@/hooks/checkout';
 import { useCheckoutStore } from '@/store';
 import { QUERY_KEYS } from '@/constants';
 import { trackCommerceEvent } from '@/lib/analytics';
 import { useFlashSale } from '@/contexts/flash-sale-context';
+import { FLASH_SALE_FEATURE_ENABLED } from '@/constants/flash-sale';
 import { useCategorySlugLookup } from '@/hooks/use-flash-sale-eligibility';
 import { applyFlashDiscount, isProductFlashSaleEligible } from '@/utils/flash-sale-eligibility';
 
@@ -31,7 +29,7 @@ export function CheckoutOrderSummary({ session, editable = false }: CheckoutOrde
   const queryClient = useQueryClient();
   const { isFlashSaleActive } = useFlashSale();
   const slugByCategoryId = useCategorySlugLookup();
-  const flashEnabled = isFlashSaleActive;
+  const flashEnabled = FLASH_SALE_FEATURE_ENABLED && isFlashSaleActive;
   const { totals, currency } = session;
   const updateMutation = useUpdateCartItemMutation();
   const removeMutation = useRemoveCartItemMutation();
@@ -43,19 +41,32 @@ export function CheckoutOrderSummary({ session, editable = false }: CheckoutOrde
     QUERY_KEYS.checkout.detail(session.checkoutToken),
   );
   const lines = cached?.lines ?? session.lines;
-  const displayTotals = cached?.totals ?? totals;
+  const rawTotals = cached?.totals ?? totals;
   const couponCode =
     typeof session.coupon?.code === 'string'
       ? session.coupon.code
       : typeof cached?.coupon?.code === 'string'
         ? cached.coupon.code
         : null;
+  const couponMessage =
+    (typeof session.coupon?.message === 'string' && session.coupon.message) ||
+    (typeof cached?.coupon?.message === 'string' && cached.coupon.message) ||
+    '';
+  // A checkout started while the sale was on can still carry FLASH20 until the
+  // next server refresh. Hide that discount while the feature is disconnected.
+  const staleFlashDiscount =
+    !FLASH_SALE_FEATURE_ENABLED && (couponCode === 'FLASH20' || /flash sale/i.test(couponMessage));
+  const displayTotals = staleFlashDiscount
+    ? {
+        ...rawTotals,
+        discount: 0,
+        grandTotal: Number((rawTotals.grandTotal + (rawTotals.discount ?? 0)).toFixed(2)),
+      }
+    : rawTotals;
   // Prefer server-applied FLASH20 so Amount Due / PayHere match the summary Total.
   const serverFlashApplied =
-    couponCode === 'FLASH20' ||
-    (displayTotals.discount > 0 &&
-      typeof session.coupon?.message === 'string' &&
-      /flash sale/i.test(session.coupon.message));
+    FLASH_SALE_FEATURE_ENABLED &&
+    (couponCode === 'FLASH20' || (displayTotals.discount > 0 && /flash sale/i.test(couponMessage)));
 
   const lineEligibility = useMemo(() => {
     return lines.map((line) => {

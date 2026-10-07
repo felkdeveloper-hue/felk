@@ -350,6 +350,16 @@ customersRouter.get(
   '/me/flash-sale',
   authorizeAny(...selfAccount),
   asyncHandler(async (req, res) => {
+    if (!FLASH_SALE_DISCOUNT.ENABLED) {
+      ApiResponse.success(res, {
+        flashSaleStartTime: null,
+        isActive: false,
+        expiresAt: null,
+        apologyFlashSalePending: false,
+        returnBonusApplied: false,
+      });
+      return;
+    }
     const customer = await resolveMeCustomer(req);
     const bonus = await customerService.applyReturnFlashSaleBonusIfPending(customer);
     const status = await anonymousFlashSaleService.adoptActiveWindow(
@@ -370,6 +380,15 @@ customersRouter.post(
   '/me/flash-sale/start',
   authorizeAny(...selfAccount),
   asyncHandler(async (req, res) => {
+    if (!FLASH_SALE_DISCOUNT.ENABLED) {
+      ApiResponse.success(res, {
+        flashSaleStartTime: null,
+        isActive: false,
+        expiresAt: null,
+        alreadyStarted: true,
+      });
+      return;
+    }
     const customer = await resolveMeCustomer(req);
     const durationMs = FLASH_SALE_DISCOUNT.DURATION_MS;
     const apologyPending = customer.metadata?.apologyFlashSalePending === true;

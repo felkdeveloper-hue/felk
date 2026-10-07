@@ -43,11 +43,12 @@ function isStaffCheckout(roleKey?: string | null) {
   return Boolean(roleKey && (STAFF_ROLES as readonly string[]).includes(roleKey));
 }
 
-async function adoptFlashSaleForCheckout(req: Request | undefined, customerId: Types.ObjectId | string) {
+async function adoptFlashSaleForCheckout(
+  req: Request | undefined,
+  customerId: Types.ObjectId | string,
+) {
   if (!req) return;
-  const customer = await CustomerModel.findById(customerId)
-    .select('flashSaleStartTime')
-    .lean();
+  const customer = await CustomerModel.findById(customerId).select('flashSaleStartTime').lean();
   if (!customer) return;
   await anonymousFlashSaleService.adoptActiveWindow(req, customer._id, customer.flashSaleStartTime);
 }
@@ -313,7 +314,7 @@ export class CheckoutService {
     // Suppress the first-order discount when the customer has an active flash sale
     // (flash sale window = 60 minutes from flashSaleStartTime).
     let customerHasActiveFlashSale = false;
-    if (session.customerId) {
+    if (FLASH_SALE_DISCOUNT.ENABLED && session.customerId) {
       if (opts?.req) {
         await adoptFlashSaleForCheckout(opts.req, session.customerId);
       }
@@ -329,7 +330,7 @@ export class CheckoutService {
     const couponCode = (session.coupon as { code?: string | null } | null)?.code ?? null;
     const couponAmount = Number((session.coupon as { amount?: number } | null)?.amount ?? 0);
 
-    if (customerHasActiveFlashSale && session.lines.length > 0) {
+    if (FLASH_SALE_DISCOUNT.ENABLED && customerHasActiveFlashSale && session.lines.length > 0) {
       // Apply real 20% flash discount on eligible lines (shoes excluded) so
       // PayHere / Amount Due charge the same price shown in the order summary.
       const productIds = [
