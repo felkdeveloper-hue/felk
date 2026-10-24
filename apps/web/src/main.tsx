@@ -1,10 +1,13 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { maintenanceMode } from '@/config/maintenance';
 import { queryClient } from '@/lib/query-client';
 import { prefetchStorefrontBootstrap } from '@/lib/prefetch-storefront-bootstrap';
 import { App } from './App';
 
-void prefetchStorefrontBootstrap(queryClient);
+if (!maintenanceMode) {
+  void prefetchStorefrontBootstrap(queryClient);
+}
 
 const rootElement = document.getElementById('root');
 

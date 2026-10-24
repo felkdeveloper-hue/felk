@@ -1229,12 +1229,12 @@ function VariantsSection({
             onToggleOwnListing={(id, next) =>
               listSeparatelyMutation.mutate({ id, listSeparately: next })
             }
-            onUpload={(variantId, file) =>
-              uploadVariantImageMutation.mutateAsync({
+            onUpload={async (variantId, file) => {
+              await uploadVariantImageMutation.mutateAsync({
                 variantId: uploadTargetId ?? variantId,
                 file,
-              })
-            }
+              });
+            }}
             onRemoveImage={(mediaId) => removeMediaMutation.mutate(mediaId)}
             onUpdateTitle={(id, title) => updateTitleMutation.mutate({ id, title })}
             onSetStock={(variantId, quantity) => setStockMutation.mutate({ variantId, quantity })}

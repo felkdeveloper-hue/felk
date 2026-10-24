@@ -71,7 +71,10 @@ const envSchema = z
     AWS_S3_BUCKET: z.string().optional(),
     AWS_S3_ENDPOINT: z.string().optional(),
     S3_PUBLIC_URL: z.string().optional(),
-    STORAGE_PROVIDER: z.enum(['local', 'r2', 's3']).optional(),
+    STORAGE_PROVIDER: z.preprocess(
+      (value) => (value === '' ? undefined : value),
+      z.enum(['local', 'r2', 's3']).optional(),
+    ),
     R2_ACCESS_KEY_ID: z.string().optional(),
     R2_SECRET_ACCESS_KEY: z.string().optional(),
     R2_ACCOUNT_ID: z.string().optional(),

@@ -4,6 +4,8 @@ interface ImportMetaEnv {
   readonly VITE_API_URL: string;
   readonly VITE_APP_NAME: string;
   readonly VITE_CDN_URL: string;
+  /** Set to "false" to show the shop. Any other value keeps the maintenance screen. */
+  readonly VITE_MAINTENANCE_MODE?: string;
   readonly VITE_SOCKET_URL: string;
   /** Optional — PostHog JS public key. Analytics no-ops when absent. */
   readonly VITE_POSTHOG_KEY?: string;
