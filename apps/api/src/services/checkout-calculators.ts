@@ -1,6 +1,5 @@
 import { ShippingZoneModel, TaxConfigModel } from '@/models/settings.models.js';
 import {
-  FIRST_ORDER_DISCOUNT,
   FIXED_SHIPPING_AMOUNT,
   FLASH_SALE_DISCOUNT,
   FREE_SHIPPING_THRESHOLD,
@@ -191,18 +190,6 @@ export function applyCouponPlaceholder(code?: string | null) {
     message: code
       ? `Coupon "${code}" accepted as placeholder — rules not applied yet`
       : 'Coupon engine reserved for future phase',
-  };
-}
-
-/** Automatic 5% discount for a customer's first order. */
-export function applyFirstOrderDiscount(subtotal: number) {
-  const amount = Number(((Math.max(0, subtotal) * FIRST_ORDER_DISCOUNT.PERCENT) / 100).toFixed(2));
-  return {
-    status: 'applied' as const,
-    code: FIRST_ORDER_DISCOUNT.CODE,
-    amount,
-    percent: FIRST_ORDER_DISCOUNT.PERCENT,
-    message: FIRST_ORDER_DISCOUNT.LABEL,
   };
 }
 

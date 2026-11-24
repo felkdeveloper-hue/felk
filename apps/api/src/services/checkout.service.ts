@@ -2,7 +2,6 @@ import type { Request } from 'express';
 import { randomBytes } from 'node:crypto';
 import { Types } from 'mongoose';
 import { CheckoutSessionModel, type CheckoutSessionDocument } from '@/models/checkout.models.js';
-import { OrderModel } from '@/models/order.models.js';
 import { InventoryItemModel, WarehouseModel } from '@/models/inventory.models.js';
 import { CustomerAddressModel, CustomerModel } from '@/models/customer.models.js';
 import { ProductModel } from '@/models/product.models.js';
@@ -13,7 +12,6 @@ import { customerService } from '@/services/customer.service.js';
 import { anonymousFlashSaleService } from '@/services/anonymous-flash-sale.service.js';
 import {
   applyCouponPlaceholder,
-  applyFirstOrderDiscount,
   applyFlashSaleDiscount,
   applyGiftCardPlaceholder,
   calculateShipping,
@@ -28,14 +26,12 @@ import {
   CHECKOUT_RESERVATION_TTL_MINUTES,
   CHECKOUT_STATUS,
   DELIVERY_METHOD,
-  FIRST_ORDER_DISCOUNT,
   FLASH_SALE_DISCOUNT,
   SHIPPING_METHOD,
   productWorthForFreeDelivery,
   type ShippingMethod,
 } from '@/constants/checkout.js';
 import { STAFF_ROLES } from '@/constants/auth.js';
-import { ORDER_STATUS } from '@/constants/order-status.js';
 import { UserModel } from '@/models/user.model.js';
 import type { AuthenticatedUser } from '@/types/index.js';
 
@@ -301,18 +297,8 @@ export class CheckoutService {
       session.giftCard = applyGiftCardPlaceholder(opts.giftCardCode);
     }
 
-    // 5% first-order discount — signed-in accounts only (never guest checkout).
-    const isGuestCheckout =
-      Boolean((session.metadata as { isGuestCheckout?: boolean } | undefined)?.isGuestCheckout) ||
-      (session.userId ? Boolean(checkoutUser?.metadata?.checkoutGuest) : true);
-    const hasPriorOrder = await OrderModel.exists({
-      customerId: session.customerId,
-      isDeleted: false,
-      status: { $nin: [ORDER_STATUS.CANCELLED, ORDER_STATUS.REFUNDED] },
-    });
-
-    // Suppress the first-order discount when the customer has an active flash sale
-    // (flash sale window = 60 minutes from flashSaleStartTime).
+    // Flash sale window = 60 minutes from flashSaleStartTime.
+    // Retired FIRSTORDER5 (5% first order) is cleared and never reapplied.
     let customerHasActiveFlashSale = false;
     if (FLASH_SALE_DISCOUNT.ENABLED && session.customerId) {
       if (opts?.req) {
@@ -367,14 +353,14 @@ export class CheckoutService {
       }
 
       session.coupon = applyFlashSaleDiscount(eligibleSubtotal);
-    } else if (!isGuestCheckout && !hasPriorOrder && subtotal > 0) {
-      session.coupon = applyFirstOrderDiscount(subtotal);
     } else if (
-      couponCode === FIRST_ORDER_DISCOUNT.CODE ||
+      couponCode === 'FIRSTORDER5' ||
       couponCode === FLASH_SALE_DISCOUNT.CODE ||
       (!couponAmount && !couponCode)
     ) {
-      session.coupon = applyCouponPlaceholder(opts?.couponCode);
+      session.coupon = applyCouponPlaceholder(
+        couponCode === 'FIRSTORDER5' ? null : opts?.couponCode,
+      );
     }
 
     const discount = Number((session.coupon as { amount?: number })?.amount ?? 0);
