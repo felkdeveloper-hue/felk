@@ -71,13 +71,6 @@ export function shippingFeeForSubtotal(
 /** Payment-window reservation TTL (minutes). Stock is held only after Place Order. */
 export const CHECKOUT_RESERVATION_TTL_MINUTES = 10;
 
-/** Auto-applied for every customer with no prior paid/active orders. */
-export const FIRST_ORDER_DISCOUNT = {
-  CODE: 'FIRSTORDER5',
-  PERCENT: 5,
-  LABEL: '5% off your first order',
-} as const;
-
 /** Personal flash sale — 20% off eligible items for 60 minutes (guest IP/cookie + member). */
 export const FLASH_SALE_DISCOUNT = {
   /**

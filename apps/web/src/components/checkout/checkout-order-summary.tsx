@@ -52,11 +52,14 @@ export function CheckoutOrderSummary({ session, editable = false }: CheckoutOrde
     (typeof session.coupon?.message === 'string' && session.coupon.message) ||
     (typeof cached?.coupon?.message === 'string' && cached.coupon.message) ||
     '';
-  // A checkout started while the sale was on can still carry FLASH20 until the
-  // next server refresh. Hide that discount while the feature is disconnected.
-  const staleFlashDiscount =
-    !FLASH_SALE_FEATURE_ENABLED && (couponCode === 'FLASH20' || /flash sale/i.test(couponMessage));
-  const displayTotals = staleFlashDiscount
+  // Open checkouts can still carry a retired automatic discount until the next
+  // server refresh. Hide those so the summary matches the full catalog price.
+  const staleAutoDiscount =
+    couponCode === 'FIRSTORDER5' ||
+    /first[- ]order/i.test(couponMessage) ||
+    (!FLASH_SALE_FEATURE_ENABLED &&
+      (couponCode === 'FLASH20' || /flash sale/i.test(couponMessage)));
+  const displayTotals = staleAutoDiscount
     ? {
         ...rawTotals,
         discount: 0,
@@ -364,7 +367,7 @@ export function CheckoutOrderSummary({ session, editable = false }: CheckoutOrde
           <div className="flex justify-between text-emerald-700">
             <dt>
               {(typeof session.coupon?.message === 'string' && session.coupon.message) ||
-                (session.coupon?.code === 'FIRSTORDER5' ? '5% first-order discount' : 'Discount')}
+                'Discount'}
             </dt>
             <dd>-{formatCurrency(displayTotals.discount, currency)}</dd>
           </div>
